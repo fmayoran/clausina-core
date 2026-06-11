@@ -1,0 +1,94 @@
+{
+  "name": "Cortafuego - Datos publicacion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "cf-pub-data",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "cf-pub-data"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT r.id, pz.titulo_interno, r.canal, m.url AS asset_ig, r.caption, r.web_titulo, r.web_copy, r.web_tags, r.estado, r.formato, r.ig_post_id, m.tipo AS tipo_media, m.poster_url, (SELECT jsonb_agg(jsonb_build_object('url',md.url,'tipo',md.tipo,'poster_url',md.poster_url) ORDER BY md.orden) FROM contenido.media md WHERE md.pieza_id = pz.id) AS media FROM contenido.revisiones r JOIN contenido.piezas pz ON pz.id = r.pieza_id LEFT JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1 WHERE r.token = $1",
+        "options": {
+          "queryReplacement": "={{ $json.query.token }}"
+        }
+      },
+      "id": "b",
+      "name": "Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DRC5p50dRb5kYMOn",
+          "name": "Postgres Cortafuego (claude)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "c",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}

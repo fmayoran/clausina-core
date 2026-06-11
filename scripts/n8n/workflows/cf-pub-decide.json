@@ -1,0 +1,94 @@
+{
+  "name": "Cortafuego - Decision publicacion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "cf-pub-decide",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "cf-pub-decide"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE contenido.revisiones SET estado = CASE WHEN $2='aprobar' THEN 'aprobada'::contenido.estado_pub WHEN $2='rechazar' THEN 'rechazada'::contenido.estado_pub WHEN $2='descartar' THEN 'descartada'::contenido.estado_pub ELSE estado END, motivo_rechazo = CASE WHEN $2='rechazar' THEN NULLIF($3,'') ELSE motivo_rechazo END, aprobado_por='Fer', aprobado_en=now() WHERE token=$1 AND estado='pendiente_aprobacion' RETURNING estado, (SELECT titulo_interno FROM contenido.piezas WHERE id=revisiones.pieza_id) AS titulo_interno",
+        "options": {
+          "queryReplacement": "={{ [$json.query.token, $json.query.accion, $json.query.motivo || ''] }}"
+        }
+      },
+      "id": "b2",
+      "name": "Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DRC5p50dRb5kYMOn",
+          "name": "Postgres Cortafuego (claude)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json && $json.estado ? `<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><body style='font-family:sans-serif;background:#080806;color:#f5f2ec;text-align:center;padding:60px 20px'><div style='font-size:2rem;font-weight:900;color:#ff4400'>CORTAFUEGO</div><p style='color:#8a8a82'>${$json.titulo_interno}</p><h2 style='font-size:2rem'>Rechazada</h2><p style='color:#8a8a82'>Gracias. El motivo quedó registrado y el equipo lo va a corregir.</p></body>` : `<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><body style='font-family:sans-serif;background:#080806;color:#f5f2ec;text-align:center;padding:60px 20px'><div style='font-size:2rem;font-weight:900;color:#ff4400'>CORTAFUEGO</div><p>No se pudo procesar: la publicación ya fue decidida o el enlace no es válido.</p></body>` }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "id": "c3",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}

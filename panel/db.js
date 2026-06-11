@@ -1,0 +1,280 @@
+// Capa de datos del panel — TODA la SQL vive acá (aislada para portar fácil a FastAPI a futuro).
+// Lectura sobre el schema `contenido` (base `claude`). Conexión por variables de entorno PG*.
+const { Pool } = require('pg');
+
+const pool = new Pool({
+  host: process.env.PGHOST || 'crm_pgvector',
+  port: Number(process.env.PGPORT || 5432),
+  user: process.env.PGUSER || 'postgres',
+  password: process.env.PGPASSWORD,
+  database: process.env.PGDATABASE || 'claude',
+  max: 4,
+  idleTimeoutMillis: 30000,
+});
+
+// --- Marcas (tenants) ---
+// Cache en memoria de las marcas (proyectos): el panel resuelve la marca activa en cada request.
+let _marcas = null, _marcasAt = 0;
+async function getMarcas() {
+  if (!_marcas || Date.now() - _marcasAt > 60000) {
+    const { rows } = await pool.query(
+      `SELECT id, slug, nombre, activo FROM contenido.proyectos ORDER BY activo DESC, creado_en`);
+    _marcas = rows; _marcasAt = Date.now();
+  }
+  return _marcas;
+}
+async function getProyectoId(slug) {
+  const f = (await getMarcas()).find(x => x.slug === slug);
+  return f ? f.id : null;
+}
+
+// Piezas con su revisión vigente + media principal (para el board por estado). Scopeado por marca.
+async function getPiezas(canal, proyectoId) {
+  const params = [proyectoId];
+  let where = 'WHERE pz.proyecto_id = $1';
+  if (canal) { params.push(canal); where += ` AND pz.canal = $${params.length}`; }
+  const { rows } = await pool.query(`
+    SELECT pz.id, pz.numero, pz.canal, pz.titulo_interno, pz.estado, pz.creado_en, pz.actualizado_en,
+           r.nro, r.formato, r.motivo_rechazo, r.derivado_en,
+           r.ig_post_id, r.ig_permalink, r.publicado_en, r.caption,
+           r.daypart, r.clima, r.transito, r.momento, r.duracion_s,
+           im.views AS m_views, im.reach AS m_reach, im.likes AS m_likes,
+           (SELECT json_build_object('url', m.url, 'tipo', m.tipo, 'poster_url', m.poster_url)
+              FROM contenido.media m WHERE m.pieza_id = pz.id AND m.orden = 1) AS media,
+           (SELECT count(*)::int FROM contenido.media m WHERE m.pieza_id = pz.id) AS n_media,
+           (SELECT count(*)::int FROM contenido.revisiones rr WHERE rr.pieza_id = pz.id) AS n_revisiones
+    FROM contenido.piezas pz
+    JOIN contenido.revisiones r ON r.id = pz.revision_vigente
+    LEFT JOIN contenido.ig_metricas im ON im.ig_post_id = r.ig_post_id
+    ${where}
+    ORDER BY COALESCE(r.publicado_en, pz.actualizado_en) DESC
+    LIMIT 200;`, params);
+  return rows;
+}
+
+// Canal + token + estado de la revisión vigente (para ramificar la acción por canal).
+async function getPiezaCanal(id) {
+  const { rows } = await pool.query(
+    `SELECT pz.canal, r.token, r.estado FROM contenido.piezas pz
+       JOIN contenido.revisiones r ON r.id = pz.revision_vigente WHERE pz.id = $1`, [id]);
+  return rows[0] || null;
+}
+
+// Avisos: cambio de estado directo en la base (no hay API externa). Aprobar=publicada (en pantalla).
+async function avisoEstado(id, estado, motivo) {
+  const setPub = estado === 'publicada' ? ', publicado_en = now()' : '';
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.revisiones SET estado = $2::contenido.estado_pub,
+       motivo_rechazo = CASE WHEN $2='rechazada' THEN NULLIF($3,'') ELSE motivo_rechazo END ${setPub}
+     WHERE id = (SELECT revision_vigente FROM contenido.piezas WHERE id = $1)
+       AND estado = 'pendiente_aprobacion'`, [id, estado, motivo || null]);
+  return rowCount > 0;
+}
+
+// IDs de posts publicados (para refrescar métricas).
+async function getPostIdsPublicados() {
+  const { rows } = await pool.query(
+    `SELECT DISTINCT ig_post_id FROM contenido.revisiones WHERE estado='publicada' AND ig_post_id IS NOT NULL`);
+  return rows.map(r => r.ig_post_id);
+}
+
+// Upsert de métricas de un post.
+async function upsertMetricas(id, v) {
+  // proyecto_id se deriva de la pieza dueña del post (no hace falta pasarlo): cada métrica queda en su marca.
+  await pool.query(
+    `INSERT INTO contenido.ig_metricas (ig_post_id, views, reach, likes, comments, saved, shares, total_interactions, proyecto_id, actualizado_en)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,
+       (SELECT pz.proyecto_id FROM contenido.revisiones r JOIN contenido.piezas pz ON pz.id=r.pieza_id WHERE r.ig_post_id=$1 LIMIT 1), now())
+     ON CONFLICT (ig_post_id) DO UPDATE SET
+       views=$2, reach=$3, likes=$4, comments=$5, saved=$6, shares=$7, total_interactions=$8, actualizado_en=now()`,
+    [id, v.views || 0, v.reach || 0, v.likes || 0, v.comments || 0, v.saved || 0, v.shares || 0, v.total_interactions || 0]);
+}
+
+// Cola de requerimientos: brief + la pieza que generó (correlación) y su estado derivado.
+// Se mantiene visible hasta que la pieza llegue a un estado terminal (publicada/descartada).
+async function getRequerimientos(proyectoId) {
+  const { rows } = await pool.query(`
+    SELECT b.id, b.estado AS brief_estado, b.origen, b.canal_destino, b.titulo AS req_titulo, b.requiere_material, b.enlace,
+           b.media_type, (b.voice_file_id IS NOT NULL) AS tiene_audio,
+           (b.media_file_id IS NOT NULL) AS tiene_media,
+           COALESCE(NULLIF(b.transcripcion,''), b.texto) AS texto, b.creado_en,
+           b.pieza_id, pz.numero AS pieza_numero, pz.titulo_interno AS pieza_titulo,
+           r.estado AS pieza_estado, r.nro AS pieza_rev
+    FROM contenido.tg_briefs b
+    LEFT JOIN contenido.piezas pz ON pz.id = b.pieza_id
+    LEFT JOIN contenido.revisiones r ON r.id = pz.revision_vigente
+    WHERE b.proyecto_id = $1 AND (
+            (b.pieza_id IS NULL AND b.estado IN ('propuesta','pendiente','procesando','error'))
+         OR (b.pieza_id IS NOT NULL AND r.estado IN ('pendiente_aprobacion','rechazada','aprobada','borrador')))
+    ORDER BY (b.estado='propuesta') DESC, b.creado_en DESC
+    LIMIT 100;`, [proyectoId]);
+  // Pedidos de propuestas en curso (placeholder en la cola mientras el creativo elabora).
+  const { rows: sol } = await pool.query(`
+    SELECT id, estado AS brief_estado, canal AS canal_destino, enfasis, creado_en, true AS es_solicitud
+    FROM contenido.solicitudes_propuesta WHERE proyecto_id = $1 AND estado IN ('pendiente','procesando')
+    ORDER BY creado_en DESC`, [proyectoId]);
+  return [...sol, ...rows];
+}
+
+// Inserta una mención entrante en la cola (dedupe por ref_externa = ig media id). Devuelve true si era nueva.
+const TG_CHAT = process.env.PANEL_TG_CHAT || '811183062';
+async function insertMencion(refId, username, permalink, proyectoId) {
+  const titulo = `Mención de @${username}`;
+  const texto = `@${username} etiquetó a la marca en Instagram.\n\nSi generás, armá una pieza de marca para agradecer o aprovechar la mención (tono de marca, sin emojis).\nPost original: ${permalink}`;
+  const { rows } = await pool.query(
+    `INSERT INTO contenido.tg_briefs (chat_id, origen, estado, titulo, texto, enlace, ref_externa, proyecto_id)
+     SELECT $1, 'mencion', 'propuesta', $2, $3, $4, $5, $6
+     WHERE NOT EXISTS (SELECT 1 FROM contenido.tg_briefs WHERE ref_externa = $5)
+     RETURNING id`, [TG_CHAT, titulo, texto, permalink || null, refId, proyectoId]);
+  return rows.length > 0;
+}
+
+// Pedido de propuestas al creativo (lo levanta el cron propuestas_local.sh).
+async function pedirPropuestas(enfasis, canal, proyectoId) {
+  await pool.query(`INSERT INTO contenido.solicitudes_propuesta (enfasis, canal, proyecto_id) VALUES ($1,$2,$3)`,
+    [enfasis || null, canal === 'aviso' ? 'aviso' : 'instagram', proyectoId]);
+  return true;
+}
+
+// Aporta material a un requerimiento (file_id de Telegram) y lo activa -> 'pendiente'.
+async function setMaterial(id, fileId, mediaType) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.tg_briefs SET media_file_id=$2, media_type=$3, estado='pendiente'
+      WHERE id=$1 AND estado IN ('propuesta','error')`, [id, fileId, mediaType]);
+  return rowCount > 0;
+}
+
+// Activa una propuesta que no requiere material nuevo -> 'pendiente'.
+async function activarReq(id) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.tg_briefs SET estado='pendiente' WHERE id=$1 AND estado='propuesta'`, [id]);
+  return rowCount > 0;
+}
+
+// Descarta un requerimiento/propuesta -> sale de la cola.
+async function descartarReq(id) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.tg_briefs SET estado='descartada' WHERE id=$1 AND estado IN ('propuesta','pendiente','error')`, [id]);
+  return rowCount > 0;
+}
+
+// file_id de la media de un requerimiento (para el proxy de miniatura).
+async function getBriefMedia(id) {
+  const { rows } = await pool.query(
+    `SELECT media_file_id, media_type FROM contenido.tg_briefs WHERE id = $1`, [id]);
+  return rows[0] || null;
+}
+
+// Latido de los procesos batch (para la barra de status).
+async function getStatus(proyectoId) {
+  const { rows } = await pool.query(`
+    SELECT proceso, last_msg, intervalo_s,
+           EXTRACT(EPOCH FROM (now() - last_run))::int AS hace_s,
+           GREATEST(0, intervalo_s - EXTRACT(EPOCH FROM (now() - last_run))::int) AS proxima_s
+    FROM contenido.batch_runs WHERE proyecto_id = $1 ORDER BY proceso;`, [proyectoId]);
+  return rows;
+}
+
+// Token de la revisión vigente SOLO si está pendiente de aprobación.
+// El token es la credencial que usan los webhooks de n8n (cf-pub-publish / cf-pub-decide).
+// Vive server-side: nunca se expone en la API pública del board.
+async function getTokenPendiente(piezaId) {
+  const { rows } = await pool.query(
+    `SELECT r.token, r.formato
+       FROM contenido.piezas pz
+       JOIN contenido.revisiones r ON r.id = pz.revision_vigente
+      WHERE pz.id = $1 AND r.estado = 'pendiente_aprobacion'`, [piezaId]);
+  return rows[0] || null;
+}
+
+// --- Programación de pantalla ---
+const _avisoMedia = `(SELECT json_build_object('url',m.url,'poster_url',m.poster_url) FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1)`;
+
+// Avisos aprobados (En pantalla) para armar programas. Scopeado por marca.
+async function getAvisosAprobados(proyectoId) {
+  const { rows } = await pool.query(`
+    SELECT pz.id, pz.numero, pz.titulo_interno, r.duracion_s, r.momento, ${_avisoMedia} AS media
+    FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id = pz.revision_vigente
+    WHERE pz.canal='aviso' AND pz.estado='publicada' AND pz.proyecto_id=$1
+    ORDER BY pz.numero DESC`, [proyectoId]);
+  return rows;
+}
+
+async function getProgramas(proyectoId) {
+  const { rows } = await pool.query(`
+    SELECT p.id, p.nombre, p.activo, p.actualizado_en,
+           (SELECT count(*)::int FROM contenido.programa_items i WHERE i.programa_id=p.id) AS n_items
+    FROM contenido.programas p WHERE p.proyecto_id=$1 ORDER BY p.activo DESC, p.actualizado_en DESC`, [proyectoId]);
+  return rows;
+}
+
+async function getPrograma(id, proyectoId) {
+  const { rows: [p] } = await pool.query(`SELECT id, nombre, activo FROM contenido.programas WHERE id=$1 AND proyecto_id=$2`, [id, proyectoId]);
+  if (!p) return null;
+  const { rows: items } = await pool.query(`
+    SELECT i.orden, pz.id AS pieza_id, pz.numero, pz.titulo_interno, r.duracion_s, ${_avisoMedia} AS media
+    FROM contenido.programa_items i JOIN contenido.piezas pz ON pz.id=i.pieza_id JOIN contenido.revisiones r ON r.id=pz.revision_vigente
+    WHERE i.programa_id=$1 ORDER BY i.orden`, [id]);
+  p.items = items;
+  return p;
+}
+
+async function crearPrograma(nombre, proyectoId) {
+  const { rows: [r] } = await pool.query(`INSERT INTO contenido.programas (nombre, proyecto_id) VALUES ($1,$2) RETURNING id`, [nombre || 'Programa', proyectoId]);
+  return r.id;
+}
+
+async function guardarPrograma(id, nombre, piezaIds, proyectoId) {
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    // Verifica que el programa sea de la marca activa antes de tocarlo.
+    const { rowCount: own } = await cli.query('SELECT 1 FROM contenido.programas WHERE id=$1 AND proyecto_id=$2', [id, proyectoId]);
+    if (!own) { await cli.query('ROLLBACK'); return false; }
+    if (nombre != null) await cli.query('UPDATE contenido.programas SET nombre=$2 WHERE id=$1', [id, nombre]);
+    await cli.query('DELETE FROM contenido.programa_items WHERE programa_id=$1', [id]);
+    for (let k = 0; k < piezaIds.length; k++)
+      await cli.query('INSERT INTO contenido.programa_items (programa_id, orden, pieza_id) VALUES ($1,$2,$3)', [id, k, piezaIds[k]]);
+    await cli.query('UPDATE contenido.programas SET actualizado_en=now() WHERE id=$1', [id]);
+    await cli.query('COMMIT');
+  } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
+  return true;
+}
+
+async function activarPrograma(id, proyectoId) {
+  // Desactiva solo los de ESTA marca (no toca el programa activo de otras marcas).
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.programas SET activo=(id=$1), actualizado_en=now()
+       WHERE proyecto_id=$2 AND (activo OR id=$1)`, [id, proyectoId]);
+  return rowCount > 0;
+}
+
+async function eliminarPrograma(id, proyectoId) {
+  const { rowCount } = await pool.query(`DELETE FROM contenido.programas WHERE id=$1 AND proyecto_id=$2`, [id, proyectoId]);
+  return rowCount > 0;
+}
+
+// Playlist del programa ACTIVO de una marca (la consume el player de la pantalla).
+async function getActivoPlaylist(proyectoId) {
+  const { rows: [p] } = await pool.query(`SELECT id, nombre, actualizado_en FROM contenido.programas WHERE activo AND proyecto_id=$1 LIMIT 1`, [proyectoId]);
+  if (!p) return { version: 'none', nombre: null, items: [] };
+  const { rows: items } = await pool.query(`
+    SELECT (SELECT m.url FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1) AS url,
+           (SELECT m.poster_url FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1) AS poster,
+           r.duracion_s AS dur
+    FROM contenido.programa_items i JOIN contenido.piezas pz ON pz.id=i.pieza_id JOIN contenido.revisiones r ON r.id=pz.revision_vigente
+    WHERE i.programa_id=$1 ORDER BY i.orden`, [p.id]);
+  return { version: p.id + ':' + new Date(p.actualizado_en).getTime(), nombre: p.nombre, items: items.filter(x => x.url) };
+}
+
+async function health() {
+  await pool.query('SELECT 1');
+  return true;
+}
+
+module.exports = { getMarcas, getProyectoId,
+  getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getTokenPendiente,
+  pedirPropuestas, setMaterial, activarReq, descartarReq, insertMencion,
+  getPostIdsPublicados, upsertMetricas,
+  getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
+  health };

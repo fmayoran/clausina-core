@@ -1,0 +1,87 @@
+{
+  "name": "Cortafuego - Avisar a Fer",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cf-avisar",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "cf-avisar"
+    },
+    {
+      "parameters": {
+        "fromEmail": "Cortafuego Asador Urbano <asador.cortafuego@gmail.com>",
+        "toEmail": "fernando.mayorano@gmail.com",
+        "subject": "=CORTAFUEGO — {{ $json.body.asunto }}",
+        "emailFormat": "html",
+        "html": "=<div style='font-family:Arial,sans-serif;max-width:520px;margin:auto;background:#080806;color:#e8e4dc;padding:28px;border-radius:8px'><div style='font-size:1.5rem;font-weight:900;color:#ff4400'>CORTAFUEGO</div><p style='color:#a5a59c;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase'>Rutina automática</p><p style='font-size:1.05rem;color:#fff'>{{ $json.body.asunto }}</p><p style='white-space:pre-wrap'>{{ $json.body.cuerpo }}</p></div>",
+        "options": {}
+      },
+      "id": "b",
+      "name": "Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        440,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "58C2JQ1ZFSV3GIxk",
+          "name": "Cortafuego SMTP"
+        }
+      },
+      "webhookId": "82a7bd4f-a8f4-4790-b719-e73ecd9293c9"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "ok",
+        "options": {}
+      },
+      "id": "c",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}

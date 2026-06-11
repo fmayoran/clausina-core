@@ -1,0 +1,93 @@
+{
+  "name": "Cortafuego - Novedades (feed)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "cf-novedades",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "cf-novedades"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT r.web_titulo, r.web_copy, r.web_tags, m.url AS asset_ig, r.ig_post_id, r.ig_permalink, m.tipo AS tipo_media, m.poster_url, to_char(r.publicado_en,'DD Mon YYYY') AS fecha FROM contenido.revisiones r JOIN contenido.piezas pz ON pz.id = r.pieza_id LEFT JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1 WHERE r.estado='publicada' AND r.formato='feed' AND r.canal IN ('novedades','ambos') ORDER BY r.publicado_en DESC",
+        "options": {}
+      },
+      "id": "b",
+      "name": "Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        440,
+        300
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "DRC5p50dRb5kYMOn",
+          "name": "Postgres Cortafuego (claude)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($input.all().map(i=>i.json).filter(x=>x && x.asset_ig)) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "c",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cortafuego — Programación de pantalla</title>
+<link rel="stylesheet" href="panel.css">
+<style>
+  .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:20px 28px 60px;}
+  @media(max-width:820px){.pgrid{grid-template-columns:1fr;}}
+  .playbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:9px 28px;border-bottom:1px solid var(--line);background:#0c0c0a;font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--ash);}
+  .playbar b{color:var(--ember);font-weight:400;}
+  .avitem{display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:6px;background:#0c0c0a;}
+  .avitem img{width:44px;height:66px;object-fit:cover;border-radius:4px;background:#000;flex:0 0 auto;}
+  .avitem .tt{font-weight:700;font-size:.95rem;color:var(--white);line-height:1.1;}
+  .avitem .mm{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--ash);}
+  .avitem .sp{flex:1;min-width:0;}
+  .ibtn{background:transparent;border:1px solid var(--line);color:var(--ash);font-family:'IBM Plex Mono',monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;padding:5px 9px;border-radius:5px;cursor:pointer;}
+  .ibtn:hover{color:var(--chalk);border-color:var(--ash);}
+  .ibtn.fire{color:var(--ember);border-color:#43352a;}
+  .ibtn.fire:hover{background:var(--fire);border-color:var(--fire);color:#0c0c0a;}
+  .ord{display:flex;flex-direction:column;gap:2px;}
+  .ord button{background:transparent;border:1px solid var(--line);color:var(--ash);width:24px;height:18px;line-height:1;border-radius:3px;cursor:pointer;font-size:.7rem;}
+  .col .pad{padding:12px;display:flex;flex-direction:column;gap:9px;}
+  .nameinput{background:#0c0c0a;border:1px solid var(--line);border-radius:5px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:1rem;padding:8px 10px;outline:none;}
+  .nameinput:focus{border-color:var(--ember);}
+  .prow{display:flex;gap:8px;}
+  .prow .ibtn{flex:1;text-align:center;}
+  .plist{display:flex;flex-direction:column;gap:7px;}
+  .pgline{display:flex;gap:7px;align-items:center;padding:6px;border:1px solid var(--line);border-radius:6px;background:#0c0c0a;}
+  .pgline.act{border-color:var(--fire);}
+  .pgline .sp{flex:1;min-width:0;}
+  .pgline .tt{font-weight:700;color:var(--white);}
+  .pgline .mm{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--ash);}
+  .actbadge{font-family:'IBM Plex Mono',monospace;font-size:.58rem;text-transform:uppercase;color:#0c0c0a;background:#5ec27a;border-radius:9px;padding:1px 7px;}
+</style>
+</head>
+<body>
+  <header>
+    <a class="logo" href=".">CORTA<b>FUEGO</b></a>
+    <span class="sub">Programación de pantalla</span>
+    <span class="upd" id="upd"></span>
+    <nav>
+      <a href=".">Panel principal</a>
+      <a href="avisos">Avisos</a>
+      <button class="logout" onclick="salir()">Salir</button>
+    </nav>
+  </header>
+  <div class="playbar">Reproductor de la pantalla: <b>cortafuego.ar/panel/play</b> — abrilo en el dispositivo de la pantalla en modo kiosco. Se actualiza solo al activar/editar el programa.</div>
+  <div id="toast"></div>
+  <div class="pgrid">
+    <div class="col">
+      <h2><span class="dot"></span>Avisos aprobados <span class="n" id="n-av"></span></h2>
+      <div class="pad" id="aprobados"></div>
+    </div>
+    <div class="col">
+      <h2><span class="dot" style="background:var(--ember)"></span>Programa <span class="n" id="n-it"></span></h2>
+      <div class="pad">
+        <input class="nameinput" id="pnombre" placeholder="Nombre del programa">
+        <div class="prow">
+          <button class="ibtn" onclick="nuevoPrograma()">Nuevo</button>
+          <button class="ibtn" onclick="guardarPrograma()">Guardar</button>
+          <button class="ibtn fire" onclick="activarPrograma()">Guardar y activar</button>
+        </div>
+        <div class="plist" id="items"></div>
+        <div class="mm" id="total" style="font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--ash)"></div>
+      </div>
+    </div>
+    <div class="col" style="grid-column:1/-1">
+      <h2><span class="dot" style="background:#5ec27a"></span>Programas <span class="n" id="n-pg"></span></h2>
+      <div class="pad" id="programas"></div>
+    </div>
+  </div>
+<script src="panel.js"></script>
+<script>
+let aprobados=[], prog={id:null,nombre:'',items:[]};
+const byId=id=>aprobados.find(a=>a.id===id);
+
+async function cargar(){
+  try{
+    const r=await fetch('api/avisos-aprobados'); if(r.status===401){location.href='login';return;}
+    aprobados=await r.json();
+    document.getElementById('aprobados').innerHTML = aprobados.length ? aprobados.map(avCard).join('') : '<div class="empty">— no hay avisos aprobados (aprobá alguno en /panel/avisos) —</div>';
+    document.getElementById('n-av').textContent=aprobados.length||'';
+    await cargarProgramas();
+    renderItems();
+  }catch(e){}
+}
+function avCard(a){
+  const p=(a.media||{}).poster_url||(a.media||{}).url||'';
+  return `<div class="avitem"><img loading="lazy" src="${esc(p)}"><div class="sp"><div class="tt">${esc(a.titulo_interno)}</div><div class="mm">CF-${String(a.numero).padStart(4,'0')} · ${a.duracion_s||10}s · ${esc(a.momento||'')}</div></div><button class="ibtn fire" onclick="agregar('${a.id}')">Agregar ▸</button></div>`;
+}
+function agregar(id){ prog.items.push(id); renderItems(); }
+function quitar(i){ prog.items.splice(i,1); renderItems(); }
+function mover(i,d){ const j=i+d; if(j<0||j>=prog.items.length)return; const t=prog.items[i];prog.items[i]=prog.items[j];prog.items[j]=t; renderItems(); }
+function renderItems(){
+  const c=document.getElementById('items');
+  c.innerHTML = prog.items.length ? prog.items.map((id,i)=>{const a=byId(id)||{};const p=(a.media||{}).poster_url||'';
+    return `<div class="pgline"><div class="ord"><button onclick="mover(${i},-1)">▲</button><button onclick="mover(${i},1)">▼</button></div><img class="avitem" style="width:36px;height:54px;object-fit:cover;border:0;border-radius:4px" src="${esc(p)}"><div class="sp"><div class="tt" style="font-size:.92rem">${esc(a.titulo_interno||'?')}</div><div class="mm">CF-${a.numero?String(a.numero).padStart(4,'0'):'?'} · ${a.duracion_s||10}s</div></div><button class="ibtn" onclick="quitar(${i})">✕</button></div>`;
+  }).join('') : '<div class="empty">— agregá avisos de la izquierda —</div>';
+  document.getElementById('n-it').textContent=prog.items.length||'';
+  const tot=prog.items.reduce((s,id)=>s+((byId(id)||{}).duracion_s||10),0);
+  document.getElementById('total').textContent = prog.items.length? ('Duración total ≈ '+tot+'s ('+prog.items.length+' avisos)') : '';
+}
+function nuevoPrograma(){ prog={id:null,nombre:'',items:[]}; document.getElementById('pnombre').value=''; renderItems(); }
+async function ensureId(){
+  if(prog.id) return prog.id;
+  const nombre=document.getElementById('pnombre').value.trim()||'Programa';
+  const d=await fetch('api/programas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre})}).then(r=>r.json());
+  if(d.ok){ prog.id=d.id; } return prog.id;
+}
+async function guardarPrograma(){
+  if(!prog.items.length){ toast('Agregá al menos un aviso', true); return; }
+  const id=await ensureId(); if(!id){ toast('No se pudo crear', true); return; }
+  const nombre=document.getElementById('pnombre').value.trim()||'Programa';
+  const d=await fetch('api/programas/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre,piezas:prog.items})}).then(r=>r.json());
+  toast(d.ok?'Programa guardado':'No se pudo guardar', !d.ok);
+  cargarProgramas();
+}
+async function activarPrograma(){
+  await guardarPrograma();
+  if(!prog.id) return;
+  const d=await fetch('api/programas/'+prog.id+'/activar',{method:'POST'}).then(r=>r.json());
+  toast(d.ok?'Activado — la pantalla se actualiza sola':'No se pudo activar', !d.ok);
+  cargarProgramas();
+}
+async function cargarProgramas(){
+  const ps=await fetch('api/programas').then(r=>r.json()).catch(()=>[]);
+  const c=document.getElementById('programas');
+  c.innerHTML = ps.length ? ps.map(p=>`<div class="pgline ${p.activo?'act':''}"><div class="sp"><div class="tt">${esc(p.nombre)} ${p.activo?'<span class="actbadge">activo</span>':''}</div><div class="mm">${p.n_items} avisos</div></div>
+    <button class="ibtn" onclick="editar('${p.id}')">Editar</button>
+    ${p.activo?'':`<button class="ibtn fire" onclick="activarId('${p.id}')">Activar</button>`}
+    <button class="ibtn" onclick="eliminar('${p.id}','${esc(p.nombre)}')">Eliminar</button></div>`).join('') : '<div class="empty">— sin programas todavía —</div>';
+  document.getElementById('n-pg').textContent=ps.length||'';
+}
+async function editar(id){
+  const p=await fetch('api/programas/'+id).then(r=>r.json());
+  prog={id:p.id,nombre:p.nombre,items:(p.items||[]).map(x=>x.pieza_id)};
+  document.getElementById('pnombre').value=p.nombre;
+  renderItems(); toast('Editando: '+p.nombre);
+}
+async function activarId(id){
+  const d=await fetch('api/programas/'+id+'/activar',{method:'POST'}).then(r=>r.json());
+  toast(d.ok?'Activado — la pantalla se actualiza sola':'No se pudo', !d.ok); cargarProgramas();
+}
+async function eliminar(id,nombre){
+  if(!confirm('Eliminar el programa "'+nombre+'"?')) return;
+  const d=await fetch('api/programas/'+id,{method:'DELETE'}).then(r=>r.json());
+  if(d.ok && prog.id===id) nuevoPrograma();
+  toast(d.ok?'Eliminado':'No se pudo', !d.ok); cargarProgramas();
+}
+cargar();
+</script>
+</body>
+</html>

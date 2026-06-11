@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cortafuego — Avisos pantalla</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header>
+    <a class="logo" href=".">CORTA<b>FUEGO</b></a>
+    <span class="sub">Avisos · pantalla de calle</span>
+    <span class="upd" id="upd"></span>
+    <nav>
+      <a href=".">Panel principal</a>
+      <a href="programacion">Programación</a>
+      <a href="instagram">Instagram</a>
+      <button class="logout" onclick="salir()">Salir</button>
+    </nav>
+  </header>
+  <div id="toast"></div>
+  <div class="board b2">
+    <div class="col pend"><h2><span class="dot"></span>Pendiente de aprobación <span class="n" id="n-pend"></span></h2><div class="cards" id="c-pend"></div></div>
+    <div class="col pub"><h2><span class="dot"></span>En pantalla <span class="n" id="n-pub"></span></h2><div class="cards" id="c-pub"></div></div>
+  </div>
+<script src="panel.js"></script>
+<script>currentLoad=loadAvisos; loadAvisos(); setInterval(loadAvisos,6000);</script>
+</body>
+</html>

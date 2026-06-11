@@ -1,0 +1,94 @@
+{
+  "name": "Cortafuego - Crear pendiente",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cf-crear-pendiente",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "cf-crear-pendiente"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH d AS (SELECT $1::jsonb j), hasmedia AS (SELECT ((jsonb_typeof(j->'media')='array' AND jsonb_array_length(j->'media')>0) OR (j->>'asset_ig') IS NOT NULL) AS yes FROM d), pz AS (INSERT INTO contenido.piezas (proyecto_id, titulo_interno, notas, canal) SELECT (SELECT id FROM contenido.proyectos WHERE slug=COALESCE(j->>'proyecto','cortafuego')), j->>'titulo_interno', j->>'notas', COALESCE(j->>'canal_pieza','instagram') FROM d WHERE j->>'pieza_id' IS NULL RETURNING id), pid AS (SELECT COALESCE((SELECT id FROM pz),(SELECT (j->>'pieza_id')::uuid FROM d)) AS pieza_id), delmed AS (DELETE FROM contenido.media WHERE pieza_id=(SELECT pieza_id FROM pid) AND (SELECT yes FROM hasmedia) RETURNING 1), rev AS (INSERT INTO contenido.revisiones (pieza_id, nro, estado, canal, formato, caption, web_titulo, web_copy, web_tags, daypart, clima, transito, momento, duracion_s) SELECT (SELECT pieza_id FROM pid), COALESCE((SELECT max(nro)+1 FROM contenido.revisiones WHERE pieza_id=(SELECT pieza_id FROM pid)),1), 'pendiente_aprobacion', COALESCE(j->>'canal','ambos')::contenido.canal, COALESCE(j->>'formato','feed'), j->>'caption', j->>'web_titulo', j->>'web_copy', ARRAY(SELECT jsonb_array_elements_text(j->'web_tags')), j->>'daypart', j->>'clima', j->>'transito', j->>'momento', NULLIF(j->>'duracion_s','')::int FROM d RETURNING token), med AS (INSERT INTO contenido.media (pieza_id, orden, tipo, url, poster_url) SELECT (SELECT pieza_id FROM pid), elem.ord, COALESCE(elem.val->>'tipo','image')::contenido.tipo_media, elem.val->>'url', elem.val->>'poster_url' FROM d, LATERAL (SELECT t.val, t.ord FROM jsonb_array_elements(CASE WHEN jsonb_typeof(j->'media')='array' AND jsonb_array_length(j->'media')>0 THEN j->'media' ELSE jsonb_build_array(jsonb_build_object('url', j->>'asset_ig', 'tipo', COALESCE(j->>'tipo_media','image'), 'poster_url', j->>'poster_url')) END) WITH ORDINALITY AS t(val, ord)) elem WHERE elem.val->>'url' IS NOT NULL RETURNING 1), lnk AS (UPDATE contenido.tg_briefs SET pieza_id=(SELECT pieza_id FROM pid), estado='procesado', procesado_en=now() WHERE id=(SELECT NULLIF(j->>'brief_id','')::uuid FROM d) RETURNING 1) SELECT token FROM rev",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify($json.body) }}"
+        }
+      },
+      "id": "b",
+      "name": "Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        440,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DRC5p50dRb5kYMOn",
+          "name": "Postgres Cortafuego (claude)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({token: $json.token}) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "c",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}

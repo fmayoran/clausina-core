@@ -1,0 +1,163 @@
+{
+  "name": "Cortafuego - Resumen diario",
+  "nodes": [
+    {
+      "id": "3a0e73cd-3070-4b19-8754-c4d94de9134b",
+      "name": "Cada día 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        40,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7a7b4777-87dc-4092-bfd5-7dab2dc5b804",
+      "name": "Resumen",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        260,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  to_char(((now() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date - 1),'DD/MM/YYYY') AS dia,\n  (SELECT count(*) FROM contenido.revisiones WHERE estado='pendiente_aprobacion') AS pendientes,\n  COALESCE(json_agg(json_build_object('titulo',titulo,'hora',hora,'formato',formato,'permalink',permalink) ORDER BY pub) FILTER (WHERE titulo IS NOT NULL), '[]'::json) AS publicados\nFROM (\n  SELECT pz.titulo_interno AS titulo, r.publicado_en AS pub,\n         to_char(r.publicado_en AT TIME ZONE 'America/Argentina/Buenos_Aires','HH24:MI') AS hora,\n         r.formato, r.ig_permalink AS permalink\n  FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id=pz.revision_vigente\n  WHERE r.estado='publicada'\n    AND (r.publicado_en AT TIME ZONE 'America/Argentina/Buenos_Aires')::date\n        = ((now() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date - 1)\n) s;",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "DRC5p50dRb5kYMOn",
+          "name": "Postgres Cortafuego (claude)"
+        }
+      }
+    },
+    {
+      "id": "80292583-d165-41b9-9327-4ede91b18f8f",
+      "name": "hayPublicados",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ ($json.publicados || []).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "24299852-1ddb-4f87-a5ce-38068087adf7",
+      "name": "Componer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        260
+      ],
+      "parameters": {
+        "jsCode": "const r=$json;\nconst esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nconst fmt={feed:'Feed',story:'Historia',reel:'Reel'};\nconst pubs=r.publicados||[];\nconst rows=pubs.map(x=>`<tr><td style=\"padding:7px 10px;color:#8a8a82;font-family:monospace;white-space:nowrap\">${x.hora}</td><td style=\"padding:7px 10px;color:#e8e4dc\">${esc(x.titulo)}${x.permalink?` &nbsp;<a href=\"${x.permalink}\" style=\"color:#ff7700;text-decoration:none\">ver &#8599;</a>`:''}</td><td style=\"padding:7px 10px;color:#ff7700;text-transform:uppercase;font-size:.72rem;letter-spacing:.05em\">${fmt[x.formato]||x.formato}</td></tr>`).join('');\nconst pend=r.pendientes||0;\nconst pendLine = pend>0 ? `<p style=\"color:#a5a59c;font-size:.85rem;margin-top:22px\">Pendientes de aprobaci&oacute;n: <b style=\"color:#e8e4dc\">${pend}</b> &mdash; <a href=\"https://cortafuego.ar/panel\" style=\"color:#ff7700;text-decoration:none\">ver el panel &#8599;</a></p>` : '';\nconst html=`<div style=\"font-family:Arial,sans-serif;max-width:560px;margin:auto;background:#080806;color:#e8e4dc;padding:32px;border-radius:8px\"><div style=\"font-size:1.6rem;font-weight:900;color:#ff4400;letter-spacing:.05em\">CORTAFUEGO</div><p style=\"color:#a5a59c;font-size:.78rem;letter-spacing:.15em;text-transform:uppercase\">Resumen del ${r.dia}</p><p style=\"font-size:1.05rem\">Ayer se ${pubs.length===1?'public&oacute; 1 pieza':'publicaron '+pubs.length+' piezas'}:</p><table style=\"width:100%;border-collapse:collapse;background:#111110;border-radius:6px;overflow:hidden\">${rows}</table>${pendLine}<p style=\"color:#55554f;font-size:.72rem;margin-top:28px\">Aprob&aacute;, rechaz&aacute; o descart&aacute; desde Telegram o el panel.</p></div>`;\nreturn [{json:{subject:`CORTAFUEGO — Ayer se publicó (${pubs.length})`, html, n:pubs.length}}];"
+      }
+    },
+    {
+      "id": "a15465da-cd61-4533-9b30-b4519d0f1df8",
+      "name": "Enviar",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        920,
+        260
+      ],
+      "parameters": {
+        "fromEmail": "Cortafuego Asador Urbano <asador.cortafuego@gmail.com>",
+        "toEmail": "fernando.mayorano@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "credentials": {
+        "smtp": {
+          "id": "58C2JQ1ZFSV3GIxk",
+          "name": "Cortafuego SMTP"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cada día 07:00": {
+      "main": [
+        [
+          {
+            "node": "Resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumen": {
+      "main": [
+        [
+          {
+            "node": "hayPublicados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "hayPublicados": {
+      "main": [
+        [
+          {
+            "node": "Componer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Componer": {
+      "main": [
+        [
+          {
+            "node": "Enviar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "timezone": "America/Argentina/Buenos_Aires",
+    "executionOrder": "v1"
+  }
+}

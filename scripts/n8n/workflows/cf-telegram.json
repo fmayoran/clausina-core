@@ -1,0 +1,764 @@
+{
+  "name": "Cortafuego - Telegram (botones)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cf-telegram",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "TGin",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        180,
+        400
+      ],
+      "webhookId": "cf-telegram"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b=$json.body||$json;\nlet o={tipo:'ignore'};\nif(b.callback_query){\n  const cq=b.callback_query; const parts=(cq.data||'').split(':');\n  const act=parts[0]; const token=parts[1]||'';\n  const map={ap:'aprobar',re:'rechazar',de:'descartar'};\n  o={tipo: map[act]||'ignore', token, chat_id:String(cq.message.chat.id), cq_id:cq.id};\n} else if(b.message){\n  const m=b.message; const chat=String(m.chat.id);\n  const voice=m.voice?m.voice.file_id:(m.audio?m.audio.file_id:'');\n  let mf='',mt='';\n  if(m.photo&&m.photo.length){mf=m.photo[m.photo.length-1].file_id;mt='photo';}\n  else if(m.video){mf=m.video.file_id;mt='video';}\n  else if(m.document&&/(image|video)/.test(m.document.mime_type||'')){mf=m.document.file_id;mt=/video/.test(m.document.mime_type)?'video':'photo';}\n  const rmid=m.reply_to_message?m.reply_to_message.message_id:0;\n  if(mf&&rmid){o={tipo:'material',chat_id:chat,media_file_id:mf,media_type:mt,reply_msg_id:rmid};}\n  else if(voice||mf){o={tipo:'brief',chat_id:chat,voice_file_id:voice,media_file_id:mf,media_type:mt,texto:(m.caption||'')};}\n  else if(m.text){o={tipo:'texto',chat_id:chat,texto:m.text};}\n}\nreturn [{json:o}];"
+      },
+      "id": "Router",
+      "name": "Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tipo }}",
+              "rightValue": "aprobar",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "esAprobar",
+      "name": "esAprobar",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        580,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://crm-n8n.dhmtev.easypanel.host/webhook/cf-pub-publish",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "={{ $('Router').item.json.token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "doPublish",
+      "name": "doPublish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        820,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $('Router').item.json.chat_id }}",
+        "text": "✅ Publicada en Instagram.",
+        "additionalFields": {}
+      },
+      "id": "okPub",
+      "name": "okPub",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        1040,
+        240
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "zvxU9F3XDpRNBsYa",
+          "name": "Cortafuego Telegram"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tipo }}",
+              "rightValue": "rechazar",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "esRechazar",
+      "name": "esRechazar",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        820,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO contenido.tg_pending (chat_id, token) VALUES ($1, $2::uuid) ON CONFLICT (chat_id) DO UPDATE SET token=EXCLUDED.token, creado_en=now()",
+        "options": {
+          "queryReplacement": "={{ [$('Router').item.json.chat_id, $('Router').item.json.token] }}"
+        }
+      },
+      "id": "setPending",
+      "name": "setPending",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1040,
+        420
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DRC5p50dRb5kYMOn",
+          "name": "Postgres Cortafuego (claude)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $('Router').item.json.chat_id }}",
+        "text": "✖️ Dale. Mandame el motivo del rechazo en el próximo mensaje y lo corrijo.",
+        "additionalFields": {}
+      },
+      "id": "askMotivo",
+      "name": "askMotivo",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        1260,
+        420
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "zvxU9F3XDpRNBsYa",
+          "name": "Cortafuego Telegram"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tipo }}",
+              "rightValue": "texto",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "esTexto",
+      "name": "esTexto",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT token::text AS token FROM contenido.tg_pending WHERE chat_id=$1",
+        "options": {
+          "queryReplacement": "={{ $('Router').item.json.chat_id }}"
+        }
+      },
+      "id": "getPending",
+      "name": "getPending",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1260,
+        640
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DRC5p50dRb5kYMOn",
+          "name": "Postgres Cortafuego (claude)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://crm-n8n.dhmtev.easypanel.host/webhook/cf-pub-decide",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "={{ $json.token }}"
+            },
+            {
+              "name": "accion",
+              "value": "rechazar"
+            },
+            {
+              "name": "motivo",
+              "value": "={{ $('Router').item.json.texto }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "doReject",
+      "name": "doReject",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        1480,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "DELETE FROM contenido.tg_pending WHERE chat_id=$1",
+        "options": {
+          "queryReplacement": "={{ $('Router').item.json.chat_id }}"
+        }
+      },
+      "id": "delPending",
+      "name": "delPending",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1700,
+        640
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DRC5p50dRb5kYMOn",
+          "name": "Postgres Cortafuego (claude)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $('Router').item.json.chat_id }}",
+        "text": "Rechazada. La corrijo y te reenvío en breve.",
+        "additionalFields": {}
+      },
+      "id": "okRej",
+      "name": "okRej",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        1920,
+        640
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "zvxU9F3XDpRNBsYa",
+          "name": "Cortafuego Telegram"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tipo }}",
+              "rightValue": "brief",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "esBrief",
+      "name": "esBrief",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        820
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO contenido.tg_briefs (chat_id, voice_file_id, media_file_id, media_type, texto) VALUES ($1, NULLIF($2,''), NULLIF($3,''), NULLIF($4,''), NULLIF($5,''))",
+        "options": {
+          "queryReplacement": "={{ [$('Router').item.json.chat_id, $('Router').item.json.voice_file_id || '', $('Router').item.json.media_file_id || '', $('Router').item.json.media_type || '', $('Router').item.json.texto || ''] }}"
+        }
+      },
+      "id": "setBrief",
+      "name": "setBrief",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1480,
+        820
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DRC5p50dRb5kYMOn",
+          "name": "Postgres Cortafuego (claude)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $('Router').item.json.chat_id }}",
+        "text": "Recibí tu brief. Lo preparo y te lo mando para aprobar en un ratito.",
+        "additionalFields": {}
+      },
+      "id": "ackBrief",
+      "name": "ackBrief",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        1700,
+        820
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "zvxU9F3XDpRNBsYa",
+          "name": "Cortafuego Telegram"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tipo }}",
+              "rightValue": "descartar",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "ab3e6be4-3479-4c42-a44a-367966f44ce5",
+      "name": "esDescartar",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        600,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://crm-n8n.dhmtev.easypanel.host/webhook/cf-pub-decide",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "token",
+              "value": "={{ $('Router').item.json.token }}"
+            },
+            {
+              "name": "accion",
+              "value": "descartar"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3a3f5e90-36eb-4892-814b-11a771aaccfe",
+      "name": "doDiscard",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        820,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $('Router').item.json.chat_id }}",
+        "text": "🗑 Descartada. No se publica ni se corrige.",
+        "additionalFields": {}
+      },
+      "id": "b465b20c-31c2-457a-bd89-1f16899b2050",
+      "name": "okDis",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        1040,
+        460
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "zvxU9F3XDpRNBsYa",
+          "name": "Cortafuego Telegram"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.tipo }}",
+              "rightValue": "material",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "21f8fe38-135e-4839-80b8-aa811e2191e0",
+      "name": "esMaterial",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        600,
+        820
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH up AS (UPDATE contenido.tg_briefs SET media_file_id=$1, media_type=$2, estado='pendiente' WHERE tg_msg_id=$3 AND estado='propuesta' RETURNING titulo), ins AS (INSERT INTO contenido.tg_briefs (chat_id, media_file_id, media_type, estado) SELECT $4,$1,$2,'pendiente' WHERE NOT EXISTS (SELECT 1 FROM up) RETURNING id) SELECT COALESCE((SELECT titulo FROM up),'nuevo requerimiento') AS titulo, EXISTS(SELECT 1 FROM up) AS era_propuesta",
+        "options": {
+          "queryReplacement": "={{ [$('Router').item.json.media_file_id, $('Router').item.json.media_type, $('Router').item.json.reply_msg_id, $('Router').item.json.chat_id] }}"
+        }
+      },
+      "id": "c19ad3c5-cf20-4717-89b9-701f309578b0",
+      "name": "updMaterial",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        820,
+        820
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DRC5p50dRb5kYMOn",
+          "name": "Postgres Cortafuego (claude)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "={{ $('Router').item.json.chat_id }}",
+        "text": "=Material recibido. \"{{ $json.titulo }}\" entra al circuito.",
+        "additionalFields": {}
+      },
+      "id": "e90068f1-9912-4318-96c8-c5a949344803",
+      "name": "okMaterial",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        1040,
+        820
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "zvxU9F3XDpRNBsYa",
+          "name": "Cortafuego Telegram"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router": {
+      "main": [
+        [
+          {
+            "node": "esAprobar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "esAprobar": {
+      "main": [
+        [
+          {
+            "node": "doPublish",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "esDescartar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "doPublish": {
+      "main": [
+        [
+          {
+            "node": "okPub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "esRechazar": {
+      "main": [
+        [
+          {
+            "node": "setPending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "esTexto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "setPending": {
+      "main": [
+        [
+          {
+            "node": "askMotivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "esTexto": {
+      "main": [
+        [
+          {
+            "node": "getPending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "esMaterial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "getPending": {
+      "main": [
+        [
+          {
+            "node": "doReject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "doReject": {
+      "main": [
+        [
+          {
+            "node": "delPending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "delPending": {
+      "main": [
+        [
+          {
+            "node": "okRej",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "esBrief": {
+      "main": [
+        [
+          {
+            "node": "setBrief",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "setBrief": {
+      "main": [
+        [
+          {
+            "node": "ackBrief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "esDescartar": {
+      "main": [
+        [
+          {
+            "node": "doDiscard",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "esRechazar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "doDiscard": {
+      "main": [
+        [
+          {
+            "node": "okDis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "esMaterial": {
+      "main": [
+        [
+          {
+            "node": "updMaterial",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "esBrief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "updMaterial": {
+      "main": [
+        [
+          {
+            "node": "okMaterial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}

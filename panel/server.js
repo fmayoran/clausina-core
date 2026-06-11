@@ -1,0 +1,309 @@
+// Panel de publicaciones de Cortafuego — backend Node/Express (read-only).
+// Sirve la UI estática (public/) + una API JSON. La SQL vive en db.js.
+// Se sirve detrás del proxy de la landing en cortafuego.ar/panel/ (Nginx → este servicio).
+const express = require('express');
+const path = require('path');
+const crypto = require('crypto');
+const db = require('./db');
+
+const app = express();
+const PORT = Number(process.env.PORT || 3001);
+// Base de los webhooks de n8n que disparan publicar/rechazar (mismos que usan mail y Telegram).
+const N8N = (process.env.N8N_WEBHOOK_BASE || 'https://crm-n8n.dhmtev.easypanel.host/webhook').replace(/\/$/, '');
+const BOT = process.env.TELEGRAM_BOT_TOKEN || '';
+const CHAT = process.env.PANEL_TG_CHAT || '811183062';
+const IG_TOKEN = process.env.IG_TOKEN || '';
+const IG_USER_ID = process.env.IG_USER_ID || '27632458043024661';
+const IG_API = 'https://graph.instagram.com/v19.0';
+
+// Captura menciones entrantes (media donde nos etiquetan, edge /tags) y las deja en la cola
+// como propuesta (origen='mencion') para que Fer decida: generar publicación o descartar. Avisa por Telegram.
+async function refreshMenciones() {
+  if (!IG_TOKEN) return;
+  try {
+    // El token/cuenta de IG es de Cortafuego: las menciones entrantes se atribuyen a esa marca.
+    // (Cuando cada marca tenga su token, esto se vuelve por-marca.)
+    const pid = await db.getProyectoId('cortafuego');
+    const d = await fetch(`${IG_API}/${IG_USER_ID}/tags?fields=id,username,permalink,timestamp&limit=25&access_token=${IG_TOKEN}`, { signal: AbortSignal.timeout(10000) }).then(r => r.json());
+    if (!d || !d.data) return;
+    for (const m of d.data) {
+      const nueva = await db.insertMencion(m.id, m.username || 'alguien', m.permalink || '', pid);
+      if (nueva && BOT) {
+        const txt = `Te etiquetaron en Instagram: @${m.username}. Quedó en la cola del panel para que decidas (generar publicación o descartar).\n${m.permalink || ''}`;
+        await fetch(`https://api.telegram.org/bot${BOT}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: CHAT, text: txt, disable_web_page_preview: false }) }).catch(() => {});
+      }
+    }
+  } catch (e) { console.error('menciones', e.message); }
+}
+
+// Refresca las métricas de IG de las piezas publicadas y las cachea en la base.
+// Insights de NUESTRA propia cuenta (el token de publicación tiene permiso). Stories viejas expiran → se saltean.
+async function refreshMetricas() {
+  if (!IG_TOKEN) return;
+  const metric = 'views,reach,likes,comments,saved,shares,total_interactions';
+  let ok = 0;
+  for (const id of await db.getPostIdsPublicados()) {
+    try {
+      const d = await fetch(`${IG_API}/${id}/insights?metric=${metric}&access_token=${IG_TOKEN}`, { signal: AbortSignal.timeout(10000) }).then(r => r.json());
+      if (!d || !d.data) continue;               // p.ej. story expirada o métrica no soportada
+      const v = {}; d.data.forEach(x => { v[x.name] = x.values && x.values[0] ? x.values[0].value : 0; });
+      await db.upsertMetricas(id, v); ok++;
+    } catch (_) { /* seguir con el resto */ }
+  }
+  console.log(`métricas refrescadas: ${ok}`);
+}
+
+// --- Sesión: contraseña compartida + cookie firmada (HMAC), sin dependencias extra ---
+const PASSWORD = process.env.PANEL_PASSWORD || '';
+const SECRET = process.env.PANEL_SECRET || crypto.randomBytes(32).toString('hex');
+const COOKIE = 'cf_panel';
+const COOKIE_PATH = process.env.PANEL_COOKIE_PATH || '/panel';
+const TTL_S = 14 * 24 * 3600;
+const sign = p => crypto.createHmac('sha256', SECRET).update(p).digest('base64url');
+const issue = () => { const p = Buffer.from(JSON.stringify({ exp: Date.now() + TTL_S * 1000 })).toString('base64url'); return `${p}.${sign(p)}`; };
+function valid(tok) {
+  if (!tok || !tok.includes('.')) return false;
+  const [p, s] = tok.split('.');
+  if (sign(p) !== s) return false;
+  try { return JSON.parse(Buffer.from(p, 'base64url').toString()).exp > Date.now(); } catch { return false; }
+}
+function readCookie(req) {
+  const c = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith(COOKIE + '='));
+  return c ? decodeURIComponent(c.slice(COOKIE.length + 1)) : '';
+}
+
+app.disable('x-powered-by');
+app.use(express.json({ limit: '25mb' }));
+
+// Públicos (sin sesión): health, pantalla de login y sus fuentes, login/logout.
+app.get('/api/health', async (req, res) => { try { await db.health(); res.json({ ok: true }); } catch { res.status(500).json({ ok: false }); } });
+app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxAge: '30d' }));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
+// Públicos para la PANTALLA: el reproductor (kiosco) y la playlist activa que poolea.
+app.get('/play', (req, res) => { res.set('Cache-Control', 'no-cache'); res.sendFile(path.join(__dirname, 'public', 'pantalla-play.html')); });
+// Player público: la marca viene por query param (cada pantalla pertenece a una marca). Default cortafuego.
+app.get('/api/pantalla/activo', async (req, res) => {
+  try {
+    const slug = String(req.query.marca || 'cortafuego');
+    const pid = (await db.getProyectoId(slug)) || (await db.getProyectoId('cortafuego'));
+    res.set('Cache-Control', 'no-store'); res.json(await db.getActivoPlaylist(pid));
+  } catch (e) { console.error('activo', e.message); res.status(500).json({ error: 'db', items: [] }); }
+});
+app.post('/api/login', (req, res) => {
+  const pw = String((req.body && req.body.password) || '');
+  if (!PASSWORD || pw !== PASSWORD) return res.status(401).json({ ok: false });
+  res.set('Set-Cookie', `${COOKIE}=${issue()}; Path=${COOKIE_PATH}; HttpOnly; Secure; SameSite=Lax; Max-Age=${TTL_S}`);
+  res.json({ ok: true });
+});
+app.post('/api/logout', (req, res) => {
+  res.set('Set-Cookie', `${COOKIE}=; Path=${COOKIE_PATH}; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
+  res.json({ ok: true });
+});
+
+// Compuerta: todo lo demás (datos, acciones, board) requiere sesión válida.
+app.use((req, res, next) => {
+  if (valid(readCookie(req))) return next();
+  if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'auth' });
+  return res.redirect('login');
+});
+
+// --- Marca activa (multi-tenant): cookie cf_marca -> proyecto_id en req. Default cortafuego. ---
+const MARCA_COOKIE = 'cf_marca';
+function readMarca(req) {
+  const c = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith(MARCA_COOKIE + '='));
+  return c ? decodeURIComponent(c.slice(MARCA_COOKIE.length + 1)) : '';
+}
+app.use(async (req, res, next) => {
+  try {
+    let slug = readMarca(req) || 'cortafuego';
+    let pid = await db.getProyectoId(slug);
+    if (!pid) { slug = 'cortafuego'; pid = await db.getProyectoId('cortafuego'); }
+    req.marca = slug; req.proyectoId = pid;
+    next();
+  } catch (e) { console.error('marca', e.message); res.status(500).json({ error: 'marca' }); }
+});
+
+// Lista de marcas (para el selector) + cuál está activa en esta sesión.
+app.get('/api/marcas', async (req, res) => {
+  try {
+    const marcas = (await db.getMarcas()).map(m => ({ slug: m.slug, nombre: m.nombre, activo: m.activo }));
+    res.json({ marcas, activa: req.marca });
+  } catch (e) { console.error('marcas', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+// Cambia la marca activa de la sesión (valida contra las marcas conocidas).
+app.post('/api/marca', async (req, res) => {
+  const slug = String((req.body && req.body.slug) || '');
+  const ok = (await db.getMarcas()).some(m => m.slug === slug);
+  if (!ok) return res.status(400).json({ ok: false, error: 'marca_invalida' });
+  res.set('Set-Cookie', `${MARCA_COOKIE}=${encodeURIComponent(slug)}; Path=${COOKIE_PATH}; HttpOnly; Secure; SameSite=Lax; Max-Age=${TTL_S}`);
+  res.json({ ok: true });
+});
+
+// Llama al webhook de n8n y devuelve el status HTTP. Timeout amplio: el publish sube media y poolea.
+async function callWebhook(url) {
+  const r = await fetch(url, { signal: AbortSignal.timeout(90000) });
+  return r.status;
+}
+
+app.get('/api/piezas', async (req, res) => {
+  try {
+    const canal = ['instagram', 'aviso'].includes(req.query.canal) ? req.query.canal : undefined;
+    res.json(await db.getPiezas(canal, req.proyectoId));
+  } catch (e) { console.error('piezas', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+app.get('/api/requerimientos', async (req, res) => {
+  try { res.json(await db.getRequerimientos(req.proyectoId)); }
+  catch (e) { console.error('requerimientos', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+app.get('/api/status', async (req, res) => {
+  try { res.json(await db.getStatus(req.proyectoId)); }
+  catch (e) { console.error('status', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+// Proxy de la miniatura de un requerimiento (foto que mandó Fer por Telegram).
+// Resuelve el file_id contra la API de Telegram y stremea la imagen (token server-side).
+app.get('/api/brief/:id/media', async (req, res) => {
+  try {
+    const m = await db.getBriefMedia(req.params.id);
+    if (!m || !m.media_file_id || m.media_type !== 'photo') return res.status(404).end();
+    if (!BOT) return res.status(503).end();
+    const gf = await fetch(`https://api.telegram.org/bot${BOT}/getFile?file_id=${encodeURIComponent(m.media_file_id)}`, { signal: AbortSignal.timeout(8000) }).then(r => r.json());
+    const fp = gf && gf.result && gf.result.file_path;
+    if (!fp) return res.status(404).end();
+    const img = await fetch(`https://api.telegram.org/file/bot${BOT}/${fp}`, { signal: AbortSignal.timeout(8000) });
+    if (!img.ok) return res.status(502).end();
+    const ct = img.headers.get('content-type');
+    res.set('Content-Type', (ct && ct.startsWith('image/')) ? ct : 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(Buffer.from(await img.arrayBuffer()));
+  } catch (e) { console.error('brief media', e.message); res.status(500).end(); }
+});
+
+// --- Acciones sobre pendientes (protegidas por la sesión del panel) ---
+// El navegador manda solo el id de la pieza; el server resuelve el token y llama a n8n.
+// Acciones canal-aware: Instagram → webhooks n8n (Graph API); Aviso → estado directo en la base.
+app.post('/api/piezas/:id/aprobar', async (req, res) => {
+  try {
+    const p = await db.getPiezaCanal(req.params.id);
+    if (!p || p.estado !== 'pendiente_aprobacion') return res.status(409).json({ ok: false, error: 'no_pendiente' });
+    if (p.canal === 'aviso') return res.json({ ok: await db.avisoEstado(req.params.id, 'publicada') });
+    const status = await callWebhook(`${N8N}/cf-pub-publish?token=${encodeURIComponent(p.token)}`);
+    res.json({ ok: status >= 200 && status < 300, status });
+  } catch (e) { console.error('aprobar', e.message); res.status(500).json({ ok: false, error: 'webhook' }); }
+});
+
+app.post('/api/piezas/:id/rechazar', async (req, res) => {
+  try {
+    const motivo = String((req.body && req.body.motivo) || '').trim().slice(0, 500);
+    if (!motivo) return res.status(400).json({ ok: false, error: 'motivo_requerido' });
+    const p = await db.getPiezaCanal(req.params.id);
+    if (!p || p.estado !== 'pendiente_aprobacion') return res.status(409).json({ ok: false, error: 'no_pendiente' });
+    if (p.canal === 'aviso') return res.json({ ok: await db.avisoEstado(req.params.id, 'rechazada', motivo) });
+    const url = `${N8N}/cf-pub-decide?token=${encodeURIComponent(p.token)}&accion=rechazar&motivo=${encodeURIComponent(motivo)}`;
+    const status = await callWebhook(url);
+    res.json({ ok: status >= 200 && status < 300, status });
+  } catch (e) { console.error('rechazar', e.message); res.status(500).json({ ok: false, error: 'webhook' }); }
+});
+
+app.post('/api/piezas/:id/descartar', async (req, res) => {
+  try {
+    const p = await db.getPiezaCanal(req.params.id);
+    if (!p || p.estado !== 'pendiente_aprobacion') return res.status(409).json({ ok: false, error: 'no_pendiente' });
+    if (p.canal === 'aviso') return res.json({ ok: await db.avisoEstado(req.params.id, 'descartada') });
+    const status = await callWebhook(`${N8N}/cf-pub-decide?token=${encodeURIComponent(p.token)}&accion=descartar`);
+    res.json({ ok: status >= 200 && status < 300, status });
+  } catch (e) { console.error('descartar', e.message); res.status(500).json({ ok: false, error: 'webhook' }); }
+});
+
+// --- Propuestas del creativo + gestión de la cola de requerimientos ---
+app.post('/api/proponer', async (req, res) => {
+  try {
+    const enfasis = String((req.body && req.body.enfasis) || '').trim().slice(0, 1000);
+    const canal = req.body && req.body.canal === 'aviso' ? 'aviso' : 'instagram';
+    await db.pedirPropuestas(enfasis, canal, req.proyectoId);
+    res.json({ ok: true });
+  } catch (e) { console.error('proponer', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+
+app.post('/api/requerimientos/:id/activar', async (req, res) => {
+  try { res.json({ ok: await db.activarReq(req.params.id) }); }
+  catch (e) { console.error('activar', e.message); res.status(500).json({ ok: false }); }
+});
+
+app.post('/api/requerimientos/:id/descartar', async (req, res) => {
+  try { res.json({ ok: await db.descartarReq(req.params.id) }); }
+  catch (e) { console.error('descartar req', e.message); res.status(500).json({ ok: false }); }
+});
+
+// Aportar material desde el panel: el archivo (base64) se manda al bot como documento (preserva calidad),
+// se obtiene el file_id y se guarda en el requerimiento -> 'pendiente'. Reusa el pipeline de Telegram.
+app.post('/api/requerimientos/:id/material', async (req, res) => {
+  try {
+    if (!BOT) return res.status(503).json({ ok: false, error: 'sin_bot' });
+    const dataUrl = String((req.body && req.body.dataUrl) || '');
+    const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!m) return res.status(400).json({ ok: false, error: 'archivo_invalido' });
+    const mime = m[1];
+    const buf = Buffer.from(m[2], 'base64');
+    const mediaType = mime.startsWith('video/') ? 'video' : 'photo';
+    const filename = String((req.body && req.body.filename) || (mediaType === 'video' ? 'material.mp4' : 'material.jpg'));
+    const fd = new FormData();
+    fd.append('chat_id', CHAT);
+    fd.append('caption', 'Material para una propuesta (vía panel).');
+    fd.append('document', new Blob([buf], { type: mime }), filename);
+    const tg = await fetch(`https://api.telegram.org/bot${BOT}/sendDocument`, { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) }).then(r => r.json());
+    const fileId = tg && tg.result && tg.result.document && tg.result.document.file_id;
+    if (!fileId) return res.status(502).json({ ok: false, error: 'telegram' });
+    const ok = await db.setMaterial(req.params.id, fileId, mediaType);
+    res.json({ ok });
+  } catch (e) { console.error('material', e.message); res.status(500).json({ ok: false, error: 'upload' }); }
+});
+
+// --- Programación de pantalla (privado) ---
+app.get('/api/avisos-aprobados', async (req, res) => {
+  try { res.json(await db.getAvisosAprobados(req.proyectoId)); }
+  catch (e) { console.error('avisos-aprob', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.get('/api/programas', async (req, res) => {
+  try { res.json(await db.getProgramas(req.proyectoId)); }
+  catch (e) { console.error('programas', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.get('/api/programas/:id', async (req, res) => {
+  try { const p = await db.getPrograma(req.params.id, req.proyectoId); p ? res.json(p) : res.status(404).json({ error: 'no_existe' }); }
+  catch (e) { console.error('programa', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/programas', async (req, res) => {
+  try { res.json({ ok: true, id: await db.crearPrograma(String((req.body && req.body.nombre) || 'Programa').slice(0, 120), req.proyectoId) }); }
+  catch (e) { console.error('crear prog', e.message); res.status(500).json({ ok: false }); }
+});
+app.put('/api/programas/:id', async (req, res) => {
+  try {
+    const nombre = req.body && req.body.nombre != null ? String(req.body.nombre).slice(0, 120) : null;
+    const piezas = Array.isArray(req.body && req.body.piezas) ? req.body.piezas : [];
+    res.json({ ok: await db.guardarPrograma(req.params.id, nombre, piezas, req.proyectoId) });
+  } catch (e) { console.error('guardar prog', e.message); res.status(500).json({ ok: false }); }
+});
+app.post('/api/programas/:id/activar', async (req, res) => {
+  try { res.json({ ok: await db.activarPrograma(req.params.id, req.proyectoId) }); }
+  catch (e) { console.error('activar prog', e.message); res.status(500).json({ ok: false }); }
+});
+app.delete('/api/programas/:id', async (req, res) => {
+  try { res.json({ ok: await db.eliminarPrograma(req.params.id, req.proyectoId) }); }
+  catch (e) { console.error('del prog', e.message); res.status(500).json({ ok: false }); }
+});
+
+app.use(express.static(path.join(__dirname, 'public'), {
+  extensions: ['html'],
+  setHeaders: (res, p) => { if (p.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache'); }
+}));
+
+app.listen(PORT, () => console.log(`cortafuego-panel escuchando en :${PORT}`));
+
+// Métricas y menciones: refresco al arrancar y cada 30 min.
+setTimeout(refreshMetricas, 10000);
+setInterval(refreshMetricas, 30 * 60 * 1000);
+setTimeout(refreshMenciones, 16000);
+setInterval(refreshMenciones, 30 * 60 * 1000);

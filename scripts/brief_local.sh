@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Handler de "briefs por voz" de Cortafuego. Corre por cron en el VPS.
+# Toma un brief pendiente (audio + media opcional que Fer mandó por Telegram), lo transcribe
+# (whisper.cpp local), y le pasa todo a Claude Code headless para que arme la pieza pendiente.
+# NADA se publica: termina en pendiente_aprobacion y Fer aprueba.
+
+set -uo pipefail
+export HOME=/root
+export PATH="/root/.local/bin:/usr/local/bin:/usr/bin:/bin"
+
+REPO="/root/claudefolder/marcas/cortafuego"
+MOTOR="/root/claudefolder/plataforma"
+LOG="$MOTOR/scripts/brief_local.log"
+WHISPER="/root/whisper.cpp/build/bin/whisper-cli"
+MODEL="/root/whisper.cpp/models/ggml-base.bin"
+BOT=$(grep '^TELEGRAM_BOT_TOKEN=' /root/claudefolder/marcas/cortafuego/cortafuego.env | cut -d= -f2-)
+CID=$(docker ps -q -f name=crm_pgvector.1.)
+ts(){ date -Is; }
+psql(){ docker exec -i "$CID" psql -U postgres -d claude -t -A -c "$1"; }
+hb(){ psql "INSERT INTO contenido.batch_runs(proceso,last_run,last_msg) VALUES('ingesta_briefs',now(),\$m\$$1\$m\$) ON CONFLICT(proceso) DO UPDATE SET last_run=now(), last_msg=EXCLUDED.last_msg;" >/dev/null 2>&1; }
+
+exec 9>/tmp/cf_brief.lock; flock -n 9 || exit 0
+
+# 1) brief pendiente (el más viejo), como JSON
+row=$(psql "SELECT row_to_json(t) FROM (SELECT id,chat_id,voice_file_id,media_file_id,media_type,texto,canal_destino FROM contenido.tg_briefs WHERE estado='pendiente' ORDER BY creado_en LIMIT 1) t;")
+[ -z "$row" ] && { echo "$(ts) sin briefs" >> "$LOG"; hb "sin requerimientos en cola"; exit 0; }
+
+bid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
+chat=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin)['chat_id'])")
+voice=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('voice_file_id') or '')")
+media=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('media_file_id') or '')")
+mtype=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('media_type') or '')")
+btext=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('texto') or '')")
+canal=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('canal_destino') or 'instagram')")
+echo "$(ts) brief $bid (voice=${voice:+si} media=$mtype canal=$canal)" >> "$LOG"
+hb "procesando requerimiento $bid"
+psql "UPDATE contenido.tg_briefs SET estado='procesando' WHERE id='$bid';" >/dev/null
+
+dl(){ # file_id -> ruta local descargada (echo); requiere extensión por content
+  local fid="$1" out="$2"
+  local fp=$(curl -s "https://api.telegram.org/bot$BOT/getFile?file_id=$fid" | python3 -c "import sys,json;print(json.load(sys.stdin)['result']['file_path'])" 2>/dev/null)
+  [ -z "$fp" ] && return 1
+  curl -s "https://api.telegram.org/file/bot$BOT/$fp" -o "$out"
+}
+
+# 2) transcribir audio
+transcript=""
+if [ -n "$voice" ]; then
+  if dl "$voice" /tmp/brief_voice.oga; then
+    ffmpeg -v error -i /tmp/brief_voice.oga -ar 16000 -ac 1 /tmp/brief_voice.wav -y
+    transcript=$("$WHISPER" -m "$MODEL" -f /tmp/brief_voice.wav -l es -nt 2>/dev/null | tr '\n' ' ' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  fi
+fi
+
+# 3) descargar media adjunta
+medialocal=""
+if [ -n "$media" ]; then
+  ext="jpg"; [ "$mtype" = "video" ] && ext="mp4"
+  if dl "$media" "/tmp/brief_media.$ext"; then medialocal="/tmp/brief_media.$ext"; fi
+fi
+
+# 4) contexto para Claude (las env vars van ANTES de python3: si van después, bash las pasa como
+#    argumentos y os.environ falla -> brief_ctx.json no se escribe. Bug corregido 05/06/2026.)
+rm -f /tmp/brief_ctx.json
+T="$transcript" B="$btext" M="$medialocal" MT="$mtype" C="$chat" I="$bid" \
+python3 -c "import json,os;json.dump({'brief':(os.environ['T']+' '+os.environ['B']).strip(),'media':os.environ['M'],'media_type':os.environ['MT'],'chat_id':os.environ['C'],'brief_id':os.environ['I']},open('/tmp/brief_ctx.json','w'),ensure_ascii=False)"
+echo "$(ts) transcript: $transcript" >> "$LOG"
+
+# guarda: sin contexto no invocamos al agente; marcamos error para reintentar/avisar
+if [ ! -s /tmp/brief_ctx.json ]; then
+  echo "$(ts) ERROR: no se generó brief_ctx.json" >> "$LOG"
+  psql "UPDATE contenido.tg_briefs SET estado='error', procesado_en=now() WHERE id='$bid';" >/dev/null
+  exit 1
+fi
+
+# 5) Claude Code arma la pieza — ruteo por canal del requerimiento
+cd "$REPO" || exit 1
+if [ "$canal" = "aviso" ]; then
+  PROMPT="Procesá un requerimiento de AVISO de pantalla (DOOH) siguiendo EXACTAMENTE $MOTOR/scripts/brief_aviso.md. Los datos están en /tmp/brief_ctx.json: leelo primero. Producí un spot 2:3 mudo de ~10s con la estética de marca, guardá mp4+poster en assets/landing/publicaciones/ (commit+push, verificá 200), registralo con cf-crear-pendiente (canal_pieza='aviso' + tags de contexto + brief_id) y avisá con cf-avisar. NUNCA uses cf-pub-notify ni publiques. Si falta material que no podés generar, avisá con cf-avisar. Resumí en una línea."
+else
+  PROMPT="Procesá un brief dictado por Fer siguiendo EXACTAMENTE $MOTOR/scripts/brief_dictado.md. Los datos del brief (texto, ruta de media, tipo, chat_id, brief_id) están en /tmp/brief_ctx.json: leelo primero. Acondicioná la media si hace falta, redactá el copy con la voz de marca, insertá la pieza pendiente vía cf-crear-pendiente y notificá con cf-pub-notify. NUNCA publiques en Instagram. Si falta material o algo no se entiende, avisá a Fer con cf-avisar. Resumí en una línea."
+fi
+timeout 1200 claude -p "$PROMPT" --model sonnet --allowedTools "Bash" Read Write Edit Glob Grep >> "$LOG" 2>&1
+rc=$?
+
+# 6) marcar procesado
+if [ $rc -eq 0 ]; then psql "UPDATE contenido.tg_briefs SET estado='procesado', procesado_en=now(), transcripcion=left(\$tr\$$transcript\$tr\$,4000) WHERE id='$bid';" >/dev/null
+else psql "UPDATE contenido.tg_briefs SET estado='error', procesado_en=now() WHERE id='$bid';" >/dev/null
+  curl -s -X POST -H "Content-Type: application/json" -d "{\"asunto\":\"Brief con error\",\"cuerpo\":\"No pude procesar un brief por voz. Revisá el log.\"}" "https://crm-n8n.dhmtev.easypanel.host/webhook/cf-avisar" >/dev/null 2>&1
+fi
+echo "$(ts) fin brief $bid (rc=$rc)" >> "$LOG"

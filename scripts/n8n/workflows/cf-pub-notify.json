@@ -1,0 +1,188 @@
+{
+  "name": "Cortafuego - Notificacion aprobacion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "cf-pub-notify",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "cf-pub-notify"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT pz.titulo_interno, r.token, r.caption, r.formato, (SELECT count(*) FROM contenido.media m WHERE m.pieza_id=pz.id) AS n_media, COALESCE((SELECT m.poster_url FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1 AND m.tipo='video'),(SELECT m.url FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1)) AS foto_url, (SELECT p.telegram_chat_id FROM contenido.proyectos p WHERE p.id=pz.proyecto_id) AS chat_id FROM contenido.revisiones r JOIN contenido.piezas pz ON pz.id=r.pieza_id WHERE r.token=$1",
+        "options": {
+          "queryReplacement": "={{ $json.query.token }}"
+        }
+      },
+      "id": "b2",
+      "name": "Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        420,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "DRC5p50dRb5kYMOn",
+          "name": "Postgres Cortafuego (claude)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "mail enviado",
+        "options": {}
+      },
+      "id": "d4",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p=$('Postgres').first().json;\nconst esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nlet cap='<b>'+(p.formato==='story'?'[HISTORIA] ':'')+esc(p.titulo_interno)+'</b>';\nif(p.caption) cap+='\\n\\n'+esc(p.caption);\nif(p.n_media>1) cap+='\\n\\n<i>(Carrusel de '+p.n_media+' imágenes — \"Ver completo\" para verlas todas)</i>';\nif(cap.length>1000) cap=cap.slice(0,1000)+'…';\nreturn [{json:{chat_id:p.chat_id, foto_url:p.foto_url, caption:cap, token:p.token, n_media:p.n_media}}];"
+      },
+      "id": "TGcard",
+      "name": "TGcard",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{ $json.chat_id }}",
+        "binaryData": false,
+        "file": "={{ $json.foto_url }}",
+        "additionalFields": {
+          "caption": "={{ $json.caption }}",
+          "parse_mode": "HTML"
+        },
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Aprobar",
+                    "additionalFields": {
+                      "callback_data": "=ap:{{ $json.token }}"
+                    }
+                  },
+                  {
+                    "text": "✖️ Rechazar",
+                    "additionalFields": {
+                      "callback_data": "=re:{{ $json.token }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "🗑 Descartar",
+                    "additionalFields": {
+                      "callback_data": "=de:{{ $json.token }}"
+                    }
+                  },
+                  {
+                    "text": "Ver completo",
+                    "additionalFields": {
+                      "url": "=https://cortafuego.ar/preview.html?token={{ $json.token }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "TGsend",
+      "name": "TGsend",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        1020,
+        460
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "zvxU9F3XDpRNBsYa",
+          "name": "Cortafuego Telegram"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres": {
+      "main": [
+        [
+          {
+            "node": "TGcard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TGcard": {
+      "main": [
+        [
+          {
+            "node": "TGsend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TGsend": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}

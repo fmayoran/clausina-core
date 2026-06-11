@@ -1,0 +1,93 @@
+{
+  "name": "Cortafuego - Rechazos pendientes",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "cf-rechazos-pendientes",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "cf-rechazos-pendientes"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT pz.id AS pieza_id, r.id AS revision_id, pz.titulo_interno, pz.canal, m.url AS asset_ig, m.tipo::text AS media_tipo, m.poster_url, r.daypart, r.clima, r.transito, r.momento, r.duracion_s, r.caption, r.web_titulo, r.web_copy, r.web_tags, r.motivo_rechazo, r.nro AS intentos FROM contenido.revisiones r JOIN contenido.piezas pz ON pz.id = r.pieza_id AND pz.revision_vigente = r.id LEFT JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1 WHERE r.estado='rechazada' AND r.derivado_en IS NULL ORDER BY r.actualizado_en",
+        "options": {}
+      },
+      "id": "b",
+      "name": "Postgres",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        440,
+        300
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "DRC5p50dRb5kYMOn",
+          "name": "Postgres Cortafuego (claude)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($input.all().map(i=>i.json).filter(x=>x && x.pieza_id)) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "c",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {}
+}
