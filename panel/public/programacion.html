@@ -130,6 +130,7 @@ async function cargarProgramas(){
   c.innerHTML = ps.length ? ps.map(p=>`<div class="pgline ${p.activo?'act':''}"><div class="sp"><div class="tt">${esc(p.nombre)} ${p.activo?'<span class="actbadge">activo</span>':''}</div><div class="mm">${p.n_items} avisos</div></div>
     <button class="ibtn" onclick="editar('${p.id}')">Editar</button>
     ${p.activo?'':`<button class="ibtn fire" onclick="activarId('${p.id}')">Activar</button>`}
+    ${p.n_items>0?`<button class="ibtn" onclick="descargarPrograma('${p.id}','${esc(p.nombre)}',this)" title="Bajar los videos del programa en un .zip">Descargar</button>`:''}
     <button class="ibtn" onclick="eliminar('${p.id}','${esc(p.nombre)}')">Eliminar</button></div>`).join('') : '<div class="empty">— sin programas todavía —</div>';
   document.getElementById('n-pg').textContent=ps.length||'';
 }
@@ -148,6 +149,20 @@ async function eliminar(id,nombre){
   const d=await fetch('api/programas/'+id,{method:'DELETE'}).then(r=>r.json());
   if(d.ok && prog.id===id) nuevoPrograma();
   toast(d.ok?'Eliminado':'No se pudo', !d.ok); cargarProgramas();
+}
+async function descargarPrograma(id,nombre,btn){
+  const t=btn.textContent; btn.disabled=true; btn.textContent='Generando…';
+  try{
+    const r=await fetch('api/programas/'+id+'/download');
+    if(!r.ok){ toast('No se pudo generar el zip', true); return; }
+    const blob=await r.blob();
+    const slug=(nombre||'programa').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'programa';
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='programa-'+slug+'.zip';
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast('Descarga lista');
+  }catch(e){ toast('Error al descargar', true); }
+  finally{ btn.disabled=false; btn.textContent=t; }
 }
 cargar();
 </script>

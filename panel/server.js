@@ -4,6 +4,7 @@
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
+const archiver = require('archiver');
 const db = require('./db');
 
 const app = express();
@@ -293,6 +294,37 @@ app.post('/api/programas/:id/activar', async (req, res) => {
 app.delete('/api/programas/:id', async (req, res) => {
   try { res.json({ ok: await db.eliminarPrograma(req.params.id, req.proyectoId) }); }
   catch (e) { console.error('del prog', e.message); res.status(500).json({ ok: false }); }
+});
+
+// Descarga del programa como .zip autocontenido: los mp4 en orden + manifest.json (para reproducir offline en la pantalla).
+app.get('/api/programas/:id/download', async (req, res) => {
+  try {
+    const prog = await db.getPrograma(req.params.id, req.proyectoId);
+    if (!prog) return res.status(404).json({ error: 'no_existe' });
+    const items = (prog.items || []).filter(it => it.media && it.media.url);
+    if (!items.length) return res.status(409).json({ error: 'programa_vacio' });
+    const slug = (prog.nombre || 'programa').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'programa';
+    res.set('Content-Type', 'application/zip');
+    res.set('Content-Disposition', `attachment; filename="programa-${slug}.zip"`);
+    const archive = archiver('zip', { store: true });   // store: el mp4 ya está comprimido, no recomprimir
+    archive.on('error', e => { console.error('zip', e.message); if (!res.headersSent) res.status(500).end(); });
+    archive.pipe(res);
+    const manifest = { programa: prog.nombre, generado: new Date().toISOString(), reproduccion: 'loop, en orden', items: [] };
+    let idx = 0;
+    for (const it of items) {
+      idx++;
+      const fname = `${String(idx).padStart(2, '0')}_CF-${String(it.numero).padStart(4, '0')}.mp4`;
+      try {
+        const r = await fetch(it.media.url, { signal: AbortSignal.timeout(30000) });
+        if (!r.ok) { console.error('zip fetch', it.media.url, r.status); continue; }
+        archive.append(Buffer.from(await r.arrayBuffer()), { name: fname });
+        manifest.items.push({ orden: idx, archivo: fname, numero: it.numero, titulo: it.titulo_interno, duracion_s: it.duracion_s || 10 });
+      } catch (e) { console.error('zip item', it.numero, e.message); }
+    }
+    archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
+    await archive.finalize();
+  } catch (e) { console.error('download prog', e.message); if (!res.headersSent) res.status(500).json({ error: 'zip' }); }
 });
 
 app.use(express.static(path.join(__dirname, 'public'), {
