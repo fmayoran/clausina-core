@@ -6,6 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const archiver = require('archiver');
 const db = require('./db');
+const vnnox = require('./vnnox');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -325,6 +326,46 @@ app.get('/api/programas/:id/download', async (req, res) => {
     archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
     await archive.finalize();
   } catch (e) { console.error('download prog', e.message); if (!res.headersSent) res.status(500).json({ error: 'zip' }); }
+});
+
+// --- VNNOX: entrega del programa a la pantalla DOOH (nube de Novastar) ---
+// Estado/diagnóstico: si está configurado + lista de players y su estado online.
+app.get('/api/pantalla/vnnox', async (req, res) => {
+  try {
+    if (!vnnox.configured()) return res.json({ configurado: false });
+    const r = await vnnox.listPlayers();
+    const players = (r.json && r.json.rows) ? r.json.rows.map(p => ({
+      playerId: p.playerId, name: p.name, sn: p.sn, online: p.onlineStatus === 1, width: p.width, height: p.height,
+    })) : [];
+    res.json({ configurado: true, status: r.status, players, targets: vnnox.PLAYER_IDS });
+  } catch (e) { console.error('vnnox status', e.message); res.status(500).json({ configurado: true, error: 'vnnox' }); }
+});
+
+// Publica un programa a la pantalla: calcula md5+size de cada video y llama a /v2/player/program/normal.
+app.post('/api/programas/:id/enviar-pantalla', async (req, res) => {
+  try {
+    if (!vnnox.configured()) return res.status(503).json({ ok: false, error: 'vnnox_no_configurado' });
+    const prog = await db.getPrograma(req.params.id, req.proyectoId);
+    if (!prog) return res.status(404).json({ ok: false, error: 'no_existe' });
+    const items = (prog.items || []).filter(it => it.media && it.media.url);
+    if (!items.length) return res.status(409).json({ ok: false, error: 'programa_vacio' });
+    const vids = [];
+    for (const it of items) {
+      const r = await fetch(it.media.url, { signal: AbortSignal.timeout(60000) });
+      if (!r.ok) return res.status(502).json({ ok: false, error: 'media_inaccesible', url: it.media.url, status: r.status });
+      const buf = Buffer.from(await r.arrayBuffer());
+      vids.push({
+        url: it.media.url,
+        md5: crypto.createHash('md5').update(buf).digest('hex'),
+        size: buf.length,
+        durMs: (it.duracion_s || 10) * 1000,
+        label: 'CF-' + String(it.numero).padStart(4, '0'),
+      });
+    }
+    const out = await vnnox.publishProgram(vids);
+    const ok = out.status >= 200 && out.status < 300;
+    res.json({ ok, status: out.status, resp: out.json });
+  } catch (e) { console.error('enviar-pantalla', e.message); res.status(500).json({ ok: false, error: 'vnnox' }); }
 });
 
 app.use(express.static(path.join(__dirname, 'public'), {

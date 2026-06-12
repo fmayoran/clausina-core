@@ -131,6 +131,7 @@ async function cargarProgramas(){
     <button class="ibtn" onclick="editar('${p.id}')">Editar</button>
     ${p.activo?'':`<button class="ibtn fire" onclick="activarId('${p.id}')">Activar</button>`}
     ${p.n_items>0?`<button class="ibtn" onclick="descargarPrograma('${p.id}','${esc(p.nombre)}',this)" title="Bajar los videos del programa en un .zip">Descargar</button>`:''}
+    ${p.n_items>0?`<button class="ibtn fire" onclick="enviarPantalla('${p.id}','${esc(p.nombre)}',this)" title="Publicar el programa en la pantalla LED vía VNNOX">A la pantalla</button>`:''}
     <button class="ibtn" onclick="eliminar('${p.id}','${esc(p.nombre)}')">Eliminar</button></div>`).join('') : '<div class="empty">— sin programas todavía —</div>';
   document.getElementById('n-pg').textContent=ps.length||'';
 }
@@ -162,6 +163,17 @@ async function descargarPrograma(id,nombre,btn){
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     toast('Descarga lista');
   }catch(e){ toast('Error al descargar', true); }
+  finally{ btn.disabled=false; btn.textContent=t; }
+}
+async function enviarPantalla(id,nombre,btn){
+  if(!confirm('Publicar "'+nombre+'" en la pantalla LED de la calle (vía VNNOX). Esto cambia lo que se ve. ¿Confirmás?')) return;
+  const t=btn.textContent; btn.disabled=true; btn.textContent='Enviando…';
+  try{
+    const r=await fetch('api/programas/'+id+'/enviar-pantalla',{method:'POST'});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok && d.ok) toast('Enviado — la pantalla está descargando el programa');
+    else { toast('No se pudo enviar ('+(d.error||d.status||r.status)+')', true); console.log('VNNOX:', d); }
+  }catch(e){ toast('Error de conexión con VNNOX', true); }
   finally{ btn.disabled=false; btn.textContent=t; }
 }
 cargar();
