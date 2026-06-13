@@ -190,46 +190,69 @@ async function getTokenPendiente(piezaId) {
 // --- Programación de pantalla ---
 const _avisoMedia = `(SELECT json_build_object('url',m.url,'poster_url',m.poster_url) FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1)`;
 
-// Avisos aprobados (En pantalla) para armar programas. Scopeado por marca.
-async function getAvisosAprobados(proyectoId) {
+// --- Pantallas: la programación es a nivel PANTALLA (activo compartido), cross-proyecto ---
+let _pantalla = null, _pantallaAt = 0;
+async function getPantallaActiva() {
+  if (!_pantalla || Date.now() - _pantallaAt > 60000) {
+    const { rows } = await pool.query(
+      `SELECT id, slug, nombre, vnnox_player_ids, ancho, alto FROM contenido.pantallas WHERE activo ORDER BY creado_en LIMIT 1`);
+    _pantalla = rows[0] || null; _pantallaAt = Date.now();
+  }
+  return _pantalla;
+}
+async function getPantallaPorSlug(slug) {
+  const { rows } = await pool.query(
+    `SELECT id, slug, nombre, vnnox_player_ids, ancho, alto FROM contenido.pantallas WHERE slug=$1 AND activo`, [slug]);
+  return rows[0] || null;
+}
+
+// Avisos aprobados de TODOS los proyectos (con su marca) para armar el mix de la pantalla.
+async function getAvisosAprobados() {
   const { rows } = await pool.query(`
-    SELECT pz.id, pz.numero, pz.titulo_interno, r.duracion_s, r.momento, ${_avisoMedia} AS media
-    FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id = pz.revision_vigente
-    WHERE pz.canal='aviso' AND pz.estado='publicada' AND pz.proyecto_id=$1
-    ORDER BY pz.numero DESC`, [proyectoId]);
+    SELECT pz.id, pz.numero, pz.titulo_interno, r.duracion_s, r.momento, ${_avisoMedia} AS media,
+           p.slug AS marca_slug, p.nombre AS marca_nombre
+    FROM contenido.piezas pz
+      JOIN contenido.revisiones r ON r.id = pz.revision_vigente
+      JOIN contenido.proyectos p ON p.id = pz.proyecto_id
+    WHERE pz.canal='aviso' AND pz.estado='publicada'
+    ORDER BY pz.numero DESC`);
   return rows;
 }
 
-async function getProgramas(proyectoId) {
+async function getProgramas(pantallaId) {
   const { rows } = await pool.query(`
     SELECT p.id, p.nombre, p.activo, p.actualizado_en,
            (SELECT count(*)::int FROM contenido.programa_items i WHERE i.programa_id=p.id) AS n_items
-    FROM contenido.programas p WHERE p.proyecto_id=$1 ORDER BY p.activo DESC, p.actualizado_en DESC`, [proyectoId]);
+    FROM contenido.programas p WHERE p.pantalla_id=$1 ORDER BY p.activo DESC, p.actualizado_en DESC`, [pantallaId]);
   return rows;
 }
 
-async function getPrograma(id, proyectoId) {
-  const { rows: [p] } = await pool.query(`SELECT id, nombre, activo FROM contenido.programas WHERE id=$1 AND proyecto_id=$2`, [id, proyectoId]);
+async function getPrograma(id, pantallaId) {
+  const { rows: [p] } = await pool.query(`SELECT id, nombre, activo FROM contenido.programas WHERE id=$1 AND pantalla_id=$2`, [id, pantallaId]);
   if (!p) return null;
   const { rows: items } = await pool.query(`
-    SELECT i.orden, pz.id AS pieza_id, pz.numero, pz.titulo_interno, r.duracion_s, ${_avisoMedia} AS media
-    FROM contenido.programa_items i JOIN contenido.piezas pz ON pz.id=i.pieza_id JOIN contenido.revisiones r ON r.id=pz.revision_vigente
+    SELECT i.orden, pz.id AS pieza_id, pz.numero, pz.titulo_interno, r.duracion_s, ${_avisoMedia} AS media,
+           pr.slug AS marca_slug, pr.nombre AS marca_nombre
+    FROM contenido.programa_items i
+      JOIN contenido.piezas pz ON pz.id=i.pieza_id
+      JOIN contenido.revisiones r ON r.id=pz.revision_vigente
+      JOIN contenido.proyectos pr ON pr.id=pz.proyecto_id
     WHERE i.programa_id=$1 ORDER BY i.orden`, [id]);
   p.items = items;
   return p;
 }
 
-async function crearPrograma(nombre, proyectoId) {
-  const { rows: [r] } = await pool.query(`INSERT INTO contenido.programas (nombre, proyecto_id) VALUES ($1,$2) RETURNING id`, [nombre || 'Programa', proyectoId]);
+async function crearPrograma(nombre, pantallaId) {
+  const { rows: [r] } = await pool.query(`INSERT INTO contenido.programas (nombre, pantalla_id) VALUES ($1,$2) RETURNING id`, [nombre || 'Programa', pantallaId]);
   return r.id;
 }
 
-async function guardarPrograma(id, nombre, piezaIds, proyectoId) {
+async function guardarPrograma(id, nombre, piezaIds, pantallaId) {
   const cli = await pool.connect();
   try {
     await cli.query('BEGIN');
-    // Verifica que el programa sea de la marca activa antes de tocarlo.
-    const { rowCount: own } = await cli.query('SELECT 1 FROM contenido.programas WHERE id=$1 AND proyecto_id=$2', [id, proyectoId]);
+    // Verifica que el programa sea de ESTA pantalla antes de tocarlo.
+    const { rowCount: own } = await cli.query('SELECT 1 FROM contenido.programas WHERE id=$1 AND pantalla_id=$2', [id, pantallaId]);
     if (!own) { await cli.query('ROLLBACK'); return false; }
     if (nombre != null) await cli.query('UPDATE contenido.programas SET nombre=$2 WHERE id=$1', [id, nombre]);
     await cli.query('DELETE FROM contenido.programa_items WHERE programa_id=$1', [id]);
@@ -241,22 +264,22 @@ async function guardarPrograma(id, nombre, piezaIds, proyectoId) {
   return true;
 }
 
-async function activarPrograma(id, proyectoId) {
-  // Desactiva solo los de ESTA marca (no toca el programa activo de otras marcas).
+async function activarPrograma(id, pantallaId) {
+  // Un solo programa activo por pantalla (desactiva los otros de la MISMA pantalla).
   const { rowCount } = await pool.query(
     `UPDATE contenido.programas SET activo=(id=$1), actualizado_en=now()
-       WHERE proyecto_id=$2 AND (activo OR id=$1)`, [id, proyectoId]);
+       WHERE pantalla_id=$2 AND (activo OR id=$1)`, [id, pantallaId]);
   return rowCount > 0;
 }
 
-async function eliminarPrograma(id, proyectoId) {
-  const { rowCount } = await pool.query(`DELETE FROM contenido.programas WHERE id=$1 AND proyecto_id=$2`, [id, proyectoId]);
+async function eliminarPrograma(id, pantallaId) {
+  const { rowCount } = await pool.query(`DELETE FROM contenido.programas WHERE id=$1 AND pantalla_id=$2`, [id, pantallaId]);
   return rowCount > 0;
 }
 
-// Playlist del programa ACTIVO de una marca (la consume el player de la pantalla).
-async function getActivoPlaylist(proyectoId) {
-  const { rows: [p] } = await pool.query(`SELECT id, nombre, actualizado_en FROM contenido.programas WHERE activo AND proyecto_id=$1 LIMIT 1`, [proyectoId]);
+// Playlist del programa ACTIVO de una pantalla (la consume el player). Mezcla avisos de varios proyectos.
+async function getActivoPlaylist(pantallaId) {
+  const { rows: [p] } = await pool.query(`SELECT id, nombre, actualizado_en FROM contenido.programas WHERE activo AND pantalla_id=$1 LIMIT 1`, [pantallaId]);
   if (!p) return { version: 'none', nombre: null, items: [] };
   const { rows: items } = await pool.query(`
     SELECT (SELECT m.url FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1) AS url,
@@ -276,5 +299,6 @@ module.exports = { getMarcas, getProyectoId,
   getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getTokenPendiente,
   pedirPropuestas, setMaterial, activarReq, descartarReq, insertMencion,
   getPostIdsPublicados, upsertMetricas,
+  getPantallaActiva, getPantallaPorSlug,
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
   health };

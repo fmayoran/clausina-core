@@ -33,6 +33,9 @@
   .pgline .tt{font-weight:700;color:var(--white);}
   .pgline .mm{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--ash);}
   .actbadge{font-family:'IBM Plex Mono',monospace;font-size:.58rem;text-transform:uppercase;color:#0c0c0a;background:#5ec27a;border-radius:9px;padding:1px 7px;}
+  .mbadge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:.56rem;text-transform:uppercase;letter-spacing:.04em;border-radius:8px;padding:1px 6px;margin-right:5px;background:#2a2a24;color:var(--chalk);}
+  .mbadge.cortafuego{background:#3a1c10;color:var(--ember);}
+  .mbadge.ardora{background:#102a2a;color:#5ec2b0;}
 </style>
 </head>
 <body>
@@ -86,9 +89,11 @@ async function cargar(){
     renderItems();
   }catch(e){}
 }
+const _mn = s => (s||'').split('—')[0].split('|')[0].trim();           // "ARDORA | Paseo…" -> "ARDORA"
+const mBadge = a => a.marca_slug ? `<span class="mbadge ${esc(a.marca_slug)}">${esc(_mn(a.marca_nombre)||a.marca_slug)}</span>` : '';
 function avCard(a){
   const p=(a.media||{}).poster_url||(a.media||{}).url||'';
-  return `<div class="avitem"><img loading="lazy" src="${esc(p)}"><div class="sp"><div class="tt">${esc(a.titulo_interno)}</div><div class="mm">CF-${String(a.numero).padStart(4,'0')} · ${a.duracion_s||10}s · ${esc(a.momento||'')}</div></div><button class="ibtn fire" onclick="agregar('${a.id}')">Agregar ▸</button></div>`;
+  return `<div class="avitem"><img loading="lazy" src="${esc(p)}"><div class="sp"><div class="tt">${esc(a.titulo_interno)}</div><div class="mm">${mBadge(a)}#${String(a.numero).padStart(4,'0')} · ${a.duracion_s||10}s · ${esc(a.momento||'')}</div></div><button class="ibtn fire" onclick="agregar('${a.id}')">Agregar ▸</button></div>`;
 }
 function agregar(id){ prog.items.push(id); renderItems(); }
 function quitar(i){ prog.items.splice(i,1); renderItems(); }
@@ -96,7 +101,7 @@ function mover(i,d){ const j=i+d; if(j<0||j>=prog.items.length)return; const t=p
 function renderItems(){
   const c=document.getElementById('items');
   c.innerHTML = prog.items.length ? prog.items.map((id,i)=>{const a=byId(id)||{};const p=(a.media||{}).poster_url||'';
-    return `<div class="pgline"><div class="ord"><button onclick="mover(${i},-1)">▲</button><button onclick="mover(${i},1)">▼</button></div><img class="avitem" style="width:36px;height:54px;object-fit:cover;border:0;border-radius:4px" src="${esc(p)}"><div class="sp"><div class="tt" style="font-size:.92rem">${esc(a.titulo_interno||'?')}</div><div class="mm">CF-${a.numero?String(a.numero).padStart(4,'0'):'?'} · ${a.duracion_s||10}s</div></div><button class="ibtn" onclick="quitar(${i})">✕</button></div>`;
+    return `<div class="pgline"><div class="ord"><button onclick="mover(${i},-1)">▲</button><button onclick="mover(${i},1)">▼</button></div><img class="avitem" style="width:36px;height:54px;object-fit:cover;border:0;border-radius:4px" src="${esc(p)}"><div class="sp"><div class="tt" style="font-size:.92rem">${esc(a.titulo_interno||'?')}</div><div class="mm">${mBadge(a)}#${a.numero?String(a.numero).padStart(4,'0'):'?'} · ${a.duracion_s||10}s</div></div><button class="ibtn" onclick="quitar(${i})">✕</button></div>`;
   }).join('') : '<div class="empty">— agregá avisos de la izquierda —</div>';
   document.getElementById('n-it').textContent=prog.items.length||'';
   const tot=prog.items.reduce((s,id)=>s+((byId(id)||{}).duracion_s||10),0);

@@ -293,6 +293,7 @@ async function loadAvisos(){
 const _nm = s => (s||'').split('—')[0].trim();   // "Ardora — Distrito" -> "Ardora"
 async function initMarca(){
   const header=document.querySelector('header'); if(!header) return;
+  if(document.querySelector('.playbar')) return;   // página de PANTALLA (programación): es cross-marca, sin selector
   let data; try{ data=await fetch('api/marcas').then(r=>r.json()); }catch(_){ return; }
   if(!data || !data.marcas) return;
   const activa=data.activa, act=data.marcas.find(m=>m.slug===activa);
@@ -308,8 +309,5 @@ async function initMarca(){
     sel.onchange=async()=>{ try{ await fetch('api/marca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:sel.value})}); }catch(_){} location.reload(); };
     nav.insertBefore(sel, nav.firstChild);
   }
-  // URL del player en la playbar de programación, con la marca activa.
-  const pb=document.querySelector('.playbar b');
-  if(pb && activa) pb.textContent='cortafuego.ar/panel/play'+(activa==='cortafuego'?'':('?marca='+activa));
 }
 initMarca();

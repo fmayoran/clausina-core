@@ -83,12 +83,12 @@ app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxA
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 // Públicos para la PANTALLA: el reproductor (kiosco) y la playlist activa que poolea.
 app.get('/play', (req, res) => { res.set('Cache-Control', 'no-cache'); res.sendFile(path.join(__dirname, 'public', 'pantalla-play.html')); });
-// Player público: la marca viene por query param (cada pantalla pertenece a una marca). Default cortafuego.
+// Player público: la pantalla viene por query param (?pantalla=<slug>); default = la pantalla activa.
 app.get('/api/pantalla/activo', async (req, res) => {
   try {
-    const slug = String(req.query.marca || 'cortafuego');
-    const pid = (await db.getProyectoId(slug)) || (await db.getProyectoId('cortafuego'));
-    res.set('Cache-Control', 'no-store'); res.json(await db.getActivoPlaylist(pid));
+    const pa = req.query.pantalla ? await db.getPantallaPorSlug(String(req.query.pantalla)) : await db.getPantallaActiva();
+    res.set('Cache-Control', 'no-store');
+    res.json(pa ? await db.getActivoPlaylist(pa.id) : { version: 'none', nombre: null, items: [] });
   } catch (e) { console.error('activo', e.message); res.status(500).json({ error: 'db', items: [] }); }
 });
 app.post('/api/login', (req, res) => {
@@ -264,43 +264,53 @@ app.post('/api/requerimientos/:id/material', async (req, res) => {
   } catch (e) { console.error('material', e.message); res.status(500).json({ ok: false, error: 'upload' }); }
 });
 
-// --- Programación de pantalla (privado) ---
+// --- Programación de pantalla (privado) — a nivel PANTALLA, cross-proyecto (no usa la marca activa) ---
+// Resuelve la pantalla destino: ?pantalla=<slug> o la pantalla activa por defecto.
+async function resolvePantalla(req) {
+  return req.query.pantalla ? db.getPantallaPorSlug(String(req.query.pantalla)) : db.getPantallaActiva();
+}
 app.get('/api/avisos-aprobados', async (req, res) => {
-  try { res.json(await db.getAvisosAprobados(req.proyectoId)); }
+  try { res.json(await db.getAvisosAprobados()); }   // de TODOS los proyectos (mix)
   catch (e) { console.error('avisos-aprob', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.get('/api/programas', async (req, res) => {
-  try { res.json(await db.getProgramas(req.proyectoId)); }
+  try { const pa = await resolvePantalla(req); res.json(pa ? await db.getProgramas(pa.id) : []); }
   catch (e) { console.error('programas', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.get('/api/programas/:id', async (req, res) => {
-  try { const p = await db.getPrograma(req.params.id, req.proyectoId); p ? res.json(p) : res.status(404).json({ error: 'no_existe' }); }
-  catch (e) { console.error('programa', e.message); res.status(500).json({ error: 'db' }); }
+  try {
+    const pa = await resolvePantalla(req); if (!pa) return res.status(404).json({ error: 'sin_pantalla' });
+    const p = await db.getPrograma(req.params.id, pa.id); p ? res.json(p) : res.status(404).json({ error: 'no_existe' });
+  } catch (e) { console.error('programa', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/programas', async (req, res) => {
-  try { res.json({ ok: true, id: await db.crearPrograma(String((req.body && req.body.nombre) || 'Programa').slice(0, 120), req.proyectoId) }); }
-  catch (e) { console.error('crear prog', e.message); res.status(500).json({ ok: false }); }
+  try {
+    const pa = await resolvePantalla(req); if (!pa) return res.status(409).json({ ok: false, error: 'sin_pantalla' });
+    res.json({ ok: true, id: await db.crearPrograma(String((req.body && req.body.nombre) || 'Programa').slice(0, 120), pa.id) });
+  } catch (e) { console.error('crear prog', e.message); res.status(500).json({ ok: false }); }
 });
 app.put('/api/programas/:id', async (req, res) => {
   try {
+    const pa = await resolvePantalla(req); if (!pa) return res.status(409).json({ ok: false, error: 'sin_pantalla' });
     const nombre = req.body && req.body.nombre != null ? String(req.body.nombre).slice(0, 120) : null;
     const piezas = Array.isArray(req.body && req.body.piezas) ? req.body.piezas : [];
-    res.json({ ok: await db.guardarPrograma(req.params.id, nombre, piezas, req.proyectoId) });
+    res.json({ ok: await db.guardarPrograma(req.params.id, nombre, piezas, pa.id) });
   } catch (e) { console.error('guardar prog', e.message); res.status(500).json({ ok: false }); }
 });
 app.post('/api/programas/:id/activar', async (req, res) => {
-  try { res.json({ ok: await db.activarPrograma(req.params.id, req.proyectoId) }); }
+  try { const pa = await resolvePantalla(req); res.json({ ok: pa ? await db.activarPrograma(req.params.id, pa.id) : false }); }
   catch (e) { console.error('activar prog', e.message); res.status(500).json({ ok: false }); }
 });
 app.delete('/api/programas/:id', async (req, res) => {
-  try { res.json({ ok: await db.eliminarPrograma(req.params.id, req.proyectoId) }); }
+  try { const pa = await resolvePantalla(req); res.json({ ok: pa ? await db.eliminarPrograma(req.params.id, pa.id) : false }); }
   catch (e) { console.error('del prog', e.message); res.status(500).json({ ok: false }); }
 });
 
 // Descarga del programa como .zip autocontenido: los mp4 en orden + manifest.json (para reproducir offline en la pantalla).
 app.get('/api/programas/:id/download', async (req, res) => {
   try {
-    const prog = await db.getPrograma(req.params.id, req.proyectoId);
+    const pa = await resolvePantalla(req); if (!pa) return res.status(404).json({ error: 'sin_pantalla' });
+    const prog = await db.getPrograma(req.params.id, pa.id);
     if (!prog) return res.status(404).json({ error: 'no_existe' });
     const items = (prog.items || []).filter(it => it.media && it.media.url);
     if (!items.length) return res.status(409).json({ error: 'programa_vacio' });
@@ -315,12 +325,13 @@ app.get('/api/programas/:id/download', async (req, res) => {
     let idx = 0;
     for (const it of items) {
       idx++;
-      const fname = `${String(idx).padStart(2, '0')}_CF-${String(it.numero).padStart(4, '0')}.mp4`;
+      const label = (it.marca_slug || 'aviso') + '-' + String(it.numero).padStart(4, '0');
+      const fname = `${String(idx).padStart(2, '0')}_${label}.mp4`;
       try {
         const r = await fetch(it.media.url, { signal: AbortSignal.timeout(30000) });
         if (!r.ok) { console.error('zip fetch', it.media.url, r.status); continue; }
         archive.append(Buffer.from(await r.arrayBuffer()), { name: fname });
-        manifest.items.push({ orden: idx, archivo: fname, numero: it.numero, titulo: it.titulo_interno, duracion_s: it.duracion_s || 10 });
+        manifest.items.push({ orden: idx, archivo: fname, marca: it.marca_slug, numero: it.numero, titulo: it.titulo_interno, duracion_s: it.duracion_s || 10 });
       } catch (e) { console.error('zip item', it.numero, e.message); }
     }
     archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
@@ -345,7 +356,8 @@ app.get('/api/pantalla/vnnox', async (req, res) => {
 app.post('/api/programas/:id/enviar-pantalla', async (req, res) => {
   try {
     if (!vnnox.configured()) return res.status(503).json({ ok: false, error: 'vnnox_no_configurado' });
-    const prog = await db.getPrograma(req.params.id, req.proyectoId);
+    const pa = await resolvePantalla(req); if (!pa) return res.status(404).json({ ok: false, error: 'sin_pantalla' });
+    const prog = await db.getPrograma(req.params.id, pa.id);
     if (!prog) return res.status(404).json({ ok: false, error: 'no_existe' });
     const items = (prog.items || []).filter(it => it.media && it.media.url);
     if (!items.length) return res.status(409).json({ ok: false, error: 'programa_vacio' });
@@ -359,10 +371,12 @@ app.post('/api/programas/:id/enviar-pantalla', async (req, res) => {
         md5: crypto.createHash('md5').update(buf).digest('hex'),
         size: buf.length,
         durMs: (it.duracion_s || 10) * 1000,
-        label: 'CF-' + String(it.numero).padStart(4, '0'),
+        label: (it.marca_slug || 'aviso') + '-' + String(it.numero).padStart(4, '0'),
       });
     }
-    const out = await vnnox.publishProgram(vids);
+    const fecha = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const playerIds = (pa.vnnox_player_ids && pa.vnnox_player_ids.length) ? pa.vnnox_player_ids : null;
+    const out = await vnnox.publishProgram(vids, playerIds, `${prog.nombre} · ${fecha}`);
     const ok = out.status >= 200 && out.status < 300;
     res.json({ ok, status: out.status, resp: out.json });
   } catch (e) { console.error('enviar-pantalla', e.message); res.status(500).json({ ok: false, error: 'vnnox' }); }

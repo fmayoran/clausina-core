@@ -21,10 +21,10 @@
   </div>
   <div id="idle"></div>
 <script>
-// Cada pantalla pertenece a una marca: se elige con ?marca=<slug> en la URL del player.
-const MARCA=new URLSearchParams(location.search).get('marca')||'';
-const API='api/pantalla/activo'+(MARCA?('?marca='+encodeURIComponent(MARCA)):'');
-document.getElementById('idle').textContent=(MARCA||'cortafuego').toUpperCase();
+// La pantalla se elige con ?pantalla=<slug> en la URL del player; por defecto, la pantalla activa.
+const PANTALLA=new URLSearchParams(location.search).get('pantalla')||'';
+const API='api/pantalla/activo'+(PANTALLA?('?pantalla='+encodeURIComponent(PANTALLA)):'');
+document.getElementById('idle').textContent=(PANTALLA||'pantalla').toUpperCase();
 let items=[], version='', idx=0, pending=null, started=false, busy=false;
 let cur=document.getElementById('vA'), nxt=document.getElementById('vB');
 const idle=document.getElementById('idle');
