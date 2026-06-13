@@ -13,6 +13,9 @@
   .ibtn:hover{color:var(--chalk);border-color:var(--ash);}
   .ibtn.fire{color:var(--ember);border-color:#43352a;}
   .ibtn.fire:hover{background:var(--fire);border-color:var(--fire);color:#0c0c0a;}
+  .navcta{color:var(--ember)!important;border-color:var(--ember)!important;}
+  .navcta:hover{background:var(--fire)!important;color:#0c0c0a!important;}
+  .wrap{padding-top:24px;}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
   .pj{border:1px solid var(--line);border-radius:10px;background:#0c0c0a;padding:16px;display:flex;flex-direction:column;gap:11px;}
   .pj h3{margin:0;font-family:'Barlow Condensed',sans-serif;font-size:1.55rem;color:var(--white);font-weight:700;display:flex;align-items:center;gap:9px;}
@@ -33,16 +36,12 @@
     <span class="sub">Dashboard · proyectos</span>
     <span class="upd" id="upd"></span>
     <nav>
-      <a href="audiovisual">Audiovisual</a>
+      <a href="audiovisual" class="navcta">Gestión de Pantallas</a>
       <button class="logout" onclick="salir()">Salir</button>
     </nav>
   </header>
   <div id="toast"></div>
   <div class="wrap">
-    <div class="toolbar">
-      <div class="ft">Proyectos <span class="n" id="n-pj"></span></div>
-      <a class="ibtn" href="audiovisual">▶ Audiovisual (pantallas)</a>
-    </div>
     <div class="grid" id="grid"></div>
   </div>
 <script src="panel.js"></script>
@@ -51,7 +50,6 @@ async function cargar(){
   try{
     const r=await fetch('api/agencia'); if(r.status===401){location.href='login';return;}
     const ps=await r.json();
-    document.getElementById('n-pj').textContent=ps.length||'';
     document.getElementById('grid').innerHTML = ps.length ? ps.map(card).join('') : '<div class="empty">— sin proyectos —</div>';
     const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR');
   }catch(e){}

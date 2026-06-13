@@ -28,21 +28,23 @@ async function getProyectoId(slug) {
   return f ? f.id : null;
 }
 
-// --- Perfil del proyecto (registro que consume el creativo): secciones + brief ---
-const PERFIL_COLS = ['propuesta_valor', 'publico', 'tono', 'lineamientos_visuales', 'hacer', 'evitar', 'productos_servicios', 'datos_clave', 'brief_md'];
+// --- Perfil del proyecto (registro que consume el creativo): marca + slogan + logo + brief ---
 async function getPerfil(proyectoId) {
   const { rows: [r] } = await pool.query(
-    `SELECT ${PERFIL_COLS.join(', ')}, actualizado_en FROM contenido.proyecto_perfil WHERE proyecto_id=$1`, [proyectoId]);
+    `SELECT p.nombre, pp.slogan, pp.logo, pp.brief_md, pp.actualizado_en
+       FROM contenido.proyectos p LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id
+      WHERE p.id=$1`, [proyectoId]);
   return r || {};
 }
 async function guardarPerfil(proyectoId, d) {
-  const vals = PERFIL_COLS.map(c => (d[c] != null && String(d[c]).trim() !== '') ? String(d[c]) : null);
+  const nn = s => (s != null && String(s).trim() !== '') ? String(s).trim() : null;
+  if (nn(d.nombre)) await pool.query('UPDATE contenido.proyectos SET nombre=$2 WHERE id=$1', [proyectoId, nn(d.nombre)]);
   await pool.query(`
-    INSERT INTO contenido.proyecto_perfil (proyecto_id, ${PERFIL_COLS.join(', ')}, actualizado_en)
-    VALUES ($1, ${PERFIL_COLS.map((_, i) => '$' + (i + 2)).join(', ')}, now())
-    ON CONFLICT (proyecto_id) DO UPDATE SET
-      ${PERFIL_COLS.map((c, i) => `${c}=$${i + 2}`).join(', ')}, actualizado_en=now()`,
-    [proyectoId, ...vals]);
+    INSERT INTO contenido.proyecto_perfil (proyecto_id, slogan, logo, brief_md, actualizado_en)
+    VALUES ($1,$2,$3,$4, now())
+    ON CONFLICT (proyecto_id) DO UPDATE SET slogan=$2, logo=$3, brief_md=$4, actualizado_en=now()`,
+    [proyectoId, nn(d.slogan), nn(d.logo), nn(d.brief_md)]);
+  _marcasAt = 0;   // el nombre pudo cambiar -> refrescar cache de marcas
   return true;
 }
 
@@ -212,7 +214,7 @@ const _avisoMedia = `(SELECT json_build_object('url',m.url,'poster_url',m.poster
 async function getResumenAgencia() {
   const { rows } = await pool.query(`
     SELECT p.id, p.slug, p.nombre, p.activo, p.ig_handle,
-      left(coalesce(pp.propuesta_valor,''), 180) AS descripcion,
+      coalesce(nullif(pp.slogan,''), left(coalesce(pp.brief_md,''), 160)) AS descripcion,
       (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='instagram' AND pz.estado='pendiente_aprobacion') AS ig_pend,
       (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='instagram' AND pz.estado='publicada') AS ig_pub,
       (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='aviso' AND pz.estado='pendiente_aprobacion') AS av_pend,

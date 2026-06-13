@@ -300,14 +300,6 @@ async function initMarca(){
   // El logo y el título reflejan la marca activa (no "perder el contexto de marca").
   const logo=header.querySelector('.logo');
   if(logo && act){ logo.innerHTML=esc(_nm(act.nombre)).toUpperCase(); document.title=_nm(act.nombre)+' — Panel'; }
-  // Selector (solo si hay más de una marca).
-  if(data.marcas.length>1){
-    const nav=header.querySelector('nav')||header;
-    const sel=document.createElement('select');
-    sel.className='marcasel'; sel.title='Marca activa';
-    sel.innerHTML=data.marcas.map(m=>`<option value="${esc(m.slug)}" ${m.slug===activa?'selected':''}>${esc(_nm(m.nombre))}${m.activo?'':' (inactiva)'}</option>`).join('');
-    sel.onchange=async()=>{ try{ await fetch('api/marca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:sel.value})}); }catch(_){} location.reload(); };
-    nav.insertBefore(sel, nav.firstChild);
-  }
+  // El cambio de proyecto se hace desde el dashboard de la Agencia (no hay selector en las páginas).
 }
 initMarca();

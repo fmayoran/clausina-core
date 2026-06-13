@@ -14,9 +14,10 @@
   .fld.full{grid-column:1/-1;}
   .fld label{font-family:'IBM Plex Mono',monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ember);}
   .fld .hint{font-family:'IBM Plex Mono',monospace;font-size:.56rem;color:var(--ash);text-transform:none;letter-spacing:0;}
-  textarea{background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:1.02rem;line-height:1.35;padding:10px 11px;outline:none;resize:vertical;min-height:80px;}
-  textarea:focus{border-color:var(--ember);}
-  .full textarea{min-height:160px;}
+  textarea,input[type=text]{background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:1.02rem;line-height:1.35;padding:10px 11px;outline:none;resize:vertical;}
+  textarea{min-height:80px;}
+  textarea:focus,input[type=text]:focus{border-color:var(--ember);}
+  .full textarea{min-height:360px;}
   .bar{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);padding:16px 0 4px;display:flex;align-items:center;gap:14px;margin-top:16px;}
   .ibtn{background:transparent;border:1px solid var(--ember);color:var(--ember);font-family:'IBM Plex Mono',monospace;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;padding:9px 18px;border-radius:6px;cursor:pointer;}
   .ibtn:hover{background:var(--fire);border-color:var(--fire);color:#0c0c0a;}
@@ -35,17 +36,12 @@
   </header>
   <div id="toast"></div>
   <div class="wrap">
-    <div class="intro">Este es el registro de marca que consume el creativo para producir contenido. Cambiá de proyecto con el selector de arriba. Lo que cargues acá es la fuente de verdad del contexto.</div>
+    <div class="intro">Registro de marca que consume el creativo. Es la fuente de verdad del contexto. Para cambiar de proyecto, volvé al panel principal (Agencia).</div>
     <div class="grid">
-      <div class="fld"><label>Propuesta de valor</label><textarea id="propuesta_valor"></textarea></div>
-      <div class="fld"><label>Público objetivo</label><textarea id="publico"></textarea></div>
-      <div class="fld"><label>Tono y voz <span class="hint">— registro, emojis sí/no, frases tipo</span></label><textarea id="tono"></textarea></div>
-      <div class="fld"><label>Lineamientos visuales <span class="hint">— paleta, tipografía, logo, estética</span></label><textarea id="lineamientos_visuales"></textarea></div>
-      <div class="fld"><label>Hacer (do's)</label><textarea id="hacer"></textarea></div>
-      <div class="fld"><label>Evitar (don'ts)</label><textarea id="evitar"></textarea></div>
-      <div class="fld"><label>Productos / servicios</label><textarea id="productos_servicios"></textarea></div>
-      <div class="fld"><label>Datos clave <span class="hint">— ubicación, horarios, canales, fechas</span></label><textarea id="datos_clave"></textarea></div>
-      <div class="fld full"><label>Brief <span class="hint">— narrativa libre, contexto profundo</span></label><textarea id="brief_md"></textarea></div>
+      <div class="fld"><label>Marca</label><input type="text" id="nombre"></div>
+      <div class="fld"><label>Slogan</label><input type="text" id="slogan"></div>
+      <div class="fld full"><label>Logo <span class="hint">— archivo/ubicación del logo oficial de la marca</span></label><input type="text" id="logo"></div>
+      <div class="fld full"><label>Brief <span class="hint">— todo el contexto: propuesta de valor, tono, público, lineamientos visuales, hacer/evitar, productos, datos clave</span></label><textarea id="brief_md"></textarea></div>
     </div>
     <div class="bar">
       <button class="ibtn" onclick="guardar()">Guardar perfil</button>
@@ -54,7 +50,7 @@
   </div>
 <script src="panel.js"></script>
 <script>
-const CAMPOS=['propuesta_valor','publico','tono','lineamientos_visuales','hacer','evitar','productos_servicios','datos_clave','brief_md'];
+const CAMPOS=['nombre','slogan','logo','brief_md'];
 async function cargar(){
   try{
     const r=await fetch('api/perfil'); if(r.status===401){location.href='login';return;}
