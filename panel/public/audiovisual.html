@@ -3,26 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Audiovisual — Pantallas</title>
+<title>Audiovisual — Pantallas y programación</title>
 <link rel="stylesheet" href="panel.css">
 <style>
-  .wrap{padding:20px 28px 60px;}
+  .wrap{padding:18px 28px 60px;}
   .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;}
-  .ibtn{background:transparent;border:1px solid var(--line);color:var(--ash);font-family:'IBM Plex Mono',monospace;font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;padding:7px 12px;border-radius:5px;cursor:pointer;}
+  .ft{font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;color:var(--white);font-weight:700;}
+  .ibtn{background:transparent;border:1px solid var(--line);color:var(--ash);font-family:'IBM Plex Mono',monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;padding:6px 11px;border-radius:5px;cursor:pointer;text-decoration:none;display:inline-block;}
   .ibtn:hover{color:var(--chalk);border-color:var(--ash);}
   .ibtn.fire{color:var(--ember);border-color:#43352a;}
   .ibtn.fire:hover{background:var(--fire);border-color:var(--fire);color:#0c0c0a;}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
-  .pcard{border:1px solid var(--line);border-radius:8px;background:#0c0c0a;padding:14px;display:flex;flex-direction:column;gap:8px;}
-  .pcard h3{margin:0;font-family:'Barlow Condensed',sans-serif;font-size:1.4rem;color:var(--white);font-weight:700;display:flex;align-items:center;gap:8px;}
-  .pcard .loc{font-size:.82rem;color:var(--ash);}
-  .pcard .mm{font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--ash);display:flex;flex-wrap:wrap;gap:4px 12px;}
-  .pcard .mm b{color:var(--chalk);font-weight:400;}
+  .screen{border:1px solid var(--line);border-radius:9px;background:#0c0c0a;margin-bottom:16px;overflow:hidden;}
+  .shead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px 16px;border-bottom:1px solid var(--line);background:#0e0e0c;}
+  .shead h3{margin:0;font-family:'Barlow Condensed',sans-serif;font-size:1.4rem;color:var(--white);font-weight:700;display:flex;align-items:center;gap:8px;}
+  .shead .meta{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--ash);display:flex;flex-wrap:wrap;gap:3px 12px;}
+  .shead .sacts{margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;}
   .dot{width:9px;height:9px;border-radius:50%;background:#555;display:inline-block;flex:0 0 auto;}
   .dot.on{background:#5ec27a;} .dot.off{background:#b4503c;}
-  .pcard .acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px;}
-  .actrow{margin-left:auto;display:flex;gap:7px;}
-  /* form */
+  .plist{padding:10px 16px 14px;display:flex;flex-direction:column;gap:7px;}
+  .pgline{display:flex;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:#080806;}
+  .pgline.act{border-color:var(--fire);}
+  .pgline .sp{flex:1;min-width:0;}
+  .pgline .tt{font-weight:700;color:var(--white);font-size:1rem;}
+  .pgline .mm{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--ash);}
+  .actbadge{font-family:'IBM Plex Mono',monospace;font-size:.56rem;text-transform:uppercase;color:#0c0c0a;background:#5ec27a;border-radius:9px;padding:1px 7px;margin-left:6px;}
+  .pgline .pacts{display:flex;gap:5px;flex-wrap:wrap;}
+  .empty{color:var(--ash);font-size:.85rem;padding:4px 2px;}
   .form{border:1px solid var(--ember);border-radius:8px;background:#0c0c0a;padding:16px;margin-bottom:16px;display:none;flex-direction:column;gap:10px;max-width:560px;}
   .form.show{display:flex;}
   .form .row{display:flex;gap:10px;flex-wrap:wrap;}
@@ -30,13 +36,12 @@
   .form input[type=text],.form input[type=number]{background:#080806;border:1px solid var(--line);border-radius:5px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:1rem;padding:8px 10px;outline:none;}
   .form input:focus{border-color:var(--ember);}
   .form .chk{flex-direction:row;align-items:center;gap:7px;min-width:0;}
-  .ft{font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;color:var(--white);font-weight:700;}
 </style>
 </head>
 <body class="av">
   <header>
     <a class="logo" href=".">CORTA<b>FUEGO</b></a>
-    <span class="sub">Audiovisual · Pantallas</span>
+    <span class="sub">Audiovisual · Pantallas y programación</span>
     <span class="upd" id="upd"></span>
     <nav>
       <a href=".">Panel principal</a>
@@ -54,7 +59,7 @@
       <div class="ft" id="form-tt">Nueva pantalla</div>
       <input type="hidden" id="f-id">
       <div class="row">
-        <label>Nombre<input type="text" id="f-nombre" maxlength="120" placeholder="Pantalla Paseo Ardora"></label>
+        <label>Nombre<input type="text" id="f-nombre" maxlength="120" placeholder="Pantalla Esquina Paseo Ardora"></label>
         <label>Ubicación<input type="text" id="f-ubic" maxlength="200" placeholder="Ochava Av. Valentín Vergara"></label>
       </div>
       <div class="row">
@@ -62,56 +67,107 @@
         <label>Alto (px)<input type="number" id="f-alto" min="0" placeholder="1620"></label>
         <label class="chk">Activa <input type="checkbox" id="f-activo" checked></label>
       </div>
-      <label>Player(s) VNNOX (IDs separados por coma)<input type="text" id="f-players" placeholder="dba8454…, …"></label>
+      <label>Player(s) VNNOX (IDs separados por coma)<input type="text" id="f-players" placeholder="dba8454…"></label>
       <div class="row" style="margin-top:4px">
-        <button class="ibtn fire" onclick="guardar()">Guardar</button>
+        <button class="ibtn fire" onclick="guardarPantalla()">Guardar</button>
         <button class="ibtn" onclick="cerrarForm()">Cancelar</button>
       </div>
     </div>
 
-    <div class="grid" id="grid"></div>
+    <div id="screens"></div>
   </div>
 <script src="panel.js"></script>
 <script>
 let pantallas=[];
 const byId=id=>pantallas.find(p=>p.id===id);
-const dim=p=>(p.ancho&&p.alto)?`${p.ancho}×${p.alto}`:'sin definir';
+const dim=p=>(p.ancho&&p.alto)?`${p.ancho}×${p.alto}`:'resolución sin definir';
+let acting=false;
 
 async function cargar(){
   try{
     const r=await fetch('api/pantallas'); if(r.status===401){location.href='login';return;}
     pantallas=await r.json();
+    await Promise.all(pantallas.map(async p=>{ p._progs = await fetch('api/programas?pantalla='+encodeURIComponent(p.slug)).then(x=>x.json()).catch(()=>[]); }));
     document.getElementById('n-pa').textContent=pantallas.length||'';
-    document.getElementById('grid').innerHTML = pantallas.length ? pantallas.map(card).join('') : '<div class="empty">— sin pantallas; agregá la primera —</div>';
+    document.getElementById('screens').innerHTML = pantallas.length ? pantallas.map(card).join('') : '<div class="empty">— sin pantallas; agregá la primera —</div>';
     const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR');
   }catch(e){}
 }
 function card(p){
-  const on = p.online===true ? '<span class="dot on" title="online"></span>' : (p.online===false ? '<span class="dot off" title="offline"></span>' : '<span class="dot" title="estado desconocido"></span>');
-  const np = (p.vnnox_player_ids||[]).length;
-  const prog = p.programa_activo ? `<span><b>Programa activo:</b> ${esc(p.programa_activo)}</span>` : '<span>sin programa activo</span>';
-  return `<div class="pcard">
-    <h3>${on}${esc(p.nombre)} ${p.activo?'':'<span class="mm">(inactiva)</span>'}</h3>
-    <div class="loc">${esc(p.ubicacion||'—')}</div>
-    <div class="mm"><span><b>Resolución:</b> ${dim(p)}</span><span><b>Players:</b> ${np}</span><span><b>Programas:</b> ${p.n_programas}</span></div>
-    <div class="mm">${prog}</div>
-    <div class="acts">
-      <button class="ibtn fire" onclick="programar('${esc(p.slug)}')">Programar ▸</button>
-      <div class="actrow">
-        <button class="ibtn" onclick="editar('${p.id}')">Editar</button>
-        <button class="ibtn" onclick="eliminar('${p.id}','${esc(p.nombre)}')">Eliminar</button>
+  const on = p.online===true?'<span class="dot on" title="online"></span>':(p.online===false?'<span class="dot off" title="offline"></span>':'<span class="dot" title="estado desconocido"></span>');
+  const progs=(p._progs||[]);
+  const rows = progs.length ? progs.map(pr=>pgline(pr,p.slug)).join('') : '<div class="empty">— sin programas; creá uno con “+ Programa” —</div>';
+  return `<div class="screen">
+    <div class="shead">
+      <h3>${on}${esc(p.nombre)} ${p.activo?'':'<span class="meta">(inactiva)</span>'}</h3>
+      <div class="meta"><span>${esc(p.ubicacion||'—')}</span><span>${dim(p)}</span><span>players: ${(p.vnnox_player_ids||[]).length}</span></div>
+      <div class="sacts">
+        <button class="ibtn fire" onclick="nuevoP('${esc(p.slug)}')">+ Programa</button>
+        <a class="ibtn" href="play?pantalla=${encodeURIComponent(p.slug)}" target="_blank" rel="noopener">▶ Reproductor</a>
+        <button class="ibtn" onclick="editarPantalla('${p.id}')">Editar pantalla</button>
+        <button class="ibtn" onclick="eliminarPantalla('${p.id}','${esc(p.nombre)}')">Eliminar</button>
       </div>
+    </div>
+    <div class="plist">${rows}</div>
+  </div>`;
+}
+function pgline(pr,slug){
+  return `<div class="pgline ${pr.activo?'act':''}">
+    <div class="sp"><div class="tt">${esc(pr.nombre)}${pr.activo?'<span class="actbadge">en pantalla</span>':''}</div>
+      <div class="mm">${pr.n_items} aviso(s)</div></div>
+    <div class="pacts">
+      <button class="ibtn" onclick="editarP('${pr.id}','${esc(slug)}')">Editar</button>
+      ${pr.activo?'':`<button class="ibtn fire" onclick="activarP('${pr.id}','${esc(slug)}',this)">Activar</button>`}
+      ${pr.n_items>0?`<button class="ibtn" onclick="descargarP('${pr.id}','${esc(pr.nombre)}','${esc(slug)}',this)">Descargar</button>`:''}
+      ${pr.n_items>0?`<button class="ibtn fire" onclick="enviarP('${pr.id}','${esc(pr.nombre)}','${esc(slug)}',this)">A la pantalla</button>`:''}
+      <button class="ibtn" onclick="eliminarP('${pr.id}','${esc(pr.nombre)}','${esc(slug)}')">Eliminar</button>
     </div></div>`;
 }
-function programar(slug){ location.href='programacion?pantalla='+encodeURIComponent(slug); }
 
+/* ---- programas: acciones sobre la pantalla del slug ---- */
+function nuevoP(slug){ location.href='programacion?pantalla='+encodeURIComponent(slug); }
+function editarP(id,slug){ location.href='programacion?pantalla='+encodeURIComponent(slug)+'&programa='+id; }
+async function activarP(id,slug,btn){
+  if(acting) return; acting=true; if(btn){btn.disabled=true;btn.textContent='…';}
+  try{ const d=await fetch('api/programas/'+id+'/activar?pantalla='+encodeURIComponent(slug),{method:'POST'}).then(r=>r.json());
+    toast(d.ok?'Activado — la pantalla se actualiza sola':'No se pudo activar',!d.ok);
+  }catch(e){ toast('Error de conexión',true); } acting=false; cargar();
+}
+async function eliminarP(id,nombre,slug){
+  if(!confirm('Eliminar el programa "'+nombre+'"?')) return;
+  try{ const d=await fetch('api/programas/'+id+'?pantalla='+encodeURIComponent(slug),{method:'DELETE'}).then(r=>r.json());
+    toast(d.ok?'Eliminado':'No se pudo',!d.ok);
+  }catch(e){ toast('Error de conexión',true); } cargar();
+}
+async function descargarP(id,nombre,slug,btn){
+  const t=btn.textContent; btn.disabled=true; btn.textContent='Generando…';
+  try{
+    const r=await fetch('api/programas/'+id+'/download?pantalla='+encodeURIComponent(slug));
+    if(!r.ok){ toast('No se pudo generar el zip',true); return; }
+    const blob=await r.blob(); const s=(nombre||'programa').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'programa';
+    const u=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=u; a.download='programa-'+s+'.zip';
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u); toast('Descarga lista');
+  }catch(e){ toast('Error al descargar',true); } finally{ btn.disabled=false; btn.textContent=t; }
+}
+async function enviarP(id,nombre,slug,btn){
+  if(!confirm('Publicar "'+nombre+'" en la pantalla LED (vía VNNOX). Cambia lo que se ve. ¿Confirmás?')) return;
+  const t=btn.textContent; btn.disabled=true; btn.textContent='Enviando…';
+  try{
+    const r=await fetch('api/programas/'+id+'/enviar-pantalla?pantalla='+encodeURIComponent(slug),{method:'POST'});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.ok) toast('Enviado — la pantalla está descargando el programa');
+    else { toast('No se pudo enviar ('+(d.error||d.status||r.status)+')',true); console.log('VNNOX:',d); }
+  }catch(e){ toast('Error de conexión con VNNOX',true); } finally{ btn.disabled=false; btn.textContent=t; }
+}
+
+/* ---- pantallas: alta / edición / baja ---- */
 function nueva(){
   document.getElementById('form-tt').textContent='Nueva pantalla';
   ['f-id','f-nombre','f-ubic','f-ancho','f-alto','f-players'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-activo').checked=true;
-  document.getElementById('form').classList.add('show');
+  document.getElementById('form').classList.add('show'); window.scrollTo({top:0,behavior:'smooth'});
 }
-function editar(id){
+function editarPantalla(id){
   const p=byId(id); if(!p) return;
   document.getElementById('form-tt').textContent='Editar pantalla';
   document.getElementById('f-id').value=p.id;
@@ -121,39 +177,31 @@ function editar(id){
   document.getElementById('f-alto').value=p.alto||'';
   document.getElementById('f-players').value=(p.vnnox_player_ids||[]).join(', ');
   document.getElementById('f-activo').checked=!!p.activo;
-  document.getElementById('form').classList.add('show');
-  window.scrollTo({top:0,behavior:'smooth'});
+  document.getElementById('form').classList.add('show'); window.scrollTo({top:0,behavior:'smooth'});
 }
 function cerrarForm(){ document.getElementById('form').classList.remove('show'); }
-async function guardar(){
+async function guardarPantalla(){
   const id=document.getElementById('f-id').value;
-  const body={
-    nombre:document.getElementById('f-nombre').value.trim(),
-    ubicacion:document.getElementById('f-ubic').value.trim(),
-    ancho:document.getElementById('f-ancho').value||null,
-    alto:document.getElementById('f-alto').value||null,
-    vnnox_player_ids:document.getElementById('f-players').value,
-    activo:document.getElementById('f-activo').checked,
-  };
-  if(!body.nombre){ toast('Poné un nombre', true); return; }
+  const body={ nombre:document.getElementById('f-nombre').value.trim(), ubicacion:document.getElementById('f-ubic').value.trim(),
+    ancho:document.getElementById('f-ancho').value||null, alto:document.getElementById('f-alto').value||null,
+    vnnox_player_ids:document.getElementById('f-players').value, activo:document.getElementById('f-activo').checked };
+  if(!body.nombre){ toast('Poné un nombre',true); return; }
   try{
-    const r = id
-      ? await fetch('api/pantallas/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-      : await fetch('api/pantallas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const r = id ? await fetch('api/pantallas/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+                 : await fetch('api/pantallas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json().catch(()=>({}));
-    if(r.ok && (d.ok!==false)){ toast(id?'Pantalla actualizada':'Pantalla creada'); cerrarForm(); cargar(); }
-    else toast('No se pudo guardar ('+(d.error||r.status)+')', true);
-  }catch(e){ toast('Error de conexión', true); }
+    if(r.ok&&(d.ok!==false)){ toast(id?'Pantalla actualizada':'Pantalla creada'); cerrarForm(); cargar(); }
+    else toast('No se pudo guardar ('+(d.error||r.status)+')',true);
+  }catch(e){ toast('Error de conexión',true); }
 }
-async function eliminar(id,nombre){
+async function eliminarPantalla(id,nombre){
   if(!confirm('Eliminar la pantalla "'+nombre+'"?')) return;
   try{
-    const r=await fetch('api/pantallas/'+id,{method:'DELETE'});
-    const d=await r.json().catch(()=>({}));
-    if(r.ok && d.ok) { toast('Eliminada'); cargar(); }
-    else if(d.error==='tiene_programas') toast('No se puede: tiene '+d.n+' programa(s). Borralos primero.', true);
-    else toast('No se pudo eliminar', true);
-  }catch(e){ toast('Error de conexión', true); }
+    const r=await fetch('api/pantallas/'+id,{method:'DELETE'}); const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.ok){ toast('Eliminada'); cargar(); }
+    else if(d.error==='tiene_programas') toast('No se puede: tiene '+d.n+' programa(s). Borralos primero.',true);
+    else toast('No se pudo eliminar',true);
+  }catch(e){ toast('Error de conexión',true); }
 }
 cargar();
 </script>

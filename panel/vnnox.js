@@ -36,7 +36,7 @@ const listPlayers = () => api('GET', '/v2/player/list?count=50');
 
 // Publica un programa = secuencia de videos a pantalla completa (una página por video; loopea).
 // items: [{ url, md5, size, durMs, label }]
-async function publishProgram(items, playerIds) {
+async function publishProgram(items, playerIds, name) {
   const pages = items.map((it, i) => ({
     name: it.label || ('p' + (i + 1)),
     repeatCount: 1,
@@ -46,10 +46,9 @@ async function publishProgram(items, playerIds) {
     }],
   }));
   // Sin "schedule" => reproducción 24 h (default de la API).
-  return api('POST', '/v2/player/program/normal', {
-    playerIds: (playerIds && playerIds.length) ? playerIds : PLAYER_IDS,
-    pages,
-  });
+  const body = { playerIds: (playerIds && playerIds.length) ? playerIds : PLAYER_IDS, pages };
+  if (name) body.name = name;
+  return api('POST', '/v2/player/program/normal', body);
 }
 
 module.exports = { configured, listPlayers, publishProgram, PLAYER_IDS, BASE };
