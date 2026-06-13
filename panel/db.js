@@ -18,7 +18,9 @@ let _marcas = null, _marcasAt = 0;
 async function getMarcas() {
   if (!_marcas || Date.now() - _marcasAt > 60000) {
     const { rows } = await pool.query(
-      `SELECT id, slug, nombre, activo FROM contenido.proyectos ORDER BY activo DESC, creado_en`);
+      `SELECT p.id, p.slug, p.nombre, p.activo, pp.logo
+         FROM contenido.proyectos p LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id
+        ORDER BY p.activo DESC, p.creado_en`);
     _marcas = rows; _marcasAt = Date.now();
   }
   return _marcas;

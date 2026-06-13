@@ -128,7 +128,7 @@ app.use(async (req, res, next) => {
 // Lista de marcas (para el selector) + cuál está activa en esta sesión.
 app.get('/api/marcas', async (req, res) => {
   try {
-    const marcas = (await db.getMarcas()).map(m => ({ slug: m.slug, nombre: m.nombre, activo: m.activo }));
+    const marcas = (await db.getMarcas()).map(m => ({ slug: m.slug, nombre: m.nombre, activo: m.activo, logo: m.logo }));
     res.json({ marcas, activa: req.marca });
   } catch (e) { console.error('marcas', e.message); res.status(500).json({ error: 'db' }); }
 });

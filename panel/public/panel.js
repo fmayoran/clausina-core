@@ -299,7 +299,11 @@ async function initMarca(){
   const activa=data.activa, act=data.marcas.find(m=>m.slug===activa);
   // El logo y el título reflejan la marca activa (no "perder el contexto de marca").
   const logo=header.querySelector('.logo');
-  if(logo && act){ logo.innerHTML=esc(_nm(act.nombre)).toUpperCase(); document.title=_nm(act.nombre)+' — Panel'; }
+  if(logo && act){
+    const nm=_nm(act.nombre), isUrl=act.logo && /^https?:\/\//.test(act.logo);
+    logo.innerHTML=(isUrl?`<img class="hdrlogo" src="${esc(act.logo)}" alt="" onerror="this.remove()">`:'')+esc(nm).toUpperCase();
+    document.title=nm+' — Panel';
+  }
   // El cambio de proyecto se hace desde el dashboard de la Agencia (no hay selector en las páginas).
 }
 initMarca();

@@ -8,6 +8,7 @@ body{background:var(--bg);color:var(--chalk);font-family:'Barlow Condensed',sans
 header{display:flex;align-items:baseline;gap:18px;padding:22px 28px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5;}
 header .logo{font-weight:900;font-size:1.7rem;letter-spacing:.04em;color:var(--white);text-decoration:none;}
 header .logo b{color:var(--fire);}
+header .logo .hdrlogo{height:30px;width:auto;vertical-align:middle;margin-right:10px;margin-top:-5px;}
 header .sub{font-family:'IBM Plex Mono',monospace;font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:var(--ash);}
 header .upd{font-family:'IBM Plex Mono',monospace;font-size:.7rem;color:var(--ash);}
 header nav{margin-left:auto;display:flex;gap:10px;align-items:center;}
