@@ -193,16 +193,18 @@ const _avisoMedia = `(SELECT json_build_object('url',m.url,'poster_url',m.poster
 // --- Pantallas: la programación es a nivel PANTALLA (activo compartido), cross-proyecto ---
 let _pantalla = null, _pantallaAt = 0;
 async function getPantallaActiva() {
+  // Default para la programación: la activa, o cualquiera si ninguna está activa (no dejar la gestión sin pantalla).
   if (!_pantalla || Date.now() - _pantallaAt > 60000) {
     const { rows } = await pool.query(
-      `SELECT id, slug, nombre, vnnox_player_ids, ancho, alto FROM contenido.pantallas WHERE activo ORDER BY creado_en LIMIT 1`);
+      `SELECT id, slug, nombre, vnnox_player_ids, ancho, alto, activo FROM contenido.pantallas ORDER BY activo DESC, creado_en LIMIT 1`);
     _pantalla = rows[0] || null; _pantallaAt = Date.now();
   }
   return _pantalla;
 }
 async function getPantallaPorSlug(slug) {
+  // No filtra por activo: se puede programar/seleccionar una pantalla aunque esté marcada inactiva.
   const { rows } = await pool.query(
-    `SELECT id, slug, nombre, vnnox_player_ids, ancho, alto FROM contenido.pantallas WHERE slug=$1 AND activo`, [slug]);
+    `SELECT id, slug, nombre, vnnox_player_ids, ancho, alto, activo FROM contenido.pantallas WHERE slug=$1`, [slug]);
   return rows[0] || null;
 }
 
