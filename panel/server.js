@@ -165,6 +165,16 @@ app.get('/api/status', async (req, res) => {
   catch (e) { console.error('status', e.message); res.status(500).json({ error: 'db' }); }
 });
 
+// Perfil del proyecto (registro de marca, por marca activa). Lo consume el creativo.
+app.get('/api/perfil', async (req, res) => {
+  try { res.json(await db.getPerfil(req.proyectoId)); }
+  catch (e) { console.error('perfil', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.put('/api/perfil', async (req, res) => {
+  try { res.json({ ok: await db.guardarPerfil(req.proyectoId, req.body || {}) }); }
+  catch (e) { console.error('guardar perfil', e.message); res.status(500).json({ ok: false }); }
+});
+
 // Proxy de la miniatura de un requerimiento (foto que mandó Fer por Telegram).
 // Resuelve el file_id contra la API de Telegram y stremea la imagen (token server-side).
 app.get('/api/brief/:id/media', async (req, res) => {

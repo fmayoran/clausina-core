@@ -28,6 +28,24 @@ async function getProyectoId(slug) {
   return f ? f.id : null;
 }
 
+// --- Perfil del proyecto (registro que consume el creativo): secciones + brief ---
+const PERFIL_COLS = ['propuesta_valor', 'publico', 'tono', 'lineamientos_visuales', 'hacer', 'evitar', 'productos_servicios', 'datos_clave', 'brief_md'];
+async function getPerfil(proyectoId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT ${PERFIL_COLS.join(', ')}, actualizado_en FROM contenido.proyecto_perfil WHERE proyecto_id=$1`, [proyectoId]);
+  return r || {};
+}
+async function guardarPerfil(proyectoId, d) {
+  const vals = PERFIL_COLS.map(c => (d[c] != null && String(d[c]).trim() !== '') ? String(d[c]) : null);
+  await pool.query(`
+    INSERT INTO contenido.proyecto_perfil (proyecto_id, ${PERFIL_COLS.join(', ')}, actualizado_en)
+    VALUES ($1, ${PERFIL_COLS.map((_, i) => '$' + (i + 2)).join(', ')}, now())
+    ON CONFLICT (proyecto_id) DO UPDATE SET
+      ${PERFIL_COLS.map((c, i) => `${c}=$${i + 2}`).join(', ')}, actualizado_en=now()`,
+    [proyectoId, ...vals]);
+  return true;
+}
+
 // Piezas con su revisión vigente + media principal (para el board por estado). Scopeado por marca.
 async function getPiezas(canal, proyectoId) {
   const params = [proyectoId];
@@ -344,7 +362,7 @@ async function health() {
   return true;
 }
 
-module.exports = { getMarcas, getProyectoId,
+module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil,
   getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getTokenPendiente,
   pedirPropuestas, setMaterial, activarReq, descartarReq, insertMencion,
   getPostIdsPublicados, upsertMetricas,

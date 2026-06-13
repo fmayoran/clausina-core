@@ -36,6 +36,7 @@ hb "rechazos=$n -> corrigiendo"
 
 # 2) Hay trabajo: Claude Code headless procesa según la doc. Herramientas acotadas a curl + lectura.
 cd "$REPO" || exit 1
+bash "$MOTOR/scripts/perfil_a_md.sh" "$(basename "$REPO")" >/dev/null 2>&1 || true
 read -r -d '' PROMPT <<'EOF'
 Sos el Director Creativo de Cortafuego corriendo como rutina automática NO interactiva en el VPS.
 Procesá los rechazos pendientes siguiendo EXACTAMENTE $MOTOR/scripts/rutina_regenerar_rechazos.md.
