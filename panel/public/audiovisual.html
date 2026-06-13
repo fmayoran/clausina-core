@@ -28,7 +28,19 @@
   .pgline .mm{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--ash);}
   .actbadge{font-family:'IBM Plex Mono',monospace;font-size:.56rem;text-transform:uppercase;color:#0c0c0a;background:#5ec27a;border-radius:9px;padding:1px 7px;margin-left:6px;}
   .pgline .pacts{display:flex;gap:5px;flex-wrap:wrap;}
-  .empty{color:var(--ash);font-size:.85rem;padding:4px 2px;}
+  .empty{color:var(--ash);font-size:.85rem;padding:4px 2px;display:flex;align-items:center;}
+  .active{padding:11px 16px 14px;}
+  .ahead{font-family:'IBM Plex Mono',monospace;font-size:.66rem;color:var(--chalk);display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin-bottom:10px;}
+  .ahead b{color:var(--white);font-weight:700;font-size:.82rem;}
+  .liveb{background:var(--fire);color:#0c0c0a;font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-radius:9px;padding:2px 8px;}
+  .aacts{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;}
+  .avstrip{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;}
+  .avth{flex:0 0 auto;width:80px;}
+  .avth img{width:80px;height:120px;object-fit:cover;border-radius:6px;background:#000;display:block;}
+  .avlbl{font-family:'IBM Plex Mono',monospace;font-size:.55rem;color:var(--ash);margin-top:4px;display:flex;align-items:center;gap:3px;flex-wrap:wrap;}
+  .mbadge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:.5rem;text-transform:uppercase;border-radius:7px;padding:1px 5px;background:#2a2a24;color:var(--chalk);}
+  .mbadge.cortafuego{background:#3a1c10;color:var(--ember);}
+  .mbadge.ardora{background:#102a2a;color:#5ec2b0;}
   .form{border:1px solid var(--ember);border-radius:8px;background:#0c0c0a;padding:16px;margin-bottom:16px;display:none;flex-direction:column;gap:10px;max-width:560px;}
   .form.show{display:flex;}
   .form .row{display:flex;gap:10px;flex-wrap:wrap;}
@@ -81,13 +93,14 @@
 let pantallas=[];
 const byId=id=>pantallas.find(p=>p.id===id);
 const dim=p=>(p.ancho&&p.alto)?`${p.ancho}×${p.alto}`:'resolución sin definir';
+const _mn = s => (s||'').split('—')[0].split('|')[0].trim();
+const mBadge = a => a.marca_slug ? `<span class="mbadge ${esc(a.marca_slug)}">${esc(_mn(a.marca_nombre)||a.marca_slug)}</span>` : '';
 let actv=false;
 
 async function cargar(){
   try{
     const r=await fetch('api/pantallas'); if(r.status===401){location.href='login';return;}
-    pantallas=await r.json();
-    await Promise.all(pantallas.map(async p=>{ p._progs = await fetch('api/programas?pantalla='+encodeURIComponent(p.slug)).then(x=>x.json()).catch(()=>[]); }));
+    pantallas=await r.json();   // cada pantalla ya trae su programa activo (con avisos)
     document.getElementById('n-pa').textContent=pantallas.length||'';
     document.getElementById('screens').innerHTML = pantallas.length ? pantallas.map(card).join('') : '<div class="empty">— sin pantallas; agregá la primera —</div>';
     const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR');
@@ -95,50 +108,43 @@ async function cargar(){
 }
 function card(p){
   const on = p.online===true?'<span class="dot on" title="online"></span>':(p.online===false?'<span class="dot off" title="offline"></span>':'<span class="dot" title="estado desconocido"></span>');
-  const progs=(p._progs||[]);
-  const rows = progs.length ? progs.map(pr=>pgline(pr,p.slug)).join('') : '<div class="empty">— sin programas; creá uno con “+ Programa” —</div>';
+  const pr = p.programa;
+  let block;
+  if(pr){
+    const its = pr.items||[];
+    const tot = its.reduce((s,it)=>s+(it.duracion_s||10),0);
+    const strip = its.length ? its.map(it=>{
+      const poster=(it.media||{}).poster_url||(it.media||{}).url||'';
+      return `<div class="avth"><img loading="lazy" src="${esc(poster)}" onerror="this.style.opacity=.15"><div class="avlbl">${mBadge(it)}#${String(it.numero).padStart(4,'0')} · ${it.duracion_s||10}s</div></div>`;
+    }).join('') : '<div class="empty">— el programa no tiene avisos —</div>';
+    block = `<div class="active">
+      <div class="ahead"><span class="liveb">EN PANTALLA</span> <b>${esc(pr.nombre)}</b> · ${its.length} aviso(s) · ~${tot}s
+        <span class="aacts">
+          <a class="ibtn" href="play?pantalla=${encodeURIComponent(p.slug)}" target="_blank" rel="noopener">▶ Reproductor</a>
+          ${its.length?`<button class="ibtn" onclick="descargarP('${pr.id}','${esc(pr.nombre)}','${esc(p.slug)}',this)">Descargar</button>`:''}
+          ${its.length?`<button class="ibtn fire" onclick="enviarP('${pr.id}','${esc(pr.nombre)}','${esc(p.slug)}',this)">A la pantalla</button>`:''}
+        </span>
+      </div>
+      <div class="avstrip">${strip}</div>
+    </div>`;
+  } else {
+    block = `<div class="active"><div class="empty">— Sin programa activo — &nbsp;<a class="ibtn fire" href="programacion?pantalla=${encodeURIComponent(p.slug)}">Programar</a></div></div>`;
+  }
   return `<div class="screen">
     <div class="shead">
       <h3>${on}${esc(p.nombre)} ${p.activo?'':'<span class="meta">(inactiva)</span>'}</h3>
       <div class="meta"><span>${esc(p.ubicacion||'—')}</span><span>${dim(p)}</span><span>players: ${(p.vnnox_player_ids||[]).length}</span></div>
       <div class="sacts">
-        <button class="ibtn fire" onclick="nuevoP('${esc(p.slug)}')">+ Programa</button>
-        <a class="ibtn" href="play?pantalla=${encodeURIComponent(p.slug)}" target="_blank" rel="noopener">▶ Reproductor</a>
+        <a class="ibtn fire" href="programacion?pantalla=${encodeURIComponent(p.slug)}">Programar</a>
         <button class="ibtn" onclick="editarPantalla('${p.id}')">Editar pantalla</button>
         <button class="ibtn" onclick="eliminarPantalla('${p.id}','${esc(p.nombre)}')">Eliminar</button>
       </div>
     </div>
-    <div class="plist">${rows}</div>
+    ${block}
   </div>`;
 }
-function pgline(pr,slug){
-  return `<div class="pgline ${pr.activo?'act':''}">
-    <div class="sp"><div class="tt">${esc(pr.nombre)}${pr.activo?'<span class="actbadge">en pantalla</span>':''}</div>
-      <div class="mm">${pr.n_items} aviso(s)</div></div>
-    <div class="pacts">
-      <button class="ibtn" onclick="editarP('${pr.id}','${esc(slug)}')">Editar</button>
-      ${pr.activo?'':`<button class="ibtn fire" onclick="activarP('${pr.id}','${esc(slug)}',this)">Activar</button>`}
-      ${pr.n_items>0?`<button class="ibtn" onclick="descargarP('${pr.id}','${esc(pr.nombre)}','${esc(slug)}',this)">Descargar</button>`:''}
-      ${pr.n_items>0?`<button class="ibtn fire" onclick="enviarP('${pr.id}','${esc(pr.nombre)}','${esc(slug)}',this)">A la pantalla</button>`:''}
-      <button class="ibtn" onclick="eliminarP('${pr.id}','${esc(pr.nombre)}','${esc(slug)}')">Eliminar</button>
-    </div></div>`;
-}
 
-/* ---- programas: acciones sobre la pantalla del slug ---- */
-function nuevoP(slug){ location.href='programacion?pantalla='+encodeURIComponent(slug); }
-function editarP(id,slug){ location.href='programacion?pantalla='+encodeURIComponent(slug)+'&programa='+id; }
-async function activarP(id,slug,btn){
-  if(actv) return; actv=true; if(btn){btn.disabled=true;btn.textContent='…';}
-  try{ const d=await fetch('api/programas/'+id+'/activar?pantalla='+encodeURIComponent(slug),{method:'POST'}).then(r=>r.json());
-    toast(d.ok?'Activado — la pantalla se actualiza sola':'No se pudo activar',!d.ok);
-  }catch(e){ toast('Error de conexión',true); } actv=false; cargar();
-}
-async function eliminarP(id,nombre,slug){
-  if(!confirm('Eliminar el programa "'+nombre+'"?')) return;
-  try{ const d=await fetch('api/programas/'+id+'?pantalla='+encodeURIComponent(slug),{method:'DELETE'}).then(r=>r.json());
-    toast(d.ok?'Eliminado':'No se pudo',!d.ok);
-  }catch(e){ toast('Error de conexión',true); } cargar();
-}
+/* ---- acciones sobre el programa activo (van a la pantalla del slug) ---- */
 async function descargarP(id,nombre,slug,btn){
   const t=btn.textContent; btn.disabled=true; btn.textContent='Generando…';
   try{

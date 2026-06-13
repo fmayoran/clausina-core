@@ -324,6 +324,21 @@ async function getActivoPlaylist(pantallaId) {
   return { version: p.id + ':' + new Date(p.actualizado_en).getTime(), nombre: p.nombre, items: items.filter(x => x.url) };
 }
 
+// Programa ACTIVO de una pantalla, con sus avisos (para el tablero Audiovisual).
+async function getProgramaActivo(pantallaId) {
+  const { rows: [p] } = await pool.query(
+    `SELECT id, nombre FROM contenido.programas WHERE activo AND pantalla_id=$1 LIMIT 1`, [pantallaId]);
+  if (!p) return null;
+  const { rows: items } = await pool.query(`
+    SELECT i.orden, pz.numero, pz.titulo_interno, r.duracion_s, ${_avisoMedia} AS media, pr.slug AS marca_slug, pr.nombre AS marca_nombre
+    FROM contenido.programa_items i
+      JOIN contenido.piezas pz ON pz.id=i.pieza_id
+      JOIN contenido.revisiones r ON r.id=pz.revision_vigente
+      JOIN contenido.proyectos pr ON pr.id=pz.proyecto_id
+    WHERE i.programa_id=$1 ORDER BY i.orden`, [p.id]);
+  return { id: p.id, nombre: p.nombre, items };
+}
+
 async function health() {
   await pool.query('SELECT 1');
   return true;
@@ -333,6 +348,6 @@ module.exports = { getMarcas, getProyectoId,
   getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getTokenPendiente,
   pedirPropuestas, setMaterial, activarReq, descartarReq, insertMencion,
   getPostIdsPublicados, upsertMetricas,
-  getPantallaActiva, getPantallaPorSlug, getPantallas, crearPantalla, actualizarPantalla, eliminarPantalla,
+  getPantallaActiva, getPantallaPorSlug, getPantallas, crearPantalla, actualizarPantalla, eliminarPantalla, getProgramaActivo,
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
   health };

@@ -404,7 +404,13 @@ app.get('/api/pantallas', async (req, res) => {
       try { const r = await vnnox.listPlayers(); onMap = {}; ((r.json && r.json.rows) || []).forEach(p => { onMap[p.playerId] = p.onlineStatus === 1; }); }
       catch (_) { onMap = null; }
     }
-    res.json(rows.map(p => ({ ...p, online: onMap ? (p.vnnox_player_ids || []).some(id => onMap[id]) : null })));
+    const out = [];
+    for (const p of rows) out.push({
+      ...p,
+      online: onMap ? (p.vnnox_player_ids || []).some(id => onMap[id]) : null,
+      programa: await db.getProgramaActivo(p.id),   // programa activo + sus avisos (para el tablero)
+    });
+    res.json(out);
   } catch (e) { console.error('pantallas', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/pantallas', async (req, res) => {
