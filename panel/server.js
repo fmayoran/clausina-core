@@ -133,6 +133,12 @@ app.get('/api/marcas', async (req, res) => {
   } catch (e) { console.error('marcas', e.message); res.status(500).json({ error: 'db' }); }
 });
 
+// Dashboard de la Agencia: todos los proyectos con descripción + indicadores (no scopeado a una marca).
+app.get('/api/agencia', async (req, res) => {
+  try { res.json(await db.getResumenAgencia()); }
+  catch (e) { console.error('agencia', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 // Cambia la marca activa de la sesión (valida contra las marcas conocidas).
 app.post('/api/marca', async (req, res) => {
   const slug = String((req.body && req.body.slug) || '');

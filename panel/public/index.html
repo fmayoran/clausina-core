@@ -3,37 +3,82 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cortafuego — Panel</title>
+<title>Agencia — Dashboard</title>
 <link rel="stylesheet" href="panel.css">
+<style>
+  .wrap{padding:20px 28px 60px;}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+  .ft{font-family:'Barlow Condensed',sans-serif;font-size:1.6rem;color:var(--white);font-weight:700;}
+  .ibtn{background:transparent;border:1px solid var(--line);color:var(--ash);font-family:'IBM Plex Mono',monospace;font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;padding:7px 13px;border-radius:5px;cursor:pointer;text-decoration:none;display:inline-block;}
+  .ibtn:hover{color:var(--chalk);border-color:var(--ash);}
+  .ibtn.fire{color:var(--ember);border-color:#43352a;}
+  .ibtn.fire:hover{background:var(--fire);border-color:var(--fire);color:#0c0c0a;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
+  .pj{border:1px solid var(--line);border-radius:10px;background:#0c0c0a;padding:16px;display:flex;flex-direction:column;gap:11px;}
+  .pj h3{margin:0;font-family:'Barlow Condensed',sans-serif;font-size:1.55rem;color:var(--white);font-weight:700;display:flex;align-items:center;gap:9px;}
+  .pj .inact{font-family:'IBM Plex Mono',monospace;font-size:.58rem;color:var(--ash);text-transform:uppercase;border:1px solid var(--line);border-radius:8px;padding:1px 7px;}
+  .pj .desc{font-size:.92rem;color:var(--ash);line-height:1.4;min-height:38px;}
+  .kpis{display:flex;gap:8px;flex-wrap:wrap;}
+  .kpi{flex:1;min-width:64px;background:#080806;border:1px solid var(--line);border-radius:7px;padding:8px 6px;text-align:center;}
+  .kpi b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;color:var(--white);line-height:1;}
+  .kpi.hot b{color:var(--ember);}
+  .kpi span{font-family:'IBM Plex Mono',monospace;font-size:.52rem;text-transform:uppercase;letter-spacing:.03em;color:var(--ash);}
+  .pj .acts{display:flex;gap:8px;margin-top:2px;}
+  .pj .acts .ibtn{flex:1;text-align:center;}
+</style>
 </head>
-<body>
+<body class="dash">
   <header>
-    <a class="logo" href=".">CORTA<b>FUEGO</b></a>
-    <span class="sub">Panel principal</span>
+    <a class="logo" href=".">AGENCIA</a>
+    <span class="sub">Dashboard · proyectos</span>
     <span class="upd" id="upd"></span>
-    <nav><button class="logout" onclick="salir()">Salir</button></nav>
+    <nav>
+      <a href="audiovisual">Audiovisual</a>
+      <button class="logout" onclick="salir()">Salir</button>
+    </nav>
   </header>
-  <div id="statusbar"></div>
   <div id="toast"></div>
-  <div class="menu">
-    <a class="menucard" href="perfil"><span class="mt">Perfil del proyecto</span><span class="md">Registro de marca que usa el creativo (contexto)</span></a>
-    <a class="menucard" href="instagram"><span class="mt">Instagram</span><span class="md">Publicaciones del feed · @cortafuego.ar</span><span class="mn" id="mc-ig"></span></a>
-    <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Aprobar avisos de esta marca para la pantalla</span><span class="mn" id="mc-av"></span></a>
-    <a class="menucard" href="audiovisual"><span class="mt">Audiovisual</span><span class="md">Pantallas (resolución · ubicación) y programación · mix de proyectos</span></a>
-  </div>
-  <div class="board b1">
-    <div class="col brief"><h2><span class="dot"></span>Cola de Requerimientos <span class="n" id="n-brief"></span></h2>
-      <div class="askprop">
-        <input id="enfasis" placeholder="Énfasis (opcional): qué destacar…" maxlength="1000">
-        <select id="canalprop" title="Canal de las propuestas">
-          <option value="instagram">Canal: Instagram</option>
-          <option value="aviso">Canal: Aviso pantalla</option>
-        </select>
-        <button id="askbtn" onclick="pedirPropuestas()">Pedir propuestas al creativo</button>
-      </div>
-      <div class="cards" id="c-brief"></div></div>
+  <div class="wrap">
+    <div class="toolbar">
+      <div class="ft">Proyectos <span class="n" id="n-pj"></span></div>
+      <a class="ibtn" href="audiovisual">▶ Audiovisual (pantallas)</a>
+    </div>
+    <div class="grid" id="grid"></div>
   </div>
 <script src="panel.js"></script>
-<script>currentLoad=loadCola; loadCola(); setInterval(loadCola,6000);</script>
+<script>
+async function cargar(){
+  try{
+    const r=await fetch('api/agencia'); if(r.status===401){location.href='login';return;}
+    const ps=await r.json();
+    document.getElementById('n-pj').textContent=ps.length||'';
+    document.getElementById('grid').innerHTML = ps.length ? ps.map(card).join('') : '<div class="empty">— sin proyectos —</div>';
+    const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR');
+  }catch(e){}
+}
+function kpi(n,label,hot){ return `<div class="kpi ${hot&&n>0?'hot':''}"><b>${n}</b><span>${label}</span></div>`; }
+function card(p){
+  return `<div class="pj">
+    <h3>${esc(p.nombre)} ${p.activo?'':'<span class="inact">inactivo</span>'}</h3>
+    <div class="desc">${esc(p.descripcion||'Sin descripción — cargá el perfil del proyecto.')}</div>
+    <div class="kpis">
+      ${kpi(p.req_cola,'en cola',true)}
+      ${kpi(p.ig_pend,'IG pend.',true)}
+      ${kpi(p.ig_pub,'IG public.')}
+      ${kpi(p.av_pend,'avisos pend.',true)}
+      ${kpi(p.av_pub,'en pantalla')}
+    </div>
+    <div class="acts">
+      <button class="ibtn fire" onclick="entrar('${esc(p.slug)}')">Entrar al proyecto →</button>
+      <button class="ibtn" onclick="entrar('${esc(p.slug)}','perfil')">Perfil</button>
+    </div>
+  </div>`;
+}
+async function entrar(slug, dest){
+  try{ await fetch('api/marca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})}); }catch(_){}
+  location.href = dest || 'proyecto';
+}
+cargar();
+</script>
 </body>
 </html>

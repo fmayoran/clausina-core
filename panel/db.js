@@ -208,6 +208,26 @@ async function getTokenPendiente(piezaId) {
 // --- Programación de pantalla ---
 const _avisoMedia = `(SELECT json_build_object('url',m.url,'poster_url',m.poster_url) FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1)`;
 
+// Resumen de la agencia: un renglón por proyecto con descripción + indicadores (para el dashboard).
+async function getResumenAgencia() {
+  const { rows } = await pool.query(`
+    SELECT p.id, p.slug, p.nombre, p.activo, p.ig_handle,
+      left(coalesce(pp.propuesta_valor,''), 180) AS descripcion,
+      (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='instagram' AND pz.estado='pendiente_aprobacion') AS ig_pend,
+      (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='instagram' AND pz.estado='publicada') AS ig_pub,
+      (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='aviso' AND pz.estado='pendiente_aprobacion') AS av_pend,
+      (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='aviso' AND pz.estado='publicada') AS av_pub,
+      ((SELECT count(*) FROM contenido.tg_briefs b
+          LEFT JOIN contenido.piezas pz ON pz.id=b.pieza_id LEFT JOIN contenido.revisiones r ON r.id=pz.revision_vigente
+          WHERE b.proyecto_id=p.id AND ((b.pieza_id IS NULL AND b.estado IN ('propuesta','pendiente','procesando','error'))
+                 OR (b.pieza_id IS NOT NULL AND r.estado IN ('pendiente_aprobacion','rechazada','aprobada','borrador'))))
+       + (SELECT count(*) FROM contenido.solicitudes_propuesta s WHERE s.proyecto_id=p.id AND s.estado IN ('pendiente','procesando')))::int AS req_cola
+    FROM contenido.proyectos p
+    LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id
+    ORDER BY p.activo DESC, p.creado_en`);
+  return rows;
+}
+
 // --- Pantallas: la programación es a nivel PANTALLA (activo compartido), cross-proyecto ---
 let _pantalla = null, _pantallaAt = 0;
 async function getPantallaActiva() {
@@ -362,7 +382,7 @@ async function health() {
   return true;
 }
 
-module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil,
+module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, getResumenAgencia,
   getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getTokenPendiente,
   pedirPropuestas, setMaterial, activarReq, descartarReq, insertMencion,
   getPostIdsPublicados, upsertMetricas,

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel del proyecto</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header>
+    <a class="logo" href=".">CORTA<b>FUEGO</b></a>
+    <span class="sub">Panel del proyecto</span>
+    <span class="upd" id="upd"></span>
+    <nav>
+      <a href=".">← Agencia</a>
+      <button class="logout" onclick="salir()">Salir</button>
+    </nav>
+  </header>
+  <div id="statusbar"></div>
+  <div id="toast"></div>
+  <div class="menu">
+    <a class="menucard" href="perfil"><span class="mt">Perfil del proyecto</span><span class="md">Registro de marca que usa el creativo (contexto)</span></a>
+    <a class="menucard" href="instagram"><span class="mt">Instagram</span><span class="md">Publicaciones del feed del proyecto</span><span class="mn" id="mc-ig"></span></a>
+    <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Aprobar avisos del proyecto para la pantalla</span><span class="mn" id="mc-av"></span></a>
+  </div>
+  <div class="board b1">
+    <div class="col brief"><h2><span class="dot"></span>Cola de Requerimientos <span class="n" id="n-brief"></span></h2>
+      <div class="askprop">
+        <input id="enfasis" placeholder="Énfasis (opcional): qué destacar…" maxlength="1000">
+        <select id="canalprop" title="Canal de las propuestas">
+          <option value="instagram">Canal: Instagram</option>
+          <option value="aviso">Canal: Aviso pantalla</option>
+        </select>
+        <button id="askbtn" onclick="pedirPropuestas()">Pedir propuestas al creativo</button>
+      </div>
+      <div class="cards" id="c-brief"></div></div>
+  </div>
+<script src="panel.js"></script>
+<script>currentLoad=loadCola; loadCola(); setInterval(loadCola,6000);</script>
+</body>
+</html>
