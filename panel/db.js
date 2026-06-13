@@ -206,6 +206,38 @@ async function getPantallaPorSlug(slug) {
   return rows[0] || null;
 }
 
+// Gestión de pantallas (multi-pantalla).
+async function getPantallas() {
+  const { rows } = await pool.query(`
+    SELECT pa.id, pa.slug, pa.nombre, pa.ubicacion, pa.ancho, pa.alto, pa.vnnox_player_ids, pa.activo,
+           (SELECT count(*)::int FROM contenido.programas p WHERE p.pantalla_id=pa.id) AS n_programas,
+           (SELECT p.nombre FROM contenido.programas p WHERE p.pantalla_id=pa.id AND p.activo LIMIT 1) AS programa_activo
+    FROM contenido.pantallas pa ORDER BY pa.creado_en`);
+  return rows;
+}
+async function crearPantalla(d) {
+  const { rows: [r] } = await pool.query(
+    `INSERT INTO contenido.pantallas (slug, nombre, ubicacion, ancho, alto, vnnox_player_ids, activo)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+    [d.slug, d.nombre, d.ubicacion || null, d.ancho || null, d.alto || null, d.vnnox_player_ids || [], d.activo !== false]);
+  _pantallaAt = 0;
+  return r.id;
+}
+async function actualizarPantalla(id, d) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.pantallas SET nombre=$2, ubicacion=$3, ancho=$4, alto=$5, vnnox_player_ids=$6, activo=$7 WHERE id=$1`,
+    [id, d.nombre, d.ubicacion || null, d.ancho || null, d.alto || null, d.vnnox_player_ids || [], d.activo !== false]);
+  _pantallaAt = 0;
+  return rowCount > 0;
+}
+async function eliminarPantalla(id) {
+  const { rows: [c] } = await pool.query(`SELECT count(*)::int AS n FROM contenido.programas WHERE pantalla_id=$1`, [id]);
+  if (c.n > 0) return { ok: false, error: 'tiene_programas', n: c.n };
+  const { rowCount } = await pool.query(`DELETE FROM contenido.pantallas WHERE id=$1`, [id]);
+  _pantallaAt = 0;
+  return { ok: rowCount > 0 };
+}
+
 // Avisos aprobados de TODOS los proyectos (con su marca) para armar el mix de la pantalla.
 async function getAvisosAprobados() {
   const { rows } = await pool.query(`
@@ -299,6 +331,6 @@ module.exports = { getMarcas, getProyectoId,
   getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getTokenPendiente,
   pedirPropuestas, setMaterial, activarReq, descartarReq, insertMencion,
   getPostIdsPublicados, upsertMetricas,
-  getPantallaActiva, getPantallaPorSlug,
+  getPantallaActiva, getPantallaPorSlug, getPantallas, crearPantalla, actualizarPantalla, eliminarPantalla,
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
   health };

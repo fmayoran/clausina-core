@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audiovisual — Pantallas</title>
+<link rel="stylesheet" href="panel.css">
+<style>
+  .wrap{padding:20px 28px 60px;}
+  .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px;}
+  .ibtn{background:transparent;border:1px solid var(--line);color:var(--ash);font-family:'IBM Plex Mono',monospace;font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;padding:7px 12px;border-radius:5px;cursor:pointer;}
+  .ibtn:hover{color:var(--chalk);border-color:var(--ash);}
+  .ibtn.fire{color:var(--ember);border-color:#43352a;}
+  .ibtn.fire:hover{background:var(--fire);border-color:var(--fire);color:#0c0c0a;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
+  .pcard{border:1px solid var(--line);border-radius:8px;background:#0c0c0a;padding:14px;display:flex;flex-direction:column;gap:8px;}
+  .pcard h3{margin:0;font-family:'Barlow Condensed',sans-serif;font-size:1.4rem;color:var(--white);font-weight:700;display:flex;align-items:center;gap:8px;}
+  .pcard .loc{font-size:.82rem;color:var(--ash);}
+  .pcard .mm{font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--ash);display:flex;flex-wrap:wrap;gap:4px 12px;}
+  .pcard .mm b{color:var(--chalk);font-weight:400;}
+  .dot{width:9px;height:9px;border-radius:50%;background:#555;display:inline-block;flex:0 0 auto;}
+  .dot.on{background:#5ec27a;} .dot.off{background:#b4503c;}
+  .pcard .acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px;}
+  .actrow{margin-left:auto;display:flex;gap:7px;}
+  /* form */
+  .form{border:1px solid var(--ember);border-radius:8px;background:#0c0c0a;padding:16px;margin-bottom:16px;display:none;flex-direction:column;gap:10px;max-width:560px;}
+  .form.show{display:flex;}
+  .form .row{display:flex;gap:10px;flex-wrap:wrap;}
+  .form label{font-family:'IBM Plex Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ash);display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px;}
+  .form input[type=text],.form input[type=number]{background:#080806;border:1px solid var(--line);border-radius:5px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:1rem;padding:8px 10px;outline:none;}
+  .form input:focus{border-color:var(--ember);}
+  .form .chk{flex-direction:row;align-items:center;gap:7px;min-width:0;}
+  .ft{font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;color:var(--white);font-weight:700;}
+</style>
+</head>
+<body class="av">
+  <header>
+    <a class="logo" href=".">CORTA<b>FUEGO</b></a>
+    <span class="sub">Audiovisual · Pantallas</span>
+    <span class="upd" id="upd"></span>
+    <nav>
+      <a href=".">Panel principal</a>
+      <button class="logout" onclick="salir()">Salir</button>
+    </nav>
+  </header>
+  <div id="toast"></div>
+  <div class="wrap">
+    <div class="toolbar">
+      <div class="ft">Pantallas <span class="n" id="n-pa"></span></div>
+      <button class="ibtn fire" onclick="nueva()">+ Agregar pantalla</button>
+    </div>
+
+    <div class="form" id="form">
+      <div class="ft" id="form-tt">Nueva pantalla</div>
+      <input type="hidden" id="f-id">
+      <div class="row">
+        <label>Nombre<input type="text" id="f-nombre" maxlength="120" placeholder="Pantalla Paseo Ardora"></label>
+        <label>Ubicación<input type="text" id="f-ubic" maxlength="200" placeholder="Ochava Av. Valentín Vergara"></label>
+      </div>
+      <div class="row">
+        <label>Ancho (px)<input type="number" id="f-ancho" min="0" placeholder="1080"></label>
+        <label>Alto (px)<input type="number" id="f-alto" min="0" placeholder="1620"></label>
+        <label class="chk">Activa <input type="checkbox" id="f-activo" checked></label>
+      </div>
+      <label>Player(s) VNNOX (IDs separados por coma)<input type="text" id="f-players" placeholder="dba8454…, …"></label>
+      <div class="row" style="margin-top:4px">
+        <button class="ibtn fire" onclick="guardar()">Guardar</button>
+        <button class="ibtn" onclick="cerrarForm()">Cancelar</button>
+      </div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+  </div>
+<script src="panel.js"></script>
+<script>
+let pantallas=[];
+const byId=id=>pantallas.find(p=>p.id===id);
+const dim=p=>(p.ancho&&p.alto)?`${p.ancho}×${p.alto}`:'sin definir';
+
+async function cargar(){
+  try{
+    const r=await fetch('api/pantallas'); if(r.status===401){location.href='login';return;}
+    pantallas=await r.json();
+    document.getElementById('n-pa').textContent=pantallas.length||'';
+    document.getElementById('grid').innerHTML = pantallas.length ? pantallas.map(card).join('') : '<div class="empty">— sin pantallas; agregá la primera —</div>';
+    const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR');
+  }catch(e){}
+}
+function card(p){
+  const on = p.online===true ? '<span class="dot on" title="online"></span>' : (p.online===false ? '<span class="dot off" title="offline"></span>' : '<span class="dot" title="estado desconocido"></span>');
+  const np = (p.vnnox_player_ids||[]).length;
+  const prog = p.programa_activo ? `<span><b>Programa activo:</b> ${esc(p.programa_activo)}</span>` : '<span>sin programa activo</span>';
+  return `<div class="pcard">
+    <h3>${on}${esc(p.nombre)} ${p.activo?'':'<span class="mm">(inactiva)</span>'}</h3>
+    <div class="loc">${esc(p.ubicacion||'—')}</div>
+    <div class="mm"><span><b>Resolución:</b> ${dim(p)}</span><span><b>Players:</b> ${np}</span><span><b>Programas:</b> ${p.n_programas}</span></div>
+    <div class="mm">${prog}</div>
+    <div class="acts">
+      <button class="ibtn fire" onclick="programar('${esc(p.slug)}')">Programar ▸</button>
+      <div class="actrow">
+        <button class="ibtn" onclick="editar('${p.id}')">Editar</button>
+        <button class="ibtn" onclick="eliminar('${p.id}','${esc(p.nombre)}')">Eliminar</button>
+      </div>
+    </div></div>`;
+}
+function programar(slug){ location.href='programacion?pantalla='+encodeURIComponent(slug); }
+
+function nueva(){
+  document.getElementById('form-tt').textContent='Nueva pantalla';
+  ['f-id','f-nombre','f-ubic','f-ancho','f-alto','f-players'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-activo').checked=true;
+  document.getElementById('form').classList.add('show');
+}
+function editar(id){
+  const p=byId(id); if(!p) return;
+  document.getElementById('form-tt').textContent='Editar pantalla';
+  document.getElementById('f-id').value=p.id;
+  document.getElementById('f-nombre').value=p.nombre||'';
+  document.getElementById('f-ubic').value=p.ubicacion||'';
+  document.getElementById('f-ancho').value=p.ancho||'';
+  document.getElementById('f-alto').value=p.alto||'';
+  document.getElementById('f-players').value=(p.vnnox_player_ids||[]).join(', ');
+  document.getElementById('f-activo').checked=!!p.activo;
+  document.getElementById('form').classList.add('show');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function cerrarForm(){ document.getElementById('form').classList.remove('show'); }
+async function guardar(){
+  const id=document.getElementById('f-id').value;
+  const body={
+    nombre:document.getElementById('f-nombre').value.trim(),
+    ubicacion:document.getElementById('f-ubic').value.trim(),
+    ancho:document.getElementById('f-ancho').value||null,
+    alto:document.getElementById('f-alto').value||null,
+    vnnox_player_ids:document.getElementById('f-players').value,
+    activo:document.getElementById('f-activo').checked,
+  };
+  if(!body.nombre){ toast('Poné un nombre', true); return; }
+  try{
+    const r = id
+      ? await fetch('api/pantallas/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      : await fetch('api/pantallas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok && (d.ok!==false)){ toast(id?'Pantalla actualizada':'Pantalla creada'); cerrarForm(); cargar(); }
+    else toast('No se pudo guardar ('+(d.error||r.status)+')', true);
+  }catch(e){ toast('Error de conexión', true); }
+}
+async function eliminar(id,nombre){
+  if(!confirm('Eliminar la pantalla "'+nombre+'"?')) return;
+  try{
+    const r=await fetch('api/pantallas/'+id,{method:'DELETE'});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok && d.ok) { toast('Eliminada'); cargar(); }
+    else if(d.error==='tiene_programas') toast('No se puede: tiene '+d.n+' programa(s). Borralos primero.', true);
+    else toast('No se pudo eliminar', true);
+  }catch(e){ toast('Error de conexión', true); }
+}
+cargar();
+</script>
+</body>
+</html>

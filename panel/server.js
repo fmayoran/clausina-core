@@ -382,6 +382,51 @@ app.post('/api/programas/:id/enviar-pantalla', async (req, res) => {
   } catch (e) { console.error('enviar-pantalla', e.message); res.status(500).json({ ok: false, error: 'vnnox' }); }
 });
 
+// --- Pantallas (gestión multi-pantalla, nivel plataforma) ---
+const slugify = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'pantalla';
+const toIds = v => Array.isArray(v) ? v.map(x => String(x).trim()).filter(Boolean)
+  : String(v || '').split(',').map(x => x.trim()).filter(Boolean);
+const pantallaBody = b => ({
+  nombre: String((b && b.nombre) || '').slice(0, 120) || 'Pantalla',
+  ubicacion: b && b.ubicacion != null ? String(b.ubicacion).slice(0, 200) : null,
+  ancho: b && b.ancho ? (parseInt(b.ancho, 10) || null) : null,
+  alto: b && b.alto ? (parseInt(b.alto, 10) || null) : null,
+  vnnox_player_ids: toIds(b && b.vnnox_player_ids),
+  activo: !(b && b.activo === false),
+});
+
+app.get('/api/pantallas', async (req, res) => {
+  try {
+    const rows = await db.getPantallas();
+    let onMap = null;                                   // estado online por player (best-effort vía VNNOX)
+    if (vnnox.configured()) {
+      try { const r = await vnnox.listPlayers(); onMap = {}; ((r.json && r.json.rows) || []).forEach(p => { onMap[p.playerId] = p.onlineStatus === 1; }); }
+      catch (_) { onMap = null; }
+    }
+    res.json(rows.map(p => ({ ...p, online: onMap ? (p.vnnox_player_ids || []).some(id => onMap[id]) : null })));
+  } catch (e) { console.error('pantallas', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/pantallas', async (req, res) => {
+  try {
+    const d = pantallaBody(req.body);
+    d.slug = slugify((req.body && req.body.slug) || d.nombre);
+    const id = await db.crearPantalla(d);
+    res.json({ ok: true, id, slug: d.slug });
+  } catch (e) {
+    if (String(e.message).includes('duplicate')) return res.status(409).json({ ok: false, error: 'slug_duplicado' });
+    console.error('crear pantalla', e.message); res.status(500).json({ ok: false });
+  }
+});
+app.put('/api/pantallas/:id', async (req, res) => {
+  try { res.json({ ok: await db.actualizarPantalla(req.params.id, pantallaBody(req.body)) }); }
+  catch (e) { console.error('upd pantalla', e.message); res.status(500).json({ ok: false }); }
+});
+app.delete('/api/pantallas/:id', async (req, res) => {
+  try { const r = await db.eliminarPantalla(req.params.id); r.ok ? res.json({ ok: true }) : res.status(409).json(r); }
+  catch (e) { console.error('del pantalla', e.message); res.status(500).json({ ok: false }); }
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   extensions: ['html'],
   setHeaders: (res, p) => { if (p.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache'); }

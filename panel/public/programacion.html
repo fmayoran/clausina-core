@@ -38,18 +38,18 @@
   .mbadge.ardora{background:#102a2a;color:#5ec2b0;}
 </style>
 </head>
-<body>
+<body class="av">
   <header>
-    <a class="logo" href=".">CORTA<b>FUEGO</b></a>
-    <span class="sub">Programación de pantalla</span>
+    <a class="logo" href="audiovisual">CORTA<b>FUEGO</b></a>
+    <span class="sub" id="sub">Programación de pantalla</span>
     <span class="upd" id="upd"></span>
     <nav>
+      <a href="audiovisual">← Audiovisual</a>
       <a href=".">Panel principal</a>
-      <a href="avisos">Avisos</a>
       <button class="logout" onclick="salir()">Salir</button>
     </nav>
   </header>
-  <div class="playbar">Reproductor de la pantalla: <b>cortafuego.ar/panel/play</b> — abrilo en el dispositivo de la pantalla en modo kiosco. Se actualiza solo al activar/editar el programa.</div>
+  <div class="playbar" id="playbar">Reproductor: <b id="playurl">cortafuego.ar/panel/play</b> — abrilo en el dispositivo de la pantalla en modo kiosco. Se actualiza solo al activar/editar el programa.</div>
   <div id="toast"></div>
   <div class="pgrid">
     <div class="col">
@@ -76,10 +76,24 @@
   </div>
 <script src="panel.js"></script>
 <script>
+// Pantalla destino: ?pantalla=<slug> (viene del hub Audiovisual); sin param = la pantalla activa por defecto.
+const PANTALLA = new URLSearchParams(location.search).get('pantalla') || '';
+const q = p => p + (PANTALLA ? ((p.includes('?')?'&':'?')+'pantalla='+encodeURIComponent(PANTALLA)) : '');
 let aprobados=[], prog={id:null,nombre:'',items:[]};
 const byId=id=>aprobados.find(a=>a.id===id);
 
+async function setContexto(){
+  // Nombre de la pantalla en el header + URL del player para esta pantalla.
+  try{
+    const ps=await fetch('api/pantallas').then(r=>r.json());
+    const pa = PANTALLA ? ps.find(p=>p.slug===PANTALLA) : ps[0];
+    if(pa){ document.getElementById('sub').textContent='Programación · '+pa.nombre;
+      document.getElementById('playurl').textContent='cortafuego.ar/panel/play'+(PANTALLA?('?pantalla='+PANTALLA):''); }
+  }catch(_){}
+}
+
 async function cargar(){
+  setContexto();
   try{
     const r=await fetch('api/avisos-aprobados'); if(r.status===401){location.href='login';return;}
     aprobados=await r.json();
@@ -111,26 +125,26 @@ function nuevoPrograma(){ prog={id:null,nombre:'',items:[]}; document.getElement
 async function ensureId(){
   if(prog.id) return prog.id;
   const nombre=document.getElementById('pnombre').value.trim()||'Programa';
-  const d=await fetch('api/programas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre})}).then(r=>r.json());
+  const d=await fetch(q('api/programas'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre})}).then(r=>r.json());
   if(d.ok){ prog.id=d.id; } return prog.id;
 }
 async function guardarPrograma(){
   if(!prog.items.length){ toast('Agregá al menos un aviso', true); return; }
   const id=await ensureId(); if(!id){ toast('No se pudo crear', true); return; }
   const nombre=document.getElementById('pnombre').value.trim()||'Programa';
-  const d=await fetch('api/programas/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre,piezas:prog.items})}).then(r=>r.json());
+  const d=await fetch(q('api/programas/'+id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre,piezas:prog.items})}).then(r=>r.json());
   toast(d.ok?'Programa guardado':'No se pudo guardar', !d.ok);
   cargarProgramas();
 }
 async function activarPrograma(){
   await guardarPrograma();
   if(!prog.id) return;
-  const d=await fetch('api/programas/'+prog.id+'/activar',{method:'POST'}).then(r=>r.json());
+  const d=await fetch(q('api/programas/'+prog.id+'/activar'),{method:'POST'}).then(r=>r.json());
   toast(d.ok?'Activado — la pantalla se actualiza sola':'No se pudo activar', !d.ok);
   cargarProgramas();
 }
 async function cargarProgramas(){
-  const ps=await fetch('api/programas').then(r=>r.json()).catch(()=>[]);
+  const ps=await fetch(q('api/programas')).then(r=>r.json()).catch(()=>[]);
   const c=document.getElementById('programas');
   c.innerHTML = ps.length ? ps.map(p=>`<div class="pgline ${p.activo?'act':''}"><div class="sp"><div class="tt">${esc(p.nombre)} ${p.activo?'<span class="actbadge">activo</span>':''}</div><div class="mm">${p.n_items} avisos</div></div>
     <button class="ibtn" onclick="editar('${p.id}')">Editar</button>
@@ -141,25 +155,25 @@ async function cargarProgramas(){
   document.getElementById('n-pg').textContent=ps.length||'';
 }
 async function editar(id){
-  const p=await fetch('api/programas/'+id).then(r=>r.json());
+  const p=await fetch(q('api/programas/'+id)).then(r=>r.json());
   prog={id:p.id,nombre:p.nombre,items:(p.items||[]).map(x=>x.pieza_id)};
   document.getElementById('pnombre').value=p.nombre;
   renderItems(); toast('Editando: '+p.nombre);
 }
 async function activarId(id){
-  const d=await fetch('api/programas/'+id+'/activar',{method:'POST'}).then(r=>r.json());
+  const d=await fetch(q('api/programas/'+id+'/activar'),{method:'POST'}).then(r=>r.json());
   toast(d.ok?'Activado — la pantalla se actualiza sola':'No se pudo', !d.ok); cargarProgramas();
 }
 async function eliminar(id,nombre){
   if(!confirm('Eliminar el programa "'+nombre+'"?')) return;
-  const d=await fetch('api/programas/'+id,{method:'DELETE'}).then(r=>r.json());
+  const d=await fetch(q('api/programas/'+id),{method:'DELETE'}).then(r=>r.json());
   if(d.ok && prog.id===id) nuevoPrograma();
   toast(d.ok?'Eliminado':'No se pudo', !d.ok); cargarProgramas();
 }
 async function descargarPrograma(id,nombre,btn){
   const t=btn.textContent; btn.disabled=true; btn.textContent='Generando…';
   try{
-    const r=await fetch('api/programas/'+id+'/download');
+    const r=await fetch(q('api/programas/'+id+'/download'));
     if(!r.ok){ toast('No se pudo generar el zip', true); return; }
     const blob=await r.blob();
     const slug=(nombre||'programa').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'programa';
@@ -174,7 +188,7 @@ async function enviarPantalla(id,nombre,btn){
   if(!confirm('Publicar "'+nombre+'" en la pantalla LED de la calle (vía VNNOX). Esto cambia lo que se ve. ¿Confirmás?')) return;
   const t=btn.textContent; btn.disabled=true; btn.textContent='Enviando…';
   try{
-    const r=await fetch('api/programas/'+id+'/enviar-pantalla',{method:'POST'});
+    const r=await fetch(q('api/programas/'+id+'/enviar-pantalla'),{method:'POST'});
     const d=await r.json().catch(()=>({}));
     if(r.ok && d.ok) toast('Enviado — la pantalla está descargando el programa');
     else { toast('No se pudo enviar ('+(d.error||d.status||r.status)+')', true); console.log('VNNOX:', d); }
