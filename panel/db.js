@@ -213,7 +213,7 @@ const _avisoMedia = `(SELECT json_build_object('url',m.url,'poster_url',m.poster
 // Resumen de la agencia: un renglón por proyecto con descripción + indicadores (para el dashboard).
 async function getResumenAgencia() {
   const { rows } = await pool.query(`
-    SELECT p.id, p.slug, p.nombre, p.activo, p.ig_handle,
+    SELECT p.id, p.slug, p.nombre, p.activo, p.ig_handle, pp.logo,
       coalesce(nullif(pp.slogan,''), left(coalesce(pp.brief_md,''), 160)) AS descripcion,
       (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='instagram' AND pz.estado='pendiente_aprobacion') AS ig_pend,
       (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='instagram' AND pz.estado='publicada') AS ig_pub,

@@ -18,6 +18,10 @@
   .wrap{padding-top:24px;}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
   .pj{border:1px solid var(--line);border-radius:10px;background:#0c0c0a;padding:16px;display:flex;flex-direction:column;gap:11px;}
+  .pjtop{display:flex;align-items:center;gap:11px;}
+  .pjlogo{position:relative;width:46px;height:46px;border-radius:8px;background:#080806;border:1px solid var(--line);flex:0 0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .pjlogo .ini{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.4rem;color:var(--ash);}
+  .pjlogo img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:5px;}
   .pj h3{margin:0;font-family:'Barlow Condensed',sans-serif;font-size:1.55rem;color:var(--white);font-weight:700;display:flex;align-items:center;gap:9px;}
   .pj .inact{font-family:'IBM Plex Mono',monospace;font-size:.58rem;color:var(--ash);text-transform:uppercase;border:1px solid var(--line);border-radius:8px;padding:1px 7px;}
   .pj .desc{font-size:.92rem;color:var(--ash);line-height:1.4;min-height:38px;}
@@ -56,8 +60,11 @@ async function cargar(){
 }
 function kpi(n,label,hot){ return `<div class="kpi ${hot&&n>0?'hot':''}"><b>${n}</b><span>${label}</span></div>`; }
 function card(p){
+  const ini=esc((p.nombre||'?').trim().charAt(0).toUpperCase()||'?');
+  const isUrl=p.logo && /^https?:\/\//.test(p.logo);
+  const logo=`<div class="pjlogo"><span class="ini">${ini}</span>${isUrl?`<img src="${esc(p.logo)}" alt="" onerror="this.remove()">`:''}</div>`;
   return `<div class="pj">
-    <h3>${esc(p.nombre)} ${p.activo?'':'<span class="inact">inactivo</span>'}</h3>
+    <div class="pjtop">${logo}<h3>${esc(p.nombre)} ${p.activo?'':'<span class="inact">inactivo</span>'}</h3></div>
     <div class="desc">${esc(p.descripcion||'Sin descripción — cargá el perfil del proyecto.')}</div>
     <div class="kpis">
       ${kpi(p.req_cola,'en cola',true)}
