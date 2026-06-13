@@ -81,7 +81,7 @@
 let pantallas=[];
 const byId=id=>pantallas.find(p=>p.id===id);
 const dim=p=>(p.ancho&&p.alto)?`${p.ancho}×${p.alto}`:'resolución sin definir';
-let acting=false;
+let actv=false;
 
 async function cargar(){
   try{
@@ -128,10 +128,10 @@ function pgline(pr,slug){
 function nuevoP(slug){ location.href='programacion?pantalla='+encodeURIComponent(slug); }
 function editarP(id,slug){ location.href='programacion?pantalla='+encodeURIComponent(slug)+'&programa='+id; }
 async function activarP(id,slug,btn){
-  if(acting) return; acting=true; if(btn){btn.disabled=true;btn.textContent='…';}
+  if(actv) return; actv=true; if(btn){btn.disabled=true;btn.textContent='…';}
   try{ const d=await fetch('api/programas/'+id+'/activar?pantalla='+encodeURIComponent(slug),{method:'POST'}).then(r=>r.json());
     toast(d.ok?'Activado — la pantalla se actualiza sola':'No se pudo activar',!d.ok);
-  }catch(e){ toast('Error de conexión',true); } acting=false; cargar();
+  }catch(e){ toast('Error de conexión',true); } actv=false; cargar();
 }
 async function eliminarP(id,nombre,slug){
   if(!confirm('Eliminar el programa "'+nombre+'"?')) return;
