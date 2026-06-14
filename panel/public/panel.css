@@ -9,6 +9,7 @@ header{display:flex;align-items:baseline;gap:18px;padding:22px 28px 16px;border-
 header .logo{font-weight:900;font-size:1.7rem;letter-spacing:.04em;color:var(--white);text-decoration:none;}
 header .logo b{color:var(--fire);}
 header .logo .hdrlogo{height:30px;width:auto;vertical-align:middle;margin-right:10px;margin-top:-5px;}
+body.dash header .logo,body.av header .logo{white-space:nowrap;flex:0 0 auto;}
 body.dash header .logo::before,body.av header .logo::before{content:"";display:inline-block;width:28px;height:28px;border-radius:7px;background:url('fonts/clausina-icono.png') center/cover no-repeat;vertical-align:middle;margin-right:10px;margin-top:-4px;}
 header .sub{font-family:'IBM Plex Mono',monospace;font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:var(--ash);}
 header .upd{font-family:'IBM Plex Mono',monospace;font-size:.7rem;color:var(--ash);}
