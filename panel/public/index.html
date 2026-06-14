@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ClaUsina — Dashboard</title>
 <link rel="stylesheet" href="panel.css">
+<link rel="icon" href="fonts/clausina-icono.png">
+<link rel="apple-touch-icon" href="fonts/clausina-icono-180.png">
 <style>
+  header .logo b{color:#1ec9ff;}
   .wrap{padding:20px 28px 60px;}
   .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
   .ft{font-family:'Barlow Condensed',sans-serif;font-size:1.6rem;color:var(--white);font-weight:700;}
@@ -13,8 +16,9 @@
   .ibtn:hover{color:var(--chalk);border-color:var(--ash);}
   .ibtn.fire{color:var(--ember);border-color:#43352a;}
   .ibtn.fire:hover{background:var(--fire);border-color:var(--fire);color:#0c0c0a;}
-  .navcta{color:var(--ember)!important;border-color:var(--ember)!important;}
-  .navcta:hover{background:var(--fire)!important;color:#0c0c0a!important;}
+  .navcta{color:#1ec9ff!important;border-color:#1ec9ff!important;}
+  .navcta:hover{background:#1ec9ff!important;color:#070708!important;}
+  .kpi.hot b{color:#1ec9ff;}
   .wrap{padding-top:24px;}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
   .pj{border:1px solid var(--line);border-radius:10px;background:#0c0c0a;padding:16px;display:flex;flex-direction:column;gap:11px;}
@@ -28,7 +32,7 @@
   .kpis{display:flex;gap:8px;flex-wrap:wrap;}
   .kpi{flex:1;min-width:64px;background:#080806;border:1px solid var(--line);border-radius:7px;padding:8px 6px;text-align:center;}
   .kpi b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;color:var(--white);line-height:1;}
-  .kpi.hot b{color:var(--ember);}
+  .kpi.hot b{color:#1ec9ff;}
   .kpi span{font-family:'IBM Plex Mono',monospace;font-size:.52rem;text-transform:uppercase;letter-spacing:.03em;color:var(--ash);}
   .pj .acts{display:flex;gap:8px;margin-top:2px;}
   .pj .acts .ibtn{flex:1;text-align:center;}
@@ -36,7 +40,7 @@
 </head>
 <body class="dash">
   <header>
-    <a class="logo" href=".">Cla<b>Usina</b></a>
+    <a class="logo" href=".">Cla<b>U</b>sina<b>.</b></a>
     <span class="sub">Agencia · impulsada por Claude</span>
     <span class="upd" id="upd"></span>
     <nav>
