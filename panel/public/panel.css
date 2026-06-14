@@ -2,7 +2,7 @@
 @font-face{font-family:'Barlow Condensed';font-weight:700;src:url('fonts/barlowcondensed-700.woff2') format('woff2');font-display:swap;}
 @font-face{font-family:'Barlow Condensed';font-weight:400;src:url('fonts/barlowcondensed-400.woff2') format('woff2');font-display:swap;}
 @font-face{font-family:'IBM Plex Mono';font-weight:400;src:url('fonts/ibmplexmono-400.woff2') format('woff2');font-display:swap;}
-:root{--bg:#080806;--panel:#111110;--line:#2c2c27;--chalk:#e8e4dc;--white:#f5f2ec;--ash:#8a8a82;--fire:#ff4400;--ember:#ff7700;}
+:root{--bg:#080806;--panel:#111110;--line:#2c2c27;--chalk:#e8e4dc;--white:#f5f2ec;--ash:#8a8a82;--fire:#1ec9ff;--ember:#57d6ff;}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--chalk);font-family:'Barlow Condensed',sans-serif;min-height:100vh;}
 header{display:flex;align-items:baseline;gap:18px;padding:22px 28px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5;}
@@ -41,11 +41,11 @@ header .marcasel:hover{border-color:var(--fire);}
 .copy{margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-size:.95rem;line-height:1.32;color:#cfcbc2;}
 .meta{font-family:'IBM Plex Mono',monospace;font-size:.66rem;letter-spacing:.06em;color:var(--ash);margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
 .badge{border:1px solid var(--line);border-radius:10px;padding:1px 7px;text-transform:uppercase;}
-.badge.fmt{color:var(--ember);border-color:#43352a;}
+.badge.fmt{color:var(--ember);border-color:#1d3a44;}
 .badge.rev{color:var(--fire);border-color:#5a2a1c;}
 .badge.cf{color:#d8d4cb;border-color:#3a3a33;letter-spacing:.03em;}
 .badge.canal{color:#5b9bd5;border-color:#2c4258;}
-.badge.canal.aviso{color:var(--ember);border-color:#43352a;}
+.badge.canal.aviso{color:var(--ember);border-color:#1d3a44;}
 .badge.mom{color:#0c0c0a;background:var(--ember);border-color:var(--ember);}
 .card a.link{display:inline-block;margin-top:8px;font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--ember);text-decoration:none;letter-spacing:.05em;}
 .card a.link:hover{color:var(--fire);}
@@ -73,7 +73,7 @@ header .marcasel:hover{border-color:var(--fire);}
 .rst{font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:10px;}
 .rst.cola{color:#8a8a82;border:1px solid var(--line);}
 .rst.proc{color:#5b9bd5;border:1px solid #2c4258;}
-.rst.pend{color:var(--ember);border:1px solid #43352a;}
+.rst.pend{color:var(--ember);border:1px solid #1d3a44;}
 .rst.rech{color:var(--fire);border:1px solid #5a2a1c;}
 .rst.ok{color:#5ec27a;border:1px solid #244a31;}
 .rst.err{color:var(--fire);border:1px solid #5a2a1c;background:#1c0f0a;}
@@ -96,10 +96,10 @@ header .marcasel:hover{border-color:var(--fire);}
 .askprop{padding:10px 12px 0;display:flex;flex-direction:column;gap:7px;}
 .askprop input,.askprop select{background:#0c0c0a;border:1px solid var(--line);border-radius:5px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:.95rem;padding:8px 10px;outline:none;}
 .askprop input:focus,.askprop select:focus{border-color:var(--ember);}
-.askprop button{background:transparent;border:1px solid #43352a;color:var(--ember);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;padding:7px;border-radius:5px;cursor:pointer;transition:.15s;}
+.askprop button{background:transparent;border:1px solid #1d3a44;color:var(--ember);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;padding:7px;border-radius:5px;cursor:pointer;transition:.15s;}
 .askprop button:hover{background:var(--fire);border-color:var(--fire);color:#0c0c0a;}
 .askprop button:disabled{opacity:.55;cursor:default;}
-.card.prop{border-color:#43352a;}
+.card.prop{border-color:#1d3a44;}
 .card.men{border-color:#2c4258;}
 .card .ptt{font-weight:700;font-size:1.02rem;line-height:1.12;color:var(--white);margin-top:7px;}
 .needs{margin-top:8px;font-size:.9rem;line-height:1.28;color:#e9c9a6;border-left:2px solid var(--ember);padding-left:8px;}
