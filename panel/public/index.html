@@ -29,6 +29,9 @@
   .pj h3{margin:0;font-family:'Barlow Condensed',sans-serif;font-size:1.55rem;color:var(--white);font-weight:700;display:flex;align-items:center;gap:9px;}
   .pj .inact{font-family:'IBM Plex Mono',monospace;font-size:.58rem;color:var(--ash);text-transform:uppercase;border:1px solid var(--line);border-radius:8px;padding:1px 7px;}
   .pj .desc{font-size:.92rem;color:var(--ash);line-height:1.4;min-height:38px;}
+  .pj .links{display:flex;flex-wrap:wrap;gap:6px;}
+  .pj .lk{font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.03em;color:var(--ash);text-decoration:none;border:1px solid var(--line);border-radius:7px;padding:3px 8px;transition:.15s;}
+  .pj .lk:hover{color:#1ec9ff;border-color:#1ec9ff;}
   .kpis{display:flex;gap:8px;flex-wrap:wrap;}
   .kpi{flex:1;min-width:64px;background:#080806;border:1px solid var(--line);border-radius:7px;padding:8px 6px;text-align:center;}
   .kpi b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;color:var(--white);line-height:1;}
@@ -67,9 +70,13 @@ function card(p){
   const ini=esc((p.nombre||'?').trim().charAt(0).toUpperCase()||'?');
   const isUrl=p.logo && /^https?:\/\//.test(p.logo);
   const logo=`<div class="pjlogo"><span class="ini">${ini}</span>${isUrl?`<img src="${esc(p.logo)}" alt="" onerror="this.remove()">`:''}</div>`;
+  const ig=p.ig_handle?`<a class="lk" href="https://instagram.com/${esc(p.ig_handle.replace(/^@/,''))}" target="_blank" rel="noopener">${esc(p.ig_handle)}</a>`:'';
+  const web=p.dominio_web?`<a class="lk" href="${/^https?:\/\//.test(p.dominio_web)?esc(p.dominio_web):'https://'+esc(p.dominio_web)}" target="_blank" rel="noopener">${esc(p.dominio_web)}</a>`:'';
+  const links=(ig||web)?`<div class="links">${ig}${web}</div>`:'';
   return `<div class="pj">
     <div class="pjtop">${logo}<h3>${esc(p.nombre)} ${p.activo?'':'<span class="inact">inactivo</span>'}</h3></div>
     <div class="desc">${esc(p.descripcion||'Sin descripción — cargá el perfil del proyecto.')}</div>
+    ${links}
     <div class="kpis">
       ${kpi(p.req_cola,'en cola',true)}
       ${kpi(p.ig_pend,'IG pend.',true)}
