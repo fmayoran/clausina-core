@@ -33,7 +33,7 @@ async function getProyectoId(slug) {
 // --- Perfil del proyecto (registro que consume el creativo): marca + slogan + logo + brief ---
 async function getPerfil(proyectoId) {
   const { rows: [r] } = await pool.query(
-    `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id,
+    `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email,
             pp.slogan, pp.logo, pp.brief_md, pp.actualizado_en
        FROM contenido.proyectos p LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id
       WHERE p.id=$1`, [proyectoId]);
@@ -43,8 +43,8 @@ async function guardarPerfil(proyectoId, d) {
   const nn = s => (s != null && String(s).trim() !== '') ? String(s).trim() : null;
   if (nn(d.nombre)) await pool.query('UPDATE contenido.proyectos SET nombre=$2 WHERE id=$1', [proyectoId, nn(d.nombre)]);
   await pool.query(
-    `UPDATE contenido.proyectos SET ig_handle=$2, dominio_web=$3, ig_user_id=$4, telegram_chat_id=$5 WHERE id=$1`,
-    [proyectoId, nn(d.ig_handle), nn(d.dominio_web), nn(d.ig_user_id), nn(d.telegram_chat_id)]);
+    `UPDATE contenido.proyectos SET ig_handle=$2, dominio_web=$3, ig_user_id=$4, telegram_chat_id=$5, email=$6 WHERE id=$1`,
+    [proyectoId, nn(d.ig_handle), nn(d.dominio_web), nn(d.ig_user_id), nn(d.telegram_chat_id), nn(d.email)]);
   await pool.query(`
     INSERT INTO contenido.proyecto_perfil (proyecto_id, slogan, logo, brief_md, actualizado_en)
     VALUES ($1,$2,$3,$4, now())
