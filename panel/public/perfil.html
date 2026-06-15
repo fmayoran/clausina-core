@@ -13,6 +13,7 @@
   .fld{display:flex;flex-direction:column;gap:5px;}
   .fld.full{grid-column:1/-1;}
   .fld label{font-family:'IBM Plex Mono',monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:var(--ember);}
+  .sect{grid-column:1/-1;font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);border-bottom:1px solid var(--line);padding-bottom:6px;margin-top:8px;}
   .fld .hint{font-family:'IBM Plex Mono',monospace;font-size:.56rem;color:var(--ash);text-transform:none;letter-spacing:0;}
   textarea,input[type=text]{background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:1.02rem;line-height:1.35;padding:10px 11px;outline:none;resize:vertical;}
   textarea{min-height:80px;}
@@ -40,6 +41,14 @@
     <div class="grid">
       <div class="fld"><label>Marca</label><input type="text" id="nombre"></div>
       <div class="fld"><label>Slogan</label><input type="text" id="slogan"></div>
+
+      <div class="sect">Canales y enlaces</div>
+      <div class="fld"><label>Instagram <span class="hint">— usuario de la cuenta, con @</span></label><input type="text" id="ig_handle" placeholder="@cuenta"></div>
+      <div class="fld"><label>Web <span class="hint">— dominio del sitio</span></label><input type="text" id="dominio_web" placeholder="marca.ar"></div>
+      <div class="fld"><label>IG User ID <span class="hint">— ID de la cuenta en la API de Instagram</span></label><input type="text" id="ig_user_id"></div>
+      <div class="fld"><label>Telegram chat ID <span class="hint">— chat para briefs/avisos</span></label><input type="text" id="telegram_chat_id"></div>
+
+      <div class="sect">Identidad y contexto</div>
       <div class="fld full"><label>Logo <span class="hint">— archivo/ubicación del logo oficial de la marca</span></label><input type="text" id="logo"></div>
       <div class="fld full"><label>Brief <span class="hint">— todo el contexto: propuesta de valor, tono, público, lineamientos visuales, hacer/evitar, productos, datos clave</span></label><textarea id="brief_md"></textarea></div>
     </div>
@@ -50,7 +59,7 @@
   </div>
 <script src="panel.js"></script>
 <script>
-const CAMPOS=['nombre','slogan','logo','brief_md'];
+const CAMPOS=['nombre','slogan','ig_handle','dominio_web','ig_user_id','telegram_chat_id','logo','brief_md'];
 async function cargar(){
   try{
     const r=await fetch('api/perfil'); if(r.status===401){location.href='login';return;}
