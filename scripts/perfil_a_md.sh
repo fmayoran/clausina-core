@@ -10,11 +10,14 @@ mkdir -p "$(dirname "$OUT")"
 docker exec -i "$CID" psql -U postgres -d claude -At -v slug="$SLUG" >"$OUT" <<'SQL'
 SELECT format(
 E'# %s — Perfil de marca\n'
- '> Generado desde la base (fuente de verdad). Editar en cortafuego.ar/panel/perfil, NO a mano.\n\n'
+ '> Generado desde la base (fuente de verdad). Editar en el panel (perfil del proyecto), NO a mano.\n\n'
  '**Slogan:** %s\n'
+ '**Instagram:** %s\n'
+ '**Web:** %s\n'
  '**Logo:** %s\n\n'
  '%s\n',
- pr.nombre, coalesce(pp.slogan,''), coalesce(pp.logo,''), coalesce(pp.brief_md,''))
+ pr.nombre, coalesce(pp.slogan,''), coalesce(pr.ig_handle,''), coalesce(pr.dominio_web,''),
+ coalesce(pp.logo,''), coalesce(pp.brief_md,''))
 FROM contenido.proyectos pr
 LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id = pr.id
 WHERE pr.slug = :'slug';

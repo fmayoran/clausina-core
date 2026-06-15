@@ -1,15 +1,14 @@
 # Rutina automática — Regenerar publicaciones rechazadas (flujo HTTP)
 
-Corre **cada 5 minutos por cron en el VPS** (`scripts/rutina_local.sh`), invocando **Claude Code headless** (`claude -p`, sobre la suscripción, sin costo de API). El script hace un chequeo barato (`curl cf-rechazos-pendientes`) y **solo invoca a Claude si hay rechazos**. Actúa como Director Creativo de Cortafuego.
+Corre **cada 5 minutos por cron en el VPS** (`scripts/rutina_local.sh`), invocando **Claude Code headless** (`claude -p`, sobre la suscripción, sin costo de API). El script hace un chequeo barato (`curl cf-rechazos-pendientes`) y **solo invoca a Claude si hay rechazos**; luego **rutea por proyecto** (una corrida de Claude por marca, en su cápsula, filtrando por `revision_id`). Actúa como Director Creativo del proyecto cuya cápsula es el directorio actual.
 **Nada se publica sin la aprobación de Fer** (lo regenerado vuelve a la preview).
 
 > **Por qué cron local y no `/schedule` (02/06/2026):** la rutina de la nube (`/schedule`, `trig_016PJteF4kHjmwP16eMubYx3`) nunca funcionó porque el entorno remoto tiene una **allowlist de red** que bloquea el host de n8n, y además tiene **límite de ejecuciones/día**. El VPS no tiene sandbox y Claude Code ya está instalado y logueado ahí, así que el cron local resuelve ambas cosas gratis. Esta doc son las **instrucciones que sigue el agente**; el orquestador es `rutina_local.sh`.
 
 > **Modelo de datos (desde 02/06/2026):** schema `contenido` (base `claude`), tablas `proyectos`/`piezas`/`revisiones`/`media`. Una corrección = una **revisión nueva** bajo la misma pieza. La cola de rechazos solo muestra revisiones `rechazada` que son la **vigente** de su pieza y **no** fueron derivadas a Fer. Al crear una revisión nueva (corrección), la rechazada deja de ser vigente y **sale sola de la cola** (no hay que marcar nada).
 
-## Tono de marca (leer del repo clonado)
-Antes de redactar, leer `contexto/CONTEXTO_MARCA.md` y `contexto/REFERENCIAS_INSTAGRAM.md`.
-Reglas duras: sin emojis; frases cortas, directas, imperativas; voseo rioplatense; **siempre "Av. Valentín Vergara"**; hashtags de marca `#cortafuego #asadorurbano` + locales (`#ranelagh #berazategui`). El slogan "Pará. Comé. Seguí." **NO es genérico**: es del mediodía express / público de paso; no lo uses como cierre de cualquier pieza.
+## Tono de marca (leer del directorio actual)
+Antes de redactar, leer `contexto/CONTEXTO_MARCA.md`, `contexto/REFERENCIAS_INSTAGRAM.md` y el `CLAUDE.md` del proyecto, y aplicar EXACTAMENTE su voz, reglas de copy (menciones, hashtags, nombres propios, uso del slogan, emojis sí/no) y estética. **No uses datos ni voz de otra marca**: lo que no esté en el contexto de ESTA marca, no va.
 
 ## Endpoints (base: `https://crm-n8n.dhmtev.easypanel.host`)
 - `GET /webhook/cf-rechazos-pendientes` → JSON array de rechazos sin procesar. Cada item: `pieza_id, revision_id, titulo_interno, **canal** (instagram|aviso), asset_ig, media_tipo, poster_url, caption, web_titulo, web_copy, web_tags, daypart, clima, transito, momento, duracion_s, motivo_rechazo, intentos`. Si `[]`, no hay nada que hacer.

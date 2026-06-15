@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Handler de "briefs por voz" de Cortafuego. Corre por cron en el VPS.
+# Handler de "briefs por voz" (multiproyecto). Corre por cron en el VPS.
 # Toma un brief pendiente (audio + media opcional que Fer mandó por Telegram), lo transcribe
 # (whisper.cpp local), y le pasa todo a Claude Code headless para que arme la pieza pendiente.
 # NADA se publica: termina en pendiente_aprobacion y Fer aprueba.
@@ -8,13 +8,13 @@ set -uo pipefail
 export HOME=/root
 export PATH="/root/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
-REPO="/root/claudefolder/marcas/cortafuego"
+MARCAS="/root/claudefolder/marcas"
 MOTOR="/root/claudefolder/plataforma"
 LOG="$MOTOR/scripts/brief_local.log"
 WHISPER="/root/whisper.cpp/build/bin/whisper-cli"
 MODEL="/root/whisper.cpp/models/ggml-base.bin"
-BOT=$(grep '^TELEGRAM_BOT_TOKEN=' /root/claudefolder/marcas/cortafuego/cortafuego.env | cut -d= -f2-)
 CID=$(docker ps -q -f name=crm_pgvector.1.)
+# REPO/BOT se resuelven por proyecto del brief (multiproyecto): cada corrida = una sola cápsula.
 ts(){ date -Is; }
 psql(){ docker exec -i "$CID" psql -U postgres -d claude -t -A -c "$1"; }
 hb(){ psql "INSERT INTO contenido.batch_runs(proceso,last_run,last_msg) VALUES('ingesta_briefs',now(),\$m\$$1\$m\$) ON CONFLICT(proceso) DO UPDATE SET last_run=now(), last_msg=EXCLUDED.last_msg;" >/dev/null 2>&1; }
@@ -22,7 +22,7 @@ hb(){ psql "INSERT INTO contenido.batch_runs(proceso,last_run,last_msg) VALUES('
 exec 9>/tmp/cf_brief.lock; flock -n 9 || exit 0
 
 # 1) brief pendiente (el más viejo), como JSON
-row=$(psql "SELECT row_to_json(t) FROM (SELECT id,chat_id,voice_file_id,media_file_id,media_type,texto,canal_destino FROM contenido.tg_briefs WHERE estado='pendiente' ORDER BY creado_en LIMIT 1) t;")
+row=$(psql "SELECT row_to_json(t) FROM (SELECT id,chat_id,voice_file_id,media_file_id,media_type,texto,canal_destino,proyecto_id FROM contenido.tg_briefs WHERE estado='pendiente' ORDER BY creado_en LIMIT 1) t;")
 [ -z "$row" ] && { echo "$(ts) sin briefs" >> "$LOG"; hb "sin requerimientos en cola"; exit 0; }
 
 bid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
@@ -32,7 +32,15 @@ media=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get
 mtype=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('media_type') or '')")
 btext=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('texto') or '')")
 canal=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('canal_destino') or 'instagram')")
-echo "$(ts) brief $bid (voice=${voice:+si} media=$mtype canal=$canal)" >> "$LOG"
+pid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('proyecto_id') or '')")
+
+# --- resolver el proyecto del brief: cápsula y secretos de ESA marca (aislamiento multiproyecto) ---
+slug=$(psql "SELECT slug FROM contenido.proyectos WHERE id='$pid';")
+[ -z "$slug" ] && slug="cortafuego"          # fallback defensivo (briefs viejos sin proyecto)
+REPO="$MARCAS/$slug"
+[ -d "$REPO" ] || { echo "$(ts) ERROR: cápsula inexistente $REPO" >> "$LOG"; psql "UPDATE contenido.tg_briefs SET estado='error', procesado_en=now() WHERE id='$bid';" >/dev/null; exit 1; }
+BOT=$(grep '^TELEGRAM_BOT_TOKEN=' "$REPO/$slug.env" 2>/dev/null | cut -d= -f2-)
+echo "$(ts) brief $bid (proyecto=$slug voice=${voice:+si} media=$mtype canal=$canal)" >> "$LOG"
 hb "procesando requerimiento $bid"
 psql "UPDATE contenido.tg_briefs SET estado='procesando' WHERE id='$bid';" >/dev/null
 

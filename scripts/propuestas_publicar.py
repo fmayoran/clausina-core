@@ -2,11 +2,12 @@
 # Lee /tmp/propuestas.json (lo escribe el creativo headless) e inserta cada propuesta en la
 # cola de requerimientos (tg_briefs, origen=creativo, estado=propuesta). Manda cada una a Telegram
 # para que Fer pueda RESPONDER ese mensaje con la foto/video; guarda tg_msg_id para vincular la respuesta.
-# Uso: propuestas_publicar.py <CID> <CHAT_ID> <BOT_TOKEN>
+# Uso: propuestas_publicar.py <CID> <CHAT_ID> <BOT_TOKEN> [canal] [proyecto_id]
 import json, sys, subprocess, urllib.request, urllib.parse
 
 CID, CHAT, BOT = sys.argv[1], sys.argv[2], sys.argv[3]
 CANAL = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4] == 'aviso' else 'instagram'
+PROYECTO_ID = sys.argv[5] if len(sys.argv) > 5 and sys.argv[5] else ''
 
 def psql(q):
     r = subprocess.run(['docker','exec','-i',CID,'psql','-U','postgres','-d','claude','-t','-A','-c',q],
@@ -47,8 +48,10 @@ for p in props:
     if copy:
         texto += "\n\nCopy tentativo:\n" + copy
     texto += f"\n\nFormato sugerido: {fmt}"
-    bid = psql("INSERT INTO contenido.tg_briefs (chat_id, origen, estado, canal_destino, titulo, texto, requiere_material) "
-               f"VALUES ('{esc(CHAT)}','creativo','propuesta','{CANAL}','{esc(titulo)}','{esc(texto)}','{esc(req)}') RETURNING id;")
+    pid_col = ", proyecto_id" if PROYECTO_ID else ""
+    pid_val = f",'{esc(PROYECTO_ID)}'" if PROYECTO_ID else ""
+    bid = psql("INSERT INTO contenido.tg_briefs (chat_id, origen, estado, canal_destino, titulo, texto, requiere_material" + pid_col + ") "
+               f"VALUES ('{esc(CHAT)}','creativo','propuesta','{CANAL}','{esc(titulo)}','{esc(texto)}','{esc(req)}'" + pid_val + ") RETURNING id;")
     if not bid:
         continue
     msg = (f"[PROPUESTA] {titulo}\n\n{concepto}\n\nNecesito: {req}\n\n"

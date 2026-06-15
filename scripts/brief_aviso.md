@@ -2,10 +2,10 @@
 
 Instrucciones para **Claude Code headless** cuando `brief_local.sh` procesa un requerimiento con
 `canal_destino='aviso'`. Corrés como **Editor de Video** (`/editor`): producís un **spot para la
-pantalla de calle** de Paseo Ardora.
+pantalla de calle** (DOOH).
 
 **NUNCA publicás.** Termina en una pieza `canal=aviso`, `pendiente_aprobacion`; el OK lo da Fer en
-`cortafuego.ar/panel/avisos`.
+el panel (sección Avisos del proyecto).
 
 ## Leé primero
 - El skill del editor: `/root/.claude/skills/editor/SKILL.md` (specs de la pantalla, reglas DOOH, pipeline, **logo oficial**).
@@ -18,7 +18,7 @@ pantalla de calle** de Paseo Ardora.
 ## Producí el spot (pipeline del SKILL)
 - Salida: **mp4 H.264 1080×1620 (2:3), ~10 s, loop, SIN audio**, diseñado bold para LED.
 - Base: la media aportada (reencuadrá a 2:3) o Higgsfield / clips de fuego de `assets/landing/publicaciones/` si no hay.
-- **Texto de marca HORNEADO** (Barlow Condensed 900 + IBM Plex Mono, naranja). Si insertás el **logo**, usá SOLO el oficial `interior-graficas/entregables/Logo.png` (nunca uno inventado/IA).
+- **Texto de marca HORNEADO** con la tipografía y colores de la marca (ver `contexto/CONTEXTO_MARCA.md` y el `CLAUDE.md` del proyecto). Si insertás el **logo**, usá SOLO el archivo oficial de la marca (nunca uno inventado/IA).
 - Guardá el mp4 + un poster (`.webp`/`.jpg`) en **`assets/landing/publicaciones/`** con nombre único `aviso_<slug>_<momento>_<fecha>.mp4`, hacé **git add + commit + push** y **verificá 200** (la landing los sirve público, como las piezas de Instagram).
 
 ## Registrá la pieza (un solo curl a cf-crear-pendiente)
@@ -32,17 +32,17 @@ pantalla de calle** de Paseo Ardora.
  "transito":"alto|normal|cualquiera",
  "momento":"pre-apertura|apertura|promo-relampago|generico",
  "duracion_s":10,
- "media":[{"url":"https://cortafuego.ar/publicaciones/<archivo>.mp4","tipo":"video","poster_url":"https://cortafuego.ar/publicaciones/<archivo>.webp"}],
+ "media":[{"url":"https://<dominio-de-la-marca>/publicaciones/<archivo>.mp4","tipo":"video","poster_url":"https://<dominio-de-la-marca>/publicaciones/<archivo>.webp"}],
  "brief_id":"<el brief_id>"
 }
 ```
-La `url` de media es la **pública de la landing** (`https://cortafuego.ar/publicaciones/...`).
+La `url` de media es la **pública de la landing de la marca** (su `dominio_web`, ver `contexto/CONTEXTO_MARCA.md`).
 
 ## Avisá a Fer (la aprobación es por el panel, sin botones)
-`POST /webhook/cf-avisar {"asunto":"Nuevo aviso de pantalla pendiente","cuerpo":"Revisá y aprobá en https://cortafuego.ar/panel/avisos"}`.
+`POST /webhook/cf-avisar {"asunto":"Nuevo aviso de pantalla pendiente","cuerpo":"Revisá y aprobá en el panel, sección Avisos del proyecto."}`.
 **NO** uses `cf-pub-notify`: esos botones publican en Instagram. Los avisos se aprueban **solo desde el panel**.
 
 ## Reglas
 - Etiquetá bien el contexto (`daypart`/`clima`/`momento`) según el brief; si es genérico, `cualquiera`/`generico`.
-- Sin emojis, tildes/ñ correctas, "Av. Valentín Vergara" completa.
+- Respetá las reglas de copy del contexto de marca (menciones, hashtags, nombres propios completos, emojis sí/no).
 - Ante error o falta de material que no podés generar, `cf-avisar` y terminá; no dejes la pieza a medias.
