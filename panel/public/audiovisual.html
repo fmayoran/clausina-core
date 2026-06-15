@@ -51,6 +51,21 @@
   .form input[type=text],.form input[type=number]{background:#080806;border:1px solid var(--line);border-radius:5px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:1rem;padding:8px 10px;outline:none;}
   .form input:focus{border-color:var(--ember);}
   .form .chk{flex-direction:row;align-items:center;gap:7px;min-width:0;}
+  /* --- reproductor embebido (panel lateral / split) --- */
+  :root{--pw:420px;}
+  .wrap{transition:margin-right .25s;}
+  body.player-open .wrap{margin-right:var(--pw);}
+  #rep{position:fixed;top:0;right:0;bottom:0;width:var(--pw);background:#0c0c0a;border-left:1px solid var(--line);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s;z-index:20;}
+  body.player-open #rep{transform:none;}
+  .rephead{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);background:#0e0e0c;}
+  .reptt{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.15rem;color:var(--white);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .repacts{display:flex;gap:6px;flex:0 0 auto;}
+  .repbox{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:14px;}
+  .repframe{aspect-ratio:var(--ar,2/3);width:100%;max-width:100%;max-height:100%;background:#000;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+  .repframe iframe{width:100%;height:100%;border:0;display:block;}
+  .repfoot{padding:9px 14px;border-top:1px solid var(--line);font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--ash);letter-spacing:.04em;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .repfoot .lv{color:#0c0c0a;background:#5ec27a;border-radius:9px;padding:1px 7px;font-weight:700;text-transform:uppercase;}
+  @media(max-width:760px){:root{--pw:100vw;}body.player-open .wrap{margin-right:0;}}
 </style>
 </head>
 <body class="av">
@@ -91,6 +106,18 @@
 
     <div id="screens"></div>
   </div>
+
+  <aside id="rep" aria-hidden="true">
+    <div class="rephead">
+      <div class="reptt" id="rep-tt">Reproductor</div>
+      <div class="repacts">
+        <a class="ibtn" id="rep-tab" href="#" target="_blank" rel="noopener" title="Abrir en pestaña">Pestaña ↗</a>
+        <button class="ibtn" onclick="cerrarRep()">Cerrar ✕</button>
+      </div>
+    </div>
+    <div class="repbox"><div class="repframe" id="rep-frame-wrap"><iframe id="rep-frame" title="Reproductor" allow="autoplay"></iframe></div></div>
+    <div class="repfoot" id="rep-foot"></div>
+  </aside>
 <script src="panel.js"></script>
 <script>
 let pantallas=[];
@@ -123,7 +150,7 @@ function card(p){
     block = `<div class="active">
       <div class="ahead"><span class="liveb">EN PANTALLA</span> <b>${esc(pr.nombre)}</b> · ${its.length} aviso(s) · ~${tot}s
         <span class="aacts">
-          <a class="ibtn" href="play?pantalla=${encodeURIComponent(p.slug)}" target="_blank" rel="noopener">▶ Reproductor</a>
+          <button class="ibtn" onclick="verReproductor('${esc(p.slug)}','${esc(p.nombre)}',${p.ancho||0},${p.alto||0})">▶ Reproductor</button>
           ${its.length?`<button class="ibtn" onclick="descargarP('${pr.id}','${esc(pr.nombre)}','${esc(p.slug)}',this)">Descargar</button>`:''}
           ${its.length?`<button class="ibtn fire" onclick="enviarP('${pr.id}','${esc(pr.nombre)}','${esc(p.slug)}',this)">A la pantalla</button>`:''}
         </span>
@@ -168,6 +195,26 @@ async function enviarP(id,nombre,slug,btn){
     else { toast('No se pudo enviar ('+(d.error||d.status||r.status)+')',true); console.log('VNNOX:',d); }
   }catch(e){ toast('Error de conexión con VNNOX',true); } finally{ btn.disabled=false; btn.textContent=t; }
 }
+
+/* ---- reproductor embebido (panel lateral) ---- */
+function repTop(){ const r=document.getElementById('rep'); r.style.top=(document.querySelector('header').offsetHeight)+'px'; }
+function verReproductor(slug,nombre,ancho,alto){
+  const ar=(ancho>0&&alto>0)?(ancho+'/'+alto):'2/3';
+  document.getElementById('rep-frame-wrap').style.setProperty('--ar',ar);
+  document.getElementById('rep-tt').textContent=nombre||'Reproductor';
+  const url='play?pantalla='+encodeURIComponent(slug);
+  document.getElementById('rep-tab').href=url;
+  document.getElementById('rep-frame').src=url;
+  document.getElementById('rep-foot').innerHTML='<span class="lv">en vivo</span> '+(ancho>0?ancho+'×'+alto:'sin resolución')+' · loop';
+  document.getElementById('rep').setAttribute('aria-hidden','false');
+  repTop(); document.body.classList.add('player-open');
+}
+function cerrarRep(){
+  document.body.classList.remove('player-open');
+  document.getElementById('rep').setAttribute('aria-hidden','true');
+  setTimeout(()=>{ if(!document.body.classList.contains('player-open')) document.getElementById('rep-frame').src='about:blank'; },300);
+}
+window.addEventListener('resize',()=>{ if(document.body.classList.contains('player-open')) repTop(); });
 
 /* ---- pantallas: alta / edición / baja ---- */
 function nueva(){
