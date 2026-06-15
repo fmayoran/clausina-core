@@ -2,13 +2,16 @@
 """
 Validador de calidad web de la landing de Cortafuego.
 Comprueba las premisas SEO/AEO/performance del skill /creativo antes de un commit.
-Uso: python3 validate_web.py   (exit 0 = ok, exit 1 = falla con reporte)
+Uso: python3 validate_web.py [ruta_landing]   (exit 0 = ok, exit 1 = falla con reporte)
+Si se pasa una ruta (ej. la landing de una marca), valida esa; si no, usa la default.
 """
 import os, re, json, sys, glob
 import xml.dom.minidom as minidom
 
-BASE = os.path.join(os.path.dirname(__file__), "..", "assets", "landing")
-BASE = os.path.abspath(BASE)
+if len(sys.argv) > 1 and sys.argv[1].strip():
+    BASE = os.path.abspath(sys.argv[1])
+else:
+    BASE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "landing"))
 errors = []
 
 def err(f, msg):
