@@ -37,6 +37,7 @@ pid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('
 # --- resolver el proyecto del brief: cápsula y secretos de ESA marca (aislamiento multiproyecto) ---
 slug=$(psql "SELECT slug FROM contenido.proyectos WHERE id='$pid';")
 [ -z "$slug" ] && slug="cortafuego"          # fallback defensivo (briefs viejos sin proyecto)
+NOMBRE=$(psql "SELECT nombre FROM contenido.proyectos WHERE slug='$slug';"); [ -z "$NOMBRE" ] && NOMBRE="$slug"
 REPO="$MARCAS/$slug"
 [ -d "$REPO" ] || { echo "$(ts) ERROR: cápsula inexistente $REPO" >> "$LOG"; psql "UPDATE contenido.tg_briefs SET estado='error', procesado_en=now() WHERE id='$bid';" >/dev/null; exit 1; }
 BOT=$(grep '^TELEGRAM_BOT_TOKEN=' "$REPO/$slug.env" 2>/dev/null | cut -d= -f2-)
@@ -85,9 +86,9 @@ fi
 cd "$REPO" || exit 1
 bash "$MOTOR/scripts/perfil_a_md.sh" "$(basename "$REPO")" >/dev/null 2>&1 || true
 if [ "$canal" = "aviso" ]; then
-  PROMPT="Procesá un requerimiento de AVISO de pantalla (DOOH) siguiendo EXACTAMENTE $MOTOR/scripts/brief_aviso.md. Los datos están en /tmp/brief_ctx.json: leelo primero. Producí un spot 2:3 mudo de ~10s con la estética de marca, guardá mp4+poster en assets/landing/publicaciones/ (commit+push, verificá 200), registralo con cf-crear-pendiente (canal_pieza='aviso' + tags de contexto + brief_id) y avisá con cf-avisar. NUNCA uses cf-pub-notify ni publiques. Si falta material que no podés generar, avisá con cf-avisar. Resumí en una línea."
+  PROMPT="Procesá un requerimiento de AVISO de pantalla (DOOH) siguiendo EXACTAMENTE $MOTOR/scripts/brief_aviso.md. Los datos están en /tmp/brief_ctx.json: leelo primero. Producí un spot 2:3 mudo de ~10s con la estética de marca, guardá mp4+poster en assets/landing/publicaciones/ (commit+push, verificá 200), registralo con cf-crear-pendiente (canal_pieza='aviso' + tags de contexto + brief_id) y avisá con cf-avisar. NUNCA uses cf-pub-notify ni publiques. Si falta material que no podés generar, avisá con cf-avisar. En cada cf-avisar incluí el campo \"marca\":\"$NOMBRE\". Resumí en una línea."
 else
-  PROMPT="Procesá un brief dictado por Fer siguiendo EXACTAMENTE $MOTOR/scripts/brief_dictado.md. Los datos del brief (texto, ruta de media, tipo, chat_id, brief_id) están en /tmp/brief_ctx.json: leelo primero. Acondicioná la media si hace falta, redactá el copy con la voz de marca, insertá la pieza pendiente vía cf-crear-pendiente y notificá con cf-pub-notify. NUNCA publiques en Instagram. Si falta material o algo no se entiende, avisá a Fer con cf-avisar. Resumí en una línea."
+  PROMPT="Procesá un brief dictado por Fer siguiendo EXACTAMENTE $MOTOR/scripts/brief_dictado.md. Los datos del brief (texto, ruta de media, tipo, chat_id, brief_id) están en /tmp/brief_ctx.json: leelo primero. Acondicioná la media si hace falta, redactá el copy con la voz de marca, insertá la pieza pendiente vía cf-crear-pendiente y notificá con cf-pub-notify. NUNCA publiques en Instagram. Si falta material o algo no se entiende, avisá a Fer con cf-avisar. En cada cf-avisar incluí el campo \"marca\":\"$NOMBRE\". Resumí en una línea."
 fi
 timeout 1200 claude -p "$PROMPT" --model sonnet --allowedTools "Bash" Read Write Edit Glob Grep >> "$LOG" 2>&1
 rc=$?
@@ -95,6 +96,6 @@ rc=$?
 # 6) marcar procesado
 if [ $rc -eq 0 ]; then psql "UPDATE contenido.tg_briefs SET estado='procesado', procesado_en=now(), transcripcion=left(\$tr\$$transcript\$tr\$,4000) WHERE id='$bid';" >/dev/null
 else psql "UPDATE contenido.tg_briefs SET estado='error', procesado_en=now() WHERE id='$bid';" >/dev/null
-  curl -s -X POST -H "Content-Type: application/json" -d "{\"asunto\":\"Brief con error\",\"cuerpo\":\"No pude procesar un brief por voz. Revisá el log.\"}" "https://crm-n8n.dhmtev.easypanel.host/webhook/cf-avisar" >/dev/null 2>&1
+  curl -s -X POST -H "Content-Type: application/json" -d "{\"asunto\":\"Brief con error\",\"cuerpo\":\"No pude procesar un brief por voz. Revisá el log.\",\"marca\":\"$NOMBRE\"}" "https://crm-n8n.dhmtev.easypanel.host/webhook/cf-avisar" >/dev/null 2>&1
 fi
 echo "$(ts) fin brief $bid (rc=$rc)" >> "$LOG"

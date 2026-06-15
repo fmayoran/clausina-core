@@ -39,7 +39,7 @@ el panel (sección Avisos del proyecto).
 La `url` de media es la **pública de la landing de la marca** (su `dominio_web`, ver `contexto/CONTEXTO_MARCA.md`).
 
 ## Avisá a Fer (la aprobación es por el panel, sin botones)
-`POST /webhook/cf-avisar {"asunto":"Nuevo aviso de pantalla pendiente","cuerpo":"Revisá y aprobá en el panel, sección Avisos del proyecto."}`.
+`POST /webhook/cf-avisar {"asunto":"Nuevo aviso de pantalla pendiente","cuerpo":"Revisá y aprobá en el panel, sección Avisos del proyecto.","marca":"<nombre de la marca>"}`.
 **NO** uses `cf-pub-notify`: esos botones publican en Instagram. Los avisos se aprueban **solo desde el panel**.
 
 ## Reglas

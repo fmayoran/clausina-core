@@ -1,5 +1,5 @@
 {
-  "name": "Cortafuego - Avisar a Fer",
+  "name": "ClaUsina - Avisar a Fer",
   "nodes": [
     {
       "parameters": {
@@ -20,11 +20,11 @@
     },
     {
       "parameters": {
-        "fromEmail": "Cortafuego Asador Urbano <asador.cortafuego@gmail.com>",
+        "fromEmail": "ClaUsina <asador.cortafuego@gmail.com>",
         "toEmail": "fernando.mayorano@gmail.com",
-        "subject": "=CORTAFUEGO — {{ $json.body.asunto }}",
+        "subject": "=ClaUsina · {{ $json.body.marca || 'Agencia' }} — {{ $json.body.asunto }}",
         "emailFormat": "html",
-        "html": "=<div style='font-family:Arial,sans-serif;max-width:520px;margin:auto;background:#080806;color:#e8e4dc;padding:28px;border-radius:8px'><div style='font-size:1.5rem;font-weight:900;color:#ff4400'>CORTAFUEGO</div><p style='color:#a5a59c;font-size:.78rem;letter-spacing:.12em;text-transform:uppercase'>Rutina automática</p><p style='font-size:1.05rem;color:#fff'>{{ $json.body.asunto }}</p><p style='white-space:pre-wrap'>{{ $json.body.cuerpo }}</p></div>",
+        "html": "=<div style='font-family:Arial,sans-serif;max-width:520px;margin:auto;background:#080806;color:#e8e4dc;padding:28px;border-radius:8px'><div style='font-size:1.5rem;font-weight:900;color:#f5f2ec'>Cla<span style=\"color:#1ec9ff\">U</span>sina<span style=\"color:#1ec9ff\">.</span></div><p style='color:#8a8a82;font-size:.74rem;letter-spacing:.14em;text-transform:uppercase'>{{ $json.body.marca || 'Agencia' }} · Notificación</p><p style='font-size:1.05rem;color:#fff'>{{ $json.body.asunto }}</p><p style='white-space:pre-wrap'>{{ $json.body.cuerpo }}</p></div>",
         "options": {}
       },
       "id": "b",

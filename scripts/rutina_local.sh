@@ -42,6 +42,7 @@ for slug in "${SLUGS[@]}"; do
   [ -d "$REPO" ] || { echo "$(ts) sin cápsula para $slug, salteo" >> "$LOG"; continue; }
   REVIDS=$(psql "SELECT string_agg(r.id::text, ', ') FROM $COLA AND p.slug='$slug'")
   [ -z "$REVIDS" ] && continue
+  NOMBRE=$(psql "SELECT nombre FROM contenido.proyectos WHERE slug='$slug';"); [ -z "$NOMBRE" ] && NOMBRE="$slug"
   cd "$REPO" || continue
   bash "$MOTOR/scripts/perfil_a_md.sh" "$slug" >/dev/null 2>&1 || true
   echo "$(ts) -> $slug (revisiones: $REVIDS)" >> "$LOG"
@@ -51,6 +52,7 @@ Procesá rechazos siguiendo EXACTAMENTE $MOTOR/scripts/rutina_regenerar_rechazos
 Base n8n: $N
 
 IMPORTANTE (aislamiento multiproyecto): procesá ÚNICAMENTE las revisiones cuyo revision_id esté en esta lista: $REVIDS. Son de ESTA marca. Cualquier otro item que devuelva el webhook NO es de esta marca: ignoralo.
+En cada llamada a cf-avisar incluí el campo "marca":"$NOMBRE".
 
 Pasos:
 1. GET /webhook/cf-rechazos-pendientes (cada item trae pieza_id, revision_id, titulo_interno, CANAL, asset_ig, media_tipo, poster_url, caption, web_*, daypart, clima, transito, momento, duracion_s, motivo_rechazo, intentos). Filtrá a los revision_id de la lista de arriba.
