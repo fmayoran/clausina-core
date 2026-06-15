@@ -46,6 +46,7 @@
       <div class="fld"><label>Instagram <span class="hint">— usuario de la cuenta, con @</span></label><input type="text" id="ig_handle" placeholder="@cuenta"></div>
       <div class="fld"><label>Web <span class="hint">— dominio del sitio</span></label><input type="text" id="dominio_web" placeholder="marca.ar"></div>
       <div class="fld"><label>Email del proyecto <span class="hint">— de la marca, para email marketing / contacto (los avisos del sistema salen de ClaUsina)</span></label><input type="text" id="email" placeholder="hola@marca.ar"></div>
+      <div class="fld"><label>WhatsApp <span class="hint">— número de la marca para interactuar con clientes (formato +54...)</span></label><input type="text" id="whatsapp" placeholder="+54 9 11 ..."></div>
       <div class="fld"><label>IG User ID <span class="hint">— ID de la cuenta en la API de Instagram</span></label><input type="text" id="ig_user_id"></div>
       <div class="fld"><label>Telegram chat ID <span class="hint">— chat para briefs/avisos</span></label><input type="text" id="telegram_chat_id"></div>
 
@@ -60,7 +61,7 @@
   </div>
 <script src="panel.js"></script>
 <script>
-const CAMPOS=['nombre','slogan','ig_handle','dominio_web','email','ig_user_id','telegram_chat_id','logo','brief_md'];
+const CAMPOS=['nombre','slogan','ig_handle','dominio_web','email','whatsapp','ig_user_id','telegram_chat_id','logo','brief_md'];
 async function cargar(){
   try{
     const r=await fetch('api/perfil'); if(r.status===401){location.href='login';return;}
