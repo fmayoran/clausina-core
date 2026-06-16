@@ -250,13 +250,28 @@ async function descartarReq(id, btn){
 
 /* ---------- Loaders por pantalla ---------- */
 async function updateMenuCounts(){
-  const mi=document.getElementById('mc-ig'), ma=document.getElementById('mc-av');
-  if(!mi && !ma) return;
+  const mi=document.getElementById('mc-ig'), ma=document.getElementById('mc-av'), mw=document.getElementById('mc-web');
+  if(!mi && !ma && !mw) return;
   try{
-    const [ig,av]=await Promise.all([fetch('api/piezas?canal=instagram').then(r=>r.json()),fetch('api/piezas?canal=aviso').then(r=>r.json())]);
+    const tasks=[fetch('api/piezas?canal=instagram').then(r=>r.json()),fetch('api/piezas?canal=aviso').then(r=>r.json())];
+    if(mw) tasks.push(fetch('api/landing').then(r=>r.json()).catch(()=>[]));
+    const [ig,av,land]=await Promise.all(tasks);
     const pe=a=>a.filter(p=>p.estado==='pendiente_aprobacion').length;
     if(mi) mi.textContent=pe(ig)+' pendiente(s) · '+ig.filter(p=>p.estado==='publicada').length+' publicada(s)';
     if(ma) ma.textContent=pe(av)+' pendiente(s) · '+av.filter(p=>p.estado==='publicada').length+' en pantalla';
+    if(mw){
+      const L=land||[];
+      const borr=L.filter(c=>c.estado==='borrador').length;
+      const gen=L.filter(c=>c.estado==='pendiente'||c.estado==='procesando').length;
+      const prod=L.some(c=>c.estado==='en_produccion');
+      let t, alert=false;
+      if(borr){ t=borr+' borrador(es) por aprobar'; alert=true; }
+      else if(gen){ t='generando borrador…'; }
+      else if(prod){ t='En producción'; }
+      else { t='—'; }
+      mw.textContent=t;
+      mw.classList.toggle('alert', alert);
+    }
   }catch(_){}
 }
 async function loadCola(){

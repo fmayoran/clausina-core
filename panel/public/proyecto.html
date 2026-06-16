@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Panel del proyecto</title>
 <link rel="stylesheet" href="panel.css">
+<style>
+  /* Layout 2 columnas: cola de trabajo (izq, ancha) + capacidades del proyecto (der) */
+  .proj-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;padding:20px 28px 60px;align-items:start;}
+  @media(max-width:900px){.proj-grid{grid-template-columns:1fr;}}
+  .proj-right{display:flex;flex-direction:column;gap:14px;}
+  .proj-right h3.sech{font-family:'IBM Plex Mono',monospace;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ash);margin:2px 2px -4px;}
+  .proj-right .menucard{padding:18px 18px;}
+  .proj-right .mt{font-size:1.3rem;}
+  .menucard .mn.alert{color:#1ec9ff;font-weight:700;}
+</style>
 </head>
 <body>
   <header>
@@ -18,13 +28,9 @@
   </header>
   <div id="statusbar"></div>
   <div id="toast"></div>
-  <div class="menu">
-    <a class="menucard" href="instagram"><span class="mt">Instagram</span><span class="md">Publicaciones del feed del proyecto</span><span class="mn" id="mc-ig"></span></a>
-    <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Aprobar avisos del proyecto para la pantalla</span><span class="mn" id="mc-av"></span></a>
-    <a class="menucard" href="landing"><span class="mt">Web / Landing</span><span class="md">Pedir cambios en la landing del proyecto (borrador → preview → producción)</span><span class="mn" id="mc-web"></span></a>
-  </div>
-  <div class="board b1">
-    <div class="col brief"><h2><span class="dot"></span>Cola de Requerimientos <span class="n" id="n-brief"></span></h2>
+  <div class="proj-grid">
+    <div class="col brief">
+      <h2><span class="dot"></span>Cola de Requerimientos <span class="n" id="n-brief"></span></h2>
       <div class="askprop">
         <input id="enfasis" placeholder="Énfasis (opcional): qué destacar…" maxlength="1000">
         <select id="canalprop" title="Canal de las propuestas">
@@ -33,7 +39,14 @@
         </select>
         <button id="askbtn" onclick="pedirPropuestas()">Pedir propuestas al creativo</button>
       </div>
-      <div class="cards" id="c-brief"></div></div>
+      <div class="cards" id="c-brief"></div>
+    </div>
+    <aside class="proj-right">
+      <h3 class="sech">Canales del proyecto</h3>
+      <a class="menucard" href="instagram"><span class="mt">Instagram</span><span class="md">Publicaciones del feed</span><span class="mn" id="mc-ig"></span></a>
+      <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Avisos para la pantalla de calle</span><span class="mn" id="mc-av"></span></a>
+      <a class="menucard" href="landing"><span class="mt">Web / Landing</span><span class="md">Cambios en la landing del proyecto</span><span class="mn" id="mc-web"></span></a>
+    </aside>
   </div>
 <script src="panel.js"></script>
 <script>currentLoad=loadCola; loadCola(); setInterval(loadCola,6000);</script>
