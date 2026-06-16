@@ -385,6 +385,38 @@ async function getProgramaActivo(pantallaId) {
   return { id: p.id, nombre: p.nombre, items };
 }
 
+// --- Landings: requerimientos de cambio de landing (borrador -> preview -> aprobación -> producción) ---
+async function getLandingCambios(proyectoId) {
+  const { rows } = await pool.query(
+    `SELECT id, requerimiento, estado, preview_url, commit_sha, resumen, motivo_rechazo, creado_en, actualizado_en
+       FROM contenido.landing_cambios WHERE proyecto_id=$1 ORDER BY creado_en DESC LIMIT 30`, [proyectoId]);
+  return rows;
+}
+async function crearLandingCambio(proyectoId, requerimiento) {
+  const r = (requerimiento || '').trim();
+  if (!r) return null;
+  const { rows: [row] } = await pool.query(
+    `INSERT INTO contenido.landing_cambios (proyecto_id, requerimiento) VALUES ($1,$2) RETURNING id`, [proyectoId, r]);
+  return row.id;
+}
+// Aprobar: solo si es un borrador de ESTE proyecto -> 'aprobada' (el motor hace el merge a producción).
+async function aprobarLanding(proyectoId, id) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.landing_cambios SET estado='aprobada', actualizado_en=now()
+      WHERE id=$1 AND proyecto_id=$2 AND estado='borrador'`, [id, proyectoId]);
+  return rowCount > 0;
+}
+// Rechazar: agrega el motivo al requerimiento y vuelve a 'pendiente' -> el motor regenera el borrador.
+async function rechazarLanding(proyectoId, id, motivo) {
+  const m = (motivo || '').trim();
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.landing_cambios
+        SET requerimiento = requerimiento || E'\n\nCorrección pedida: ' || $3,
+            motivo_rechazo = $3, estado='pendiente', branch=NULL, preview_url=NULL, actualizado_en=now()
+      WHERE id=$1 AND proyecto_id=$2 AND estado='borrador'`, [id, proyectoId, m || 'ajustes']);
+  return rowCount > 0;
+}
+
 async function health() {
   await pool.query('SELECT 1');
   return true;
@@ -396,4 +428,5 @@ module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, getResume
   getPostIdsPublicados, upsertMetricas,
   getPantallaActiva, getPantallaPorSlug, getPantallas, crearPantalla, actualizarPantalla, eliminarPantalla, getProgramaActivo,
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
+  getLandingCambios, crearLandingCambio, aprobarLanding, rechazarLanding,
   health };

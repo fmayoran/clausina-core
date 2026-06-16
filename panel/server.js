@@ -181,6 +181,25 @@ app.put('/api/perfil', async (req, res) => {
   catch (e) { console.error('guardar perfil', e.message); res.status(500).json({ ok: false }); }
 });
 
+// --- Landing del proyecto (cambios con borrador -> preview -> aprobación -> producción) ---
+app.get('/api/landing', async (req, res) => {
+  try { res.json(await db.getLandingCambios(req.proyectoId)); }
+  catch (e) { console.error('landing list', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/landing', async (req, res) => {
+  try { const id = await db.crearLandingCambio(req.proyectoId, (req.body || {}).requerimiento);
+    res.json(id ? { ok: true, id } : { ok: false, error: 'requerimiento vacío' }); }
+  catch (e) { console.error('landing crear', e.message); res.status(500).json({ ok: false }); }
+});
+app.post('/api/landing/:id/aprobar', async (req, res) => {
+  try { res.json({ ok: await db.aprobarLanding(req.proyectoId, req.params.id) }); }
+  catch (e) { console.error('landing aprobar', e.message); res.status(500).json({ ok: false }); }
+});
+app.post('/api/landing/:id/rechazar', async (req, res) => {
+  try { res.json({ ok: await db.rechazarLanding(req.proyectoId, req.params.id, (req.body || {}).motivo) }); }
+  catch (e) { console.error('landing rechazar', e.message); res.status(500).json({ ok: false }); }
+});
+
 // Proxy de la miniatura de un requerimiento (foto que mandó Fer por Telegram).
 // Resuelve el file_id contra la API de Telegram y stremea la imagen (token server-side).
 app.get('/api/brief/:id/media', async (req, res) => {

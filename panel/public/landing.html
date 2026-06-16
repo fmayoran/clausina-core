@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Web / Landing del proyecto</title>
+<link rel="stylesheet" href="panel.css">
+<style>
+  .wrap{padding:18px 28px 70px;max-width:1100px;margin:0 auto;}
+  .intro{font-family:'IBM Plex Mono',monospace;font-size:.7rem;color:var(--ash);margin-bottom:14px;line-height:1.5;}
+  .ask{display:flex;gap:10px;align-items:flex-start;margin-bottom:22px;flex-wrap:wrap;}
+  .ask textarea{flex:1;min-width:280px;min-height:64px;background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:1.02rem;padding:10px 12px;outline:none;resize:vertical;}
+  .ask textarea:focus{border-color:var(--ember);}
+  .ask button{background:var(--fire);color:#0c0c0a;border:none;border-radius:6px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1rem;letter-spacing:.04em;text-transform:uppercase;padding:11px 18px;cursor:pointer;white-space:nowrap;}
+  .ask button:hover{background:var(--ember);}
+  .lc{border:1px solid var(--line);border-radius:9px;background:#0c0c0a;padding:14px 16px;margin-bottom:14px;}
+  .lc-top{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+  .lc-date{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--ash);margin-left:auto;}
+  .lc-req{font-size:1rem;color:var(--chalk);line-height:1.45;white-space:pre-wrap;margin-bottom:10px;}
+  .st{font-family:'IBM Plex Mono',monospace;font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;padding:2px 9px;border-radius:9px;border:1px solid var(--line);color:var(--ash);}
+  .st-borrador{color:#1ec9ff;border-color:#1ec9ff;}
+  .st-pendiente,.st-procesando{color:var(--ember);border-color:#1d3a44;}
+  .st-en_produccion{color:#5ec27a;border-color:#2f5e3f;}
+  .st-error{color:var(--fire);border-color:#43352a;}
+  .muted{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--ash);}
+  .muted.ok{color:#5ec27a;} .muted.no{color:var(--fire);}
+  .prev{border:1px solid var(--line);border-radius:7px;overflow:hidden;background:#000;margin-bottom:10px;}
+  .prev iframe{width:100%;height:520px;border:0;display:block;}
+  .acts{display:flex;gap:8px;flex-wrap:wrap;}
+  .ibtn{background:transparent;border:1px solid var(--line);color:var(--ash);font-family:'IBM Plex Mono',monospace;font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;padding:7px 13px;border-radius:5px;cursor:pointer;text-decoration:none;display:inline-block;}
+  .ibtn:hover{color:var(--chalk);border-color:var(--ash);}
+  .ibtn.ok{color:#0c0c0a;background:#5ec27a;border-color:#5ec27a;}
+  .ibtn.ok:hover{background:#6fd38b;}
+  .ibtn.no{color:var(--fire);border-color:#43352a;}
+  .ibtn.no:hover{background:var(--fire);color:#0c0c0a;border-color:var(--fire);}
+  .empty{color:var(--ash);font-size:.9rem;padding:18px 2px;}
+</style>
+</head>
+<body>
+  <header>
+    <a class="logo" href=".">CORTA<b>FUEGO</b></a>
+    <span class="sub">Web · Landing del proyecto</span>
+    <span class="upd" id="upd"></span>
+    <nav>
+      <a href="proyecto">← Proyecto</a>
+      <button class="logout" onclick="salir()">Salir</button>
+    </nav>
+  </header>
+  <div id="toast"></div>
+  <div class="wrap">
+    <div class="intro">Pedí cambios en la landing del proyecto. El creativo arma un <b>borrador</b> que podés previsualizar acá; pasa a producción solo cuando lo <b>aprobás</b>.</div>
+    <div class="ask">
+      <textarea id="req" placeholder="Ej: cambiá el color de los botones, agregá una sección de horarios, achicá el título…"></textarea>
+      <button onclick="pedir()">Pedir cambio</button>
+    </div>
+    <div id="lista"><div class="empty">Cargando…</div></div>
+  </div>
+<script src="panel.js"></script>
+<script>
+const LBL={pendiente:'En cola',procesando:'Generando…',borrador:'Borrador listo',aprobada:'Aprobando…',en_produccion:'En producción',rechazada:'A ajustar',error:'Error'};
+async function load(){
+  try{
+    const r=await fetch('api/landing'); if(r.status===401){location.href='login';return;}
+    const items=await r.json();
+    const cont=document.getElementById('lista');
+    cont.innerHTML = items.length ? items.map(card).join('') : '<div class="empty">— Sin cambios todavía. Pedí el primero arriba. —</div>';
+    const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR');
+  }catch(e){}
+}
+function card(c){
+  let body='';
+  if(c.estado==='borrador' && c.preview_url){
+    body=`<div class="prev"><iframe src="${esc(c.preview_url)}" loading="lazy"></iframe></div>
+      <div class="acts">
+        <a class="ibtn" href="${esc(c.preview_url)}" target="_blank" rel="noopener">Abrir preview ↗</a>
+        <button class="ibtn ok" onclick="aprobar('${c.id}')">Aprobar y publicar</button>
+        <button class="ibtn no" onclick="rechazar('${c.id}')">Rechazar / ajustar</button>
+      </div>`;
+  } else if(c.estado==='pendiente'||c.estado==='procesando'){
+    body='<div class="muted">El creativo está generando el borrador… (se refresca solo)</div>';
+  } else if(c.estado==='aprobada'){
+    body='<div class="muted">Aprobado — pasando a producción…</div>';
+  } else if(c.estado==='en_produccion'){
+    body='<div class="muted ok">En producción ✓</div>';
+  } else if(c.estado==='error'){
+    body='<div class="muted no">Hubo un error procesando el cambio. Volvé a pedirlo o ajustá el texto.</div>';
+  }
+  return `<div class="lc">
+    <div class="lc-top"><span class="st st-${esc(c.estado)}">${LBL[c.estado]||c.estado}</span><span class="lc-date">${fecha(c.creado_en)}</span></div>
+    <div class="lc-req">${esc(c.requerimiento)}</div>
+    ${body}
+  </div>`;
+}
+async function pedir(){
+  const el=document.getElementById('req'); const t=el.value.trim();
+  if(!t){ toast('Escribí qué cambiar',true); return; }
+  try{
+    const d=await fetch('api/landing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({requerimiento:t})}).then(r=>r.json());
+    if(d.ok){ el.value=''; toast('Pedido enviado al creativo'); load(); }
+    else toast('No se pudo'+(d.error?' ('+d.error+')':''),true);
+  }catch(e){ toast('Error de conexión',true); }
+}
+async function aprobar(id){
+  if(!confirm('Aprobar este borrador y publicarlo en producción?')) return;
+  try{ const d=await fetch('api/landing/'+id+'/aprobar',{method:'POST'}).then(r=>r.json());
+    toast(d.ok?'Aprobado — publicando en minutos':'No se pudo aprobar',!d.ok); load();
+  }catch(e){ toast('Error de conexión',true); }
+}
+async function rechazar(id){
+  const m=prompt('¿Qué querés ajustar? El creativo regenera el borrador con esto:');
+  if(m===null) return;
+  try{ const d=await fetch('api/landing/'+id+'/rechazar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({motivo:m})}).then(r=>r.json());
+    toast(d.ok?'Mandado a ajustar':'No se pudo',!d.ok); load();
+  }catch(e){ toast('Error de conexión',true); }
+}
+load(); setInterval(load,6000);
+</script>
+</body>
+</html>

@@ -19,6 +19,39 @@ psql(){ docker exec -i "$CID" psql -U postgres -d claude -t -A -c "$1"; }
 fail(){ psql "UPDATE contenido.landing_cambios SET estado='error', actualizado_en=now(), procesado_en=now() WHERE id='$1';" >/dev/null; }
 
 exec 9>/tmp/cf_landing.lock; flock -n 9 || exit 0
+export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no"
+
+# 0) APROBADAS -> aplicar el borrador (draft) a producción (main). El panel solo marca 'aprobada'.
+psql "SELECT id||'|'||proyecto_id FROM contenido.landing_cambios WHERE estado='aprobada' ORDER BY actualizado_en" | while IFS='|' read -r aid apid; do
+  [ -z "$aid" ] && continue
+  aslug=$(psql "SELECT slug FROM contenido.proyectos WHERE id='$apid';")
+  AREPO="$MARCAS/$aslug"
+  [ -d "$AREPO/.git" ] || { psql "UPDATE contenido.landing_cambios SET estado='error',actualizado_en=now() WHERE id='$aid';" >/dev/null; continue; }
+  cd "$AREPO" || continue
+  git fetch origin >/dev/null 2>&1
+  git checkout main >/dev/null 2>&1 && git reset --hard origin/main >/dev/null 2>&1
+  if ! git rev-parse --verify origin/draft >/dev/null 2>&1; then
+    echo "$(ts) aprobar $aid: no hay draft remoto" >> "$LOG"
+    psql "UPDATE contenido.landing_cambios SET estado='error',actualizado_en=now() WHERE id='$aid';" >/dev/null; continue
+  fi
+  git checkout origin/draft -- assets/landing 2>>"$LOG"   # la landing del borrador pisa la de main
+  git add -A assets/landing
+  if git diff --cached --quiet; then
+    psql "UPDATE contenido.landing_cambios SET estado='en_produccion',actualizado_en=now(),procesado_en=now() WHERE id='$aid';" >/dev/null
+    echo "$(ts) aprobar $aid: sin diferencias con prod" >> "$LOG"
+  else
+    git -c user.name="ClaUsina" -c user.email="creativo@clausina.local" commit -q -m "Landing: aprobado cambio $aid"
+    asha=$(git rev-parse --short HEAD)
+    if git push origin main >> "$LOG" 2>&1; then
+      git push origin --delete draft >/dev/null 2>&1 || true
+      psql "UPDATE contenido.landing_cambios SET estado='en_produccion',commit_sha='$asha',actualizado_en=now(),procesado_en=now() WHERE id='$aid';" >/dev/null
+      echo "$(ts) aprobado $aid -> produccion (sha $asha)" >> "$LOG"
+    else
+      psql "UPDATE contenido.landing_cambios SET estado='error',actualizado_en=now() WHERE id='$aid';" >/dev/null
+      echo "$(ts) aprobar $aid: push a main fallo" >> "$LOG"
+    fi
+  fi
+done
 
 # 1) requerimiento de landing pendiente (el más viejo)
 row=$(psql "SELECT row_to_json(t) FROM (SELECT id, proyecto_id FROM contenido.landing_cambios WHERE estado='pendiente' ORDER BY creado_en LIMIT 1) t;")
