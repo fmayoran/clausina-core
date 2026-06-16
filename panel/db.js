@@ -74,7 +74,7 @@ async function getPiezas(canal, proyectoId) {
     LEFT JOIN contenido.ig_metricas im ON im.ig_post_id = r.ig_post_id
     ${where}
     ORDER BY COALESCE(r.publicado_en, pz.actualizado_en) DESC
-    LIMIT 200;`, params);
+    LIMIT 300;`, params);
   return rows;
 }
 
