@@ -3,3 +3,4 @@ node_modules/
 *.log
 scripts/*.log
 panel/node_modules/
+__pycache__/

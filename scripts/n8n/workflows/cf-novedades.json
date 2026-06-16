@@ -21,7 +21,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT r.web_titulo, r.web_copy, r.web_tags, m.url AS asset_ig, r.ig_post_id, r.ig_permalink, m.tipo AS tipo_media, m.poster_url, to_char(r.publicado_en,'DD Mon YYYY') AS fecha FROM contenido.revisiones r JOIN contenido.piezas pz ON pz.id = r.pieza_id LEFT JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1 WHERE r.estado='publicada' AND r.formato='feed' AND r.canal IN ('novedades','ambos') ORDER BY r.publicado_en DESC",
+        "query": "SELECT r.web_titulo, r.web_copy, r.web_tags, m.url AS asset_ig, r.ig_post_id, r.ig_permalink, m.tipo AS tipo_media, m.poster_url, to_char(r.publicado_en,'DD Mon YYYY') AS fecha FROM contenido.revisiones r JOIN contenido.piezas pz ON pz.id = r.pieza_id LEFT JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1 WHERE r.estado='publicada' AND r.formato='feed' AND r.canal IN ('novedades','ambos') AND r.id = pz.revision_vigente AND pz.canal = 'instagram' ORDER BY r.publicado_en DESC",
         "options": {}
       },
       "id": "b",
