@@ -80,6 +80,8 @@ app.use(express.json({ limit: '25mb' }));
 // Públicos (sin sesión): health, pantalla de login y sus fuentes, login/logout.
 app.get('/api/health', async (req, res) => { try { await db.health(); res.json({ ok: true }); } catch { res.status(500).json({ ok: false }); } });
 app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxAge: '30d' }));
+// Almacén de medios de la agencia (volumen persistente /app/media): imágenes para panel, IG, landings, creativo. Público.
+app.use('/media', express.static('/app/media', { maxAge: '30d' }));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 // Públicos para la PANTALLA: el reproductor (kiosco) y la playlist activa que poolea.
 app.get('/play', (req, res) => { res.set('Cache-Control', 'no-cache'); res.sendFile(path.join(__dirname, 'public', 'pantalla-play.html')); });
