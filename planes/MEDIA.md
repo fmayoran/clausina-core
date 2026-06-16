@@ -19,11 +19,16 @@ Para: histórico/referencias de IG, imágenes que genera el creativo, borradores
 - **Cómo escribir** (desde el VPS): directo al host path de arriba, o `docker cp`/`docker exec` al contenedor `/app/media`. La URL pública se arma con `https://panel.clausina.ar/media/<ruta>`.
 - **Backup:** el volumen NO entra en el backup de Postgres. Lo re-descargable (thumbnails de IG) no es crítico; lo generado (creativo) conviene respaldarlo aparte cuando empiece a acumularse.
 
-## Nivel 2 — CDN de cada marca (público, de cara al cliente)
-Para: imágenes de la landing y de las piezas publicadas que se muestran en el sitio de la marca (home, novedades).
+## Nivel 2 — Diseño del sitio (público, CDN de la marca)
+Para: imágenes que son parte del DISEÑO de la landing (hero, logos del sitio, fuentes).
+- Viven en `marcas/<slug>/assets/landing/img/`, servidas por el **CDN de la marca** (Cloudflare): `cortafuego.ar/...`, `ardora.com.ar/...`. Rápido y desacoplado. Correcto ahí.
 
-- Viven en el **repo de la cápsula de la marca** (`marcas/<slug>/assets/landing/img/` y `.../publicaciones/`) y se sirven por el **CDN de la marca** (Cloudflare): `cortafuego.ar/...`, `ardora.com.ar/...`.
-- Ventaja: rápido (CDN) y **desacoplado** del panel/VPS. No mover esto al store central (sería un retroceso).
+## Categoría aparte — Material de PUBLICACIONES (pendiente de mover)
+Para: imágenes/videos de piezas de Instagram y mp4+poster de avisos de la pantalla DOOH.
+- **Hoy (interino):** co-alojado en `marcas/<slug>/assets/landing/publicaciones/` solo para tener URL pública vía el CDN de la marca (a 16/06: ~58 archivos / 99 MB en Cortafuego; 26 media en la base apuntan a cortafuego.ar).
+- **Problema:** NO es contenido de la landing; infla el repo y acopla cada publicación a un commit + redeploy de la landing.
+- **Necesita:** URL pública + CDN (lo descarga VNNOX para la pantalla; lo ven los visitantes en novedades). Por eso NO va al media store actual (panel-served, sin CDN = retroceso).
+- **Destino correcto = Opción B** (ver abajo).
 
-## Decisión (16/06/2026)
-Se adoptó el **estándar de dos niveles (Opción A)**. Opción B futura: un store único con CDN propio (`media.clausina.ar` fronteado por Cloudflare) que además desacople el flujo de publicación del repo de la landing — es un proyecto en sí, a planificar si se quiere centralización total.
+## Decisión (16/06/2026) y pendiente
+Se adoptó el estándar para lo de hoy. **PENDIENTE / próximo proyecto de infra: Opción B** — media store único **fronteado con Cloudflare** (`media.clausina.ar`, CDN). Mover ahí el **material de publicaciones** (IG + pantalla), sacarlo del repo de la landing, repuntar las URLs en la base, y cambiar los flujos de publicación/avisos para que suban al store (en vez de commitear+redeployar la landing). Frontear sin lío de cert: agregar el host DNS-only → que EasyPanel emita el Let's Encrypt → pasar a proxied (Cloudflare Full usa ese cert). Es un proyecto con foco, no al cierre de una sesión.
