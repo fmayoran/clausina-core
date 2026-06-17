@@ -45,7 +45,7 @@
   <div class="wrap" id="wrap"><div class="empty">Cargando auditoría…</div></div>
 <script src="panel.js"></script>
 <script>
-const nf=n=>(n==null?'—':new Intl.NumberFormat('es-AR').format(n));
+const nfmt=n=>(n==null?'—':new Intl.NumberFormat('es-AR').format(n));
 function md(t){ // mini-markdown: ## , **bold**, listas 1. / -
   if(!t) return '';
   const lines=t.split('\n'); let html=''; let inList=null;
@@ -76,14 +76,14 @@ async function load(){
   const k=a.kpis, g=k.global||{}, bm=k.benchmark||{};
   const u=document.getElementById('upd'); if(u) u.textContent='generada '+fecha(a.creada_en);
   w.innerHTML=`
-    <div class="head2"><span class="ft">Instagram · presencia digital</span><span class="meta">${nf(k.followers)} seguidores · ${g.posts} posts · período: ${esc(a.periodo||'')}</span></div>
+    <div class="head2"><span class="ft">Instagram · presencia digital</span><span class="meta">${nfmt(k.followers)} seguidores · ${g.posts} posts · período: ${esc(a.periodo||'')}</span></div>
     <div class="kpis">
       ${kpi((g.er_alcance!=null?g.er_alcance+'%':'—'),'Engagement / alcance','típico '+(bm.er_alcance_tipico||''),true)}
       ${kpi((g.er_seguidores!=null?g.er_seguidores+'%':'—'),'Engagement / seguidores','típico '+(bm.er_seguidores_tipico||''))}
-      ${kpi(nf(g.reach_prom),'Alcance promedio',(g.reach_rate!=null?g.reach_rate+'% de la base':''))}
-      ${kpi(nf(g.views_prom),'Vistas promedio')}
-      ${kpi(nf(g.guard_prom),'Guardados / post')}
-      ${kpi(nf(g.compart_prom),'Compartidos / post')}
+      ${kpi(nfmt(g.reach_prom),'Alcance promedio',(g.reach_rate!=null?g.reach_rate+'% de la base':''))}
+      ${kpi(nfmt(g.views_prom),'Vistas promedio')}
+      ${kpi(nfmt(g.guard_prom),'Guardados / post')}
+      ${kpi(nfmt(g.compart_prom),'Compartidos / post')}
     </div>
     <div class="grid">
       <div class="card"><h3>Cadencia y alcance por mes</h3><div class="cw"><canvas id="c-cad"></canvas></div></div>
