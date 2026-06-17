@@ -8,26 +8,33 @@
 <script src="vendor/chart.min.js"></script>
 <style>
   .wrap{padding:18px 28px 70px;max-width:1180px;margin:0 auto;}
-  .head2{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px;}
-  .head2 .ft{font-family:'Barlow Condensed',sans-serif;font-size:1.7rem;font-weight:700;color:var(--white);}
-  .head2 .meta{font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--ash);letter-spacing:.04em;}
-  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0 22px;}
+  .sect{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:26px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line);}
+  .sect:first-child{margin-top:6px;}
+  .sect .t{font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;font-weight:700;color:var(--white);}
+  .sect .m{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--ash);letter-spacing:.04em;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
   .kpi{background:#0c0c0a;border:1px solid var(--line);border-radius:9px;padding:14px 16px;}
   .kpi b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:1.9rem;color:var(--white);line-height:1;}
-  .kpi.cy b{color:#1ec9ff;}
+  .kpi.cy b{color:#1ec9ff;} .kpi.gr b{color:#5ec27a;}
   .kpi span{font-family:'IBM Plex Mono',monospace;font-size:.56rem;text-transform:uppercase;letter-spacing:.04em;color:var(--ash);display:block;margin-top:5px;}
   .kpi .bm{font-family:'IBM Plex Mono',monospace;font-size:.54rem;color:#6b7280;margin-top:3px;}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   @media(max-width:820px){.grid{grid-template-columns:1fr;}}
   .card{background:#0c0c0a;border:1px solid var(--line);border-radius:9px;padding:14px 16px;}
   .card h3{font-family:'IBM Plex Mono',monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:12px;}
-  .card .cw{position:relative;height:240px;}
-  .reco{background:#0c0c0a;border:1px solid var(--line);border-top:3px solid #1ec9ff;border-radius:9px;padding:18px 22px;margin-top:16px;}
-  .reco h2{font-family:'Barlow Condensed',sans-serif;font-size:1.2rem;color:#1ec9ff;margin:14px 0 6px;}
+  .card .cw{position:relative;height:230px;}
+  .chk{display:flex;flex-direction:column;gap:7px;}
+  .chk-row{display:flex;align-items:center;gap:9px;font-size:.86rem;color:var(--chalk);}
+  .chk-row .d{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
+  .d.ok{background:#5ec27a;} .d.no{background:var(--fire);}
+  .chk-row .dt{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--ash);}
+  .chk-row .ct{font-family:'IBM Plex Mono',monospace;font-size:.54rem;color:#6b7280;text-transform:uppercase;width:48px;flex:0 0 auto;}
+  .reco{background:#0c0c0a;border:1px solid var(--line);border-top:3px solid #1ec9ff;border-radius:9px;padding:16px 20px;margin-top:14px;}
+  .reco h2{font-family:'Barlow Condensed',sans-serif;font-size:1.15rem;color:#1ec9ff;margin:12px 0 5px;}
   .reco h2:first-child{margin-top:0;}
-  .reco p,.reco li{font-size:.98rem;color:var(--chalk);line-height:1.55;}
-  .reco ul,.reco ol{margin:6px 0 6px 20px;}
-  .reco strong{color:var(--white);}
+  .reco p,.reco li{font-size:.95rem;color:var(--chalk);line-height:1.5;}
+  .reco ul,.reco ol{margin:5px 0 5px 20px;} .reco strong{color:var(--white);}
+  .nodata{color:var(--ash);font-size:.9rem;padding:14px 2px;font-family:'IBM Plex Mono',monospace;}
   .empty{color:var(--ash);font-size:.95rem;padding:40px 4px;}
 </style>
 </head>
@@ -46,79 +53,90 @@
 <script src="panel.js"></script>
 <script>
 const nfmt=n=>(n==null?'—':new Intl.NumberFormat('es-AR').format(n));
-function md(t){ // mini-markdown: ## , **bold**, listas 1. / -
-  if(!t) return '';
-  const lines=t.split('\n'); let html=''; let inList=null;
-  const close=()=>{ if(inList){ html+='</'+inList+'>'; inList=null; } };
-  for(let l of lines){
-    l=l.trim();
-    if(!l){ close(); continue; }
-    l=l.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
-    if(l.startsWith('## ')){ close(); html+='<h2>'+l.slice(3)+'</h2>'; }
-    else if(/^\d+\.\s/.test(l)){ if(inList!=='ol'){close();html+='<ol>';inList='ol';} html+='<li>'+l.replace(/^\d+\.\s/,'')+'</li>'; }
-    else if(l.startsWith('- ')){ if(inList!=='ul'){close();html+='<ul>';inList='ul';} html+='<li>'+l.slice(2)+'</li>'; }
-    else { close(); html+='<p>'+l+'</p>'; }
-  }
-  close(); return html;
-}
-function kpi(val,label,bm,cy){ return `<div class="kpi ${cy?'cy':''}"><b>${val}</b><span>${label}</span>${bm?`<div class="bm">${bm}</div>`:''}</div>`; }
+const pct=v=>(v==null?'—':v+'%');
+function md(t){ if(!t) return '';
+  const L=t.split('\n'); let h=''; let il=null; const cl=()=>{if(il){h+='</'+il+'>';il=null;}};
+  for(let l of L){ l=l.trim(); if(!l){cl();continue;} l=l.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+    if(l.startsWith('## ')){cl();h+='<h2>'+l.slice(3)+'</h2>';}
+    else if(/^\d+\.\s/.test(l)){if(il!=='ol'){cl();h+='<ol>';il='ol';}h+='<li>'+l.replace(/^\d+\.\s/,'')+'</li>';}
+    else if(l.startsWith('- ')){if(il!=='ul'){cl();h+='<ul>';il='ul';}h+='<li>'+l.slice(2)+'</li>';}
+    else{cl();h+='<p>'+l+'</p>';} } cl(); return h; }
+function kpi(val,label,bm,cls){ return `<div class="kpi ${cls||''}"><b>${val}</b><span>${label}</span>${bm?`<div class="bm">${bm}</div>`:''}</div>`; }
 
-Chart.defaults.color='#8a8a82';
-Chart.defaults.font.family="'IBM Plex Mono', monospace";
-Chart.defaults.font.size=10;
+Chart.defaults.color='#8a8a82'; Chart.defaults.font.family="'IBM Plex Mono', monospace"; Chart.defaults.font.size=10;
 const GRID={color:'rgba(255,255,255,0.06)'};
-const CY='#1ec9ff', OR='#ff7700', GR='#5ec27a', RD='#d2412f', GD='#E0A526';
+const CY='#1ec9ff', OR='#ff7700', GR='#5ec27a', GD='#E0A526';
 
-async function load(){
-  let a; try{ const r=await fetch('api/auditoria'); if(r.status===401){location.href='login';return;} a=await r.json(); }catch(e){}
-  const w=document.getElementById('wrap');
-  if(!a || !a.kpis){ w.innerHTML='<div class="empty">— Todavía no hay auditoría para este proyecto. —</div>'; return; }
+function webHTML(a){
+  if(!a||!a.kpis) return `<div class="sect"><span class="t">Web</span></div><div class="nodata">— Sin datos aún (el proyecto no tiene sitio cargado). —</div>`;
+  const k=a.kpis;
+  return `<div class="sect"><span class="t">Web</span><span class="m">${esc(k.dominio||'')} · checklist técnico ${k.checks_ok}/${k.checks_total}</span></div>
+  <div class="kpis">
+    ${kpi(k.score+'/100','Salud técnica','',k.score>=85?'gr':'cy')}
+    ${kpi(k.checks_ok+'/'+k.checks_total,'Checks OK')}
+    ${kpi(nfmt((k.recursos||{}).webp)+'/'+nfmt((k.recursos||{}).imagenes),'Imágenes en WebP')}
+    ${kpi(nfmt(k.html_kb)+' KB','Peso del HTML')}
+  </div>
+  <div class="grid">
+    <div class="card"><h3>Categorías</h3><div class="cw"><canvas id="cw-cat"></canvas></div></div>
+    <div class="card"><h3>Checklist técnico</h3><div class="chk">${(k.checklist||[]).map(c=>`<div class="chk-row"><span class="d ${c.ok?'ok':'no'}"></span><span class="ct">${esc(c.cat)}</span><span>${esc(c.item)}</span><span class="dt">${esc(c.detalle||'')}</span></div>`).join('')}</div></div>
+  </div>
+  <div class="reco">${md(a.recomendaciones)}</div>`;
+}
+function igHTML(a){
+  if(!a||!a.kpis) return `<div class="sect"><span class="t">Instagram</span></div><div class="nodata">— Sin datos aún. —</div>`;
   const k=a.kpis, g=k.global||{}, bm=k.benchmark||{};
-  const u=document.getElementById('upd'); if(u) u.textContent='generada '+fecha(a.creada_en);
-  w.innerHTML=`
-    <div class="head2"><span class="ft">Instagram · presencia digital</span><span class="meta">${nfmt(k.followers)} seguidores · ${g.posts} posts · período: ${esc(a.periodo||'')}</span></div>
-    <div class="kpis">
-      ${kpi((g.er_alcance!=null?g.er_alcance+'%':'—'),'Engagement / alcance','típico '+(bm.er_alcance_tipico||''),true)}
-      ${kpi((g.er_seguidores!=null?g.er_seguidores+'%':'—'),'Engagement / seguidores','típico '+(bm.er_seguidores_tipico||''))}
-      ${kpi(nfmt(g.reach_prom),'Alcance promedio',(g.reach_rate!=null?g.reach_rate+'% de la base':''))}
-      ${kpi(nfmt(g.views_prom),'Vistas promedio')}
-      ${kpi(nfmt(g.guard_prom),'Guardados / post')}
-      ${kpi(nfmt(g.compart_prom),'Compartidos / post')}
-    </div>
-    <div class="grid">
-      <div class="card"><h3>Cadencia y alcance por mes</h3><div class="cw"><canvas id="c-cad"></canvas></div></div>
-      <div class="card"><h3>Rendimiento por formato</h3><div class="cw"><canvas id="c-fmt"></canvas></div></div>
-      <div class="card"><h3>Mix de formatos (cantidad)</h3><div class="cw"><canvas id="c-mix"></canvas></div></div>
-      <div class="card"><h3>Top posts (engagement / alcance)</h3><div class="cw"><canvas id="c-top"></canvas></div></div>
-    </div>
-    <div class="reco">${md(a.recomendaciones)}</div>`;
-
+  return `<div class="sect"><span class="t">Instagram</span><span class="m">${k.followers?nfmt(k.followers)+' seguidores · ':''}${g.posts} posts</span></div>
+  <div class="kpis">
+    ${kpi(pct(g.er_alcance),'Engag. / alcance','típico '+(bm.er_alcance_tipico||''),'cy')}
+    ${kpi(pct(g.er_seguidores),'Engag. / seguidores','típico '+(bm.er_seguidores_tipico||''))}
+    ${kpi(nfmt(g.reach_prom),'Alcance prom',(g.reach_rate!=null?g.reach_rate+'% de la base':''))}
+    ${kpi(nfmt(g.views_prom),'Vistas prom')}
+    ${kpi(nfmt(g.guard_prom),'Guardados/post')}
+    ${kpi(nfmt(g.compart_prom),'Compartidos/post')}
+  </div>
+  <div class="grid">
+    <div class="card"><h3>Cadencia y alcance por mes</h3><div class="cw"><canvas id="c-cad"></canvas></div></div>
+    <div class="card"><h3>Rendimiento por formato</h3><div class="cw"><canvas id="c-fmt"></canvas></div></div>
+    <div class="card"><h3>Mix de formatos</h3><div class="cw"><canvas id="c-mix"></canvas></div></div>
+    <div class="card"><h3>Top posts (engag./alcance)</h3><div class="cw"><canvas id="c-top"></canvas></div></div>
+  </div>
+  <div class="reco">${md(a.recomendaciones)}</div>`;
+}
+function renderWeb(a){ if(!a||!a.kpis) return; const c=a.kpis.categorias||[];
+  new Chart(document.getElementById('cw-cat'),{type:'bar',data:{labels:c.map(x=>x.nombre),
+    datasets:[{label:'% OK',data:c.map(x=>x.pct),backgroundColor:c.map(x=>x.pct>=80?GR:(x.pct>=50?GD:OR))}]},
+    options:{maintainAspectRatio:false,scales:{y:{grid:GRID,min:0,max:100},x:{grid:{display:false}}},plugins:{legend:{display:false}}}}); }
+function renderIg(a){ if(!a||!a.kpis) return; const k=a.kpis;
   const cad=k.cadencia||[];
-  new Chart(document.getElementById('c-cad'),{data:{labels:cad.map(x=>x.mes),
-    datasets:[
-      {type:'bar',label:'Posts',data:cad.map(x=>x.posts),backgroundColor:'rgba(30,201,255,0.55)',yAxisID:'y'},
-      {type:'line',label:'Alcance prom',data:cad.map(x=>x.reach_prom),borderColor:OR,backgroundColor:OR,tension:.3,yAxisID:'y1'}
-    ]},
-    options:{maintainAspectRatio:false,scales:{
-      y:{position:'left',grid:GRID,title:{display:true,text:'posts'}},
-      y1:{position:'right',grid:{display:false},title:{display:true,text:'alcance'}},
-      x:{grid:{display:false}}},plugins:{legend:{labels:{boxWidth:10}}}}});
-
+  new Chart(document.getElementById('c-cad'),{data:{labels:cad.map(x=>x.mes),datasets:[
+    {type:'bar',label:'Posts',data:cad.map(x=>x.posts),backgroundColor:'rgba(30,201,255,0.55)',yAxisID:'y'},
+    {type:'line',label:'Alcance prom',data:cad.map(x=>x.reach_prom),borderColor:OR,backgroundColor:OR,tension:.3,yAxisID:'y1'}]},
+    options:{maintainAspectRatio:false,scales:{y:{position:'left',grid:GRID},y1:{position:'right',grid:{display:false}},x:{grid:{display:false}}},plugins:{legend:{labels:{boxWidth:10}}}}});
   const fmt=k.por_formato||[];
-  new Chart(document.getElementById('c-fmt'),{type:'bar',data:{labels:fmt.map(x=>x.formato),
-    datasets:[
-      {label:'Alcance prom',data:fmt.map(x=>x.reach_prom),backgroundColor:CY},
-      {label:'Vistas prom',data:fmt.map(x=>x.views_prom),backgroundColor:'rgba(255,119,0,0.7)'}
-    ]},options:{maintainAspectRatio:false,scales:{y:{grid:GRID},x:{grid:{display:false}}},plugins:{legend:{labels:{boxWidth:10}}}}});
-
-  new Chart(document.getElementById('c-mix'),{type:'doughnut',data:{labels:fmt.map(x=>x.formato),
-    datasets:[{data:fmt.map(x=>x.n),backgroundColor:[CY,OR,GR,GD]}]},
+  new Chart(document.getElementById('c-fmt'),{type:'bar',data:{labels:fmt.map(x=>x.formato),datasets:[
+    {label:'Alcance prom',data:fmt.map(x=>x.reach_prom),backgroundColor:CY},
+    {label:'Vistas prom',data:fmt.map(x=>x.views_prom),backgroundColor:'rgba(255,119,0,0.7)'}]},
+    options:{maintainAspectRatio:false,scales:{y:{grid:GRID},x:{grid:{display:false}}},plugins:{legend:{labels:{boxWidth:10}}}}});
+  new Chart(document.getElementById('c-mix'),{type:'doughnut',data:{labels:fmt.map(x=>x.formato),datasets:[{data:fmt.map(x=>x.n),backgroundColor:[CY,OR,GR,GD]}]},
     options:{maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:12}}}}});
-
   const top=k.top||[];
-  new Chart(document.getElementById('c-top'),{type:'bar',data:{labels:top.map(x=>x.fecha+' · '+x.formato),
-    datasets:[{label:'ER % (interac/alcance)',data:top.map(x=>x.er_pct),backgroundColor:GR}]},
+  new Chart(document.getElementById('c-top'),{type:'bar',data:{labels:top.map(x=>x.fecha+' · '+x.formato),datasets:[{label:'ER %',data:top.map(x=>x.er_pct),backgroundColor:GR}]},
     options:{indexAxis:'y',maintainAspectRatio:false,scales:{x:{grid:GRID},y:{grid:{display:false}}},plugins:{legend:{display:false}}}});
+}
+async function load(){
+  let web=null, ig=null;
+  try{
+    const [rw,ri]=await Promise.all([fetch('api/auditoria?canal=web'),fetch('api/auditoria?canal=instagram')]);
+    if(rw.status===401){location.href='login';return;}
+    web=await rw.json(); ig=await ri.json();
+  }catch(e){}
+  const w=document.getElementById('wrap');
+  const fechas=[web&&web.creada_en, ig&&ig.creada_en].filter(Boolean).sort().pop();
+  const u=document.getElementById('upd'); if(u&&fechas) u.textContent='generada '+fecha(fechas);
+  if(!web && !ig){ w.innerHTML='<div class="empty">— Todavía no hay auditoría para este proyecto. —</div>'; return; }
+  w.innerHTML = webHTML(web) + igHTML(ig);
+  renderWeb(web); renderIg(ig);
 }
 load();
 </script>
