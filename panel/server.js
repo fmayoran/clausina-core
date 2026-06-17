@@ -202,6 +202,12 @@ app.post('/api/landing/:id/rechazar', async (req, res) => {
   catch (e) { console.error('landing rechazar', e.message); res.status(500).json({ ok: false }); }
 });
 
+// --- Auditoría de presencia digital del proyecto ---
+app.get('/api/auditoria', async (req, res) => {
+  try { res.json(await db.getAuditoria(req.proyectoId, req.query.canal)); }
+  catch (e) { console.error('auditoria', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 // Proxy de la miniatura de un requerimiento (foto que mandó Fer por Telegram).
 // Resuelve el file_id contra la API de Telegram y stremea la imagen (token server-side).
 app.get('/api/brief/:id/media', async (req, res) => {

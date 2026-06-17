@@ -417,6 +417,14 @@ async function rechazarLanding(proyectoId, id, motivo) {
   return rowCount > 0;
 }
 
+// --- Auditoría de presencia digital (snapshot más reciente por proyecto/canal) ---
+async function getAuditoria(proyectoId, canal) {
+  const { rows: [r] } = await pool.query(
+    `SELECT canal, periodo, kpis, recomendaciones, creada_en FROM contenido.auditorias
+      WHERE proyecto_id=$1 AND canal=$2 ORDER BY creada_en DESC LIMIT 1`, [proyectoId, canal || 'instagram']);
+  return r || null;
+}
+
 async function health() {
   await pool.query('SELECT 1');
   return true;
@@ -429,4 +437,5 @@ module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, getResume
   getPantallaActiva, getPantallaPorSlug, getPantallas, crearPantalla, actualizarPantalla, eliminarPantalla, getProgramaActivo,
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
   getLandingCambios, crearLandingCambio, aprobarLanding, rechazarLanding,
+  getAuditoria,
   health };
