@@ -67,6 +67,8 @@ async function getPiezas(canal, proyectoId) {
            im.views AS m_views, im.reach AS m_reach, im.likes AS m_likes,
            (SELECT json_build_object('url', m.url, 'tipo', m.tipo, 'poster_url', m.poster_url)
               FROM contenido.media m WHERE m.pieza_id = pz.id AND m.orden = 1) AS media,
+           (SELECT COALESCE(json_agg(json_build_object('url', m.url, 'tipo', m.tipo, 'poster_url', m.poster_url) ORDER BY m.orden), '[]'::json)
+              FROM contenido.media m WHERE m.pieza_id = pz.id) AS medios,
            (SELECT count(*)::int FROM contenido.media m WHERE m.pieza_id = pz.id) AS n_media,
            (SELECT count(*)::int FROM contenido.revisiones rr WHERE rr.pieza_id = pz.id) AS n_revisiones
     FROM contenido.piezas pz

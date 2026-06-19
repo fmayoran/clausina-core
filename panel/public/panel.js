@@ -26,9 +26,20 @@ function fill(id, n, html){
 }
 
 /* ---------- Tarjetas Instagram ---------- */
+// Tira de medios para revisar un carrusel completo (cada uno abre la imagen/video original).
+function mediaGallery(medios){
+  return `<div class="cargal">${medios.map((m,i)=>{
+    const t=thumbSrc(m), full=m.url||'';
+    const inner = t ? `<img loading="lazy" src="${esc(t)}" onerror="this.style.opacity=.15">` : '<span class="cgph"></span>';
+    return `<a class="cgi" href="${esc(full)}" target="_blank" rel="noopener" title="Abrir ${i+1}/${medios.length}">${inner}${m.tipo==='video'?'<span class="cgv">▶</span>':''}<span class="cgn">${i+1}</span></a>`;
+  }).join('')}</div>`;
+}
 function pendCard(p){
   const t = thumbSrc(p.media);
-  const thumb = t ? `<img class="thumb" loading="lazy" src="${esc(t)}" onerror="this.style.display='none'">` : '<div class="thumb"></div>';
+  const medios = Array.isArray(p.medios) ? p.medios : [];
+  const thumb = medios.length>1
+    ? mediaGallery(medios)
+    : (t ? `<img class="thumb" loading="lazy" src="${esc(t)}" onerror="this.style.display='none'">` : '<div class="thumb"></div>');
   const copy = p.caption ? `<div class="copy">${esc(p.caption).replace(/\n/g,'<br>')}</div>` : '';
   return `<div class="card">${thumb}<div class="body">
     <div class="tt">${esc(p.titulo_interno)} <span class="intlbl" title="Nombre interno — no se publica">interno</span></div>

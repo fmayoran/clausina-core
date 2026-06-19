@@ -37,6 +37,13 @@ header .marcasel:hover{border-color:var(--fire);}
 .cards{padding:12px;display:flex;flex-direction:column;gap:12px;}
 .card{background:#0c0c0a;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
 .card .thumb{width:100%;aspect-ratio:4/5;object-fit:cover;display:block;background:#1a1a17;}
+/* Tira de carrusel: ver todas las imágenes/videos antes de aprobar */
+.cargal{display:grid;grid-auto-flow:column;grid-auto-columns:46%;gap:6px;overflow-x:auto;padding:8px;background:#0a0a08;scroll-snap-type:x mandatory;}
+.cargal .cgi{position:relative;aspect-ratio:4/5;border-radius:5px;overflow:hidden;background:#1a1a17;scroll-snap-align:start;line-height:0;display:block;}
+.cargal .cgi img{width:100%;height:100%;object-fit:cover;display:block;}
+.cargal .cgph{display:block;width:100%;height:100%;background:#1a1a17;}
+.cargal .cgn{position:absolute;bottom:4px;right:5px;font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--white);background:rgba(4,4,3,.7);border-radius:8px;padding:1px 6px;line-height:1.3;}
+.cargal .cgv{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:1.4rem;text-shadow:0 1px 6px rgba(0,0,0,.8);}
 .card .body{padding:10px 12px;}
 .card .tt{font-weight:700;font-size:1.02rem;line-height:1.1;color:var(--white);}
 .intlbl{font-family:'IBM Plex Mono',monospace;font-weight:400;font-size:.54rem;letter-spacing:.1em;text-transform:uppercase;color:#55554f;border:1px solid var(--line);border-radius:8px;padding:1px 5px;vertical-align:middle;white-space:nowrap;}
