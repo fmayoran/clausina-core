@@ -122,33 +122,27 @@ function reqStatus(b){
 const canalBadge = b => b.canal_destino==='aviso'
   ? '<span class="badge canal aviso">aviso</span>'
   : '<span class="badge canal">instagram</span>';
+// Compacta: una línea que abre el popup con el texto completo + material + acciones.
 function propCard(b){
   const n = b.n_material||0;
-  const matInfo = n ? `<div class="matline">${n} material(es) aportado(s)</div>` : '';
-  return `<div class="card prop"><div class="reqbody">
-    <div class="meta2"><span class="rst prop">Propuesta del creativo</span>${canalBadge(b)}</div>
-    <div class="ptt">${esc(b.req_titulo||'Propuesta')}</div>
-    <div class="reqtext">${esc((b.texto||'')).slice(0,300)}</div>
-    ${b.requiere_material ? `<div class="needs"><b>Necesita:</b> ${esc(b.requiere_material)}</div>` : ''}
-    ${matInfo}
-    <div class="acts">
-      <button class="btn ok" onclick="openReqModal('${b.id}')">Aportar material y generar</button>
-      <div class="acts-row">
-        <button class="btn del" onclick="descartarReq('${b.id}',this)">Descartar</button>
-      </div>
-    </div></div></div>`;
+  const hint = [b.requiere_material?'pide material':'', n?`${n} aportado(s)`:''].filter(Boolean).join(' · ');
+  return `<div class="card prop">
+    <button class="qhead" onclick="openReqModal('${b.id}')">
+      <span class="rst prop">Propuesta</span>
+      <span class="qtt">${esc(b.req_titulo||'Propuesta')}</span>
+      ${canalBadge(b)}
+      ${hint?`<span class="phint">${hint}</span>`:''}
+      <span class="qchev">⤢</span>
+    </button></div>`;
 }
 function mentionCard(b){
-  const link = b.enlace ? `<a class="link" href="${esc(b.enlace)}" target="_blank" rel="noopener">Ver post en Instagram ↗</a>` : '';
-  return `<div class="card men"><div class="reqbody">
-    <div class="meta2"><span class="rst men">Mención entrante</span>${canalBadge(b)}</div>
-    <div class="ptt">${esc(b.req_titulo||'Mención')}</div>
-    <div class="reqtext">${esc((b.texto||'')).slice(0,240)}</div>
-    ${link}
-    <div class="acts">
-      <button class="btn ok" onclick="activarReq('${b.id}',this)">Generar publicación</button>
-      <div class="acts-row"><button class="btn del" onclick="descartarReq('${b.id}',this)">Descartar</button></div>
-    </div></div></div>`;
+  return `<div class="card men">
+    <button class="qhead" onclick="openReqModal('${b.id}')">
+      <span class="rst men">Mención</span>
+      <span class="qtt">${esc(b.req_titulo||'Mención')}</span>
+      ${canalBadge(b)}
+      <span class="qchev">⤢</span>
+    </button></div>`;
 }
 function solicitudCard(b){
   const txt = b.brief_estado==='procesando' ? 'El creativo está elaborando propuestas…' : 'Pedido de propuestas en cola…';
@@ -254,19 +248,25 @@ async function pedirPropuestas(){
   }catch(e){ toast('Error de conexión', true); }
   btn.disabled=false; btn.textContent=t;
 }
-async function activarReq(id, btn){
-  if(acting) return; if(!confirm('Se manda a generar una pieza y entra al circuito de aprobación. ¿Confirmás?')) return;
-  acting=true; if(btn){btn.disabled=true; btn.textContent='Activando…';}
-  try{ const d=await fetch('api/requerimientos/'+id+'/activar',{method:'POST'}).then(r=>r.json()); toast(d.ok?'Activada — entra al circuito':'No se pudo activar',!d.ok); }
-  catch(e){ toast('Error de conexión', true); }
-  acting=false; setTimeout(currentLoad, 800);
-}
 async function descartarReq(id, btn){
   if(acting) return; if(!confirm('Descartar este requerimiento. ¿Confirmás?')) return;
   acting=true; if(btn){btn.disabled=true; btn.textContent='Descartando…';}
   try{ const d=await fetch('api/requerimientos/'+id+'/descartar',{method:'POST'}).then(r=>r.json()); toast(d.ok?'Descartado':'No se pudo descartar',!d.ok); }
   catch(e){ toast('Error de conexión', true); }
   acting=false; setTimeout(currentLoad, 800);
+}
+// Descartar desde el popup de propuesta/mención.
+async function descartarDesdeModal(){
+  if(!modalId||acting) return;
+  if(!confirm('Descartar este requerimiento. No se genera nada. ¿Confirmás?')) return;
+  const id=modalId, btn=document.getElementById('rm-desc'), t=btn?btn.textContent:'';
+  acting=true; if(btn){btn.disabled=true; btn.textContent='Descartando…';}
+  try{
+    const d=await fetch('api/requerimientos/'+id+'/descartar',{method:'POST'}).then(r=>r.json());
+    if(d.ok){ toast('Descartado'); modalId=null; document.getElementById('reqmodal').classList.add('hidden'); }
+    else toast('No se pudo descartar', true);
+  }catch(e){ toast('Error de conexión', true); }
+  if(btn){btn.disabled=false; btn.textContent=t;} acting=false; setTimeout(currentLoad, 500);
 }
 
 /* ---------- Ventana de interacción con el creativo (preview + comentarios + generar) ---------- */
@@ -277,6 +277,11 @@ function openReqModal(id){
   modalId=id;
   document.getElementById('rm-tt').textContent=b.req_titulo||'Propuesta';
   document.getElementById('rm-concepto').innerHTML=esc(b.texto||'').replace(/\n/g,'<br>');
+  const link=document.getElementById('rm-link');
+  if(link){
+    if(b.enlace){ link.innerHTML=`<a class="link" href="${esc(b.enlace)}" target="_blank" rel="noopener">Ver post en Instagram ↗</a>`; link.style.display=''; }
+    else link.style.display='none';
+  }
   const needs=document.getElementById('rm-needs');
   if(b.requiere_material){ needs.innerHTML=`<b>Necesita:</b> ${esc(b.requiere_material)}`; needs.style.display=''; }
   else needs.style.display='none';

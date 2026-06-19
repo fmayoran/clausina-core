@@ -45,6 +45,12 @@
   .askbox button:hover{background:var(--fire);border-color:var(--fire);color:#0c0c0a;}
   .askbox button:disabled{opacity:.55;cursor:default;}
 
+  /* Propuestas/menciones: filas compactas que abren el popup */
+  #c-prop{gap:8px;}
+  .card.prop .qhead,.card.men .qhead{padding:10px 12px;}
+  .phint{flex:0 0 auto;font-family:'IBM Plex Mono',monospace;font-size:.58rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ember);}
+  .qhead .qchev{font-size:.85rem;}
+
   /* Filas compactas de la cola (acordeón) */
   #c-cola{gap:8px;}
   .qcard{overflow:hidden;}
@@ -129,6 +135,7 @@
       </div>
       <div class="modal-body">
         <div class="reqtext" id="rm-concepto"></div>
+        <div id="rm-link"></div>
         <div class="needs" id="rm-needs"></div>
         <div class="modal-sec">
           <div class="modal-lbl">Material aportado</div>
@@ -142,6 +149,7 @@
       </div>
       <div class="modal-foot">
         <button class="btn ok" id="rm-gen" onclick="generarPublicacion()">Generar publicación</button>
+        <button class="btn del" id="rm-desc" onclick="descartarDesdeModal()">Descartar</button>
         <button class="btn no" onclick="closeReqModal()">Cerrar</button>
       </div>
     </div>
