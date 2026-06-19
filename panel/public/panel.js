@@ -215,17 +215,9 @@ async function aprobar(id, btn){
   }catch(e){ toast('Error de conexión', true); }
   acting=false; setTimeout(currentLoad, 1500);
 }
-async function rechazar(id, btn){
-  if(acting) return;
-  const motivo = prompt('Motivo del rechazo (se usa para corregir la pieza):');
-  if(motivo===null) return;
-  if(!motivo.trim()){ toast('Hace falta un motivo', true); return; }
-  acting=true; busy(btn,'Rechazando…');
-  try{ const d=await fetch('api/piezas/'+id+'/rechazar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({motivo})}).then(r=>r.json());
-    toast(d.ok?'Rechazada — se va a corregir':'No se pudo rechazar ('+(d.error||d.status)+')', !d.ok);
-  }catch(e){ toast('Error de conexión', true); }
-  acting=false; setTimeout(currentLoad, 1200);
-}
+// Rechazo con material: abre un modal con el motivo + galería opcional de imágenes/videos a aportar.
+// El material se sube a la pieza (mientras está pendiente) y la rutina de corrección lo usa al reprocesar.
+function rechazar(id, btn){ if(acting) return; openRejectModal(id); }
 async function descartar(id, btn){
   if(acting) return;
   if(!confirm('Descartar la pieza definitivamente. No se publica ni se corrige. ¿Confirmás?')) return;
@@ -425,6 +417,96 @@ async function loadAvisos(){
     fill('c-pub','n-pub', piezas.filter(p=>p.estado==='publicada').map(avisoPubCard).join(''));
     setUpd();
   }catch(e){ setUpd(); }
+}
+
+/* ---------- Modal de rechazo (motivo + material opcional) ---------- */
+// Disponible en cualquier página (Instagram/Avisos): se inyecta en el DOM la primera vez.
+let rejectId=null;
+function ensureRejectModal(){
+  if(document.getElementById('rejmodal')) return;
+  const d=document.createElement('div');
+  d.id='rejmodal'; d.className='modal hidden';
+  d.innerHTML=`
+    <div class="modal-bg" onclick="closeRejectModal()"></div>
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-tt">Rechazar pieza</div>
+        <button class="modal-x" onclick="closeRejectModal()" title="Cerrar">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-sec">
+          <div class="modal-lbl">Motivo del rechazo (se usa para corregir)</div>
+          <textarea id="rj-motivo" maxlength="500" placeholder="Qué corregir: copy, recorte, el texto tapa la comida, otro encuadre, sumá las fotos nuevas…"></textarea>
+        </div>
+        <div class="modal-sec">
+          <div class="modal-lbl">Material para la corrección (opcional)</div>
+          <div class="gallery" id="rj-gallery"></div>
+          <label class="btn ok filelbl mt8"><span class="flbl">+ Agregar imágenes / videos</span><input type="file" accept="image/*,video/*" multiple onchange="rjAddFiles(this)"></label>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn no" id="rj-go" onclick="confirmRechazo()">Rechazar y corregir</button>
+        <button class="btn no" onclick="closeRejectModal()">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(d);
+}
+function openRejectModal(id){
+  ensureRejectModal();
+  rejectId=id;
+  document.getElementById('rj-motivo').value='';
+  document.getElementById('rejmodal').classList.remove('hidden');
+  loadRejMateriales();
+}
+function closeRejectModal(){ if(acting) return; rejectId=null; document.getElementById('rejmodal').classList.add('hidden'); }
+async function loadRejMateriales(){
+  if(!rejectId) return;
+  const g=document.getElementById('rj-gallery');
+  try{
+    const mats=await fetch('api/piezas/'+rejectId+'/materiales').then(r=>r.json());
+    g.innerHTML = (mats&&mats.length) ? mats.map(rejTile).join('') : '<div class="empty">— sin material extra —</div>';
+  }catch(e){}
+}
+function rejTile(m){
+  const inner = m.media_type==='photo'
+    ? `<img src="api/material/${m.id}/media" loading="lazy" onerror="this.style.opacity=.2">`
+    : `<div class="vidtile">▶<span>${esc(m.filename||'video')}</span></div>`;
+  return `<div class="tile">${inner}<button class="tile-x" title="Quitar" onclick="rjDelMaterial('${m.id}')">×</button></div>`;
+}
+async function rjAddFiles(input){
+  const files=[...(input.files||[])]; if(!files.length||acting||!rejectId) return;
+  const lbl=input.closest('label'), txt=lbl.querySelector('.flbl'), base=txt.textContent;
+  acting=true; lbl.style.pointerEvents='none';
+  let okc=0;
+  for(let i=0;i<files.length;i++){
+    txt.textContent='Subiendo '+(i+1)+'/'+files.length+'…';
+    try{
+      const dataUrl=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(files[i]);});
+      const d=await fetch('api/piezas/'+rejectId+'/material',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,filename:files[i].name})}).then(r=>r.json());
+      if(d.ok) okc++;
+    }catch(e){}
+  }
+  input.value=''; txt.textContent=base; lbl.style.pointerEvents=''; acting=false;
+  toast(okc?okc+' material(es) agregado(s)':'No se pudo subir', !okc);
+  loadRejMateriales();
+}
+async function rjDelMaterial(mid){
+  if(acting||!rejectId) return; acting=true;
+  try{ await fetch('api/piezas/'+rejectId+'/material/'+mid,{method:'DELETE'}); }catch(e){}
+  acting=false; loadRejMateriales();
+}
+async function confirmRechazo(){
+  if(!rejectId||acting) return;
+  const motivo=document.getElementById('rj-motivo').value.trim();
+  if(!motivo){ toast('Hace falta un motivo', true); return; }
+  const id=rejectId, btn=document.getElementById('rj-go');
+  acting=true; btn.disabled=true; btn.textContent='Rechazando…';
+  try{
+    const d=await fetch('api/piezas/'+id+'/rechazar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({motivo})}).then(r=>r.json());
+    if(d.ok){ toast('Rechazada — se va a corregir'); rejectId=null; document.getElementById('rejmodal').classList.add('hidden'); }
+    else toast('No se pudo rechazar ('+(d.error||d.status)+')', true);
+  }catch(e){ toast('Error de conexión', true); }
+  btn.disabled=false; btn.textContent='Rechazar y corregir'; acting=false; setTimeout(currentLoad, 1200);
 }
 
 /* ---------- Marca activa (multi-tenant) ---------- */

@@ -45,6 +45,30 @@ for slug in "${SLUGS[@]}"; do
   NOMBRE=$(psql "SELECT nombre FROM contenido.proyectos WHERE slug='$slug';"); [ -z "$NOMBRE" ] && NOMBRE="$slug"
   cd "$REPO" || continue
   bash "$MOTOR/scripts/perfil_a_md.sh" "$slug" >/dev/null 2>&1 || true
+
+  # Material que Fer aportó AL RECHAZAR (galería brief_material de las piezas rechazadas de esta marca).
+  # Se descarga con el bot de la marca (mismo file_id que sube el panel) y se inyecta al prompt por pieza_id.
+  BOT=$(grep '^TELEGRAM_BOT_TOKEN=' "$REPO/$slug.env" 2>/dev/null | cut -d= -f2-)
+  dl(){ local fid="$1" out="$2"; local fp=$(curl -s "https://api.telegram.org/bot$BOT/getFile?file_id=$fid" | python3 -c "import sys,json;print(json.load(sys.stdin)['result']['file_path'])" 2>/dev/null); [ -z "$fp" ] && return 1; curl -s "https://api.telegram.org/file/bot$BOT/$fp" -o "$out"; }
+  rm -f /tmp/fix_mat_*
+  MATCTX=""; mi=0
+  if [ -n "$BOT" ]; then
+    while IFS=$'\t' read -r pieza fid mt; do
+      [ -z "$fid" ] && continue
+      ext="jpg"; [ "$mt" = "video" ] && ext="mp4"
+      out="/tmp/fix_mat_$mi.$ext"
+      if dl "$fid" "$out"; then MATCTX+="- pieza_id=$pieza -> $out ($mt)"$'\n'; fi
+      mi=$((mi+1))
+    done < <(psql "SELECT b.pieza_id::text || E'\t' || bm.file_id || E'\t' || COALESCE(bm.media_type,'photo')
+                   FROM contenido.brief_material bm
+                   JOIN contenido.tg_briefs b ON b.id=bm.brief_id
+                   JOIN contenido.piezas pz ON pz.id=b.pieza_id
+                   JOIN contenido.revisiones r ON r.id=pz.revision_vigente
+                   JOIN contenido.proyectos p ON p.id=pz.proyecto_id
+                   WHERE r.estado='rechazada' AND r.derivado_en IS NULL AND p.slug='$slug'
+                   ORDER BY bm.orden, bm.creado_en")
+  fi
+  [ -n "$MATCTX" ] && echo "$(ts)    material aportado al rechazo ($mi archivo/s)" >> "$LOG"
   echo "$(ts) -> $slug (revisiones: $REVIDS)" >> "$LOG"
   PROMPT=$(cat <<EOF
 Sos el Director Creativo del proyecto (su identidad, voz y estética están en contexto/CONTEXTO_MARCA.md y el CLAUDE.md del directorio actual). Corrés como rutina automática NO interactiva en el VPS.
@@ -53,7 +77,11 @@ Base n8n: $N
 
 IMPORTANTE (aislamiento multiproyecto): procesá ÚNICAMENTE las revisiones cuyo revision_id esté en esta lista: $REVIDS. Son de ESTA marca. Cualquier otro item que devuelva el webhook NO es de esta marca: ignoralo.
 En cada llamada a cf-avisar incluí el campo "marca":"$NOMBRE".
-
+${MATCTX:+
+MATERIAL APORTADO POR FER AL RECHAZAR (ya descargado en el VPS, agrupado por pieza_id):
+$MATCTX
+Cuando corrijas una pieza que figure acá, USÁ ese material: son imágenes/clips que Fer sumó al rechazar para que los incorpores (p.ej. una mejor foto del plato, otro encuadre, el logo, un clip). Para correcciones VISUALES partí de esos archivos (solos o combinados con la media actual) en vez de inventar. Si el material claramente no aplica al motivo, ignoralo.
+}
 Pasos:
 1. GET /webhook/cf-rechazos-pendientes (cada item trae pieza_id, revision_id, titulo_interno, CANAL, asset_ig, media_tipo, poster_url, caption, web_*, daypart, clima, transito, momento, duracion_s, motivo_rechazo, intentos). Filtrá a los revision_id de la lista de arriba.
 2. Por cada rechazo (de la lista): si intentos>=5 → cf-avisar + cf-marcar-procesado. Si no, RUTEÁ por "canal":

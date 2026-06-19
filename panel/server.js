@@ -318,30 +318,54 @@ app.delete('/api/requerimientos/:id/material/:mid', async (req, res) => {
   catch (e) { console.error('del material', e.message); res.status(500).json({ ok: false }); }
 });
 
-// Aportar material desde el panel: el archivo (base64) se manda al bot como documento (preserva calidad),
-// se obtiene el file_id y se SUMA a la galería del requerimiento. NO dispara la generación (eso lo hace
-// el botón "Generar publicación"). Reusa el pipeline de Telegram.
+// Sube un archivo (base64) al bot como documento (preserva calidad) y devuelve {fileId, mediaType, filename}.
+// Lanza un Error con .http para que el handler responda el status correcto.
+async function subirMaterialTg(body, caption) {
+  if (!BOT) { const e = new Error('sin_bot'); e.http = 503; throw e; }
+  const dataUrl = String((body && body.dataUrl) || '');
+  const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!m) { const e = new Error('archivo_invalido'); e.http = 400; throw e; }
+  const mime = m[1];
+  const buf = Buffer.from(m[2], 'base64');
+  const mediaType = mime.startsWith('video/') ? 'video' : 'photo';
+  const filename = String((body && body.filename) || (mediaType === 'video' ? 'material.mp4' : 'material.jpg'));
+  const fd = new FormData();
+  fd.append('chat_id', CHAT);
+  fd.append('caption', caption);
+  fd.append('document', new Blob([buf], { type: mime }), filename);
+  const tg = await fetch(`https://api.telegram.org/bot${BOT}/sendDocument`, { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) }).then(r => r.json());
+  const fileId = tg && tg.result && tg.result.document && tg.result.document.file_id;
+  if (!fileId) { const e = new Error('telegram'); e.http = 502; throw e; }
+  return { fileId, mediaType, filename };
+}
+
+// Aportar material desde el panel: el archivo se suma a la galería del requerimiento. NO dispara la
+// generación (eso lo hace el botón "Generar publicación").
 app.post('/api/requerimientos/:id/material', async (req, res) => {
   try {
-    if (!BOT) return res.status(503).json({ ok: false, error: 'sin_bot' });
-    const dataUrl = String((req.body && req.body.dataUrl) || '');
-    const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-    if (!m) return res.status(400).json({ ok: false, error: 'archivo_invalido' });
-    const mime = m[1];
-    const buf = Buffer.from(m[2], 'base64');
-    const mediaType = mime.startsWith('video/') ? 'video' : 'photo';
-    const filename = String((req.body && req.body.filename) || (mediaType === 'video' ? 'material.mp4' : 'material.jpg'));
-    const fd = new FormData();
-    fd.append('chat_id', CHAT);
-    fd.append('caption', 'Material para una propuesta (vía panel).');
-    fd.append('document', new Blob([buf], { type: mime }), filename);
-    const tg = await fetch(`https://api.telegram.org/bot${BOT}/sendDocument`, { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) }).then(r => r.json());
-    const fileId = tg && tg.result && tg.result.document && tg.result.document.file_id;
-    if (!fileId) return res.status(502).json({ ok: false, error: 'telegram' });
+    const { fileId, mediaType, filename } = await subirMaterialTg(req.body, 'Material para una propuesta (vía panel).');
     const mat = await db.addMaterial(req.params.id, fileId, mediaType, filename);
     if (!mat) return res.status(409).json({ ok: false, error: 'estado' });
     res.json({ ok: true, material: mat });
-  } catch (e) { console.error('material', e.message); res.status(500).json({ ok: false, error: 'upload' }); }
+  } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
+});
+
+// --- Material aportado al RECHAZAR una pieza (se adjunta al brief que la generó, para la corrección) ---
+app.get('/api/piezas/:id/materiales', async (req, res) => {
+  try { res.json(await db.getMaterialesPorPieza(req.params.id)); }
+  catch (e) { console.error('materiales pieza', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/piezas/:id/material', async (req, res) => {
+  try {
+    const { fileId, mediaType, filename } = await subirMaterialTg(req.body, 'Material para corregir un rechazo (vía panel).');
+    const mat = await db.addMaterialPorPieza(req.params.id, fileId, mediaType, filename);
+    if (!mat) return res.status(409).json({ ok: false, error: 'no_pendiente' });
+    res.json({ ok: true, material: mat });
+  } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
+});
+app.delete('/api/piezas/:id/material/:mid', async (req, res) => {
+  try { res.json({ ok: await db.delMaterialPorPieza(req.params.id, req.params.mid) }); }
+  catch (e) { console.error('del material pieza', e.message); res.status(500).json({ ok: false }); }
 });
 
 // --- Programación de pantalla (privado) — a nivel PANTALLA, cross-proyecto (no usa la marca activa) ---

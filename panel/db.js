@@ -199,6 +199,35 @@ async function delMaterial(briefId, mid) {
   return rowCount > 0;
 }
 
+// --- Material aportado AL RECHAZAR una pieza ---
+// Se adjunta a la galería del brief que generó la pieza (brief.pieza_id), para que la rutina de
+// corrección lo descargue y lo use al reprocesar. Solo mientras la pieza está pendiente de aprobación
+// (el panel sube el material ANTES de confirmar el rechazo).
+async function addMaterialPorPieza(piezaId, fileId, mediaType, filename) {
+  const { rows } = await pool.query(
+    `INSERT INTO contenido.brief_material (brief_id, file_id, media_type, filename, orden)
+       SELECT b.id, $2, $3, $4, COALESCE((SELECT max(orden)+1 FROM contenido.brief_material WHERE brief_id=b.id), 0)
+       FROM contenido.tg_briefs b
+       JOIN contenido.piezas pz ON pz.id = b.pieza_id
+       JOIN contenido.revisiones r ON r.id = pz.revision_vigente
+       WHERE b.pieza_id = $1 AND r.estado = 'pendiente_aprobacion'
+     RETURNING id, media_type, filename, orden`, [piezaId, fileId, mediaType, filename || null]);
+  return rows[0] || null;
+}
+async function getMaterialesPorPieza(piezaId) {
+  const { rows } = await pool.query(
+    `SELECT bm.id, bm.media_type, bm.filename, bm.orden
+       FROM contenido.brief_material bm JOIN contenido.tg_briefs b ON b.id = bm.brief_id
+      WHERE b.pieza_id = $1 ORDER BY bm.orden, bm.creado_en`, [piezaId]);
+  return rows;
+}
+async function delMaterialPorPieza(piezaId, mid) {
+  const { rowCount } = await pool.query(
+    `DELETE FROM contenido.brief_material bm USING contenido.tg_briefs b
+      WHERE bm.id = $2 AND bm.brief_id = b.id AND b.pieza_id = $1`, [piezaId, mid]);
+  return rowCount > 0;
+}
+
 // "Generar publicación": guarda los comentarios y manda el requerimiento al circuito -> 'pendiente'.
 async function generarReq(id, comentarios) {
   const { rowCount } = await pool.query(
@@ -469,7 +498,8 @@ async function health() {
 
 module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, getResumenAgencia,
   getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getTokenPendiente,
-  pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial, generarReq, activarReq, descartarReq, insertMencion,
+  pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,
+  addMaterialPorPieza, getMaterialesPorPieza, delMaterialPorPieza, generarReq, activarReq, descartarReq, insertMencion,
   getPostIdsPublicados, upsertMetricas,
   getPantallaActiva, getPantallaPorSlug, getPantallas, crearPantalla, actualizarPantalla, eliminarPantalla, getProgramaActivo,
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,

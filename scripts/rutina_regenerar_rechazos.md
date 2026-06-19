@@ -22,6 +22,8 @@ Antes de redactar, leer `contexto/CONTEXTO_MARCA.md`, `contexto/REFERENCIAS_INST
 
 ## Flujo (cada ejecución)
 1. `GET cf-rechazos-pendientes`. Si `[]` → **terminar** (caso normal).
+> **Material aportado al rechazar:** cuando Fer rechaza desde el panel puede adjuntar imágenes/videos. El runner (`rutina_local.sh`) ya los descarga al VPS y te los pasa en el prompt como `MATERIAL APORTADO POR FER AL RECHAZAR`, agrupado por `pieza_id` (rutas locales). Si un rechazo tiene material acá, **usalo** en la corrección visual (partí de esos archivos en lugar de inventar o de pedir material). Sale de `contenido.brief_material` del brief que generó la pieza (`brief.pieza_id`).
+
 2. Para cada rechazo:
    a. **Límite (ambos canales):** si `intentos >= 5` → `cf-avisar` ("No pude resolver tras 5 intentos: <titulo>. Motivo: <motivo>. Necesito tu intervención.") → `cf-marcar-procesado?id=<revision_id>` → siguiente.
    b. **Ruteo por `canal`:**
@@ -30,7 +32,7 @@ Antes de redactar, leer `contexto/CONTEXTO_MARCA.md`, `contexto/REFERENCIAS_INST
    c. **Clasificar el `motivo_rechazo`** (solo Instagram):
       - **De TEXTO** (copy/caption/título/datos/tono): redactar la versión corregida (caption, `web_titulo`, `web_copy`, `web_tags`) **reusando la misma imagen** (`asset_ig` igual). `POST cf-crear-pendiente` **con `pieza_id`** y los textos nuevos (`notas` = qué se corrigió). Con el `{token}` que devuelve: `GET cf-pub-notify?token=<token>`. **No hace falta marcar nada**: la revisión nueva supera a la rechazada y sale de la cola sola.
       - **VISUAL editable** (tipografía/colores fuera de marca, "el texto tapa la comida", "sacá/borrá X", "más cinematográfico", reencuadre, otro texto): **corregilo vos editando la pieza**. Partí de la media base (descargá `asset_ig`), editá la imagen con Higgsfield si hace falta (`nano_banana_2 --image`, ver `scripts/higgsfield/README.md` → *Edición de imagen por instrucción*) y/o rehorneá el texto con la **tipografía de marca** (ver *Texto de marca horneado*). Acondicioná a 9:16 si es Story/Reel, subí (commit+push, verificá 200) y reenviá como **revisión nueva** con `POST cf-crear-pendiente` **+ `pieza_id`** (incluí el `media` nuevo + `formato` si es story) → `GET cf-pub-notify?token=<token>`. La rechazada sale sola de la cola.
-      - **Material faltante que NO tenés** ("mandame otra foto de X", "necesito una toma del salón", falta un asset real): NO inventes. `cf-avisar` pidiendo el material → `cf-marcar-procesado?id=<revision_id>`.
+      - **Material faltante que NO tenés** ("mandame otra foto de X", "necesito una toma del salón", falta un asset real): primero fijate si Fer adjuntó material al rechazar (`MATERIAL APORTADO…` en el prompt, por `pieza_id`); si está, usalo. Si no hay y no lo tenés, NO inventes: `cf-avisar` pidiendo el material → `cf-marcar-procesado?id=<revision_id>`.
    c. Si el motivo es ambiguo, intentá la corrección visual; si genuinamente no se puede sin material nuevo, avisá a Fer y derivá.
 3. Terminar. Resumir en el log qué se hizo.
 
