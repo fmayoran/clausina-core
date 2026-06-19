@@ -158,22 +158,43 @@ function solicitudCard(b){
     ${b.enfasis?`<div class="reqtext">Énfasis: ${esc(b.enfasis)}</div>`:''}
   </div></div>`;
 }
-function reqCard(b){
-  if(b.es_solicitud) return solicitudCard(b);
-  if(b.origen==='mencion' && b.brief_estado==='propuesta') return mentionCard(b);
-  if(b.origen==='creativo' && b.brief_estado==='propuesta') return propCard(b);
+// Clasifica un brief para la sección a la que pertenece.
+//   'work' = pedido en curso (creativo elaborando) · 'prop' = propuesta/mención por revisar · 'cola' = requerimiento en pipeline.
+function reqClass(b){
+  if(b.es_solicitud) return 'work';
+  if(b.brief_estado==='propuesta' && (b.origen==='mencion' || b.origen==='creativo')) return 'prop';
+  return 'cola';
+}
+const firstLine = (t,n=64) => { t=(t||'').trim().split('\n')[0]; return t.length>n ? t.slice(0,n).trim()+'…' : t; };
+
+// Fila compacta de la cola: una línea (estado + título); la descripción se despliega al entrar.
+const _openReq = new Set();
+function toggleReq(id){ _openReq.has(id) ? _openReq.delete(id) : _openReq.add(id); renderCola(); }
+function reqRow(b){
   const s = reqStatus(b);
-  const thumb = (b.tiene_media && b.media_type==='photo')
-      ? `<img class="reqthumb" loading="lazy" src="api/brief/${b.id}/media" onerror="this.classList.add('ph');this.removeAttribute('src')">`
-      : (b.tiene_media ? `<div class="reqthumb ph">▶</div>` : '');
+  const open = _openReq.has(b.id);
   const cf = b.pieza_numero ? `<span class="badge cf">CF-${pad4(b.pieza_numero)}</span>` : '';
   const kind = b.tiene_audio ? 'audio' : (b.media_type || 'texto');
-  return `<div class="card"><div class="reqrow">${thumb}
-    <div class="reqbody">
-      <div class="meta2"><span class="rst ${s.c}">${esc(s.l)}</span>${canalBadge(b)}${cf}</div>
-      <div class="meta2"><span class="badge">${esc(kind)}</span><span>${fecha(b.creado_en)}</span></div>
-      <div class="reqtext">${esc((b.texto||'(sin texto)')).slice(0,200)}</div>
-    </div></div></div>`;
+  const title = esc(b.req_titulo || firstLine(b.texto) || '(sin texto)');
+  let det = '';
+  if(open){
+    const thumb = (b.tiene_media && b.media_type==='photo')
+        ? `<img class="qmedia" loading="lazy" src="api/brief/${b.id}/media" onerror="this.classList.add('ph');this.removeAttribute('src')">`
+        : (b.tiene_media ? `<div class="qmedia ph">▶</div>` : '');
+    const needs = b.requiere_material ? `<div class="needs"><b>Necesita:</b> ${esc(b.requiere_material)}</div>` : '';
+    det = `<div class="qdet">${thumb}
+      <div class="reqtext">${esc(b.texto||'(sin texto)').replace(/\n/g,'<br>')}</div>
+      ${needs}
+      <div class="meta2"><span class="badge">${esc(kind)}</span><span>${fecha(b.creado_en)}</span>${cf}</div>
+    </div>`;
+  }
+  return `<div class="card qcard ${open?'open':''}">
+    <button class="qhead" onclick="toggleReq('${b.id}')">
+      <span class="rst ${s.c}">${esc(s.l)}</span>
+      <span class="qtt">${title}</span>
+      ${canalBadge(b)}
+      <span class="qchev">${open?'▼':'▶'}</span>
+    </button>${det}</div>`;
 }
 
 /* ---------- Barra de status ---------- */
@@ -314,16 +335,31 @@ async function generarPublicacion(){
 }
 
 /* ---------- Loaders por pantalla ---------- */
+// Estado del resumen (dashboard), alimentado desde loadCola (cola/prop/work) y updateMenuCounts (aprob/pub).
+const _stats={cola:0,prop:0,work:0,aprob:0,pub:0};
+function setStat(id, val){ const e=document.getElementById(id); if(e) e.textContent=val; }
+function paintResumen(){
+  setStat('st-cola', _stats.cola);
+  setStat('st-prop', _stats.prop);
+  setStat('st-aprob', _stats.aprob);
+  setStat('st-pub', _stats.pub);
+  const px=document.getElementById('st-prop-x');
+  if(px) px.textContent = _stats.work ? `${_stats.work} en elaboración` : 'del creativo, por revisar';
+  const ta=document.querySelector('.statile.c-aprob'); if(ta) ta.classList.toggle('alert', _stats.aprob>0);
+  const tp=document.querySelector('.statile.c-prop'); if(tp) tp.classList.toggle('alert', _stats.prop>0);
+}
 async function updateMenuCounts(){
   const mi=document.getElementById('mc-ig'), ma=document.getElementById('mc-av'), mw=document.getElementById('mc-web');
-  if(!mi && !ma && !mw) return;
+  if(!mi && !ma && !mw && !document.getElementById('resumen')) return;
   try{
     const tasks=[fetch('api/piezas?canal=instagram').then(r=>r.json()),fetch('api/piezas?canal=aviso').then(r=>r.json())];
     if(mw) tasks.push(fetch('api/landing').then(r=>r.json()).catch(()=>[]));
     const [ig,av,land]=await Promise.all(tasks);
     const pe=a=>a.filter(p=>p.estado==='pendiente_aprobacion').length;
-    if(mi) mi.textContent=pe(ig)+' pendiente(s) · '+ig.filter(p=>p.estado==='publicada').length+' publicada(s)';
-    if(ma) ma.textContent=pe(av)+' pendiente(s) · '+av.filter(p=>p.estado==='publicada').length+' en pantalla';
+    const pu=a=>a.filter(p=>p.estado==='publicada').length;
+    _stats.aprob=pe(ig)+pe(av); _stats.pub=pu(ig)+pu(av); paintResumen();
+    if(mi) mi.textContent=pe(ig)+' pendiente(s) · '+pu(ig)+' publicada(s)';
+    if(ma) ma.textContent=pe(av)+' pendiente(s) · '+pu(av)+' en pantalla';
     if(mw){
       const L=land||[];
       const borr=L.filter(c=>c.estado==='borrador').length;
@@ -339,13 +375,29 @@ async function updateMenuCounts(){
     }
   }catch(_){}
 }
+let _reqList=[];
+// Render de las dos secciones operativas a partir del cache (sin re-fetch). Lo llama loadCola y el acordeón.
+function renderCola(){
+  const work=_reqList.filter(b=>reqClass(b)==='work');
+  const prop=_reqList.filter(b=>reqClass(b)==='prop');
+  const cola=_reqList.filter(b=>reqClass(b)==='cola');
+  // Propuestas: primero los pedidos en curso (estado), después las propuestas/menciones accionables.
+  const propHtml = work.map(solicitudCard).join('')
+    + prop.map(b => b.origen==='mencion' ? mentionCard(b) : propCard(b)).join('');
+  fill('c-prop','n-prop', propHtml);
+  fill('c-cola','n-cola', cola.map(reqRow).join(''));
+  _stats.cola=cola.length; _stats.prop=prop.length; _stats.work=work.length; paintResumen();
+}
 async function loadCola(){
   if(acting) return;
   try{
     const r=await fetch('api/requerimientos'); if(r.status===401){ location.href='login'; return; }
     const [reqs, status] = await Promise.all([ r.json(), fetch('api/status').then(x=>x.json()).catch(()=>[]) ]);
     _reqs={}; reqs.forEach(b=>{ if(b.id) _reqs[b.id]=b; });
-    fill('c-brief','n-brief', reqs.map(reqCard).join(''));
+    _reqList=reqs;
+    // Limpia del set de "abiertos" los que ya no están en la cola.
+    for(const id of [..._openReq]) if(!_reqs[id]) _openReq.delete(id);
+    renderCola();
     renderStatus(status); setUpd(); updateMenuCounts();
   }catch(e){ setUpd(); }
 }

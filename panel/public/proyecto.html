@@ -6,14 +6,58 @@
 <title>Panel del proyecto</title>
 <link rel="stylesheet" href="panel.css">
 <style>
-  /* Layout 2 columnas: cola de trabajo (izq, ancha) + capacidades del proyecto (der) */
-  .proj-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;padding:20px 28px 60px;align-items:start;}
-  @media(max-width:900px){.proj-grid{grid-template-columns:1fr;}}
+  /* ===== Panel operativo del proyecto: dashboard + secciones ===== */
+  .proj-wrap{display:flex;flex-direction:column;gap:22px;padding:20px 28px 60px;}
+
+  /* Tira de resumen (dashboard) */
+  .resumen{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  @media(max-width:760px){.resumen{grid-template-columns:repeat(2,1fr);}}
+  .statile{position:relative;display:flex;flex-direction:column;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px 16px 14px;text-decoration:none;cursor:pointer;transition:.15s;overflow:hidden;}
+  .statile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ash);}
+  .statile.c-cola::before{background:#8a8a82;} .statile.c-prop::before{background:var(--ember);}
+  .statile.c-aprob::before{background:#e9c9a6;} .statile.c-pub::before{background:#5ec27a;}
+  .statile:hover{border-color:var(--ember);}
+  .statile .sv{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:2.15rem;line-height:.95;color:var(--white);}
+  .statile .sl{font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);}
+  .statile .sx{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:#6f6f68;letter-spacing:.03em;}
+  .statile.alert .sv{color:var(--fire);}
+  .statile.alert::before{background:var(--fire);}
+
+  /* Grilla principal: operativo (izq) + canales (der) */
+  .proj-cols{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start;}
+  @media(max-width:900px){.proj-cols{grid-template-columns:1fr;}}
+  .proj-main{display:flex;flex-direction:column;gap:22px;min-width:0;}
   .proj-right{display:flex;flex-direction:column;gap:14px;}
   .proj-right h3.sech{font-family:'IBM Plex Mono',monospace;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ash);margin:2px 2px -4px;}
   .proj-right .menucard{padding:18px 18px;}
   .proj-right .mt{font-size:1.3rem;}
   .menucard .mn.alert{color:#1ec9ff;font-weight:700;}
+
+  /* Caja "pedir propuestas" dentro de la sección Propuestas */
+  .askbox{margin:12px;padding:13px 14px 14px;background:#0c0c0a;border:1px dashed #1d3a44;border-radius:8px;display:flex;flex-direction:column;gap:9px;}
+  .askbox .akl{font-family:'IBM Plex Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ember);}
+  .askbox input,.askbox select{background:#080806;border:1px solid var(--line);border-radius:5px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:.95rem;padding:8px 10px;outline:none;}
+  .askbox input:focus,.askbox select:focus{border-color:var(--ember);}
+  .askbox .akrow{display:flex;gap:8px;}
+  .askbox .akrow select{flex:1;}
+  .askbox .akrow input[type=number]{width:64px;text-align:center;-moz-appearance:textfield;}
+  .askbox button{background:transparent;border:1px solid #1d3a44;color:var(--ember);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:.84rem;letter-spacing:.04em;text-transform:uppercase;padding:8px;border-radius:5px;cursor:pointer;transition:.15s;}
+  .askbox button:hover{background:var(--fire);border-color:var(--fire);color:#0c0c0a;}
+  .askbox button:disabled{opacity:.55;cursor:default;}
+
+  /* Filas compactas de la cola (acordeón) */
+  #c-cola{gap:8px;}
+  .qcard{overflow:hidden;}
+  .qhead{width:100%;background:transparent;border:0;color:inherit;cursor:pointer;display:flex;align-items:center;gap:9px;padding:9px 12px;text-align:left;font-family:inherit;}
+  .qhead:hover{background:#0e0e0c;}
+  .qcard.open .qhead{background:#0e0e0c;}
+  .qhead .rst{flex:0 0 auto;}
+  .qtt{flex:1;min-width:0;font-weight:700;font-size:.97rem;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .qchev{flex:0 0 auto;font-family:'IBM Plex Mono',monospace;color:var(--ash);font-size:.7rem;width:12px;text-align:center;}
+  .qdet{padding:11px 12px 13px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:9px;}
+  .qdet .reqtext{margin:0;}
+  .qdet .qmedia{width:120px;height:120px;object-fit:cover;border-radius:6px;background:#1a1a17;}
+  .qdet .qmedia.ph{display:flex;align-items:center;justify-content:center;color:#55554f;font-size:1.6rem;}
 </style>
 </head>
 <body>
@@ -28,29 +72,51 @@
   </header>
   <div id="statusbar"></div>
   <div id="toast"></div>
-  <div class="proj-grid">
-    <div class="col brief">
-      <h2><span class="dot"></span>Cola de Requerimientos <span class="n" id="n-brief"></span></h2>
-      <div class="askprop">
-        <input id="enfasis" placeholder="Énfasis (opcional): qué destacar…" maxlength="1000">
-        <div class="askrow">
-          <select id="canalprop" title="Canal de las propuestas">
-            <option value="instagram">Canal: Instagram</option>
-            <option value="aviso">Canal: Aviso pantalla</option>
-          </select>
-          <input id="cantprop" type="number" min="1" max="8" value="5" title="Cantidad de propuestas (1 a 8)">
-        </div>
-        <button id="askbtn" onclick="pedirPropuestas()">Pedir propuestas al creativo</button>
-      </div>
-      <div class="cards" id="c-brief"></div>
+
+  <div class="proj-wrap">
+    <!-- Resumen / dashboard -->
+    <div class="resumen" id="resumen">
+      <a class="statile c-cola"  href="#sec-cola"><span class="sv" id="st-cola">—</span><span class="sl">En cola</span><span class="sx">requerimientos por resolver</span></a>
+      <a class="statile c-prop"  href="#sec-prop"><span class="sv" id="st-prop">—</span><span class="sl">Propuestas</span><span class="sx" id="st-prop-x">del creativo, por revisar</span></a>
+      <a class="statile c-aprob" href="#sec-canales"><span class="sv" id="st-aprob">—</span><span class="sl">Por aprobar</span><span class="sx">piezas en revisión</span></a>
+      <a class="statile c-pub"   href="#sec-canales"><span class="sv" id="st-pub">—</span><span class="sl">Publicadas</span><span class="sx">en feed y pantalla</span></a>
     </div>
-    <aside class="proj-right">
-      <h3 class="sech">Canales del proyecto</h3>
-      <a class="menucard" href="instagram"><span class="mt">Instagram</span><span class="md">Publicaciones del feed</span><span class="mn" id="mc-ig"></span></a>
-      <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Avisos para la pantalla de calle</span><span class="mn" id="mc-av"></span></a>
-      <a class="menucard" href="landing"><span class="mt">Web / Landing</span><span class="md">Cambios en la landing del proyecto</span><span class="mn" id="mc-web"></span></a>
-      <a class="menucard" href="auditoria"><span class="mt">Auditoría</span><span class="md">Presencia digital: KPIs, gráficos y recomendaciones</span><span class="mn" id="mc-aud"></span></a>
-    </aside>
+
+    <div class="proj-cols">
+      <div class="proj-main">
+        <!-- Sección: propuestas del creativo + pedido -->
+        <section class="col brief" id="sec-prop">
+          <h2><span class="dot"></span>Propuestas del creativo <span class="n" id="n-prop"></span></h2>
+          <div class="askbox">
+            <span class="akl">Pedir propuestas</span>
+            <input id="enfasis" placeholder="Énfasis (opcional): qué destacar…" maxlength="1000">
+            <div class="akrow">
+              <select id="canalprop" title="Canal de las propuestas">
+                <option value="instagram">Canal: Instagram</option>
+                <option value="aviso">Canal: Aviso pantalla</option>
+              </select>
+              <input id="cantprop" type="number" min="1" max="8" value="5" title="Cantidad de propuestas (1 a 8)">
+            </div>
+            <button id="askbtn" onclick="pedirPropuestas()">Pedir propuestas al creativo</button>
+          </div>
+          <div class="cards" id="c-prop"></div>
+        </section>
+
+        <!-- Sección: cola de requerimientos (compacta) -->
+        <section class="col pend" id="sec-cola">
+          <h2><span class="dot"></span>Cola de requerimientos <span class="n" id="n-cola"></span></h2>
+          <div class="cards" id="c-cola"></div>
+        </section>
+      </div>
+
+      <aside class="proj-right" id="sec-canales">
+        <h3 class="sech">Canales del proyecto</h3>
+        <a class="menucard" href="instagram"><span class="mt">Instagram</span><span class="md">Publicaciones del feed</span><span class="mn" id="mc-ig"></span></a>
+        <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Avisos para la pantalla de calle</span><span class="mn" id="mc-av"></span></a>
+        <a class="menucard" href="landing"><span class="mt">Web / Landing</span><span class="md">Cambios en la landing del proyecto</span><span class="mn" id="mc-web"></span></a>
+        <a class="menucard" href="auditoria"><span class="mt">Auditoría</span><span class="md">Presencia digital: KPIs, gráficos y recomendaciones</span><span class="mn" id="mc-aud"></span></a>
+      </aside>
+    </div>
   </div>
 
   <!-- Ventana de interacción con el creativo sobre un requerimiento -->
