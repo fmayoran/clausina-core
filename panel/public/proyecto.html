@@ -23,14 +23,20 @@
   .statile.alert .sv{color:var(--fire);}
   .statile.alert::before{background:var(--fire);}
 
-  /* Grilla principal: operativo (izq) + canales (der) */
-  .proj-cols{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start;}
+  /* Grilla principal: dos mitades — operativo (izq) + canales protagonistas (der) */
+  .proj-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start;}
   @media(max-width:900px){.proj-cols{grid-template-columns:1fr;}}
   .proj-main{display:flex;flex-direction:column;gap:22px;min-width:0;}
   .proj-right{display:flex;flex-direction:column;gap:14px;}
-  .proj-right h3.sech{font-family:'IBM Plex Mono',monospace;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ash);margin:2px 2px -4px;}
-  .proj-right .menucard{padding:18px 18px;}
-  .proj-right .mt{font-size:1.3rem;}
+  .proj-right h3.sech{font-family:'IBM Plex Mono',monospace;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ash);margin:2px 2px -2px;}
+  .chan-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:520px){.chan-grid{grid-template-columns:1fr;}}
+  .proj-right .menucard{padding:22px 20px;min-height:140px;gap:8px;position:relative;overflow:hidden;}
+  .proj-right .menucard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--line);transition:.15s;}
+  .proj-right .menucard:hover::before{background:var(--ember);}
+  .proj-right .mt{font-size:1.65rem;}
+  .proj-right .md{line-height:1.35;}
+  .proj-right .mn{font-size:.8rem;margin-top:auto;padding-top:8px;}
   .menucard .mn.alert{color:#1ec9ff;font-weight:700;}
 
   /* Caja "pedir propuestas" dentro de la sección Propuestas */
@@ -90,6 +96,12 @@
 
     <div class="proj-cols">
       <div class="proj-main">
+        <!-- Sección: cola de requerimientos (compacta) — lo que más atención requiere, va arriba -->
+        <section class="col pend" id="sec-cola">
+          <h2><span class="dot"></span>Cola de requerimientos <span class="n" id="n-cola"></span></h2>
+          <div class="cards" id="c-cola"></div>
+        </section>
+
         <!-- Sección: propuestas del creativo + pedido -->
         <section class="col brief" id="sec-prop">
           <h2><span class="dot"></span>Propuestas del creativo <span class="n" id="n-prop"></span></h2>
@@ -107,20 +119,16 @@
           </div>
           <div class="cards" id="c-prop"></div>
         </section>
-
-        <!-- Sección: cola de requerimientos (compacta) -->
-        <section class="col pend" id="sec-cola">
-          <h2><span class="dot"></span>Cola de requerimientos <span class="n" id="n-cola"></span></h2>
-          <div class="cards" id="c-cola"></div>
-        </section>
       </div>
 
       <aside class="proj-right" id="sec-canales">
         <h3 class="sech">Canales del proyecto</h3>
-        <a class="menucard" href="instagram"><span class="mt">Instagram</span><span class="md">Publicaciones del feed</span><span class="mn" id="mc-ig"></span></a>
-        <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Avisos para la pantalla de calle</span><span class="mn" id="mc-av"></span></a>
-        <a class="menucard" href="landing"><span class="mt">Web / Landing</span><span class="md">Cambios en la landing del proyecto</span><span class="mn" id="mc-web"></span></a>
-        <a class="menucard" href="auditoria"><span class="mt">Auditoría</span><span class="md">Presencia digital: KPIs, gráficos y recomendaciones</span><span class="mn" id="mc-aud"></span></a>
+        <div class="chan-grid">
+          <a class="menucard" href="instagram"><span class="mt">Instagram</span><span class="md">Publicaciones del feed</span><span class="mn" id="mc-ig"></span></a>
+          <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Avisos para la pantalla de calle</span><span class="mn" id="mc-av"></span></a>
+          <a class="menucard" href="landing"><span class="mt">Web / Landing</span><span class="md">Cambios en la landing del proyecto</span><span class="mn" id="mc-web"></span></a>
+          <a class="menucard" href="auditoria"><span class="mt">Auditoría</span><span class="md">Presencia digital: KPIs, gráficos y recomendaciones</span><span class="mn" id="mc-aud"></span></a>
+        </div>
       </aside>
     </div>
   </div>
