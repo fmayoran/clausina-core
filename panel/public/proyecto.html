@@ -33,10 +33,13 @@
       <h2><span class="dot"></span>Cola de Requerimientos <span class="n" id="n-brief"></span></h2>
       <div class="askprop">
         <input id="enfasis" placeholder="Énfasis (opcional): qué destacar…" maxlength="1000">
-        <select id="canalprop" title="Canal de las propuestas">
-          <option value="instagram">Canal: Instagram</option>
-          <option value="aviso">Canal: Aviso pantalla</option>
-        </select>
+        <div class="askrow">
+          <select id="canalprop" title="Canal de las propuestas">
+            <option value="instagram">Canal: Instagram</option>
+            <option value="aviso">Canal: Aviso pantalla</option>
+          </select>
+          <input id="cantprop" type="number" min="1" max="8" value="5" title="Cantidad de propuestas (1 a 8)">
+        </div>
         <button id="askbtn" onclick="pedirPropuestas()">Pedir propuestas al creativo</button>
       </div>
       <div class="cards" id="c-brief"></div>
@@ -48,6 +51,34 @@
       <a class="menucard" href="landing"><span class="mt">Web / Landing</span><span class="md">Cambios en la landing del proyecto</span><span class="mn" id="mc-web"></span></a>
       <a class="menucard" href="auditoria"><span class="mt">Auditoría</span><span class="md">Presencia digital: KPIs, gráficos y recomendaciones</span><span class="mn" id="mc-aud"></span></a>
     </aside>
+  </div>
+
+  <!-- Ventana de interacción con el creativo sobre un requerimiento -->
+  <div id="reqmodal" class="modal hidden">
+    <div class="modal-bg" onclick="closeReqModal()"></div>
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-tt" id="rm-tt"></div>
+        <button class="modal-x" onclick="closeReqModal()" title="Cerrar">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="reqtext" id="rm-concepto"></div>
+        <div class="needs" id="rm-needs"></div>
+        <div class="modal-sec">
+          <div class="modal-lbl">Material aportado</div>
+          <div class="gallery" id="rm-gallery"></div>
+          <label class="btn ok filelbl mt8"><span class="flbl">+ Agregar material</span><input type="file" accept="image/*,video/*" multiple onchange="rmAddFiles(this)"></label>
+        </div>
+        <div class="modal-sec">
+          <div class="modal-lbl">Comentarios para el creativo</div>
+          <textarea id="rm-coment" maxlength="2000" placeholder="Indicaciones: cuál foto va de portada, recortes, orden del carrusel, tono…"></textarea>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn ok" id="rm-gen" onclick="generarPublicacion()">Generar publicación</button>
+        <button class="btn no" onclick="closeReqModal()">Cerrar</button>
+      </div>
+    </div>
   </div>
 <script src="panel.js"></script>
 <script>currentLoad=loadCola; loadCola(); setInterval(loadCola,6000);</script>

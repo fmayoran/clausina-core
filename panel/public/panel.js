@@ -112,18 +112,17 @@ const canalBadge = b => b.canal_destino==='aviso'
   ? '<span class="badge canal aviso">aviso</span>'
   : '<span class="badge canal">instagram</span>';
 function propCard(b){
-  const noMat = /no requiere/i.test(b.requiere_material||'');
+  const n = b.n_material||0;
+  const matInfo = n ? `<div class="matline">${n} material(es) aportado(s)</div>` : '';
   return `<div class="card prop"><div class="reqbody">
     <div class="meta2"><span class="rst prop">Propuesta del creativo</span>${canalBadge(b)}</div>
     <div class="ptt">${esc(b.req_titulo||'Propuesta')}</div>
     <div class="reqtext">${esc((b.texto||'')).slice(0,300)}</div>
     ${b.requiere_material ? `<div class="needs"><b>Necesita:</b> ${esc(b.requiere_material)}</div>` : ''}
+    ${matInfo}
     <div class="acts">
-      ${noMat
-        ? `<button class="btn ok" onclick="activarReq('${b.id}',this)">Activar (sin material)</button>`
-        : `<label class="btn ok filelbl">Aportar material<input type="file" accept="image/*,video/*" onchange="aportar('${b.id}',this)"></label>`}
+      <button class="btn ok" onclick="openReqModal('${b.id}')">Aportar material y generar</button>
       <div class="acts-row">
-        ${noMat ? `<label class="btn no filelbl">Aportar igual<input type="file" accept="image/*,video/*" onchange="aportar('${b.id}',this)"></label>` : ''}
         <button class="btn del" onclick="descartarReq('${b.id}',this)">Descartar</button>
       </div>
     </div></div></div>`;
@@ -213,25 +212,15 @@ async function descartar(id, btn){
 
 /* ---------- Acciones sobre requerimientos (cola) ---------- */
 async function pedirPropuestas(){
-  const inp=document.getElementById('enfasis'), sel=document.getElementById('canalprop'), btn=document.getElementById('askbtn'), t=btn.textContent;
+  const inp=document.getElementById('enfasis'), sel=document.getElementById('canalprop'), cant=document.getElementById('cantprop'), btn=document.getElementById('askbtn'), t=btn.textContent;
+  const cantidad=Math.min(8,Math.max(1,parseInt(cant&&cant.value,10)||5));
   btn.disabled=true; btn.textContent='Pidiendo…';
   try{
-    const d=await fetch('api/proponer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enfasis:inp.value, canal: sel?sel.value:'instagram'})}).then(r=>r.json());
-    toast(d.ok?'Pedido enviado — el creativo carga propuestas en unos minutos':'No se pudo pedir', !d.ok);
+    const d=await fetch('api/proponer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enfasis:inp.value, canal: sel?sel.value:'instagram', cantidad})}).then(r=>r.json());
+    toast(d.ok?`Pedido enviado (${cantidad}) — el creativo carga propuestas en unos minutos`:'No se pudo pedir', !d.ok);
     if(d.ok) inp.value='';
   }catch(e){ toast('Error de conexión', true); }
   btn.disabled=false; btn.textContent=t;
-}
-async function aportar(id, input){
-  const f=input.files && input.files[0]; if(!f || acting) return;
-  acting=true; input.closest('.acts').querySelectorAll('button,label').forEach(x=>x.style.pointerEvents='none');
-  toast('Subiendo material…');
-  try{
-    const dataUrl=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(f);});
-    const d=await fetch('api/requerimientos/'+id+'/material',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,filename:f.name})}).then(r=>r.json());
-    toast(d.ok?'Material recibido — la propuesta entra al circuito':'No se pudo subir ('+(d.error||'')+')', !d.ok);
-  }catch(e){ toast('Error al subir', true); }
-  acting=false; setTimeout(currentLoad, 800);
 }
 async function activarReq(id, btn){
   if(acting) return; if(!confirm('Se manda a generar una pieza y entra al circuito de aprobación. ¿Confirmás?')) return;
@@ -246,6 +235,71 @@ async function descartarReq(id, btn){
   try{ const d=await fetch('api/requerimientos/'+id+'/descartar',{method:'POST'}).then(r=>r.json()); toast(d.ok?'Descartado':'No se pudo descartar',!d.ok); }
   catch(e){ toast('Error de conexión', true); }
   acting=false; setTimeout(currentLoad, 800);
+}
+
+/* ---------- Ventana de interacción con el creativo (preview + comentarios + generar) ---------- */
+let _reqs={};        // briefs de la última carga, por id (para abrir el modal sin re-fetch)
+let modalId=null;    // requerimiento abierto en el modal
+function openReqModal(id){
+  const b=_reqs[id]; if(!b) return;
+  modalId=id;
+  document.getElementById('rm-tt').textContent=b.req_titulo||'Propuesta';
+  document.getElementById('rm-concepto').innerHTML=esc(b.texto||'').replace(/\n/g,'<br>');
+  const needs=document.getElementById('rm-needs');
+  if(b.requiere_material){ needs.innerHTML=`<b>Necesita:</b> ${esc(b.requiere_material)}`; needs.style.display=''; }
+  else needs.style.display='none';
+  document.getElementById('rm-coment').value=b.comentarios||'';
+  document.getElementById('reqmodal').classList.remove('hidden');
+  loadMateriales();
+}
+function closeReqModal(){ if(acting) return; modalId=null; document.getElementById('reqmodal').classList.add('hidden'); setTimeout(currentLoad,150); }
+function matTile(m){
+  const inner = m.media_type==='photo'
+    ? `<img src="api/material/${m.id}/media" loading="lazy" onerror="this.style.opacity=.2">`
+    : `<div class="vidtile">▶<span>${esc(m.filename||'video')}</span></div>`;
+  return `<div class="tile">${inner}<button class="tile-x" title="Quitar" onclick="rmDelMaterial('${m.id}')">×</button></div>`;
+}
+async function loadMateriales(){
+  if(!modalId) return;
+  const g=document.getElementById('rm-gallery');
+  try{
+    const mats=await fetch('api/requerimientos/'+modalId+'/materiales').then(r=>r.json());
+    g.innerHTML = (mats&&mats.length) ? mats.map(matTile).join('') : '<div class="empty">— sin material aún —</div>';
+  }catch(e){}
+}
+async function rmAddFiles(input){
+  const files=[...(input.files||[])]; if(!files.length||acting||!modalId) return;
+  const lbl=input.closest('label'), txt=lbl.querySelector('.flbl'), base=txt.textContent;
+  acting=true; lbl.style.pointerEvents='none';
+  let okc=0;
+  for(let i=0;i<files.length;i++){
+    txt.textContent='Subiendo '+(i+1)+'/'+files.length+'…';
+    try{
+      const dataUrl=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(files[i]);});
+      const d=await fetch('api/requerimientos/'+modalId+'/material',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,filename:files[i].name})}).then(r=>r.json());
+      if(d.ok) okc++;
+    }catch(e){}
+  }
+  input.value=''; txt.textContent=base; lbl.style.pointerEvents=''; acting=false;
+  toast(okc?okc+' material(es) agregado(s)':'No se pudo subir', !okc);
+  loadMateriales();
+}
+async function rmDelMaterial(mid){
+  if(acting||!modalId) return; acting=true;
+  try{ await fetch('api/requerimientos/'+modalId+'/material/'+mid,{method:'DELETE'}); }catch(e){}
+  acting=false; loadMateriales();
+}
+async function generarPublicacion(){
+  if(!modalId||acting) return;
+  if(!confirm('Generar la publicación: se manda a crear la pieza y entra al circuito de aprobación. ¿Confirmás?')) return;
+  const coment=document.getElementById('rm-coment').value, btn=document.getElementById('rm-gen');
+  acting=true; btn.disabled=true; btn.textContent='Generando…';
+  try{
+    const d=await fetch('api/requerimientos/'+modalId+'/generar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({comentarios:coment})}).then(r=>r.json());
+    if(d.ok){ toast('Generando — entra al circuito de aprobación'); modalId=null; document.getElementById('reqmodal').classList.add('hidden'); }
+    else toast('No se pudo generar', true);
+  }catch(e){ toast('Error de conexión', true); }
+  btn.disabled=false; btn.textContent='Generar publicación'; acting=false; setTimeout(currentLoad,500);
 }
 
 /* ---------- Loaders por pantalla ---------- */
@@ -279,6 +333,7 @@ async function loadCola(){
   try{
     const r=await fetch('api/requerimientos'); if(r.status===401){ location.href='login'; return; }
     const [reqs, status] = await Promise.all([ r.json(), fetch('api/status').then(x=>x.json()).catch(()=>[]) ]);
+    _reqs={}; reqs.forEach(b=>{ if(b.id) _reqs[b.id]=b; });
     fill('c-brief','n-brief', reqs.map(reqCard).join(''));
     renderStatus(status); setUpd(); updateMenuCounts();
   }catch(e){ setUpd(); }

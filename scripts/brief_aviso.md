@@ -12,8 +12,10 @@ el panel (sección Avisos del proyecto).
 - `contexto/CONTEXTO_MARCA.md` y `scripts/higgsfield/README.md`.
 
 ## Lo que recibís
-`/tmp/brief_ctx.json`: `brief` (qué aviso quiere Fer), `media` (ruta de foto/video que aportó, o vacío),
-`media_type`, `chat_id`, `brief_id`.
+`/tmp/brief_ctx.json`: `brief` (qué aviso quiere Fer), `materiales` (lista `[{path,media_type}]` aportada
+desde el panel; elegí la mejor toma o combiná tomas para el spot), `media` (adjunto único legacy, fallback si
+`materiales` está vacío), `media_type`, `comentarios` (indicaciones de Fer sobre el material: respetalas),
+`chat_id`, `brief_id`.
 
 ## Producí el spot (pipeline del SKILL)
 - Salida: **mp4 H.264 1080×1620 (2:3), ~10 s, loop, SIN audio**, diseñado bold para LED.

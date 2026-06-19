@@ -122,7 +122,8 @@ async function getRequerimientos(proyectoId) {
   const { rows } = await pool.query(`
     SELECT b.id, b.estado AS brief_estado, b.origen, b.canal_destino, b.titulo AS req_titulo, b.requiere_material, b.enlace,
            b.media_type, (b.voice_file_id IS NOT NULL) AS tiene_audio,
-           (b.media_file_id IS NOT NULL) AS tiene_media,
+           (b.media_file_id IS NOT NULL) AS tiene_media, b.comentarios,
+           (SELECT count(*)::int FROM contenido.brief_material bm WHERE bm.brief_id = b.id) AS n_material,
            COALESCE(NULLIF(b.transcripcion,''), b.texto) AS texto, b.creado_en,
            b.pieza_id, pz.numero AS pieza_numero, pz.titulo_interno AS pieza_titulo,
            r.estado AS pieza_estado, r.nro AS pieza_rev
@@ -155,18 +156,52 @@ async function insertMencion(refId, username, permalink, proyectoId) {
   return rows.length > 0;
 }
 
-// Pedido de propuestas al creativo (lo levanta el cron propuestas_local.sh).
-async function pedirPropuestas(enfasis, canal, proyectoId) {
-  await pool.query(`INSERT INTO contenido.solicitudes_propuesta (enfasis, canal, proyecto_id) VALUES ($1,$2,$3)`,
-    [enfasis || null, canal === 'aviso' ? 'aviso' : 'instagram', proyectoId]);
+// Pedido de propuestas al creativo (lo levanta el cron propuestas_local.sh). cantidad: 1..8.
+async function pedirPropuestas(enfasis, canal, cantidad, proyectoId) {
+  const n = Math.min(8, Math.max(1, parseInt(cantidad, 10) || 5));
+  await pool.query(`INSERT INTO contenido.solicitudes_propuesta (enfasis, canal, cantidad, proyecto_id) VALUES ($1,$2,$3,$4)`,
+    [enfasis || null, canal === 'aviso' ? 'aviso' : 'instagram', n, proyectoId]);
   return true;
 }
 
-// Aporta material a un requerimiento (file_id de Telegram) y lo activa -> 'pendiente'.
-async function setMaterial(id, fileId, mediaType) {
+// Agrega un material (file_id de Telegram) a la galería del requerimiento. NO cambia el estado:
+// el requerimiento sigue como 'propuesta' hasta que Fer aprieta "Generar publicación".
+async function addMaterial(briefId, fileId, mediaType, filename) {
+  const { rows } = await pool.query(
+    `INSERT INTO contenido.brief_material (brief_id, file_id, media_type, filename, orden)
+       SELECT $1, $2, $3, $4, COALESCE((SELECT max(orden)+1 FROM contenido.brief_material WHERE brief_id=$1), 0)
+       WHERE EXISTS (SELECT 1 FROM contenido.tg_briefs WHERE id=$1 AND estado IN ('propuesta','error'))
+     RETURNING id, media_type, filename, orden`, [briefId, fileId, mediaType, filename || null]);
+  return rows[0] || null;
+}
+
+// Lista los materiales aportados a un requerimiento (para la galería del modal).
+async function getMateriales(briefId) {
+  const { rows } = await pool.query(
+    `SELECT id, media_type, filename, orden FROM contenido.brief_material
+      WHERE brief_id=$1 ORDER BY orden, creado_en`, [briefId]);
+  return rows;
+}
+
+// file_id de un material puntual (para el proxy de miniatura).
+async function getMaterialFile(mid) {
+  const { rows } = await pool.query(
+    `SELECT file_id AS media_file_id, media_type FROM contenido.brief_material WHERE id=$1`, [mid]);
+  return rows[0] || null;
+}
+
+// Quita un material de la galería (antes de generar).
+async function delMaterial(briefId, mid) {
   const { rowCount } = await pool.query(
-    `UPDATE contenido.tg_briefs SET media_file_id=$2, media_type=$3, estado='pendiente'
-      WHERE id=$1 AND estado IN ('propuesta','error')`, [id, fileId, mediaType]);
+    `DELETE FROM contenido.brief_material WHERE id=$1 AND brief_id=$2`, [mid, briefId]);
+  return rowCount > 0;
+}
+
+// "Generar publicación": guarda los comentarios y manda el requerimiento al circuito -> 'pendiente'.
+async function generarReq(id, comentarios) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.tg_briefs SET comentarios=$2, estado='pendiente'
+      WHERE id=$1 AND estado IN ('propuesta','error')`, [id, (comentarios || '').slice(0, 2000) || null]);
   return rowCount > 0;
 }
 
@@ -432,7 +467,7 @@ async function health() {
 
 module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, getResumenAgencia,
   getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getTokenPendiente,
-  pedirPropuestas, setMaterial, activarReq, descartarReq, insertMencion,
+  pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial, generarReq, activarReq, descartarReq, insertMencion,
   getPostIdsPublicados, upsertMetricas,
   getPantallaActiva, getPantallaPorSlug, getPantallas, crearPantalla, actualizarPantalla, eliminarPantalla, getProgramaActivo,
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,

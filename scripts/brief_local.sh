@@ -22,7 +22,7 @@ hb(){ psql "INSERT INTO contenido.batch_runs(proceso,last_run,last_msg) VALUES('
 exec 9>/tmp/cf_brief.lock; flock -n 9 || exit 0
 
 # 1) brief pendiente (el más viejo), como JSON
-row=$(psql "SELECT row_to_json(t) FROM (SELECT id,chat_id,voice_file_id,media_file_id,media_type,texto,canal_destino,proyecto_id FROM contenido.tg_briefs WHERE estado='pendiente' ORDER BY creado_en LIMIT 1) t;")
+row=$(psql "SELECT row_to_json(t) FROM (SELECT id,chat_id,voice_file_id,media_file_id,media_type,texto,comentarios,canal_destino,proyecto_id FROM contenido.tg_briefs WHERE estado='pendiente' ORDER BY creado_en LIMIT 1) t;")
 [ -z "$row" ] && { echo "$(ts) sin briefs" >> "$LOG"; hb "sin requerimientos en cola"; exit 0; }
 
 bid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
@@ -31,6 +31,7 @@ voice=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get
 media=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('media_file_id') or '')")
 mtype=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('media_type') or '')")
 btext=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('texto') or '')")
+comentarios=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('comentarios') or '')")
 canal=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('canal_destino') or 'instagram')")
 pid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('proyecto_id') or '')")
 
@@ -61,19 +62,43 @@ if [ -n "$voice" ]; then
   fi
 fi
 
-# 3) descargar media adjunta
+# 3) descargar media adjunta (legacy: el único media_file_id del brief, p.ej. respuesta por Telegram)
 medialocal=""
 if [ -n "$media" ]; then
   ext="jpg"; [ "$mtype" = "video" ] && ext="mp4"
   if dl "$media" "/tmp/brief_media.$ext"; then medialocal="/tmp/brief_media.$ext"; fi
 fi
 
+# 3b) descargar TODOS los materiales aportados desde el panel (galería brief_material, en orden).
+rm -f /tmp/brief_mat_*.jpg /tmp/brief_mat_*.mp4
+mats=$(psql "SELECT COALESCE(json_agg(json_build_object('file_id',file_id,'media_type',media_type) ORDER BY orden, creado_en),'[]') FROM contenido.brief_material WHERE brief_id='$bid';")
+matlines=""
+i=0
+while IFS=$'\t' read -r fid mt; do
+  [ -z "$fid" ] && continue
+  ext="jpg"; [ "$mt" = "video" ] && ext="mp4"
+  out="/tmp/brief_mat_$i.$ext"
+  if dl "$fid" "$out"; then matlines+="$out|$mt"$'\n'; fi
+  i=$((i+1))
+done < <(echo "$mats" | python3 -c "import sys,json
+for m in json.load(sys.stdin):
+    print((m.get('file_id') or '')+'\t'+(m.get('media_type') or 'photo'))")
+matlist=$(printf '%s' "$matlines" | python3 -c "import sys,json
+out=[]
+for line in sys.stdin:
+    line=line.strip()
+    if not line: continue
+    p,t=line.split('|',1); out.append({'path':p,'media_type':t})
+print(json.dumps(out,ensure_ascii=False))")
+[ -z "$matlist" ] && matlist="[]"
+
 # 4) contexto para Claude (las env vars van ANTES de python3: si van después, bash las pasa como
 #    argumentos y os.environ falla -> brief_ctx.json no se escribe. Bug corregido 05/06/2026.)
+#    'materiales' = lista (panel, varios). 'media' = único legacy (Telegram). 'comentarios' = nota de Fer.
 rm -f /tmp/brief_ctx.json
-T="$transcript" B="$btext" M="$medialocal" MT="$mtype" C="$chat" I="$bid" \
-python3 -c "import json,os;json.dump({'brief':(os.environ['T']+' '+os.environ['B']).strip(),'media':os.environ['M'],'media_type':os.environ['MT'],'chat_id':os.environ['C'],'brief_id':os.environ['I']},open('/tmp/brief_ctx.json','w'),ensure_ascii=False)"
-echo "$(ts) transcript: $transcript" >> "$LOG"
+T="$transcript" B="$btext" M="$medialocal" MT="$mtype" C="$chat" I="$bid" MATS="$matlist" CM="$comentarios" \
+python3 -c "import json,os;json.dump({'brief':(os.environ['T']+' '+os.environ['B']).strip(),'media':os.environ['M'],'media_type':os.environ['MT'],'materiales':json.loads(os.environ['MATS']),'comentarios':os.environ['CM'],'chat_id':os.environ['C'],'brief_id':os.environ['I']},open('/tmp/brief_ctx.json','w'),ensure_ascii=False)"
+echo "$(ts) transcript: $transcript | materiales: $(echo "$matlist" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)))')" >> "$LOG"
 
 # guarda: sin contexto no invocamos al agente; marcamos error para reintentar/avisar
 if [ ! -s /tmp/brief_ctx.json ]; then
@@ -86,9 +111,9 @@ fi
 cd "$REPO" || exit 1
 bash "$MOTOR/scripts/perfil_a_md.sh" "$(basename "$REPO")" >/dev/null 2>&1 || true
 if [ "$canal" = "aviso" ]; then
-  PROMPT="Procesá un requerimiento de AVISO de pantalla (DOOH) siguiendo EXACTAMENTE $MOTOR/scripts/brief_aviso.md. Los datos están en /tmp/brief_ctx.json: leelo primero. Producí un spot 2:3 mudo de ~10s con la estética de marca, guardá mp4+poster en assets/landing/publicaciones/ (commit+push, verificá 200), registralo con cf-crear-pendiente (canal_pieza='aviso' + tags de contexto + brief_id) y avisá con cf-avisar. NUNCA uses cf-pub-notify ni publiques. Si falta material que no podés generar, avisá con cf-avisar. En cada cf-avisar incluí el campo \"marca\":\"$NOMBRE\". Resumí en una línea."
+  PROMPT="Procesá un requerimiento de AVISO de pantalla (DOOH) siguiendo EXACTAMENTE $MOTOR/scripts/brief_aviso.md. Los datos están en /tmp/brief_ctx.json: leelo primero (incluye 'materiales': lista de archivos aportados, 'media': adjunto legacy, y 'comentarios': indicaciones de Fer, que debés respetar). Producí un spot 2:3 mudo de ~10s con la estética de marca, guardá mp4+poster en assets/landing/publicaciones/ (commit+push, verificá 200), registralo con cf-crear-pendiente (canal_pieza='aviso' + tags de contexto + brief_id) y avisá con cf-avisar. NUNCA uses cf-pub-notify ni publiques. Si falta material que no podés generar, avisá con cf-avisar. En cada cf-avisar incluí el campo \"marca\":\"$NOMBRE\". Resumí en una línea."
 else
-  PROMPT="Procesá un brief dictado por Fer siguiendo EXACTAMENTE $MOTOR/scripts/brief_dictado.md. Los datos del brief (texto, ruta de media, tipo, chat_id, brief_id) están en /tmp/brief_ctx.json: leelo primero. Acondicioná la media si hace falta, redactá el copy con la voz de marca, insertá la pieza pendiente vía cf-crear-pendiente y notificá con cf-pub-notify. NUNCA publiques en Instagram. Si falta material o algo no se entiende, avisá a Fer con cf-avisar. En cada cf-avisar incluí el campo \"marca\":\"$NOMBRE\". Resumí en una línea."
+  PROMPT="Procesá un brief dictado por Fer siguiendo EXACTAMENTE $MOTOR/scripts/brief_dictado.md. Los datos del brief están en /tmp/brief_ctx.json: leelo primero. Incluye 'materiales' (lista de archivos aportados desde el panel, en orden; usalos TODOS — si son varios fotos en Instagram, armá carrusel), 'media' (adjunto único legacy, fallback si 'materiales' está vacío), 'comentarios' (indicaciones de Fer sobre el material: respetalas), 'texto', 'chat_id' y 'brief_id'. Acondicioná la media si hace falta, redactá el copy con la voz de marca, insertá la pieza pendiente vía cf-crear-pendiente y notificá con cf-pub-notify. NUNCA publiques en Instagram. Si falta material o algo no se entiende, avisá a Fer con cf-avisar. En cada cf-avisar incluí el campo \"marca\":\"$NOMBRE\". Resumí en una línea."
 fi
 timeout 1200 claude -p "$PROMPT" --model sonnet --allowedTools "Bash" Read Write Edit Glob Grep >> "$LOG" 2>&1
 rc=$?

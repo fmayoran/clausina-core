@@ -19,12 +19,13 @@ hb(){ psqlc "INSERT INTO contenido.batch_runs(proceso,last_run,last_msg) VALUES(
 
 exec 9>/tmp/cf_propuestas.lock; flock -n 9 || exit 0
 
-row=$(psqlc "SELECT row_to_json(t) FROM (SELECT id,enfasis,canal,proyecto_id FROM contenido.solicitudes_propuesta WHERE estado='pendiente' ORDER BY creado_en LIMIT 1) t;")
+row=$(psqlc "SELECT row_to_json(t) FROM (SELECT id,enfasis,canal,cantidad,proyecto_id FROM contenido.solicitudes_propuesta WHERE estado='pendiente' ORDER BY creado_en LIMIT 1) t;")
 [ -z "$row" ] && { echo "$(ts) sin pedidos" >> "$LOG"; hb "sin pedidos"; exit 0; }
 
 sid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
 enfasis=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('enfasis') or '')")
 canal=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('canal') or 'instagram')")
+cantidad=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('cantidad') or 5)")
 pid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('proyecto_id') or '')")
 
 # --- resolver el proyecto del pedido: cápsula y secretos de ESA marca (aislamiento multiproyecto) ---
@@ -35,19 +36,19 @@ CHAT=$(psqlc "SELECT coalesce(telegram_chat_id,'') FROM contenido.proyectos WHER
 REPO="$MARCAS/$slug"
 [ -d "$REPO" ] || { echo "$(ts) ERROR: cápsula inexistente $REPO" >> "$LOG"; psqlc "UPDATE contenido.solicitudes_propuesta SET estado='error', procesado_en=now() WHERE id='$sid';" >/dev/null; exit 1; }
 BOT=$(grep '^TELEGRAM_BOT_TOKEN=' "$REPO/$slug.env" 2>/dev/null | cut -d= -f2-)
-echo "$(ts) pedido $sid (proyecto=$slug) enfasis='$enfasis'" >> "$LOG"
+echo "$(ts) pedido $sid (proyecto=$slug) enfasis='$enfasis' cantidad=$cantidad" >> "$LOG"
 hb "elaborando propuestas"
 psqlc "UPDATE contenido.solicitudes_propuesta SET estado='procesando' WHERE id='$sid';" >/dev/null
 
 # Contexto: últimas publicadas (para no repetir y mantener coherencia)
 recientes=$(psqlc "SELECT COALESCE(json_agg(json_build_object('titulo',titulo_interno,'caption',left(caption,200))),'[]'::json) FROM (SELECT pz.titulo_interno, r.caption FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id=pz.revision_vigente WHERE pz.proyecto_id='$pid' AND r.estado='publicada' ORDER BY r.publicado_en DESC LIMIT 10) s;")
 rm -f /tmp/propuestas.json /tmp/prop_ctx.json
-E="$enfasis" R="$recientes" CN="$canal" python3 -c "import json,os;json.dump({'enfasis':os.environ['E'],'canal':os.environ['CN'],'recientes':json.loads(os.environ['R'])},open('/tmp/prop_ctx.json','w'),ensure_ascii=False)"
+E="$enfasis" R="$recientes" CN="$canal" QT="$cantidad" python3 -c "import json,os;json.dump({'enfasis':os.environ['E'],'canal':os.environ['CN'],'cantidad':int(os.environ['QT']),'recientes':json.loads(os.environ['R'])},open('/tmp/prop_ctx.json','w'),ensure_ascii=False)"
 
 cd "$REPO" || exit 1
 bash "$MOTOR/scripts/perfil_a_md.sh" "$(basename "$REPO")" >/dev/null 2>&1 || true
 PROMPT="Sos el Director Creativo del proyecto. Su identidad, voz y estética están en contexto/CONTEXTO_MARCA.md y en el CLAUDE.md del proyecto (directorio actual): leelos y respetalos; NO uses contexto de otra marca. Generá propuestas para la cola de requerimientos, siguiendo $MOTOR/scripts/propuestas_creativo.md.
-Contexto en /tmp/prop_ctx.json: 'enfasis' (qué destacar; puede estar vacío), 'canal' (instagram=publicaciones de feed, o aviso=spots para la pantalla de calle DOOH 2:3) y 'recientes' (últimas publicaciones, para no repetir).
+Contexto en /tmp/prop_ctx.json: 'enfasis' (qué destacar; puede estar vacío), 'canal' (instagram=publicaciones de feed, o aviso=spots para la pantalla de calle DOOH 2:3), 'cantidad' (EXACTAMENTE cuántas propuestas generar) y 'recientes' (últimas publicaciones, para no repetir).
 Proponé para el CANAL indicado. Escribí EXCLUSIVAMENTE el archivo /tmp/propuestas.json (array de objetos). NO publiques, NO toques la base, NO mandes mails: solo escribí el archivo."
 timeout 900 claude -p "$PROMPT" --model sonnet --allowedTools "Bash" Read Write Edit Glob Grep >> "$LOG" 2>&1
 

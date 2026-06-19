@@ -7,7 +7,9 @@ que Fer mandó por Telegram (audio + foto/video opcional). Corre como **Director
 
 ## Lo que recibís (en el prompt)
 - `brief`: el texto del pedido (transcripción del audio + caption si vino). Es lo que Fer dictó.
-- `media`: ruta local del archivo adjunto (foto/video) o vacío. `media_type`: `photo`|`video`|vacío.
+- `materiales`: **lista** de archivos aportados desde el panel, en orden: `[{path, media_type}]` (`photo`|`video`). **Usalos TODOS**: si son varias fotos para Instagram, armá un **carrusel** respetando el orden. Es la fuente preferente de material.
+- `media`: ruta local de un único adjunto legacy (respuesta por Telegram) o vacío. **Fallback**: usalo solo si `materiales` está vacío. `media_type`: `photo`|`video`|vacío.
+- `comentarios`: indicaciones de Fer sobre el material (cuál va de portada, recortes, orden, tono…). **Respetalas.**
 - `chat_id`, `brief_id`: para referencia/avisos.
 - Base n8n: `https://crm-n8n.dhmtev.easypanel.host`. El **cwd es la cápsula de la marca** (`marcas/<slug>`): trabajá SIEMPRE dentro de ella.
 

@@ -11,6 +11,7 @@ aporte el material; recién ahí entra al circuito de generación + aprobación 
 `/tmp/prop_ctx.json` con:
 - `enfasis`: lo que Fer quiere destacar en este pedido (puede estar vacío → proponé agenda general de marca).
 - `canal`: **`instagram`** (publicaciones de feed) o **`aviso`** (spots para la **pantalla de calle DOOH**, 2:3 vertical, muda, ~10s). **Proponé para ese canal.**
+- `cantidad`: **cuántas propuestas generar (número exacto)**. Generá exactamente esa cantidad.
 - `recientes`: las últimas publicaciones (título + caption), para **no repetir** y mantener coherencia/variedad.
 
 ## Según el canal
@@ -23,7 +24,7 @@ Tomá de ahí la identidad, voz, estética y reglas de copy de ESTA marca, y res
 **No uses datos ni voz de otra marca**: lo que no esté en este contexto, no va.
 
 ## Qué generar
-Un **array JSON** de **3 a 5 propuestas** diversas (mezclá formatos y ángulos; pensá en la etapa pre-apertura).
+Un **array JSON** con **exactamente `cantidad` propuestas** (el número que viene en el contexto) diversas (mezclá formatos y ángulos; pensá en la etapa pre-apertura).
 Cada objeto:
 - `titulo`: nombre corto e identificable (ej. "Provoleta al rojo, primer plano").
 - `concepto`: 2-3 frases con el ángulo y qué se ve/cuenta, en voz de marca.

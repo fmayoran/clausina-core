@@ -208,23 +208,37 @@ app.get('/api/auditoria', async (req, res) => {
   catch (e) { console.error('auditoria', e.message); res.status(500).json({ error: 'db' }); }
 });
 
-// Proxy de la miniatura de un requerimiento (foto que mandó Fer por Telegram).
-// Resuelve el file_id contra la API de Telegram y stremea la imagen (token server-side).
+// Stremea una foto de Telegram (resuelve file_id -> file_path -> bytes, con el token server-side).
+async function proxyTelegramPhoto(res, fileId) {
+  if (!fileId) return res.status(404).end();
+  if (!BOT) return res.status(503).end();
+  const gf = await fetch(`https://api.telegram.org/bot${BOT}/getFile?file_id=${encodeURIComponent(fileId)}`, { signal: AbortSignal.timeout(8000) }).then(r => r.json());
+  const fp = gf && gf.result && gf.result.file_path;
+  if (!fp) return res.status(404).end();
+  const img = await fetch(`https://api.telegram.org/file/bot${BOT}/${fp}`, { signal: AbortSignal.timeout(8000) });
+  if (!img.ok) return res.status(502).end();
+  const ct = img.headers.get('content-type');
+  res.set('Content-Type', (ct && ct.startsWith('image/')) ? ct : 'image/jpeg');
+  res.set('Cache-Control', 'public, max-age=3600');
+  res.send(Buffer.from(await img.arrayBuffer()));
+}
+
+// Proxy de la miniatura de un requerimiento (foto que mandó Fer por Telegram, media_file_id legacy).
 app.get('/api/brief/:id/media', async (req, res) => {
   try {
     const m = await db.getBriefMedia(req.params.id);
-    if (!m || !m.media_file_id || m.media_type !== 'photo') return res.status(404).end();
-    if (!BOT) return res.status(503).end();
-    const gf = await fetch(`https://api.telegram.org/bot${BOT}/getFile?file_id=${encodeURIComponent(m.media_file_id)}`, { signal: AbortSignal.timeout(8000) }).then(r => r.json());
-    const fp = gf && gf.result && gf.result.file_path;
-    if (!fp) return res.status(404).end();
-    const img = await fetch(`https://api.telegram.org/file/bot${BOT}/${fp}`, { signal: AbortSignal.timeout(8000) });
-    if (!img.ok) return res.status(502).end();
-    const ct = img.headers.get('content-type');
-    res.set('Content-Type', (ct && ct.startsWith('image/')) ? ct : 'image/jpeg');
-    res.set('Cache-Control', 'public, max-age=3600');
-    res.send(Buffer.from(await img.arrayBuffer()));
+    if (!m || m.media_type !== 'photo') return res.status(404).end();
+    await proxyTelegramPhoto(res, m.media_file_id);
   } catch (e) { console.error('brief media', e.message); res.status(500).end(); }
+});
+
+// Proxy de la miniatura de un material puntual de la galería (preview en el modal).
+app.get('/api/material/:mid/media', async (req, res) => {
+  try {
+    const m = await db.getMaterialFile(req.params.mid);
+    if (!m || m.media_type !== 'photo') return res.status(404).end();
+    await proxyTelegramPhoto(res, m.media_file_id);
+  } catch (e) { console.error('material media', e.message); res.status(500).end(); }
 });
 
 // --- Acciones sobre pendientes (protegidas por la sesión del panel) ---
@@ -268,7 +282,8 @@ app.post('/api/proponer', async (req, res) => {
   try {
     const enfasis = String((req.body && req.body.enfasis) || '').trim().slice(0, 1000);
     const canal = req.body && req.body.canal === 'aviso' ? 'aviso' : 'instagram';
-    await db.pedirPropuestas(enfasis, canal, req.proyectoId);
+    const cantidad = Math.min(8, Math.max(1, parseInt(req.body && req.body.cantidad, 10) || 5));
+    await db.pedirPropuestas(enfasis, canal, cantidad, req.proyectoId);
     res.json({ ok: true });
   } catch (e) { console.error('proponer', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
@@ -283,8 +298,29 @@ app.post('/api/requerimientos/:id/descartar', async (req, res) => {
   catch (e) { console.error('descartar req', e.message); res.status(500).json({ ok: false }); }
 });
 
+// "Generar publicación": guarda los comentarios y manda el requerimiento al circuito -> 'pendiente'.
+app.post('/api/requerimientos/:id/generar', async (req, res) => {
+  try {
+    const comentarios = String((req.body && req.body.comentarios) || '').trim();
+    res.json({ ok: await db.generarReq(req.params.id, comentarios) });
+  } catch (e) { console.error('generar req', e.message); res.status(500).json({ ok: false }); }
+});
+
+// Galería de materiales aportados a un requerimiento (para el modal de interacción).
+app.get('/api/requerimientos/:id/materiales', async (req, res) => {
+  try { res.json(await db.getMateriales(req.params.id)); }
+  catch (e) { console.error('materiales', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+// Quitar un material de la galería (antes de generar).
+app.delete('/api/requerimientos/:id/material/:mid', async (req, res) => {
+  try { res.json({ ok: await db.delMaterial(req.params.id, req.params.mid) }); }
+  catch (e) { console.error('del material', e.message); res.status(500).json({ ok: false }); }
+});
+
 // Aportar material desde el panel: el archivo (base64) se manda al bot como documento (preserva calidad),
-// se obtiene el file_id y se guarda en el requerimiento -> 'pendiente'. Reusa el pipeline de Telegram.
+// se obtiene el file_id y se SUMA a la galería del requerimiento. NO dispara la generación (eso lo hace
+// el botón "Generar publicación"). Reusa el pipeline de Telegram.
 app.post('/api/requerimientos/:id/material', async (req, res) => {
   try {
     if (!BOT) return res.status(503).json({ ok: false, error: 'sin_bot' });
@@ -302,8 +338,9 @@ app.post('/api/requerimientos/:id/material', async (req, res) => {
     const tg = await fetch(`https://api.telegram.org/bot${BOT}/sendDocument`, { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) }).then(r => r.json());
     const fileId = tg && tg.result && tg.result.document && tg.result.document.file_id;
     if (!fileId) return res.status(502).json({ ok: false, error: 'telegram' });
-    const ok = await db.setMaterial(req.params.id, fileId, mediaType);
-    res.json({ ok });
+    const mat = await db.addMaterial(req.params.id, fileId, mediaType, filename);
+    if (!mat) return res.status(409).json({ ok: false, error: 'estado' });
+    res.json({ ok: true, material: mat });
   } catch (e) { console.error('material', e.message); res.status(500).json({ ok: false, error: 'upload' }); }
 });
 
