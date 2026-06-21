@@ -2,6 +2,7 @@
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fecha = s => { if(!s) return ''; const d=new Date(s); return d.toLocaleDateString('es-AR',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}); };
 const pad4 = n => String(n).padStart(4,'0');
+const hace = s => { if(!s) return ''; const d=Math.max(0,(Date.now()-new Date(s).getTime())/1000|0); if(d<60) return 'recién'; const m=Math.floor(d/60); return m<60 ? 'hace '+m+'m' : 'hace '+Math.floor(m/60)+'h'; };
 const nf = x => Number(x||0).toLocaleString('es-AR');
 const thumbSrc = m => (m && m.url) ? ((m.tipo==='video' && m.poster_url) ? m.poster_url : m.url) : '';
 const revBadge = p => p.nro>1 ? `<span class="badge rev">rev ${p.nro}</span>` : `<span class="badge">rev ${p.nro}</span>`;
@@ -34,7 +35,32 @@ function mediaGallery(medios){
     return `<a class="cgi" href="${esc(full)}" target="_blank" rel="noopener" title="Abrir ${i+1}/${medios.length}">${inner}${m.tipo==='video'?'<span class="cgv">▶</span>':''}<span class="cgn">${i+1}</span></a>`;
   }).join('')}</div>`;
 }
+// Tarjeta de pieza EN MODIFICACIÓN (estado rechazada): visible en la columna de pendientes
+// para que el requerimiento no "desaparezca" del board mientras el agente la reprocesa.
+function modCard(p, canal){
+  const enProceso = !p.derivado_en;
+  const t = thumbSrc(p.media);
+  const medios = Array.isArray(p.medios) ? p.medios : [];
+  const thumb = canal==='aviso'
+    ? (p.media&&p.media.url ? `<video class="avvid" src="${esc(p.media.url)}" ${p.media.poster_url?`poster="${esc(p.media.poster_url)}"`:''} preload="none" muted loop playsinline controls></video>` : '<div class="thumb"></div>')
+    : (medios.length>1 ? mediaGallery(medios) : (t ? `<img class="thumb" loading="lazy" src="${esc(t)}" onerror="this.style.display='none'">` : '<div class="thumb"></div>'));
+  const motivo = p.motivo_rechazo ? `<div class="copy"><b>Pediste:</b> ${esc(p.motivo_rechazo)}</div>` : '';
+  const banner = enProceso
+    ? `<span class="rst proc">En modificación… ${hace(p.actualizado_en)}</span>`
+    : `<span class="rst rech">Modificación no resuelta — revisá o reintentá</span>`;
+  const acts = enProceso ? '' : `<div class="acts"><div class="acts-row">
+      <button class="btn no" onclick="rechazar('${p.id}',this)">Modificar de nuevo</button>
+      <button class="btn del" onclick="descartar('${p.id}',this)">Descartar</button>
+    </div></div>`;
+  return `<div class="card">${thumb}<div class="body">
+    <div class="tt">${esc(p.titulo_interno)} <span class="intlbl" title="Nombre interno — no se publica">interno</span></div>
+    <div class="meta">${cfBadge(p)}${fmtBadge(p)}${revBadge(p)}${carrBadge(p)}<span>${fecha(p.actualizado_en)}</span></div>
+    <div class="meta2">${banner}</div>
+    ${motivo}
+    </div>${acts}</div>`;
+}
 function pendCard(p){
+  if(p.estado==='rechazada') return modCard(p,'instagram');
   const t = thumbSrc(p.media);
   const medios = Array.isArray(p.medios) ? p.medios : [];
   const thumb = medios.length>1
@@ -74,6 +100,7 @@ function ctxBadges(p){
   return h;
 }
 function avisoPendCard(p){
+  if(p.estado==='rechazada') return modCard(p,'aviso');
   const m=p.media||{};
   const vid = m.url ? `<video class="avvid" src="${esc(m.url)}" ${m.poster_url?`poster="${esc(m.poster_url)}"`:''} preload="none" muted loop playsinline controls></video>` : '<div class="thumb"></div>';
   const copy = p.caption ? `<div class="copy">${esc(p.caption).replace(/\n/g,'<br>')}</div>` : '';
@@ -403,7 +430,7 @@ async function loadInstagram(){
   try{
     const r=await fetch('api/piezas?canal=instagram'); if(r.status===401){ location.href='login'; return; }
     const piezas=await r.json();
-    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado)).map(pendCard).join(''));
+    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador','rechazada'].includes(p.estado)).map(pendCard).join(''));
     fill('c-pub','n-pub', piezas.filter(p=>p.estado==='publicada').map(pubCard).join(''));
     setUpd();
   }catch(e){ setUpd(); }
@@ -413,7 +440,7 @@ async function loadAvisos(){
   try{
     const r=await fetch('api/piezas?canal=aviso'); if(r.status===401){ location.href='login'; return; }
     const piezas=await r.json();
-    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado)).map(avisoPendCard).join(''));
+    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador','rechazada'].includes(p.estado)).map(avisoPendCard).join(''));
     fill('c-pub','n-pub', piezas.filter(p=>p.estado==='publicada').map(avisoPubCard).join(''));
     setUpd();
   }catch(e){ setUpd(); }
