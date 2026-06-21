@@ -8,6 +8,7 @@ import sys
 import traceback
 
 import jobqueue
+from db import heartbeat
 from handlers import correccion, propuesta, brief, landing
 
 # Registry de handlers por tipo de job.
@@ -46,12 +47,16 @@ def process(job):
 
 def run():
     log("worker iniciado, esperando jobs...")
+    heartbeat("worker", "en espera")
     while True:
         try:
             job = jobqueue.dequeue(timeout=10)
             if job is None:
+                heartbeat("worker", "en espera")   # latido de salud (cada ~10s) cuando está libre
                 continue
+            heartbeat("worker", f"procesando {job.get('tipo')}/{job.get('proyecto_slug')}")
             process(job)
+            heartbeat("worker", "en espera")
         except KeyboardInterrupt:
             log("worker detenido")
             sys.exit(0)

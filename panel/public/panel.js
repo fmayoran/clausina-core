@@ -219,16 +219,36 @@ function reqRow(b){
 }
 
 /* ---------- Barra de status ---------- */
-const procName={correccion:'Modificaciones', ingesta_briefs:'Ingesta de requerimientos', propuestas:'Propuestas'};
-const humanSec = s => { s=Math.max(0,s|0); if(s<60) return s+'s'; const m=Math.floor(s/60); return m+'m'+(s%60?' '+(s%60)+'s':''); };
+const procName={correccion:'Modificaciones', ingesta_briefs:'Ingesta', propuestas:'Propuestas'};
+const humanSec = s => { s=Math.max(0,s|0); if(s<60) return s+'s'; const m=Math.floor(s/60); if(m<60) return m+'m'; const h=Math.floor(m/60); return h<24 ? h+'h' : Math.floor(h/24)+'d'; };
+const _dot = c => `<span class="dotp" style="background:${c}"></span>`;
+// Barra de control de workers: estado del worker (procesando/en espera), salud del dispatcher
+// y última corrida real de cada proceso. Datos de contenido.batch_runs (vía /api/status).
 function renderStatus(rows){
-  const sb=document.getElementById('statusbar');
-  if(!sb) return;
-  if(!rows || !rows.length){ sb.innerHTML=''; return; }
-  sb.innerHTML = rows.map(r=>{
-    const stale = r.hace_s > r.intervalo_s*3;
-    return `<span class="it"><span class="dotp ${stale?'stale':''}"></span>${procName[r.proceso]||r.proceso}: última hace <b>${humanSec(r.hace_s)}</b> · próxima ~<b>${humanSec(r.proxima_s)}</b></span>`;
-  }).join('');
+  const sb=document.getElementById('statusbar'); if(!sb) return;
+  const by={}; (rows||[]).forEach(r=>by[r.proceso]=r);
+  const parts=[];
+  // Worker
+  const w=by.worker;
+  if(w){
+    const proc=(w.last_msg||'').startsWith('procesando');
+    const down=w.hace_s>30;   // el worker late cada ~10s; >30s = sin señal
+    const color=down?'#e5484d':(proc?'#30a46c':'#8a8a8a');
+    const txt=down?`sin señal (hace ${humanSec(w.hace_s)})`:(proc?esc(w.last_msg):'en espera');
+    parts.push(`<span class="it">${_dot(color)}Workers: <b>${txt}</b></span>`);
+  } else {
+    parts.push(`<span class="it">${_dot('#e5484d')}Workers: <b>sin datos</b></span>`);
+  }
+  // Dispatcher (chequea cada ~1 min)
+  const d=by.dispatcher;
+  if(d){
+    const down=d.hace_s>90;
+    parts.push(`<span class="it">${_dot(down?'#e5484d':'#8a8a8a')}Dispatcher: chequeo hace <b>${humanSec(d.hace_s)}</b></span>`);
+  }
+  // Última corrida real por proceso
+  const pp=['correccion','propuestas','ingesta_briefs'].filter(k=>by[k]).map(k=>`${procName[k]} ${humanSec(by[k].hace_s)}`).join(' · ');
+  if(pp) parts.push(`<span class="it">última corrida: ${pp}</span>`);
+  sb.innerHTML = parts.join('');
 }
 function setUpd(){ const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR'); }
 

@@ -257,13 +257,15 @@ async function getBriefMedia(id) {
   return rows[0] || null;
 }
 
-// Latido de los procesos batch (para la barra de status).
-async function getStatus(proyectoId) {
+// Estado de los workers (infra global, igual para todas las marcas): worker (procesando/en espera),
+// dispatcher (salud del chequeo) y última corrida real de cada proceso. La barra de control lo lee.
+async function getStatus(_proyectoId) {
   const { rows } = await pool.query(`
-    SELECT proceso, last_msg, intervalo_s,
-           EXTRACT(EPOCH FROM (now() - last_run))::int AS hace_s,
-           GREATEST(0, intervalo_s - EXTRACT(EPOCH FROM (now() - last_run))::int) AS proxima_s
-    FROM contenido.batch_runs WHERE proyecto_id = $1 ORDER BY proceso;`, [proyectoId]);
+    SELECT proceso, last_msg,
+           EXTRACT(EPOCH FROM (now() - last_run))::int AS hace_s
+    FROM contenido.batch_runs
+    WHERE proceso IN ('worker','dispatcher','correccion','propuestas','ingesta_briefs')
+    ORDER BY proceso;`);
   return rows;
 }
 

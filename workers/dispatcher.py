@@ -42,8 +42,6 @@ def det_correccion():
         if revids:
             jobs.append({"tipo": "correccion", "proyecto_slug": slug,
                          "payload": {"revision_ids": revids}, "lock_key": f"correccion:{slug}"})
-    if not jobs:
-        heartbeat("correccion", "sin rechazos")
     return jobs
 
 
@@ -56,8 +54,6 @@ def det_propuesta():
         sid, slug = row.split('|', 1)
         jobs.append({"tipo": "propuesta", "proyecto_slug": slug,
                      "payload": {"solicitud_id": sid}, "lock_key": f"propuesta:{sid}"})
-    if not jobs:
-        heartbeat("propuestas", "sin pedidos")
     return jobs
 
 
@@ -70,8 +66,6 @@ def det_brief():
         bid, slug = row.split('|', 1)
         jobs.append({"tipo": "brief", "proyecto_slug": slug,
                      "payload": {"brief_id": bid}, "lock_key": f"brief:{bid}"})
-    if not jobs:
-        heartbeat("ingesta_briefs", "sin requerimientos en cola")
     return jobs
 
 
@@ -96,6 +90,7 @@ DETECTORS = {
 
 
 def run():
+    encolados = 0
     for tipo in ("correccion", "propuesta", "brief", "landing"):
         if tipo not in MIGRATED:
             continue
@@ -103,9 +98,12 @@ def run():
             for job in DETECTORS[tipo]():
                 if jobqueue.acquire_inflight(job["lock_key"]):
                     jobqueue.enqueue(job)
+                    encolados += 1
                     log(f"encolado {job['tipo']}/{job['proyecto_slug']} ({job['lock_key']})")
         except Exception as e:
             log(f"!! detector {tipo} falló: {e}")
+    # Latido de salud del dispatcher (lo lee la barra de control de workers del panel).
+    heartbeat("dispatcher", f"chequeo ok · {encolados} encolado(s)")
 
 
 if __name__ == "__main__":
