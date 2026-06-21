@@ -222,32 +222,24 @@ function reqRow(b){
 const procName={correccion:'Modificaciones', ingesta_briefs:'Ingesta', propuestas:'Propuestas'};
 const humanSec = s => { s=Math.max(0,s|0); if(s<60) return s+'s'; const m=Math.floor(s/60); if(m<60) return m+'m'; const h=Math.floor(m/60); return h<24 ? h+'h' : Math.floor(h/24)+'d'; };
 const _dot = c => `<span class="dotp" style="background:${c}"></span>`;
-// Barra de control de workers: estado del worker (procesando/en espera), salud del dispatcher
-// y última corrida real de cada proceso. Datos de contenido.batch_runs (vía /api/status).
+// Barra de control de workers (salud de la plataforma de un vistazo). Datos de batch_runs (/api/status).
+// Verde = activo/procesando · gris = en espera (ok) · rojo = problema. Tooltips (title) explican cada estado.
+const ST_GREEN='#30a46c', ST_GREY='#8a8a8a', ST_RED='#e5484d';
 function renderStatus(rows){
   const sb=document.getElementById('statusbar'); if(!sb) return;
   const by={}; (rows||[]).forEach(r=>by[r.proceso]=r);
   const parts=[];
-  // Worker
-  const w=by.worker;
-  if(w){
-    const proc=(w.last_msg||'').startsWith('procesando');
-    const down=w.hace_s>30;   // el worker late cada ~10s; >30s = sin señal
-    const color=down?'#e5484d':(proc?'#30a46c':'#8a8a8a');
-    const txt=down?`sin señal (hace ${humanSec(w.hace_s)})`:(proc?esc(w.last_msg):'en espera');
-    parts.push(`<span class="it">${_dot(color)}Workers: <b>${txt}</b></span>`);
-  } else {
-    parts.push(`<span class="it">${_dot('#e5484d')}Workers: <b>sin datos</b></span>`);
-  }
-  // Dispatcher (chequea cada ~1 min)
-  const d=by.dispatcher;
-  if(d){
-    const down=d.hace_s>90;
-    parts.push(`<span class="it">${_dot(down?'#e5484d':'#8a8a8a')}Dispatcher: chequeo hace <b>${humanSec(d.hace_s)}</b></span>`);
-  }
-  // Última corrida real por proceso
-  const pp=['correccion','propuestas','ingesta_briefs'].filter(k=>by[k]).map(k=>`${procName[k]} ${humanSec(by[k].hace_s)}`).join(' · ');
-  if(pp) parts.push(`<span class="it">última corrida: ${pp}</span>`);
+  // 1) Dispatcher (orquestador): revisa la base cada ~1 min y encola el trabajo.
+  const d=by.dispatcher, dDown=!d || d.hace_s>90;
+  const dTip='Orquestador: revisa la base cada ~1 min y encola el trabajo pendiente (corrección, propuestas, briefs, landings). Verde = activo · Rojo = dejó de chequear (revisar cf-dispatcher.timer).';
+  parts.push(`<span class="it" title="${dTip}">${_dot(dDown?ST_RED:ST_GREEN)}Dispatcher: <b>${dDown?'sin señal':'activo · hace '+humanSec(d.hace_s)}</b></span>`);
+  // 2) Workers: ejecutan las tareas. Verde procesando · gris en espera · rojo caído.
+  const w=by.worker, wDown=!w || w.hace_s>30, proc=w&&(w.last_msg||'').startsWith('procesando');
+  const ult=['correccion','propuestas','ingesta_briefs'].filter(k=>by[k]).map(k=>`${procName[k]}: hace ${humanSec(by[k].hace_s)}`).join(' · ')||'sin datos';
+  const wTip=`Ejecutan las tareas sobre la suscripción de Claude. Verde = procesando ahora · Gris = en espera (libre, ok) · Rojo = caído (revisar cf-worker). Última actividad — ${ult}.`;
+  const wColor=wDown?ST_RED:(proc?ST_GREEN:ST_GREY);
+  const wTxt=wDown?'sin señal':(proc?esc(w.last_msg):'en espera');
+  parts.push(`<span class="it" title="${wTip}">${_dot(wColor)}Workers (1): <b>${wTxt}</b></span>`);
   sb.innerHTML = parts.join('');
 }
 function setUpd(){ const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR'); }
