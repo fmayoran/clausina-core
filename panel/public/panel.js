@@ -430,7 +430,7 @@ async function loadInstagram(){
   try{
     const r=await fetch('api/piezas?canal=instagram'); if(r.status===401){ location.href='login'; return; }
     const piezas=await r.json();
-    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador','rechazada'].includes(p.estado)).map(pendCard).join(''));
+    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado) || (p.estado==='rechazada' && !p.derivado_en)).map(pendCard).join(''));
     fill('c-pub','n-pub', piezas.filter(p=>p.estado==='publicada').map(pubCard).join(''));
     setUpd();
   }catch(e){ setUpd(); }
@@ -440,7 +440,7 @@ async function loadAvisos(){
   try{
     const r=await fetch('api/piezas?canal=aviso'); if(r.status===401){ location.href='login'; return; }
     const piezas=await r.json();
-    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador','rechazada'].includes(p.estado)).map(avisoPendCard).join(''));
+    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado) || (p.estado==='rechazada' && !p.derivado_en)).map(avisoPendCard).join(''));
     fill('c-pub','n-pub', piezas.filter(p=>p.estado==='publicada').map(avisoPubCard).join(''));
     setUpd();
   }catch(e){ setUpd(); }
