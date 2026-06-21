@@ -17,6 +17,36 @@ Reemplaza al mail como herramienta operativa (el mail quedó solo para el resume
   `PGHOST/PGPORT/PGUSER/PGDATABASE/PGPASSWORD`, `TELEGRAM_BOT_TOKEN`, `PANEL_TG_CHAT`,
   `PANEL_PASSWORD`, `PANEL_SECRET`, `PANEL_COOKIE_PATH=/panel`.
 
+## Trabajo desde Claude Code
+- Rama de trabajo actual: `claude-panel-global`.
+- Abre el folder `plataforma` en VS Studio y asegúrate de estar en `claude-panel-global`.
+- Archivos clave:
+  - `plataforma/panel/public/index.html` — home/dashboard principal.
+  - `plataforma/panel/public/panel.js` — lógica compartida del panel.
+  - `plataforma/panel/deploy.sh` — script de despliegue EasyPanel.
+- Flujo recomendado:
+  1. editar en VS Studio.
+  2. guardar cambios.
+  3. en la terminal integrada:
+     ```bash
+     cd /root/claudefolder/plataforma
+     git status
+     git add plataforma/panel/public/index.html plataforma/panel/public/panel.js plataforma/panel/deploy.sh
+     git commit -m "panel: <lo que cambiaste>"
+     git push
+     ```
+  4. para desplegar en la plataforma real:
+     ```bash
+     cd /root/claudefolder/plataforma/panel
+     ./deploy.sh
+     ```
+  5. verificar:
+     ```bash
+     docker service ps clausina_panel
+     curl -I -L -s https://panel.clausina.ar/
+     ```
+- Si necesitás ver cambios rápidos antes de deploy, usa el editor y prueba localmente con `git diff` y `git status`.
+
 ## Seguridad (login de marca + sesión)
 - Pantalla de login (`public/login.html`) con la estética Cortafuego. Contraseña compartida (`PANEL_PASSWORD`).
 - Sesión por **cookie firmada con HMAC** (`PANEL_SECRET`, 14 días). Botón **Salir** y manejo de `401 → login`.
