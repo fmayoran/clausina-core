@@ -2,17 +2,20 @@
 
 Reemplaza el poll por cron de los procesos batch. Daemon de larga vida (systemd: cf-worker).
 Escala horizontalmente: levantar N réplicas comparte la misma cola (BLPOP reparte).
+El heartbeat a contenido.batch_runs lo hace cada job script (con el nombre de proceso correcto).
 """
 import sys
 import traceback
 
 import jobqueue
-from db import heartbeat
-from handlers import correccion
+from handlers import correccion, propuesta, brief, landing
 
-# Registry de handlers por tipo de job. Agregar acá cada proceso nuevo (briefs, propuestas, landings).
+# Registry de handlers por tipo de job.
 HANDLERS = {
     "correccion": correccion.handle,
+    "propuesta": propuesta.handle,
+    "brief": brief.handle,
+    "landing": landing.handle,
 }
 
 
@@ -23,6 +26,7 @@ def log(msg):
 def process(job):
     tipo = job.get("tipo")
     slug = job.get("proyecto_slug", "?")
+    lock_key = job.get("lock_key")
     handler = HANDLERS.get(tipo)
     if not handler:
         log(f"job desconocido tipo={tipo} -> descartado")
@@ -30,15 +34,14 @@ def process(job):
     log(f"-> {tipo} / {slug}")
     try:
         ok, detalle = handler(job)
-        log(f"<- {tipo} / {slug} ok={ok} :: {detalle[:200]}")
-        heartbeat(tipo, f"{slug}: {'ok' if ok else 'error'}")
+        log(f"<- {tipo} / {slug} ok={ok} :: {(detalle or '')[:200]}")
     except Exception as e:
         log(f"!! error procesando {tipo}/{slug}: {e}")
         traceback.print_exc()
-        heartbeat(tipo, f"{slug}: excepción {e}")
     finally:
         # Libera el lock 'en vuelo' para que el dispatcher pueda reencolar si quedó trabajo.
-        jobqueue.release_inflight(tipo, slug)
+        if lock_key:
+            jobqueue.release_inflight(lock_key)
 
 
 def run():

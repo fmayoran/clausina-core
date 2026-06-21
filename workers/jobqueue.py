@@ -16,17 +16,15 @@ def client():
     return _client
 
 
-def _inflight_key(tipo, slug):
-    return f"{INFLIGHT_PREFIX}:{tipo}:{slug}"
+def acquire_inflight(key):
+    """SETNX con TTL. Devuelve True si tomó el lock (no había un job con esa clave en vuelo).
+    La clave la define el dispatcher: correccion usa la marca (correccion:<slug>);
+    propuesta/brief/landing usan el id del ítem (p.ej. brief:<id>)."""
+    return bool(_client.set(f"{INFLIGHT_PREFIX}:{key}", "1", nx=True, ex=INFLIGHT_TTL))
 
 
-def acquire_inflight(tipo, slug):
-    """SETNX con TTL. Devuelve True si tomó el lock (no había job de ese (tipo,slug) en vuelo)."""
-    return bool(_client.set(_inflight_key(tipo, slug), "1", nx=True, ex=INFLIGHT_TTL))
-
-
-def release_inflight(tipo, slug):
-    _client.delete(_inflight_key(tipo, slug))
+def release_inflight(key):
+    _client.delete(f"{INFLIGHT_PREFIX}:{key}")
 
 
 def enqueue(job):

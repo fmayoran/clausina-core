@@ -1,23 +1,24 @@
-"""Dispatcher de corrección (piloto: solo Cortafuego).
+"""Dispatcher: detecta trabajo pendiente en Postgres y lo encola en Redis (single-shot por timer).
 
-Single-shot: chequeo barato -> si hay rechazos, deriva los revision_ids de Cortafuego y encola
-un job en Redis (con lock 'en vuelo' para no duplicar). Lo corre un timer systemd (cf-dispatcher).
+Multi-proceso y multi-marca. Para cada proceso "migrado" corre su detector (chequeo barato en la
+base) y encola un job por ítem, con lock 'en vuelo' para no duplicar. El worker lo consume y corre
+el job script correspondiente (claude -p, suscripción).
 
-PENDIENTE (backlog): quitar el filtro slug='cortafuego' (todas las marcas) y reemplazar este
-poll por Postgres LISTEN/NOTIFY o push directo desde los productores (panel/n8n/telegram).
+Gate por proceso: MIGRATED controla qué procesos maneja el dispatcher. Para rollback de uno solo,
+sacalo de MIGRATED y reactivá su línea de cron (el dispatcher se lee del disco en cada tick).
+
+PENDIENTE (backlog): reemplazar este poll por Postgres LISTEN/NOTIFY o push desde los productores.
 """
-import json
 import sys
-import urllib.request
 
 import jobqueue
 from db import psql, heartbeat
-from config import N
 
-PILOTO_SLUG = "cortafuego"
-TIPO = "correccion"
+# Procesos que maneja el dispatcher (los demás siguen en cron).
+MIGRATED = {"correccion", "propuesta", "brief", "landing"}
 
-COLA = (
+# Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
+COLA_CORR = (
     "contenido.revisiones r "
     "JOIN contenido.piezas pz ON pz.id=r.pieza_id AND pz.revision_vigente=r.id "
     "JOIN contenido.proyectos p ON p.id=pz.proyecto_id "
@@ -29,39 +30,82 @@ def log(msg):
     print(msg, flush=True)
 
 
-def chequeo_barato():
-    """¿Hay rechazos pendientes? (no invoca al agente). Devuelve la cantidad."""
-    try:
-        with urllib.request.urlopen(f"{N}/webhook/cf-rechazos-pendientes", timeout=25) as r:
-            return len(json.loads(r.read().decode() or "[]"))
-    except Exception:
-        return 0
+def _lines(sql):
+    out = psql(sql)
+    return [ln for ln in out.splitlines() if ln.strip()]
+
+
+def det_correccion():
+    jobs = []
+    for slug in _lines(f"SELECT DISTINCT p.slug FROM {COLA_CORR}"):
+        revids = psql(f"SELECT string_agg(r.id::text, ', ') FROM {COLA_CORR} AND p.slug='{slug}'").strip()
+        if revids:
+            jobs.append({"tipo": "correccion", "proyecto_slug": slug,
+                         "payload": {"revision_ids": revids}, "lock_key": f"correccion:{slug}"})
+    if not jobs:
+        heartbeat("correccion", "sin rechazos")
+    return jobs
+
+
+def det_propuesta():
+    jobs = []
+    for row in _lines("SELECT s.id||'|'||COALESCE(p.slug,'cortafuego') "
+                      "FROM contenido.solicitudes_propuesta s "
+                      "LEFT JOIN contenido.proyectos p ON p.id=s.proyecto_id "
+                      "WHERE s.estado='pendiente' ORDER BY s.creado_en"):
+        sid, slug = row.split('|', 1)
+        jobs.append({"tipo": "propuesta", "proyecto_slug": slug,
+                     "payload": {"solicitud_id": sid}, "lock_key": f"propuesta:{sid}"})
+    if not jobs:
+        heartbeat("propuestas", "sin pedidos")
+    return jobs
+
+
+def det_brief():
+    jobs = []
+    for row in _lines("SELECT b.id||'|'||COALESCE(p.slug,'cortafuego') "
+                      "FROM contenido.tg_briefs b "
+                      "LEFT JOIN contenido.proyectos p ON p.id=b.proyecto_id "
+                      "WHERE b.estado='pendiente' ORDER BY b.creado_en"):
+        bid, slug = row.split('|', 1)
+        jobs.append({"tipo": "brief", "proyecto_slug": slug,
+                     "payload": {"brief_id": bid}, "lock_key": f"brief:{bid}"})
+    if not jobs:
+        heartbeat("ingesta_briefs", "sin requerimientos en cola")
+    return jobs
+
+
+def det_landing():
+    jobs = []
+    for estado, accion in (("pendiente", "procesar"), ("aprobada", "aplicar")):
+        for row in _lines(f"SELECT lc.id||'|'||p.slug FROM contenido.landing_cambios lc "
+                          f"JOIN contenido.proyectos p ON p.id=lc.proyecto_id "
+                          f"WHERE lc.estado='{estado}' ORDER BY lc.actualizado_en"):
+            cid, slug = row.split('|', 1)
+            jobs.append({"tipo": "landing", "proyecto_slug": slug,
+                         "payload": {"cambio_id": cid, "accion": accion}, "lock_key": f"landing:{cid}"})
+    return jobs  # landing no tiene proceso en la barra del panel -> sin heartbeat
+
+
+DETECTORS = {
+    "correccion": det_correccion,
+    "propuesta": det_propuesta,
+    "brief": det_brief,
+    "landing": det_landing,
+}
 
 
 def run():
-    n = chequeo_barato()
-    if n == 0:
-        heartbeat(TIPO, "sin rechazos")
-        log("sin rechazos")
-        return
-
-    # Revids de la marca del piloto (la base es la fuente de verdad; el webhook puede divergir).
-    revids = psql(f"SELECT string_agg(r.id::text, ', ') FROM {COLA} AND p.slug='{PILOTO_SLUG}'")
-    if not revids:
-        log(f"rechazos={n} pero ninguno de {PILOTO_SLUG}; nada que encolar")
-        return
-
-    if not jobqueue.acquire_inflight(TIPO, PILOTO_SLUG):
-        log(f"{PILOTO_SLUG} ya tiene un job de {TIPO} en vuelo; no reencolo")
-        return
-
-    jobqueue.enqueue({
-        "tipo": TIPO,
-        "proyecto_slug": PILOTO_SLUG,
-        "payload": {"revision_ids": revids},
-    })
-    heartbeat(TIPO, f"{PILOTO_SLUG}: encolado ({n} pend.)")
-    log(f"encolado {TIPO}/{PILOTO_SLUG} revids=[{revids}]")
+    for tipo in ("correccion", "propuesta", "brief", "landing"):
+        if tipo not in MIGRATED:
+            continue
+        try:
+            for job in DETECTORS[tipo]():
+                if jobqueue.acquire_inflight(job["lock_key"]):
+                    jobqueue.enqueue(job)
+                    log(f"encolado {job['tipo']}/{job['proyecto_slug']} ({job['lock_key']})")
+        except Exception as e:
+            log(f"!! detector {tipo} falló: {e}")
 
 
 if __name__ == "__main__":
