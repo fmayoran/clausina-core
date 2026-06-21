@@ -1,0 +1,12 @@
+[Unit]
+Description=cf dispatcher (chequeo barato -> encola jobs de corrección)
+After=network.target docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/root/claudefolder/plataforma/workers
+Environment=HOME=/root
+Environment=REDIS_URL=redis://localhost:6380/0
+ExecStart=/usr/bin/python3 /root/claudefolder/plataforma/workers/dispatcher.py

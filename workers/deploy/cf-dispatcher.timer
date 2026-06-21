@@ -1,0 +1,12 @@
+[Unit]
+Description=Dispara cf-dispatcher periódicamente (reemplaza el poll por cron del piloto)
+
+[Timer]
+# Cada 1 min (el chequeo es barato; no invoca al agente). El backlog lo cambia por LISTEN/NOTIFY.
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=10s
+Unit=cf-dispatcher.service
+
+[Install]
+WantedBy=timers.target

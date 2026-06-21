@@ -1,0 +1,2 @@
+redis>=5
+# anthropic  # solo si se usa el backend AGENT_BACKEND=api (Opus 4.8); en headless no hace falta
