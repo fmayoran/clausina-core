@@ -37,6 +37,11 @@
   .kpi b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;color:var(--white);line-height:1;}
   .kpi.hot b{color:#1ec9ff;}
   .kpi span{font-family:'IBM Plex Mono',monospace;font-size:.52rem;text-transform:uppercase;letter-spacing:.03em;color:var(--ash);}
+  .global-summary{margin-bottom:20px;padding:18px;border:1px solid var(--line);border-radius:12px;background:#080806;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;}
+  .gs-main{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+  .gs-title{font-family:'Barlow Condensed',sans-serif;font-size:1.4rem;color:var(--white);font-weight:700;}
+  .gs-sub{font-family:'IBM Plex Mono',monospace;font-size:.82rem;color:var(--ash);margin-top:4px;}
+  .gs-badges{display:flex;gap:10px;flex-wrap:wrap;}
   .pj .acts{display:flex;gap:8px;margin-top:2px;}
   .pj .acts .ibtn{flex:1;text-align:center;}
 </style>
@@ -53,14 +58,52 @@
   </header>
   <div id="toast"></div>
   <div class="wrap">
+    <div class="global-summary" id="globalSummary">
+      <div class="gs-main">
+        <div>
+          <div class="gs-title">Estado global de la plataforma</div>
+          <div class="gs-sub">Cargando estado global…</div>
+        </div>
+      </div>
+    </div>
     <div class="grid" id="grid"></div>
   </div>
 <script src="panel.js"></script>
 <script>
+function renderGlobal(ps){
+  const totals = ps.reduce((acc,p) => ({
+    projects: acc.projects + 1,
+    active: acc.active + (p.activo ? 1 : 0),
+    inactive: acc.inactive + (p.activo ? 0 : 1),
+    ig_pend: acc.ig_pend + (p.ig_pend || 0),
+    ig_pub: acc.ig_pub + (p.ig_pub || 0),
+    av_pend: acc.av_pend + (p.av_pend || 0),
+    av_pub: acc.av_pub + (p.av_pub || 0),
+    req_cola: acc.req_cola + (p.req_cola || 0),
+  }), {projects:0, active:0, inactive:0, ig_pend:0, ig_pub:0, av_pend:0, av_pub:0, req_cola:0});
+  const statusText = totals.req_cola > 0
+    ? `Plataforma activa · ${totals.req_cola} requerimiento(s) en la cola` 
+    : `Plataforma inactiva · no hay requerimientos en cola`;
+  document.getElementById('globalSummary').innerHTML = `
+    <div class="gs-main">
+      <div>
+        <div class="gs-title">Estado global de la plataforma</div>
+        <div class="gs-sub">${esc(statusText)}</div>
+      </div>
+      <div class="gs-badges">
+        ${kpi(totals.projects,'proyectos')}
+        ${kpi(totals.ig_pend,'IG pendientes',totals.ig_pend>0)}
+        ${kpi(totals.av_pend,'avisos pendientes',totals.av_pend>0)}
+        ${kpi(totals.req_cola,'requerimientos en cola',totals.req_cola>0)}
+      </div>
+    </div>
+  `;
+}
 async function cargar(){
   try{
     const r=await fetch('api/agencia'); if(r.status===401){location.href='login';return;}
     const ps=await r.json();
+    renderGlobal(ps);
     document.getElementById('grid').innerHTML = ps.length ? ps.map(card).join('') : '<div class="empty">— sin proyectos —</div>';
     const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR');
   }catch(e){}
