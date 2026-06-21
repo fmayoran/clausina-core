@@ -57,7 +57,7 @@
   </div>
 <script src="panel.js"></script>
 <script>
-const LBL={pendiente:'En cola',procesando:'Generando…',borrador:'Borrador listo',aprobada:'Aprobando…',en_produccion:'En producción',rechazada:'A ajustar',error:'Error'};
+const LBL={pendiente:'En cola',procesando:'Generando…',borrador:'Borrador listo',aprobada:'Aprobando…',en_produccion:'En producción',rechazada:'A modificar',error:'Error'};
 async function load(){
   try{
     const r=await fetch('api/landing'); if(r.status===401){location.href='login';return;}
@@ -74,7 +74,7 @@ function card(c){
       <div class="acts">
         <a class="ibtn" href="${esc(c.preview_url)}" target="_blank" rel="noopener">Abrir preview ↗</a>
         <button class="ibtn ok" onclick="aprobar('${c.id}')">Aprobar y publicar</button>
-        <button class="ibtn no" onclick="rechazar('${c.id}')">Rechazar / ajustar</button>
+        <button class="ibtn no" onclick="rechazar('${c.id}')">Modificar</button>
       </div>`;
   } else if(c.estado==='pendiente'||c.estado==='procesando'){
     body='<div class="muted">El creativo está generando el borrador… (se refresca solo)</div>';

@@ -49,7 +49,7 @@ function pendCard(p){
     <div class="acts">
       <button class="btn ok" onclick="aprobar('${p.id}',this)">Aprobar y publicar</button>
       <div class="acts-row">
-        <button class="btn no" onclick="rechazar('${p.id}',this)">Rechazar</button>
+        <button class="btn no" onclick="rechazar('${p.id}',this)">Modificar</button>
         <button class="btn del" onclick="descartar('${p.id}',this)">Descartar</button>
       </div>
     </div></div>`;
@@ -86,7 +86,7 @@ function avisoPendCard(p){
     <div class="acts">
       <button class="btn ok" onclick="aprobar('${p.id}',this)">Aprobar (a pantalla)</button>
       <div class="acts-row">
-        <button class="btn no" onclick="rechazar('${p.id}',this)">Rechazar</button>
+        <button class="btn no" onclick="rechazar('${p.id}',this)">Modificar</button>
         <button class="btn del" onclick="descartar('${p.id}',this)">Descartar</button>
       </div>
     </div></div>`;
@@ -112,7 +112,7 @@ function reqStatus(b){
   }
   switch(b.pieza_estado){
     case 'pendiente_aprobacion': return {l:'Pieza pendiente de aprobación', c:'pend'};
-    case 'rechazada':            return {l:`Rechazada · reprocesando (rev ${b.pieza_rev})`, c:'rech'};
+    case 'rechazada':            return {l:`A modificar · reprocesando (rev ${b.pieza_rev})`, c:'rech'};
     case 'aprobada':             return {l:'Aprobada · publicando…', c:'ok'};
     case 'borrador':             return {l:'En preparación', c:'proc'};
     case 'publicada':            return {l:'Publicada', c:'ok'};
@@ -192,7 +192,7 @@ function reqRow(b){
 }
 
 /* ---------- Barra de status ---------- */
-const procName={correccion:'Corrección de rechazos', ingesta_briefs:'Ingesta de requerimientos', propuestas:'Propuestas'};
+const procName={correccion:'Modificaciones', ingesta_briefs:'Ingesta de requerimientos', propuestas:'Propuestas'};
 const humanSec = s => { s=Math.max(0,s|0); if(s<60) return s+'s'; const m=Math.floor(s/60); return m+'m'+(s%60?' '+(s%60)+'s':''); };
 function renderStatus(rows){
   const sb=document.getElementById('statusbar');
@@ -419,7 +419,7 @@ async function loadAvisos(){
   }catch(e){ setUpd(); }
 }
 
-/* ---------- Modal de rechazo (motivo + material opcional) ---------- */
+/* ---------- Modal de modificación (motivo + material opcional) ---------- */
 // Disponible en cualquier página (Instagram/Avisos): se inyecta en el DOM la primera vez.
 let rejectId=null;
 function ensureRejectModal(){
@@ -430,12 +430,12 @@ function ensureRejectModal(){
     <div class="modal-bg" onclick="closeRejectModal()"></div>
     <div class="modal-box">
       <div class="modal-head">
-        <div class="modal-tt">Rechazar pieza</div>
+        <div class="modal-tt">Modificar pieza</div>
         <button class="modal-x" onclick="closeRejectModal()" title="Cerrar">×</button>
       </div>
       <div class="modal-body">
         <div class="modal-sec">
-          <div class="modal-lbl">Motivo del rechazo (se usa para corregir)</div>
+          <div class="modal-lbl">Qué modificar (se usa para corregir)</div>
           <textarea id="rj-motivo" maxlength="500" placeholder="Qué corregir: copy, recorte, el texto tapa la comida, otro encuadre, sumá las fotos nuevas…"></textarea>
         </div>
         <div class="modal-sec">
@@ -445,7 +445,7 @@ function ensureRejectModal(){
         </div>
       </div>
       <div class="modal-foot">
-        <button class="btn no" id="rj-go" onclick="confirmRechazo()">Rechazar y corregir</button>
+        <button class="btn no" id="rj-go" onclick="confirmRechazo()">Modificar</button>
         <button class="btn no" onclick="closeRejectModal()">Cancelar</button>
       </div>
     </div>`;
@@ -500,13 +500,13 @@ async function confirmRechazo(){
   const motivo=document.getElementById('rj-motivo').value.trim();
   if(!motivo){ toast('Hace falta un motivo', true); return; }
   const id=rejectId, btn=document.getElementById('rj-go');
-  acting=true; btn.disabled=true; btn.textContent='Rechazando…';
+  acting=true; btn.disabled=true; btn.textContent='Modificando…';
   try{
     const d=await fetch('api/piezas/'+id+'/rechazar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({motivo})}).then(r=>r.json());
-    if(d.ok){ toast('Rechazada — se va a corregir'); rejectId=null; document.getElementById('rejmodal').classList.add('hidden'); }
-    else toast('No se pudo rechazar ('+(d.error||d.status)+')', true);
+    if(d.ok){ toast('Modificación enviada — se va a corregir'); rejectId=null; document.getElementById('rejmodal').classList.add('hidden'); }
+    else toast('No se pudo enviar la modificación ('+(d.error||d.status)+')', true);
   }catch(e){ toast('Error de conexión', true); }
-  btn.disabled=false; btn.textContent='Rechazar y corregir'; acting=false; setTimeout(currentLoad, 1200);
+  btn.disabled=false; btn.textContent='Modificar'; acting=false; setTimeout(currentLoad, 1200);
 }
 
 /* ---------- Marca activa (multi-tenant) ---------- */
