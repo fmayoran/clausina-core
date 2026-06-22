@@ -37,7 +37,8 @@ pid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('
 
 # --- resolver el proyecto del brief: cápsula y secretos de ESA marca (aislamiento multiproyecto) ---
 slug=$(psql "SELECT slug FROM contenido.proyectos WHERE id='$pid';")
-[ -z "$slug" ] && slug="cortafuego"          # fallback defensivo (briefs viejos sin proyecto)
+# Sin proyecto resoluble no se asume ninguna marca: se marca error (multi-marca, agnóstico).
+[ -z "$slug" ] && { echo "$(ts) ERROR: brief $bid sin proyecto resoluble (pid='$pid')" >> "$LOG"; psql "UPDATE contenido.tg_briefs SET estado='error', procesado_en=now() WHERE id='$bid';" >/dev/null; exit 1; }
 NOMBRE=$(psql "SELECT nombre FROM contenido.proyectos WHERE slug='$slug';"); [ -z "$NOMBRE" ] && NOMBRE="$slug"
 REPO="$MARCAS/$slug"
 [ -d "$REPO" ] || { echo "$(ts) ERROR: cápsula inexistente $REPO" >> "$LOG"; psql "UPDATE contenido.tg_briefs SET estado='error', procesado_en=now() WHERE id='$bid';" >/dev/null; exit 1; }

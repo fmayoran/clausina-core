@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Validador de calidad web de la landing de Cortafuego.
+Validador de calidad web de landings (agnóstico de marca).
 Comprueba las premisas SEO/AEO/performance del skill /creativo antes de un commit.
 Uso: python3 validate_web.py [ruta_landing]   (exit 0 = ok, exit 1 = falla con reporte)
 Si se pasa una ruta (ej. la landing de una marca), valida esa; si no, usa la default.

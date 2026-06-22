@@ -55,7 +55,7 @@ for p in props:
     if not bid:
         continue
     msg = (f"[PROPUESTA] {titulo}\n\n{concepto}\n\nNecesito: {req}\n\n"
-           "Respondé este mensaje con la foto/video para activarla — o gestionala en https://cortafuego.ar/panel")
+           "Respondé este mensaje con la foto/video para activarla — o gestionala en https://panel.clausina.ar")
     mid = tg_send(msg)
     if mid:
         psql(f"UPDATE contenido.tg_briefs SET tg_msg_id={int(mid)} WHERE id='{bid}';")

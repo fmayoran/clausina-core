@@ -30,7 +30,8 @@ pid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('
 
 # --- resolver el proyecto del pedido: cápsula y secretos de ESA marca (aislamiento multiproyecto) ---
 slug=$(psqlc "SELECT slug FROM contenido.proyectos WHERE id='$pid';")
-[ -z "$slug" ] && slug="cortafuego"          # fallback defensivo (pedidos viejos sin proyecto)
+# Sin proyecto resoluble no se asume ninguna marca: se marca error (multi-marca, agnóstico).
+[ -z "$slug" ] && { echo "$(ts) ERROR: pedido $sid sin proyecto resoluble (pid='$pid')" >> "$LOG"; psqlc "UPDATE contenido.solicitudes_propuesta SET estado='error', procesado_en=now() WHERE id='$sid';" >/dev/null; exit 1; }
 pid=$(psqlc "SELECT id FROM contenido.proyectos WHERE slug='$slug';")   # normaliza si vino vacío
 CHAT=$(psqlc "SELECT coalesce(telegram_chat_id,'') FROM contenido.proyectos WHERE slug='$slug';")
 REPO="$MARCAS/$slug"
@@ -63,6 +64,6 @@ n=$(python3 "$MOTOR/scripts/propuestas_publicar.py" "$CID" "$CHAT" "$BOT" "$cana
 echo "$(ts) propuestas cargadas: $n" >> "$LOG"
 psqlc "UPDATE contenido.solicitudes_propuesta SET estado='procesado', procesado_en=now(), resultado='$n propuestas' WHERE id='$sid';" >/dev/null
 # aviso a Fer
-curl -s "https://api.telegram.org/bot$BOT/sendMessage" --data-urlencode "chat_id=$CHAT" --data-urlencode "text=El creativo cargó $n propuestas nuevas en la cola. Revisalas en https://cortafuego.ar/panel" -o /dev/null 2>&1
+curl -s "https://api.telegram.org/bot$BOT/sendMessage" --data-urlencode "chat_id=$CHAT" --data-urlencode "text=El creativo cargó $n propuestas nuevas en la cola. Revisalas en https://panel.clausina.ar" -o /dev/null 2>&1
 hb "$n propuestas cargadas"
 echo "$(ts) fin pedido $sid" >> "$LOG"

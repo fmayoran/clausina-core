@@ -58,6 +58,6 @@ fi
 n=$(python3 "$MOTOR/scripts/propuestas_publicar.py" "$CID" "$CHAT" "$BOT" "$canal" "$pid" 2>>"$LOG")
 echo "$(ts) propuestas cargadas: $n" >> "$LOG"
 psqlc "UPDATE contenido.solicitudes_propuesta SET estado='procesado', procesado_en=now(), resultado='$n propuestas' WHERE id='$sid';" >/dev/null
-curl -s "https://api.telegram.org/bot$BOT/sendMessage" --data-urlencode "chat_id=$CHAT" --data-urlencode "text=El creativo cargó $n propuestas nuevas en la cola. Revisalas en https://cortafuego.ar/panel" -o /dev/null 2>&1
+curl -s "https://api.telegram.org/bot$BOT/sendMessage" --data-urlencode "chat_id=$CHAT" --data-urlencode "text=El creativo cargó $n propuestas nuevas en la cola. Revisalas en https://panel.clausina.ar" -o /dev/null 2>&1
 hb "$n propuestas cargadas"
 echo "$(ts) fin pedido $sid" >> "$LOG"
