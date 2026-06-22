@@ -1,5 +1,5 @@
 {
-  "name": "Cortafuego - Publicar (Fase C)",
+  "name": "ClaUsina - Publicar (Fase C)",
   "nodes": [
     {
       "parameters": {
@@ -728,7 +728,7 @@
     {
       "parameters": {
         "respondWith": "text",
-        "responseBody": "=<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><body style='font-family:sans-serif;background:#080806;color:#f5f2ec;text-align:center;padding:60px 20px'><div style='font-size:2rem;font-weight:900;color:#ff4400'>CORTAFUEGO</div><h2 style='font-size:1.8rem'>Publicada</h2><p style='color:#8a8a82'>Ya podes cerrar esta pestana.</p></body>",
+        "responseBody": "=<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><body style='font-family:sans-serif;background:#080806;color:#f5f2ec;text-align:center;padding:60px 20px'><div style='font-size:2rem;font-weight:900;color:#1ec9ff'>ClaUsina</div><h2 style='font-size:1.8rem'>Publicada</h2><p style='color:#8a8a82'>Ya podes cerrar esta pestana.</p></body>",
         "options": {}
       },
       "id": "Respond",

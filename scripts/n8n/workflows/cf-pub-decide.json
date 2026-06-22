@@ -1,5 +1,5 @@
 {
-  "name": "Cortafuego - Decision publicacion",
+  "name": "ClaUsina - Decision publicacion",
   "nodes": [
     {
       "parameters": {
@@ -44,7 +44,7 @@
     {
       "parameters": {
         "respondWith": "text",
-        "responseBody": "={{ $json && $json.estado ? `<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><body style='font-family:sans-serif;background:#080806;color:#f5f2ec;text-align:center;padding:60px 20px'><div style='font-size:2rem;font-weight:900;color:#ff4400'>CORTAFUEGO</div><p style='color:#8a8a82'>${$json.titulo_interno}</p><h2 style='font-size:2rem'>Rechazada</h2><p style='color:#8a8a82'>Gracias. El motivo quedó registrado y el equipo lo va a corregir.</p></body>` : `<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><body style='font-family:sans-serif;background:#080806;color:#f5f2ec;text-align:center;padding:60px 20px'><div style='font-size:2rem;font-weight:900;color:#ff4400'>CORTAFUEGO</div><p>No se pudo procesar: la publicación ya fue decidida o el enlace no es válido.</p></body>` }}",
+        "responseBody": "={{ $json && $json.estado ? `<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><body style='font-family:sans-serif;background:#080806;color:#f5f2ec;text-align:center;padding:60px 20px'><div style='font-size:2rem;font-weight:900;color:#1ec9ff'>ClaUsina</div><p style='color:#8a8a82'>${$json.titulo_interno}</p><h2 style='font-size:2rem'>Rechazada</h2><p style='color:#8a8a82'>Gracias. El motivo quedó registrado y el equipo lo va a corregir.</p></body>` : `<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><body style='font-family:sans-serif;background:#080806;color:#f5f2ec;text-align:center;padding:60px 20px'><div style='font-size:2rem;font-weight:900;color:#1ec9ff'>ClaUsina</div><p>No se pudo procesar: la publicación ya fue decidida o el enlace no es válido.</p></body>` }}",
         "options": {
           "responseHeaders": {
             "entries": [

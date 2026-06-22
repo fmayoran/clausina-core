@@ -1,5 +1,5 @@
 {
-  "name": "Cortafuego - Notificacion aprobacion",
+  "name": "ClaUsina - Notificacion aprobacion",
   "nodes": [
     {
       "parameters": {
@@ -135,7 +135,8 @@
           "id": "zvxU9F3XDpRNBsYa",
           "name": "Cortafuego Telegram"
         }
-      }
+      },
+      "webhookId": "8411116a-e750-49a4-9caa-714f8333d6c2"
     }
   ],
   "connections": {
