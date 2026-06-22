@@ -1,7 +1,7 @@
 # Organización de la plataforma (multi-marca)
 
 > Contrato de dónde vive cada cosa. Cualquier desarrollo nuevo debe respetar esta separación.
-> Restructure aplicado: 2026-06-11.
+> Restructure aplicado: 2026-06-11. Monorepo contenedor `clausina` (raíz como submodules): 2026-06-22.
 
 ## Principio
 **Motor agnóstico + cápsula de marca aislada.** El motor no sabe de ninguna marca en particular;
@@ -40,7 +40,17 @@ sabe operar *una marca cualquiera*. Cada marca es una cápsula independiente (co
 - **Panel** (`cf-panel`): `bash plataforma/panel/deploy.sh` (docker build local desde `plataforma/panel/`).
 - **Crons**: en el crontab del VPS, apuntan a `plataforma/scripts/*.sh`. CWD de generación = la cápsula de la marca (`marcas/<slug>/`); playbooks/logs del motor por ruta absoluta (`$MOTOR=/root/claudefolder/plataforma`).
 
-## Pendiente (no hecho en este restructure)
-- El motor (`plataforma/`) todavía no tiene su propio repo git (queda respaldado por tar). Evaluar versionarlo.
+## Repos git (monorepo contenedor, 2026-06-22)
+La raíz `/root/claudefolder/` es el repo contenedor `fmayoran/clausina` (monorepo). Todo lo que deploya a un servicio externo es un submodule con su propio repo:
+- `plataforma/` → `fmayoran/clausina-core` (motor; el panel buildea desde acá en EasyPanel).
+- `marcas/cortafuego/` → `fmayoran/cortafuego` (Cloudflare Worker).
+- `marcas/ardora/` → `fmayoran/ardora` (Cloudflare Pages).
+- `marcas/clausina/` → `fmayoran/clausina-web` (Cloudflare Worker; `wrangler.jsonc` listo, falta conectar el proyecto en Cloudflare).
+- Huérfanos versionados dentro del contenedor: `infra/`, `tools/`, archivos raíz (`CLAUDE.md`, `.mcp.json`). Secretos (`.env`, `*.env`) gitignored.
+
+Flujo con submodules: editar landing → commit+push DENTRO del submodule (dispara Cloudflare) → commit en el contenedor para actualizar el puntero (solo registro, no afecta deploy).
+
+## Pendiente
+- Conectar el proyecto `clausina-web` en Cloudflare (Workers, repo `fmayoran/clausina-web`/main) para que auto-deploye.
 - Des-hornear lo que aún asume "Cortafuego" en crons/n8n para que iteren por marca activa (Fase 2 resto).
 - Conectar `@ardora.sport` y modelar el paraguas Distrito Ardora + sub-marcas.
