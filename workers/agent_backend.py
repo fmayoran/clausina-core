@@ -3,7 +3,8 @@
 - headless (default, producción): ejecuta el job script bash que corre `claude -p --model sonnet`
   sobre la suscripción de Claude Code logueada en el host (/root/.claude). Costo de API = 0.
 - api (futuro): generaría el prompt en Python y llamaría a la API (Opus 4.8) vía
-  poc-multi-brand-agent/claude_client.py. Se activa con AGENT_BACKEND=api cuando haya volumen.
+  workers/claude_client.py (cliente real Opus 4.8; quedó como base del backend api,
+  rescatado del POC). Se activa con AGENT_BACKEND=api cuando haya volumen.
 
 Cada job script (scripts/<tipo>_job.sh) encapsula el prompt y la lógica exacta de cada proceso,
 extraídos verbatim de los scripts batch originales, por lo que el backend headless no re-deriva
