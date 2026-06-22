@@ -51,6 +51,5 @@ La raíz `/root/claudefolder/` es el repo contenedor `fmayoran/clausina` (monore
 Flujo con submodules: editar landing → commit+push DENTRO del submodule (dispara Cloudflare) → commit en el contenedor para actualizar el puntero (solo registro, no afecta deploy).
 
 ## Pendiente
-- Conectar el proyecto `clausina-web` en Cloudflare (Workers, repo `fmayoran/clausina-web`/main) para que auto-deploye.
 - Des-hornear lo que aún asume "Cortafuego" en crons/n8n para que iteren por marca activa (Fase 2 resto).
 - Conectar `@ardora.sport` y modelar el paraguas Distrito Ardora + sub-marcas.
