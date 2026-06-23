@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Arquitectura técnica y funcional</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --line:#2a323d;
+    --ink:#e6edf3; --mut:#9aa7b4; --dim:#6b7785;
+    --cel:#1ec9ff; --cel2:#0a8fbf; --celsoft:#103340;
+    --ok:#3fb950; --warn:#d29922; --pend:#8957e5;
+    --r:12px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55;font-size:15px}
+  a{color:var(--cel);text-decoration:none}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86em;
+    background:#0b0e13;border:1px solid var(--line);border-radius:5px;padding:1px 5px;color:#cfe9f5}
+  .layout{display:grid;grid-template-columns:248px 1fr;min-height:100vh}
+  /* nav */
+  nav{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;
+    background:#0b0e13;border-right:1px solid var(--line);padding:22px 16px}
+  nav .brand{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+  nav .dot{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--cel),var(--cel2));
+    box-shadow:0 0 18px rgba(30,201,255,.45)}
+  nav .brand b{font-size:16px;letter-spacing:.3px}
+  nav a{display:block;color:var(--mut);padding:7px 10px;border-radius:8px;font-size:13.5px;margin:1px 0}
+  nav a:hover{background:var(--panel);color:var(--ink)}
+  nav .sec{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin:16px 10px 4px}
+  main{padding:0 0 80px}
+  .wrap{max-width:980px;margin:0 auto;padding:0 28px}
+  /* hero */
+  header.hero{padding:54px 0 34px;border-bottom:1px solid var(--line);
+    background:radial-gradient(1200px 300px at 20% -10%,rgba(30,201,255,.10),transparent)}
+  .hero h1{font-size:34px;margin:0 0 8px;letter-spacing:.2px}
+  .hero .sub{color:var(--mut);font-size:16px;max-width:680px}
+  .hero .meta{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
+  .pill{font-size:12px;color:var(--cel);background:var(--celsoft);border:1px solid #1e4150;
+    padding:4px 10px;border-radius:999px}
+  section{padding:40px 0 8px;border-bottom:1px solid var(--line)}
+  section h2{font-size:23px;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+  section h2::before{content:"";width:5px;height:22px;border-radius:3px;background:var(--cel)}
+  section .lead{color:var(--mut);margin:0 0 20px;max-width:760px}
+  h3{font-size:16px;margin:26px 0 10px;color:#cfe9f5}
+  p{margin:0 0 12px}
+  .muted{color:var(--mut)}
+  /* grids / cards */
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+  .card h4{margin:0 0 6px;font-size:14.5px;display:flex;align-items:center;gap:8px}
+  .card p{font-size:13.5px;color:var(--mut);margin:0}
+  .tag{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--panel2);
+    border:1px solid var(--line);color:var(--mut)}
+  .ico{width:18px;height:18px;flex:0 0 auto}
+  /* topology */
+  .topo{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:22px}
+  .topo .root{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:6px}
+  .node{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;text-align:center}
+  .node b{display:block;font-size:13.5px}
+  .node small{color:var(--dim);font-size:11.5px}
+  .node.root-n{border-color:var(--cel);box-shadow:0 0 0 1px rgba(30,201,255,.25) inset}
+  .subs{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+  .stem{height:18px;border-left:1px dashed var(--line);width:0;margin:0 auto}
+  .deploy{margin-top:8px;font-size:11.5px;color:var(--cel)}
+  /* flow / pipeline */
+  .flow{position:relative;margin-top:8px}
+  .step{display:grid;grid-template-columns:46px 1fr;gap:16px;margin-bottom:14px}
+  .step .num{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-weight:700;color:#06212c;background:linear-gradient(135deg,var(--cel),var(--cel2));font-size:18px}
+  .step .body{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+  .step .body h4{margin:0 0 4px;font-size:15.5px}
+  .step .func{color:var(--ink);margin:0 0 10px;font-size:14px}
+  .step .tech{background:#0b0e13;border:1px solid var(--line);border-left:3px solid var(--cel);
+    border-radius:8px;padding:9px 12px;font-size:13px;color:var(--mut)}
+  .step .tech b{color:#cfe9f5;font-weight:600}
+  .step:not(:last-child) .num::after{content:"";position:absolute;margin-top:46px;width:0;height:14px}
+  .railwrap{position:relative}
+  .railwrap::before{content:"";position:absolute;left:22px;top:6px;bottom:18px;width:2px;
+    background:linear-gradient(var(--cel),transparent);opacity:.35}
+  /* loop note */
+  .loop{display:flex;gap:10px;align-items:flex-start;background:var(--celsoft);border:1px solid #1e4150;
+    border-radius:10px;padding:12px 14px;margin:10px 0 0;font-size:13.5px}
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:6px 0 4px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--dim);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+  td code{white-space:nowrap}
+  .st{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:600}
+  .st.ok{background:rgba(63,185,80,.13);color:var(--ok);border:1px solid rgba(63,185,80,.3)}
+  .st.pend{background:rgba(137,87,229,.14);color:#b08cf0;border:1px solid rgba(137,87,229,.35)}
+  .st.warn{background:rgba(210,153,34,.13);color:var(--warn);border:1px solid rgba(210,153,34,.3)}
+  /* data model */
+  .erd{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;overflow:auto}
+  .erd .ent{border:1px solid var(--line);border-radius:9px;margin:0;min-width:180px;background:var(--panel2)}
+  .erd .ent .t{background:#11202a;color:var(--cel);font-weight:700;padding:7px 12px;border-bottom:1px solid var(--line);
+    border-radius:9px 9px 0 0;font-size:13px}
+  .erd .ent .f{padding:7px 12px;font-size:12.5px;color:var(--mut)}
+  .erd .row{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+  .erd .arrow{color:var(--dim);align-self:center;font-size:20px}
+  .erd .nest{margin-left:26px;margin-top:10px;border-left:1px dashed var(--line);padding-left:18px}
+  ul.clean{margin:6px 0 14px;padding-left:18px}
+  ul.clean li{margin:5px 0;color:var(--mut)}
+  ul.clean li b{color:var(--ink)}
+  .foot{color:var(--dim);font-size:12.5px;padding:26px 0}
+  .chg td:first-child{white-space:nowrap;color:var(--cel);font-variant-numeric:tabular-nums}
+  @media(max-width:860px){.layout{grid-template-columns:1fr}nav{display:none}.g2,.g3,.g4,.subs{grid-template-columns:1fr 1fr}}
+  @media(max-width:560px){.g2,.g3,.g4,.subs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav>
+  <div class="brand"><span class="dot"></span><b>ClaUsina</b></div>
+  <div class="sec">Documento</div>
+  <a href="#vision">1 · Visión y principio</a>
+  <a href="#topologia">2 · Topología de repos</a>
+  <a href="#componentes">3 · Mapa de componentes</a>
+  <a href="#proceso">4 · El proceso end-to-end</a>
+  <a href="#canales">5 · Canales</a>
+  <a href="#datos">6 · Modelo de datos</a>
+  <a href="#infra">7 · Infraestructura</a>
+  <a href="#marcas">8 · Marcas activas</a>
+  <a href="#roadmap">9 · Roadmap / pendientes</a>
+  <a href="#changelog">10 · Changelog</a>
+</nav>
+
+<main>
+<header class="hero"><div class="wrap">
+  <h1>ClaUsina — Arquitectura técnica y funcional</h1>
+  <p class="sub">La plataforma de contenido y operaciones multi-marca. Un motor agnóstico de marca que prepara, aprueba y publica contenido con generación asistida por IA, y una cápsula aislada por cada marca.</p>
+  <div class="meta">
+    <span class="pill">Documento vivo</span>
+    <span class="pill">Actualizado: 2026-06-23</span>
+    <span class="pill">3 marcas activas</span>
+    <span class="pill">Monorepo + 4 submodules</span>
+  </div>
+</div></header>
+
+<!-- 1 -->
+<section id="vision"><div class="wrap">
+  <h2>1 · Visión y principio</h2>
+  <p class="lead">Una plataforma para que una o varias marcas <b>planifiquen, aprueben y publiquen</b> contenido sin fricción. La automatización prepara y publica; <b>no decide</b>.</p>
+  <div class="grid g2">
+    <div class="card">
+      <h4>Principio rector</h4>
+      <p><b>Nada sale sin aprobación humana.</b> El contenido se prepara (texto + imagen/video, generado o real), se registra como pieza pendiente, pasa por una aprobación humana con preview, y recién entonces se publica. Si se rechaza, entra en un loop de iteración hasta aprobarse.</p>
+    </div>
+    <div class="card">
+      <h4>Motor agnóstico + cápsula por marca</h4>
+      <p>El <b>motor</b> no sabe de ninguna marca en particular: sabe operar <i>una marca cualquiera</i>, ruteando por <code>proyecto_id</code>. Cada <b>marca</b> es una cápsula independiente (contexto + assets + secretos), aislada de las demás.</p>
+    </div>
+  </div>
+  <div class="loop">
+    <span class="ico" style="color:var(--cel)">◆</span>
+    <div><b>Dualidad de ClaUsina.</b> ClaUsina es a la vez el contenedor/motor/agencia que abarca todo, <i>y</i> una marca más (simétrica con Cortafuego y Ardora): la agencia se hace su propio marketing en <a href="https://clausina.ar">clausina.ar</a>.</div>
+  </div>
+</div></section>
+
+<!-- 2 -->
+<section id="topologia"><div class="wrap">
+  <h2>2 · Topología de repos y deploy</h2>
+  <p class="lead">La raíz es un monorepo contenedor. Todo lo que deploya a un servicio externo es un submodule con su propio repo git, que dispara su propio deploy.</p>
+  <div class="topo">
+    <div class="root"><div class="node root-n"><b>fmayoran/clausina</b><small>monorepo contenedor · /root/claudefolder</small></div></div>
+    <div class="stem"></div>
+    <div class="subs">
+      <div class="node"><b>clausina-core</b><small>plataforma/ · el MOTOR</small><div class="deploy">▸ EasyPanel (panel)</div></div>
+      <div class="node"><b>cortafuego</b><small>marcas/cortafuego/</small><div class="deploy">▸ Cloudflare Worker</div></div>
+      <div class="node"><b>ardora</b><small>marcas/ardora/</small><div class="deploy">▸ Cloudflare Pages</div></div>
+      <div class="node"><b>clausina-web</b><small>marcas/clausina/</small><div class="deploy">▸ Cloudflare Worker</div></div>
+    </div>
+  </div>
+  <p class="muted" style="margin-top:14px">Huérfanos versionados dentro del contenedor: <code>infra/</code>, <code>tools/</code>, archivos raíz (<code>CLAUDE.md</code>, <code>.mcp.json</code>). Secretos (<code>.env</code>, <code>*.env</code>) gitignored.</p>
+  <h3>Flujo de trabajo con submodules</h3>
+  <ul class="clean">
+    <li><b>Editar</b> dentro del submodule → <b>commit + push ahí</b> (dispara su deploy: Cloudflare en las landings).</li>
+    <li><b>Commit en el contenedor</b> para actualizar el puntero del submodule (solo registro; no afecta el deploy). Olvidarlo es inofensivo.</li>
+  </ul>
+</div></section>
+
+<!-- 3 -->
+<section id="componentes"><div class="wrap">
+  <h2>3 · Mapa de componentes</h2>
+  <p class="lead">Cinco capas: control/agentes, generación IA, orquestación, datos y presentación, sobre la infraestructura del VPS.</p>
+  <div class="grid g3">
+    <div class="card"><h4>Control / Agentes</h4><p>Claude Code como operador. Skills globales: <code>/creativo</code> (contenido), <code>/editor</code> (pantalla DOOH), <code>/it</code> (infra). Headless por cron/cola para la auto-corrección.</p></div>
+    <div class="card"><h4>Panel</h4><p><code>clausina_panel</code> (EasyPanel) en <a href="https://panel.clausina.ar">panel.clausina.ar</a>. Board: Cola de Requerimientos · Pendientes · Publicadas, login por marca. Sirve el media store en <code>/media</code>.</p></div>
+    <div class="card"><h4>Generación IA</h4><p><b>Higgsfield</b> (CLI, plan ultra): imágenes y Reels. Tipografía de marca: HTML → JPG con Chromium/Playwright. La inicia Fer (calidad/NSFW en el loop).</p></div>
+    <div class="card"><h4>Orquestación — n8n</h4><p>Webhooks <code>cf-*</code> (paths estables) tras el rebrand a "ClaUsina - X". Crea piezas, notifica, decide, publica, sirve el feed. Postgres + Telegram + Graph API.</p></div>
+    <div class="card"><h4>Datos — PostgreSQL</h4><p>Motor <code>crm_pgvector</code>, base propia <code>claude</code>, schema <code>contenido</code> (multi-proyecto). Fuente de verdad de todo el ciclo de contenido.</p></div>
+    <div class="card"><h4>Cola Redis + workers</h4><p>Corrección de rechazos migrándose de cron a <b>cola Redis + worker</b> (piloto Cortafuego). Desacopla el disparo del procesamiento.</p></div>
+    <div class="card"><h4>Presentación — landings</h4><p>Sitios estáticos por marca (Cloudflare). <code>index.html</code> con SEO/JSON-LD; <code>preview.html</code> (aprobación) y feed de novedades vía proxy same-origin a n8n.</p></div>
+    <div class="card"><h4>Canales de salida</h4><p>Instagram (Graph API), pantalla DOOH (VNNOX, Paseo Ardora), web (novedades), Telegram (operación/avisos a Fer).</p></div>
+    <div class="card"><h4>Media store</h4><p>Dos niveles: store central <code>clausina-media</code> (interno/trabajo, <code>panel.clausina.ar/media</code>) + CDN de marca (público).</p></div>
+  </div>
+</div></section>
+
+<!-- 4 -->
+<section id="proceso"><div class="wrap">
+  <h2>4 · El proceso end-to-end</h2>
+  <p class="lead">El camino completo de una pieza de contenido, desde que entra el requerimiento hasta que se publica. Cada paso indica <b>qué pasa</b> (funcional) y <b>cómo se resuelve técnicamente</b>.</p>
+  <div class="flow railwrap">
+
+    <div class="step"><div class="num">1</div><div class="body">
+      <h4>Entra el requerimiento (intake)</h4>
+      <p class="func">Fer dicta un brief por voz/foto+texto en Telegram, o sube un pedido en el panel; el creativo también puede proponer qué publicar y qué material hace falta.</p>
+      <div class="tech"><b>Técnico:</b> el brief queda en <code>contenido.tg_briefs</code> con <code>proyecto_id</code> y <code>canal_destino</code> (instagram|aviso). Handlers en el VPS: <code>brief_local.sh</code> (voz → Whisper.cpp local) y <code>propuestas_local.sh</code>. Ruteo por marca: cada corrida = una sola cápsula <code>marcas/&lt;slug&gt;/</code>.</div>
+    </div></div>
+
+    <div class="step"><div class="num">2</div><div class="body">
+      <h4>El agente prepara la pieza</h4>
+      <p class="func">El Director Creativo (o el Editor, para avisos de pantalla) redacta el copy con la voz de la marca y arma el material, generándolo si no hay foto/video real.</p>
+      <div class="tech"><b>Técnico:</b> Claude Code headless (sobre la suscripción, sin API) lee <code>contexto/CONTEXTO_MARCA.md</code> de la cápsula. Imagen/Reel con <b>Higgsfield</b>; tipografía de marca renderizada HTML→JPG (Chromium). El material se acondiciona (reencode IG / poster) y entra al circuito.</div>
+    </div></div>
+
+    <div class="step"><div class="num">3</div><div class="body">
+      <h4>Se registra como pieza pendiente</h4>
+      <p class="func">La pieza queda registrada y a la espera de aprobación, con su versión y su material asociados.</p>
+      <div class="tech"><b>Técnico:</b> webhook <code>cf-crear-pendiente</code> inserta <code>piezas</code> + <code>revisiones</code> (+ <code>media</code>) con <code>estado='pendiente_aprobacion'</code> y un <code>token</code> único. Una corrección entra como <b>revisión nueva</b> bajo la misma pieza. El trigger <code>sync_pieza</code> mantiene <code>estado</code>/<code>revision_vigente</code>.</div>
+    </div></div>
+
+    <div class="step"><div class="num">4</div><div class="body">
+      <h4>Se le avisa a Fer</h4>
+      <p class="func">Fer recibe la pieza para revisar, con preview y botones de Aprobar / Rechazar / Descartar.</p>
+      <div class="tech"><b>Técnico:</b> <code>cf-pub-notify</code> manda una tarjeta de <b>Telegram</b> (imagen/poster + botones inline) vía bot. Botón "Ver completo" → <code>preview.html?token=…</code> (mockup IG + tarjeta de novedad), cargado por proxy same-origin para funcionar incluso dentro de Gmail. Identidad de los avisos: agencia <b>ClaUsina</b> (celeste).</div>
+    </div></div>
+
+    <div class="step"><div class="num">5</div><div class="body">
+      <h4>Fer decide</h4>
+      <p class="func">Aprueba, rechaza con un motivo, o descarta. Es el único disparador real de publicación.</p>
+      <div class="tech"><b>Técnico:</b> los botones pegan a <code>cf-pub-decide</code> (valida el <code>token</code>, cambia el estado). <code>aprobada</code> dispara la publicación; <code>rechazada</code> guarda el motivo y abre el loop; <code>descartada</code> es estado terminal.</div>
+    </div></div>
+
+    <div class="step"><div class="num">6</div><div class="body">
+      <h4>Se publica solo</h4>
+      <p class="func">Al aprobar, la pieza sale al canal correspondiente y queda registrada como publicada.</p>
+      <div class="tech"><b>Técnico:</b> <b>Instagram</b> → <code>cf-pub-publish</code> con Graph API (crear container imagen/Reel/carrusel → poll de <code>status_code</code> hasta <code>FINISHED</code> → <code>media_publish</code>), guarda <code>ig_post_id</code> + <code>ig_permalink</code> → <code>publicada</code>. <b>Aviso DOOH</b> → <code>publicada</code> = "en pantalla" (sin API externa; lo levanta VNNOX). La web lee las publicadas vía <code>cf-novedades</code>.</div>
+    </div></div>
+
+    <div class="loop">
+      <span class="ico" style="color:var(--cel)">↻</span>
+      <div><b>Loop de corrección.</b> Un rechazo crea una revisión nueva (misma pieza) y vuelve al paso 4. La <b>auto-corrección</b> lo resuelve sola para texto y visual (regenera con Higgsfield + tipografía de marca) y reenvía; escala a Fer al 5º intento. Históricamente por <code>rutina_local.sh</code> (cron cada 5 min); migrándose a <b>cola Redis + worker</b>. Soporte: <code>cf-rechazos-pendientes</code> / <code>cf-marcar-procesado</code> / <code>cf-avisar</code>.</div>
+    </div>
+  </div>
+</div></section>
+
+<!-- 5 -->
+<section id="canales"><div class="wrap">
+  <h2>5 · Canales</h2>
+  <p class="lead">Un intake único (la Cola de Requerimientos, agnóstica del canal) separa el <b>qué</b> del <b>dónde</b>. La misma máquina de estados y aprobación vale para todos los canales.</p>
+  <div class="grid g2">
+    <div class="card"><h4>Instagram</h4><p>Feed, carrusel, Reels e Historias vía <b>Graph API</b>. Aprobar → <code>cf-pub-publish</code>. Métricas y Collab en el panel. Token IG en credencial cifrada de n8n (no en git ni en la DB).</p></div>
+    <div class="card"><h4>Pantalla DOOH (Paseo Ardora)</h4><p>Cartel de calle vertical (2×3 m, mudo). El <code>/editor</code> arma spots 2:3 ~10s. Aprobar = "en pantalla". Integración <b>VNNOX</b> (botón "A la pantalla", device T1-4G).</p></div>
+    <div class="card"><h4>Web / Novedades</h4><p>Landings estáticas en Cloudflare. El feed de novedades hace fetch a <code>cf-novedades</code> (n8n → DB) y renderiza; al publicar una pieza aparece sola, sin redeploy. Home conserva su SEO estático.</p></div>
+    <div class="card"><h4>Telegram</h4><p>Canal operativo: tarjetas de aprobación con botones, ingreso de briefs por voz/foto y avisos a Fer. Workflow <code>cf-telegram</code> + bot.</p></div>
+  </div>
+</div></section>
+
+<!-- 6 -->
+<section id="datos"><div class="wrap">
+  <h2>6 · Modelo de datos</h2>
+  <p class="lead">Base <code>claude</code> (independiente de las apps ajenas en <code>crm</code>), schema <code>contenido</code>. Multi-proyecto: una marca = una fila en <code>proyectos</code>; el resto cuelga de ahí.</p>
+  <div class="erd">
+    <div class="row">
+      <div class="ent">
+        <div class="t">proyectos</div>
+        <div class="f">slug · nombre<br>ig_user_id · ig_handle<br>dominio_web · telegram_chat_id</div>
+      </div>
+      <span class="arrow">→</span>
+      <div>
+        <div class="ent">
+          <div class="t">piezas</div>
+          <div class="f">numero (CF-NNNN) · canal (instagram|aviso)<br>estado · revision_vigente</div>
+        </div>
+        <div class="nest">
+          <div class="row">
+            <div class="ent">
+              <div class="t">revisiones</div>
+              <div class="f">nro · caption · web_* · token<br>estado · motivo_rechazo<br>ig_post_id · ig_permalink<br>daypart/clima/transito (aviso)</div>
+            </div>
+            <div class="ent">
+              <div class="t">media</div>
+              <div class="f">orden · tipo (image|video)<br>url · poster_url<br>(solo la última versión)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <h3>Claves del diseño</h3>
+  <ul class="clean">
+    <li><b>Publicación = revisión</b> con <code>estado='publicada'</code>. El feed lee las publicadas filtrando por <code>revision_vigente</code> y <code>canal='instagram'</code>.</li>
+    <li><b>Trazabilidad del loop:</b> cada corrección es una revisión nueva (<code>nro+1</code>) bajo la misma pieza; el texto queda como historial, la media se reemplaza (no acumula peso).</li>
+    <li><b>Estados</b> (<code>estado_pub</code>): borrador → pendiente_aprobacion → aprobada → publicada · más rechazada y descartada. <code>derivado_en</code> marca lo escalado a Fer.</li>
+    <li><b>Triggers:</b> <code>sync_pieza</code> mantiene <code>estado</code> y <code>revision_vigente</code> de la pieza. DDL en <code>scripts/db/</code>.</li>
+  </ul>
+</div></section>
+
+<!-- 7 -->
+<section id="infra"><div class="wrap">
+  <h2>7 · Infraestructura</h2>
+  <p class="lead">VPS Hostinger gestionado con EasyPanel; Docker Swarm + Traefik (SSL Let's Encrypt). La sesión de Claude Code corre en el propio VPS.</p>
+  <table>
+    <thead><tr><th>Componente</th><th>Qué es</th><th>Dónde / cómo</th><th>Deploy</th></tr></thead>
+    <tbody>
+      <tr><td><b>Panel</b></td><td>App del motor (Cola/Pendientes/Publicadas)</td><td><code>clausina_panel</code> · <a href="https://panel.clausina.ar">panel.clausina.ar</a> · source <code>clausina-core</code></td><td><span class="st warn">manual</span></td></tr>
+      <tr><td><b>Landing Cortafuego</b></td><td>Sitio de marca</td><td><code>cortafuego.ar</code> · Cloudflare Worker</td><td><span class="st ok">auto (push)</span></td></tr>
+      <tr><td><b>Landing Ardora</b></td><td>Sitio de marca</td><td><code>ardora.com.ar</code> · Cloudflare Pages</td><td><span class="st ok">auto (push)</span></td></tr>
+      <tr><td><b>Landing ClaUsina</b></td><td>Sitio de la agencia</td><td><code>clausina.ar</code> · Cloudflare Worker</td><td><span class="st ok">auto (GitHub Actions)</span></td></tr>
+      <tr><td><b>n8n</b></td><td>Orquestación</td><td><code>crm-n8n.…easypanel.host</code></td><td><span class="st ok">vía API</span></td></tr>
+      <tr><td><b>PostgreSQL</b></td><td>Datos (pgvector)</td><td><code>crm_pgvector</code> · base <code>claude</code></td><td>—</td></tr>
+      <tr><td><b>Crons (VPS)</b></td><td>Keepalive de red del panel · backup diario</td><td><code>clausina_net.sh</code> (1 min) · <code>db_backup.sh</code> (07:00)</td><td>—</td></tr>
+      <tr><td><b>Traefik</b></td><td>Reverse proxy + SSL</td><td>todos los dominios</td><td>—</td></tr>
+    </tbody>
+  </table>
+  <p class="muted" style="margin-top:12px">Secretos por nivel: plataforma (DB, panel) en <code>plataforma/plataforma.env</code>; marca (IG/Telegram/mail) en <code>marcas/&lt;slug&gt;/&lt;slug&gt;.env</code>; infra/ops (VPS, EasyPanel, GitHub, dominios, Cloudflare, n8n) en <code>.env</code> raíz.</p>
+</div></section>
+
+<!-- 8 -->
+<section id="marcas"><div class="wrap">
+  <h2>8 · Marcas activas</h2>
+  <p class="lead">Hoy ClaUsina maneja 3 cápsulas. Antes de cualquier tarea de una marca se lee su contexto.</p>
+  <div class="grid g3">
+    <div class="card"><h4>Cortafuego</h4><p>Asador urbano (Ranelagh). Marca piloto, donde se valida todo el circuito. <span class="tag">@cortafuego.ar</span> <span class="tag">Worker</span></p></div>
+    <div class="card"><h4>Distrito Ardora</h4><p>Marca paraguas con sub-marcas (Paseo de Compras, Complejo Deportivo). Token IG permanente (System User). <span class="tag">@ardora.ar</span> <span class="tag">Pages</span> <span class="tag">DOOH</span></p></div>
+    <div class="card"><h4>ClaUsina</h4><p>La agencia como marca (dualidad): se hace su propio marketing. <span class="tag">@clausina.ar</span> <span class="tag">Worker</span></p></div>
+  </div>
+</div></section>
+
+<!-- 9 -->
+<section id="roadmap"><div class="wrap">
+  <h2>9 · Roadmap / pendientes</h2>
+  <p class="lead">Lo sustancial que está abierto. Se va vaciando a medida que se incorpora.</p>
+  <table>
+    <thead><tr><th>Pendiente</th><th>Detalle</th><th>Estado</th></tr></thead>
+    <tbody>
+      <tr><td>Cola Redis a toda la plataforma</td><td>Extender la corrección por cola+worker (hoy piloto Cortafuego) a todas las marcas.</td><td><span class="st warn">en curso</span></td></tr>
+      <tr><td>Media store con CDN</td><td>Store único fronteado con Cloudflare (<code>media.clausina.ar</code>); sacar el material de publicaciones del repo de la landing.</td><td><span class="st pend">pendiente</span></td></tr>
+      <tr><td>API REST de Higgsfield en n8n</td><td>Generación automática dentro del pipeline (async con webhook), manteniendo a Fer por calidad/NSFW.</td><td><span class="st pend">pendiente</span></td></tr>
+      <tr><td>Preview por marca (cf-pub-notify)</td><td>El botón "Ver completo" apunta a <code>cortafuego.ar/preview.html</code>; falta servir preview + proxy por cada marca.</td><td><span class="st pend">pendiente</span></td></tr>
+      <tr><td>Fallback SQL en cf-crear-pendiente</td><td><code>COALESCE(j-&gt;&gt;'proyecto','cortafuego')</code>: el último resabio de marca en n8n; depende del esquema y del contrato de payload.</td><td><span class="st pend">pendiente</span></td></tr>
+      <tr><td>Skills agnósticos</td><td><code>/creativo</code> y <code>/editor</code> aún teñidos de Cortafuego; el contenido específico debería leerse del contexto de la marca activa.</td><td><span class="st pend">pendiente</span></td></tr>
+      <tr><td>Ardora: @ardora.sport + paraguas</td><td>Conectar la sub-marca deportiva y modelar el paraguas Distrito Ardora.</td><td><span class="st pend">pendiente</span></td></tr>
+    </tbody>
+  </table>
+</div></section>
+
+<!-- 10 -->
+<section id="changelog"><div class="wrap">
+  <h2>10 · Changelog</h2>
+  <p class="lead">Cambios sustanciales de arquitectura. Agregar una fila acá al incorporar algo que cambie este documento.</p>
+  <table class="chg">
+    <thead><tr><th>Fecha</th><th>Cambio</th></tr></thead>
+    <tbody>
+      <tr><td>2026-06-23</td><td>Primera versión de este documento de arquitectura (HTML vivo).</td></tr>
+      <tr><td>2026-06-22</td><td>Monorepo contenedor <code>clausina</code> + 4 submodules; <code>clausina.ar</code> live (Worker + auto-deploy GitHub Actions); crons des-horneados (agnósticos); rebrand de n8n a "ClaUsina - X"; hook de calidad web reactivado y agnóstico.</td></tr>
+      <tr><td>2026-06-16</td><td>Estándar de media en dos niveles (store central + CDN de marca). Identidad de avisos = agencia ClaUsina.</td></tr>
+      <tr><td>2026-06-06</td><td>Intake único + canales (Instagram / Aviso DOOH) sobre la misma máquina de estados. Panel de operación + propuestas del creativo.</td></tr>
+      <tr><td>2026-06-02</td><td>Reingeniería al schema multi-proyecto <code>contenido</code> (proyectos/piezas/revisiones/media); base <code>claude</code> independiente de <code>crm</code>.</td></tr>
+      <tr><td>2026-05-31</td><td>Aprobación desacoplada (Nivel 3): PostgreSQL como fuente de verdad + n8n + token.</td></tr>
+    </tbody>
+  </table>
+  <p class="foot">ClaUsina · documento de arquitectura · fuente de detalle en <code>plataforma/planes/</code> (ARQUITECTURA_PLATAFORMA, ARQUITECTURA_PUBLICACIONES, ARQUITECTURA_CANALES, MEDIA, ORGANIZACION) y los README de <code>scripts/db/</code> y <code>scripts/n8n/</code>.</p>
+</div></section>
+
+</main>
+</div>
+</body>
+</html>
