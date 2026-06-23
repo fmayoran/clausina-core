@@ -21,23 +21,23 @@ Reemplaza al mail como herramienta operativa (el mail quedó solo para el resume
 - Rama de trabajo actual: `claude-panel-global`.
 - Abre el folder `plataforma` en VS Studio y asegúrate de estar en `claude-panel-global`.
 - Archivos clave:
-  - `plataforma/panel/public/index.html` — home/dashboard principal.
-  - `plataforma/panel/public/panel.js` — lógica compartida del panel.
-  - `plataforma/panel/deploy.sh` — script de despliegue EasyPanel.
+  - `core/panel/public/index.html` — home/dashboard principal.
+  - `core/panel/public/panel.js` — lógica compartida del panel.
+  - `core/panel/deploy.sh` — script de despliegue EasyPanel.
 - Flujo recomendado:
   1. editar en VS Studio.
   2. guardar cambios.
   3. en la terminal integrada:
      ```bash
-     cd /root/claudefolder/plataforma
+     cd /root/claudefolder/core
      git status
-     git add plataforma/panel/public/index.html plataforma/panel/public/panel.js plataforma/panel/deploy.sh
+     git add core/panel/public/index.html core/panel/public/panel.js core/panel/deploy.sh
      git commit -m "panel: <lo que cambiaste>"
      git push
      ```
   4. para desplegar en la plataforma real:
      ```bash
-     cd /root/claudefolder/plataforma/panel
+     cd /root/claudefolder/core/panel
      ./deploy.sh
      ```
   5. verificar:

@@ -16,7 +16,7 @@ slug="${1:-}"
 
 N="https://crm-n8n.dhmtev.easypanel.host"
 MARCAS="/root/claudefolder/marcas"
-MOTOR="/root/claudefolder/plataforma"
+MOTOR="/root/claudefolder/core"
 LOG="$MOTOR/scripts/rutina_local.log"
 ts(){ date -Is; }
 

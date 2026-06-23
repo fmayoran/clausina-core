@@ -9,7 +9,7 @@ export HOME=/root
 export PATH="/root/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
 MARCAS="/root/claudefolder/marcas"
-MOTOR="/root/claudefolder/plataforma"
+MOTOR="/root/claudefolder/core"
 LOG="$MOTOR/scripts/brief_local.log"
 WHISPER="/root/whisper.cpp/build/bin/whisper-cli"
 MODEL="/root/whisper.cpp/models/ggml-base.bin"

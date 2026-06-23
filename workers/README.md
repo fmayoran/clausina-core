@@ -44,15 +44,15 @@ Job: `{ "tipo": "correccion", "proyecto_slug": "cortafuego", "payload": {"revisi
 
 ```bash
 # 1. Dependencias del host (el worker corre en el host, no en contenedor: usa /root/.claude)
-pip3 install -r /root/claudefolder/plataforma/workers/requirements.txt
+pip3 install -r /root/claudefolder/core/workers/requirements.txt
 
 # 2. Redis (contenedor, solo localhost)
-bash /root/claudefolder/plataforma/workers/deploy/redis-run.sh
+bash /root/claudefolder/core/workers/deploy/redis-run.sh
 
 # 3. Servicios systemd
-cp /root/claudefolder/plataforma/workers/deploy/cf-worker.service /etc/systemd/system/
-cp /root/claudefolder/plataforma/workers/deploy/cf-dispatcher.service /etc/systemd/system/
-cp /root/claudefolder/plataforma/workers/deploy/cf-dispatcher.timer /etc/systemd/system/
+cp /root/claudefolder/core/workers/deploy/cf-worker.service /etc/systemd/system/
+cp /root/claudefolder/core/workers/deploy/cf-dispatcher.service /etc/systemd/system/
+cp /root/claudefolder/core/workers/deploy/cf-dispatcher.timer /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now cf-worker.service
 systemctl enable --now cf-dispatcher.timer
@@ -64,7 +64,7 @@ Mientras `cf-worker` corre, el cron de `rutina_local` sigue activo: hay que **co
 no procese en paralelo. Editar el crontab de root y comentar SOLO esa línea:
 
 ```
-# */5 * * * * /root/claudefolder/plataforma/scripts/rutina_local.sh   # migrado a workers (cola Redis)
+# */5 * * * * /root/claudefolder/core/scripts/rutina_local.sh   # migrado a workers (cola Redis)
 ```
 
 Las otras 3 líneas (brief/propuestas/landing) quedan **intactas** hasta migrarlas (ver backlog).

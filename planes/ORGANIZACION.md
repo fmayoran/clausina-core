@@ -13,7 +13,7 @@ sabe operar *una marca cualquiera*. Cada marca es una cápsula independiente (co
 ├── CLAUDE.md                    # preferencias de Fer (usuario) + punteros de proyecto
 ├── infra/                       # infra compartida (INFRA_CONTEXTO.md)
 ├── .env                         # SOLO infra/ops: VPS, EasyPanel, GitHub, dominios, n8n
-├── plataforma/                  # EL MOTOR (agnóstico de marca)
+├── core/                  # EL MOTOR (agnóstico de marca)
 │   ├── panel/                   # app del panel (contenedor cf-panel; deploy.sh)
 │   ├── scripts/                 # crons (brief/rutina/propuestas), db/, n8n/, higgsfield/, validate_web, send_mail
 │   ├── planes/                  # arquitectura (este doc, ARQUITECTURA_*, CALENDARIO)
@@ -30,19 +30,19 @@ sabe operar *una marca cualquiera*. Cada marca es una cápsula independiente (co
 ```
 
 ## Reglas de secretos
-- **Plataforma** (DB, panel): `plataforma/plataforma.env`.
+- **Plataforma** (DB, panel): `core/plataforma.env`.
 - **Marca** (IG token, Telegram, mail): `marcas/<slug>/<slug>.env`. Nunca en el `.env` raíz.
 - **Infra/ops** (VPS, EasyPanel, GitHub, dominios, n8n): `.env` raíz.
 - El panel carga los tres con `--env-file` (plataforma + cada marca). Los crons leen el token de la marca de su `<slug>.env`.
 
 ## Deploys
 - **Landing de marca** (`cortafuego.ar`): EasyPanel buildea el repo de la marca **desde GitHub** (Dockerfile → nginx + assets/landing). Mover el working copy local NO afecta el deploy; solo importa lo que se pushea.
-- **Panel** (`cf-panel`): `bash plataforma/panel/deploy.sh` (docker build local desde `plataforma/panel/`).
-- **Crons**: en el crontab del VPS, apuntan a `plataforma/scripts/*.sh`. CWD de generación = la cápsula de la marca (`marcas/<slug>/`); playbooks/logs del motor por ruta absoluta (`$MOTOR=/root/claudefolder/plataforma`).
+- **Panel** (`cf-panel`): `bash core/panel/deploy.sh` (docker build local desde `core/panel/`).
+- **Crons**: en el crontab del VPS, apuntan a `core/scripts/*.sh`. CWD de generación = la cápsula de la marca (`marcas/<slug>/`); playbooks/logs del motor por ruta absoluta (`$MOTOR=/root/claudefolder/core`).
 
 ## Repos git (monorepo contenedor, 2026-06-22)
 La raíz `/root/claudefolder/` es el repo contenedor `fmayoran/clausina` (monorepo). Todo lo que deploya a un servicio externo es un submodule con su propio repo:
-- `plataforma/` → `fmayoran/clausina-core` (motor; el panel buildea desde acá en EasyPanel).
+- `core/` → `fmayoran/clausina-core` (motor; el panel buildea desde acá en EasyPanel).
 - `marcas/cortafuego/` → `fmayoran/cortafuego` (Cloudflare Worker).
 - `marcas/ardora/` → `fmayoran/ardora` (Cloudflare Pages).
 - `marcas/clausina/` → `fmayoran/clausina-web` (Cloudflare Worker; `wrangler.jsonc` listo, falta conectar el proyecto en Cloudflare).

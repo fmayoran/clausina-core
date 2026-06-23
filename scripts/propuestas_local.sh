@@ -9,7 +9,7 @@ export HOME=/root
 export PATH="/root/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
 MARCAS="/root/claudefolder/marcas"
-MOTOR="/root/claudefolder/plataforma"
+MOTOR="/root/claudefolder/core"
 LOG="$MOTOR/scripts/propuestas_local.log"
 CID=$(docker ps -q -f name=crm_pgvector.1.)
 # REPO/BOT/CHAT se resuelven por proyecto del pedido (multiproyecto): cada corrida = una cápsula.

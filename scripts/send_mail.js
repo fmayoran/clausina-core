@@ -1,6 +1,6 @@
 // Envío de mail — capacidad de AGENCIA (ClaUsina), disponible para todos los proyectos.
 // Remitente unificado: la identidad es ClaUsina; la marca va como etiqueta en el asunto.
-// Credenciales en plataforma/plataforma.env (AGENCIA_MAIL_*), gitignored. No hay mail por marca:
+// Credenciales en core/plataforma.env (AGENCIA_MAIL_*), gitignored. No hay mail por marca:
 // las notificaciones son internas (a Fer). Para cambiar el remitente, editar plataforma.env.
 //
 // Uso: node send_mail.js <to> <subject> <body> [marca]
@@ -18,7 +18,7 @@ function loadEnv(p) {
     }
   } catch (e) { /* si no está, se usan las env vars del proceso */ }
 }
-loadEnv('/root/claudefolder/plataforma/plataforma.env');
+loadEnv('/root/claudefolder/core/plataforma.env');
 
 const USER = process.env.AGENCIA_MAIL_USER;
 const PASS = process.env.AGENCIA_MAIL_PASS;

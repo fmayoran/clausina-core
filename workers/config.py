@@ -2,7 +2,7 @@
 
 Arquitectura: cola Redis + worker(s) reemplazan el poll por cron de los procesos batch.
 El trabajo real (cola de tareas) sigue viviendo en Postgres (contenido.*); Redis es solo el
-canal de despacho evento -> worker. Ver plataforma/workers/README.md.
+canal de despacho evento -> worker. Ver core/workers/README.md.
 """
 import os
 
@@ -17,7 +17,7 @@ INFLIGHT_PREFIX = "cf:inflight"
 INFLIGHT_TTL = 1800  # segundos
 
 # Rutas del motor / cápsulas de marca.
-MOTOR = os.environ.get("MOTOR", "/root/claudefolder/plataforma")
+MOTOR = os.environ.get("MOTOR", "/root/claudefolder/core")
 MARCAS = os.environ.get("MARCAS", "/root/claudefolder/marcas")
 
 # Base de n8n (chequeos baratos cf-*).

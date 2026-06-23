@@ -6,4 +6,4 @@ cid=$(docker ps -q -f name=clausina_panel) || exit 0
 [ -z "$cid" ] && exit 0
 docker network inspect easypanel-crm --format '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null | grep -q clausina_panel && exit 0
 docker network connect easypanel-crm "$cid" 2>/dev/null \
-  && echo "$(date -Is) reconectado easypanel-crm" >> /root/claudefolder/plataforma/scripts/clausina_net.log
+  && echo "$(date -Is) reconectado easypanel-crm" >> /root/claudefolder/core/scripts/clausina_net.log

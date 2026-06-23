@@ -172,7 +172,7 @@
     <div class="root"><div class="node root-n"><b>fmayoran/clausina</b><small>monorepo contenedor · /root/claudefolder</small></div></div>
     <div class="stem"></div>
     <div class="subs">
-      <div class="node"><b>clausina-core</b><small>plataforma/ · el MOTOR</small><div class="deploy">▸ EasyPanel (panel)</div></div>
+      <div class="node"><b>clausina-core</b><small>core/ · el MOTOR</small><div class="deploy">▸ EasyPanel (panel)</div></div>
       <div class="node"><b>cortafuego</b><small>marcas/cortafuego/</small><div class="deploy">▸ Cloudflare Worker</div></div>
       <div class="node"><b>ardora</b><small>marcas/ardora/</small><div class="deploy">▸ Cloudflare Pages</div></div>
       <div class="node"><b>clausina-web</b><small>marcas/clausina/</small><div class="deploy">▸ Cloudflare Worker</div></div>
@@ -321,7 +321,7 @@
       <tr><td><b>Traefik</b></td><td>Reverse proxy + SSL</td><td>todos los dominios</td><td>—</td></tr>
     </tbody>
   </table>
-  <p class="muted" style="margin-top:12px">Secretos por nivel: plataforma (DB, panel) en <code>plataforma/plataforma.env</code>; marca (IG/Telegram/mail) en <code>marcas/&lt;slug&gt;/&lt;slug&gt;.env</code>; infra/ops (VPS, EasyPanel, GitHub, dominios, Cloudflare, n8n) en <code>.env</code> raíz.</p>
+  <p class="muted" style="margin-top:12px">Secretos por nivel: plataforma (DB, panel) en <code>core/plataforma.env</code>; marca (IG/Telegram/mail) en <code>marcas/&lt;slug&gt;/&lt;slug&gt;.env</code>; infra/ops (VPS, EasyPanel, GitHub, dominios, Cloudflare, n8n) en <code>.env</code> raíz.</p>
 </div></section>
 
 <!-- 8 -->
@@ -368,7 +368,7 @@
       <tr><td>2026-05-31</td><td>Aprobación desacoplada (Nivel 3): PostgreSQL como fuente de verdad + n8n + token.</td></tr>
     </tbody>
   </table>
-  <p class="foot">ClaUsina · documento de arquitectura · fuente de detalle en <code>plataforma/planes/</code> (ARQUITECTURA_PLATAFORMA, ARQUITECTURA_PUBLICACIONES, ARQUITECTURA_CANALES, MEDIA, ORGANIZACION) y los README de <code>scripts/db/</code> y <code>scripts/n8n/</code>.</p>
+  <p class="foot">ClaUsina · documento de arquitectura · fuente de detalle en <code>core/planes/</code> (ARQUITECTURA_PLATAFORMA, ARQUITECTURA_PUBLICACIONES, ARQUITECTURA_CANALES, MEDIA, ORGANIZACION) y los README de <code>scripts/db/</code> y <code>scripts/n8n/</code>.</p>
 </div></section>
 
 </main>
