@@ -11,8 +11,8 @@ export PATH="/root/.local/bin:/usr/local/bin:/usr/bin:/bin"
 slug="${1:-}"; cid="${2:-}"; accion="${3:-}"
 { [ -z "$slug" ] || [ -z "$cid" ] || [ -z "$accion" ]; } && { echo "uso: landing_job.sh <slug> <cambio_id> <aplicar|procesar>" >&2; exit 2; }
 
-MARCAS="/root/claudefolder/marcas"
-MOTOR="/root/claudefolder/core"
+MARCAS="/root/clausina/marcas"
+MOTOR="/root/clausina/core"
 LOG="$MOTOR/scripts/landing_local.log"
 WORKERS_SUBDOMAIN="fernando-mayorano"
 CID=$(docker ps -q -f name=crm_pgvector.1.)

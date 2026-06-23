@@ -9,8 +9,8 @@ set -uo pipefail
 export HOME=/root
 export PATH="/root/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
-MARCAS="/root/claudefolder/marcas"
-MOTOR="/root/claudefolder/core"
+MARCAS="/root/clausina/marcas"
+MOTOR="/root/clausina/core"
 LOG="$MOTOR/scripts/landing_local.log"
 WORKERS_SUBDOMAIN="fernando-mayorano"   # subdominio workers.dev de la cuenta Cloudflare (preview por branch)
 CID=$(docker ps -q -f name=crm_pgvector.1.)

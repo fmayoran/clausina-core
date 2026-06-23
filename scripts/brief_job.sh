@@ -9,8 +9,8 @@ export PATH="/root/.local/bin:/usr/local/bin:/usr/bin:/bin"
 slug="${1:-}"; bid="${2:-}"
 { [ -z "$slug" ] || [ -z "$bid" ]; } && { echo "uso: brief_job.sh <slug> <brief_id>" >&2; exit 2; }
 
-MARCAS="/root/claudefolder/marcas"
-MOTOR="/root/claudefolder/core"
+MARCAS="/root/clausina/marcas"
+MOTOR="/root/clausina/core"
 LOG="$MOTOR/scripts/brief_local.log"
 WHISPER="/root/whisper.cpp/build/bin/whisper-cli"
 MODEL="/root/whisper.cpp/models/ggml-base.bin"

@@ -10,10 +10,10 @@
 # Hay que disparar el deploy a mano -> esto hace eso: dispara el rebuild en EasyPanel,
 # que clona el repo, reconstruye la imagen y recrea el servicio (zero-downtime).
 #
-# Requiere en /root/claudefolder/.env: EASYPANEL_URL y EASYPANEL_API_KEY.
+# Requiere en /root/clausina/.env: EASYPANEL_URL y EASYPANEL_API_KEY.
 set -euo pipefail
 
-ENV_FILE="/root/claudefolder/.env"
+ENV_FILE="/root/clausina/.env"
 PROJECT="clausina"
 SERVICE="panel"
 

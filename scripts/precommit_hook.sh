@@ -20,10 +20,10 @@ if printf '%s' "$cmd" | grep -Eq '(^|[^[:alnum:]])git([[:space:]]|$)' \
     fi
   done
   if [ -n "$slug" ]; then
-    LANDING="/root/claudefolder/marcas/$slug/assets/landing"
+    LANDING="/root/clausina/marcas/$slug/assets/landing"
     # Solo valida marcas cuya landing vive en assets/landing (otras se ignoran).
     if [ -d "$LANDING" ]; then
-      if ! out="$(python3 /root/claudefolder/core/scripts/validate_web.py "$LANDING" 2>&1)"; then
+      if ! out="$(python3 /root/clausina/core/scripts/validate_web.py "$LANDING" 2>&1)"; then
         {
           echo "Commit BLOQUEADO por el hook de calidad web ($slug)."
           echo "$out"

@@ -121,5 +121,5 @@ link("Permalink", ["MarcarPub"])
 link("MarcarPub", ["Respond"])
 
 wf = {"name": "Cortafuego - Publicar (Fase C)", "nodes": nodes, "connections": connections, "settings": {}}
-json.dump(wf, open("/root/claudefolder/core/scripts/n8n/workflows/cf-pub-publish.json", "w"), ensure_ascii=False, indent=2)
+json.dump(wf, open("/root/clausina/core/scripts/n8n/workflows/cf-pub-publish.json", "w"), ensure_ascii=False, indent=2)
 print("nodos:", len(nodes))

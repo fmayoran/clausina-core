@@ -9,8 +9,8 @@ export PATH="/root/.local/bin:/usr/local/bin:/usr/bin:/bin"
 slug="${1:-}"; sid="${2:-}"
 { [ -z "$slug" ] || [ -z "$sid" ]; } && { echo "uso: propuesta_job.sh <slug> <solicitud_id>" >&2; exit 2; }
 
-MARCAS="/root/claudefolder/marcas"
-MOTOR="/root/claudefolder/core"
+MARCAS="/root/clausina/marcas"
+MOTOR="/root/clausina/core"
 LOG="$MOTOR/scripts/propuestas_local.log"
 CID=$(docker ps -q -f name=crm_pgvector.1.)
 ts(){ date -Is; }

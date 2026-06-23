@@ -18,7 +18,7 @@ function loadEnv(p) {
     }
   } catch (e) { /* si no está, se usan las env vars del proceso */ }
 }
-loadEnv('/root/claudefolder/core/plataforma.env');
+loadEnv('/root/clausina/core/plataforma.env');
 
 const USER = process.env.AGENCIA_MAIL_USER;
 const PASS = process.env.AGENCIA_MAIL_PASS;

@@ -17,8 +17,8 @@ INFLIGHT_PREFIX = "cf:inflight"
 INFLIGHT_TTL = 1800  # segundos
 
 # Rutas del motor / cápsulas de marca.
-MOTOR = os.environ.get("MOTOR", "/root/claudefolder/core")
-MARCAS = os.environ.get("MARCAS", "/root/claudefolder/marcas")
+MOTOR = os.environ.get("MOTOR", "/root/clausina/core")
+MARCAS = os.environ.get("MARCAS", "/root/clausina/marcas")
 
 # Base de n8n (chequeos baratos cf-*).
 N = os.environ.get("N", "https://crm-n8n.dhmtev.easypanel.host")

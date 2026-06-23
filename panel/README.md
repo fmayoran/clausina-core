@@ -29,7 +29,7 @@ Reemplaza al mail como herramienta operativa (el mail quedó solo para el resume
   2. guardar cambios.
   3. en la terminal integrada:
      ```bash
-     cd /root/claudefolder/core
+     cd /root/clausina/core
      git status
      git add core/panel/public/index.html core/panel/public/panel.js core/panel/deploy.sh
      git commit -m "panel: <lo que cambiaste>"
@@ -37,7 +37,7 @@ Reemplaza al mail como herramienta operativa (el mail quedó solo para el resume
      ```
   4. para desplegar en la plataforma real:
      ```bash
-     cd /root/claudefolder/core/panel
+     cd /root/clausina/core/panel
      ./deploy.sh
      ```
   5. verificar:

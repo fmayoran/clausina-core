@@ -3,7 +3,7 @@
 # Lo corren los crons antes de generar, para que el creativo use siempre el perfil actual del panel.
 set -uo pipefail
 SLUG="${1:?uso: perfil_a_md.sh <slug>}"
-OUT="/root/claudefolder/marcas/$SLUG/contexto/CONTEXTO_MARCA.md"
+OUT="/root/clausina/marcas/$SLUG/contexto/CONTEXTO_MARCA.md"
 CID=$(docker ps -q -f name=crm_pgvector.1.)
 [ -z "$CID" ] && { echo "sin contenedor de base"; exit 1; }
 mkdir -p "$(dirname "$OUT")"

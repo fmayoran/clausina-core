@@ -9,7 +9,7 @@ sabe operar *una marca cualquiera*. Cada marca es una cápsula independiente (co
 
 ## Árbol
 ```
-/root/claudefolder/
+/root/clausina/
 ├── CLAUDE.md                    # preferencias de Fer (usuario) + punteros de proyecto
 ├── infra/                       # infra compartida (INFRA_CONTEXTO.md)
 ├── .env                         # SOLO infra/ops: VPS, EasyPanel, GitHub, dominios, n8n
@@ -38,10 +38,10 @@ sabe operar *una marca cualquiera*. Cada marca es una cápsula independiente (co
 ## Deploys
 - **Landing de marca** (`cortafuego.ar`): EasyPanel buildea el repo de la marca **desde GitHub** (Dockerfile → nginx + assets/landing). Mover el working copy local NO afecta el deploy; solo importa lo que se pushea.
 - **Panel** (`cf-panel`): `bash core/panel/deploy.sh` (docker build local desde `core/panel/`).
-- **Crons**: en el crontab del VPS, apuntan a `core/scripts/*.sh`. CWD de generación = la cápsula de la marca (`marcas/<slug>/`); playbooks/logs del motor por ruta absoluta (`$MOTOR=/root/claudefolder/core`).
+- **Crons**: en el crontab del VPS, apuntan a `core/scripts/*.sh`. CWD de generación = la cápsula de la marca (`marcas/<slug>/`); playbooks/logs del motor por ruta absoluta (`$MOTOR=/root/clausina/core`).
 
 ## Repos git (monorepo contenedor, 2026-06-22)
-La raíz `/root/claudefolder/` es el repo contenedor `fmayoran/clausina` (monorepo). Todo lo que deploya a un servicio externo es un submodule con su propio repo:
+La raíz `/root/clausina/` es el repo contenedor `fmayoran/clausina` (monorepo). Todo lo que deploya a un servicio externo es un submodule con su propio repo:
 - `core/` → `fmayoran/clausina-core` (motor; el panel buildea desde acá en EasyPanel).
 - `marcas/cortafuego/` → `fmayoran/cortafuego` (Cloudflare Worker).
 - `marcas/ardora/` → `fmayoran/ardora` (Cloudflare Pages).

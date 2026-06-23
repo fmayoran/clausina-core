@@ -15,8 +15,8 @@ slug="${1:-}"
 [ -z "$slug" ] && { echo "uso: correccion_job.sh <slug> [revision_ids]" >&2; exit 2; }
 
 N="https://crm-n8n.dhmtev.easypanel.host"
-MARCAS="/root/claudefolder/marcas"
-MOTOR="/root/claudefolder/core"
+MARCAS="/root/clausina/marcas"
+MOTOR="/root/clausina/core"
 LOG="$MOTOR/scripts/rutina_local.log"
 ts(){ date -Is; }
 

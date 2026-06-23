@@ -11,7 +11,7 @@ PGPASS = os.environ["PGPASS"]
 
 # API key desde .env
 KEY = None
-with open("/root/claudefolder/.env") as f:
+with open("/root/clausina/.env") as f:
     for line in f:
         if line.startswith("N8N_API_KEY="):
             KEY = line.split("=", 1)[1].strip()

@@ -6,7 +6,7 @@ import json, urllib.request
 N8N_URL = "https://crm-n8n.dhmtev.easypanel.host"
 CRED = "DRC5p50dRb5kYMOn"
 KEY = None
-with open("/root/claudefolder/.env") as f:
+with open("/root/clausina/.env") as f:
     for line in f:
         if line.startswith("N8N_API_KEY="):
             KEY = line.split("=", 1)[1].strip()

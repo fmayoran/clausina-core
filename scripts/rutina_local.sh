@@ -9,8 +9,8 @@ export HOME=/root
 export PATH="/root/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
 N="https://crm-n8n.dhmtev.easypanel.host"
-MARCAS="/root/claudefolder/marcas"
-MOTOR="/root/claudefolder/core"
+MARCAS="/root/clausina/marcas"
+MOTOR="/root/clausina/core"
 LOG="$MOTOR/scripts/rutina_local.log"
 ts(){ date -Is; }
 
