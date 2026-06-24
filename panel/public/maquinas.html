@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Sala de máquinas</title>
+<link rel="stylesheet" href="panel.css">
+<link rel="icon" href="fonts/clausina-icono.png">
+<link rel="apple-touch-icon" href="fonts/clausina-icono-180.png">
+<style>
+  /* ── Sala de máquinas: la cabina del motor. Sustrato = sistema del panel; ─────────
+     se agrega SOLO semántica de instrumento (alarma ámbar/rojo, latido) y el circuito. ── */
+  :root{
+    --ok:#5ec27a;       /* late / al día */
+    --warn:#e0a458;     /* atrasado */
+    --alarm:#e5675a;    /* sin latido / escalado / error */
+    --hair:#23231f;     /* conducto apagado */
+  }
+  header .logo b.dot{color:var(--fire);}
+  body.maq{background:
+    radial-gradient(1100px 480px at 50% -8%, #0d1417 0%, transparent 60%),
+    var(--bg);}
+
+  /* ── Consola: estado maestro del motor de un vistazo ── */
+  .sm-console{display:flex;align-items:center;gap:22px;flex-wrap:wrap;
+    padding:18px 28px;border-bottom:1px solid var(--line);background:#0b0c0b;}
+  .sm-master{display:flex;align-items:center;gap:14px;flex:0 0 auto;}
+  .sm-lamp{width:13px;height:13px;border-radius:50%;background:var(--ash);flex:0 0 auto;
+    box-shadow:0 0 0 0 transparent;}
+  .sm-lamp.marcha{background:var(--ok);box-shadow:0 0 14px 1px rgba(94,194,122,.6);animation:sm-breathe 3.4s ease-in-out infinite;}
+  .sm-lamp.espera{background:var(--fire);box-shadow:0 0 16px 2px rgba(30,201,255,.55);animation:sm-breathe 1.8s ease-in-out infinite;}
+  .sm-lamp.paro{background:var(--alarm);box-shadow:0 0 16px 2px rgba(229,103,90,.6);animation:sm-blink 1s steps(1) infinite;}
+  .sm-state{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.9rem;
+    letter-spacing:.06em;text-transform:uppercase;line-height:.9;color:var(--white);}
+  .sm-state small{display:block;font-family:'IBM Plex Mono',monospace;font-weight:400;
+    font-size:.62rem;letter-spacing:.18em;color:var(--ash);text-transform:uppercase;margin-top:5px;}
+  .sm-reads{margin-left:auto;display:flex;gap:30px;flex-wrap:wrap;}
+  .sm-read{font-family:'IBM Plex Mono',monospace;}
+  .sm-read b{display:block;font-family:'Barlow Condensed',sans-serif;font-weight:700;
+    font-size:1.7rem;line-height:.95;color:var(--white);}
+  .sm-read.act b{color:var(--fire);}
+  .sm-read.bad b{color:var(--alarm);}
+  .sm-read span{font-size:.58rem;letter-spacing:.13em;text-transform:uppercase;color:var(--ash);}
+
+  /* ── Layout ── */
+  .sm-wrap{padding:0 0 70px;}
+  .sm-sec{padding:26px 28px;}
+  .sm-sec + .sm-sec{border-top:1px solid var(--line);}
+  .sm-eyebrow{font-family:'IBM Plex Mono',monospace;font-size:.62rem;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--ash);margin-bottom:3px;}
+  .sm-h{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.45rem;
+    letter-spacing:.03em;text-transform:uppercase;color:var(--white);line-height:1;}
+  .sm-h em{font-style:normal;color:var(--ash);font-weight:400;font-size:.78rem;letter-spacing:.04em;
+    font-family:'IBM Plex Mono',monospace;margin-left:10px;text-transform:none;}
+  .sm-flowwrap{margin-top:26px;}
+
+  /* ── HÉROE: el circuito (esquema de planta) ── */
+  .sm-grid{display:grid;max-width:1000px;margin:0 auto;
+    grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr) 40px minmax(0,1fr) 40px minmax(0,1fr);
+    grid-template-rows:auto 26px auto 22px auto;align-items:stretch;}
+  .sm-st{grid-row:1;border:1px solid var(--line);border-radius:9px;background:var(--panel);
+    padding:15px 14px 13px;text-align:center;position:relative;}
+  .sm-st.s1{grid-column:1;} .sm-st.s2{grid-column:3;} .sm-st.s3{grid-column:5;} .sm-st.s4{grid-column:7;}
+  .sm-st-no{font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.12em;color:#55554f;}
+  .sm-st-n{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:3.1rem;line-height:.82;
+    color:var(--white);margin:4px 0 2px;font-variant-numeric:tabular-nums;}
+  .sm-st-l{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.05rem;
+    letter-spacing:.05em;text-transform:uppercase;color:var(--chalk);}
+  .sm-st-d{font-family:'IBM Plex Mono',monospace;font-size:.58rem;letter-spacing:.03em;color:var(--ash);margin-top:5px;line-height:1.3;}
+  /* La compuerta humana: donde ACTÚA Fer (principio del motor: nada sale sin aprobación). */
+  .sm-st.gate{border-color:var(--fire);background:linear-gradient(180deg,#0c1a20,#0a1116);
+    box-shadow:0 0 0 1px rgba(30,201,255,.18),0 0 34px -8px rgba(30,201,255,.45);}
+  .sm-st.gate .sm-st-n{color:var(--fire);}
+  .sm-st.gate .sm-st-l{color:var(--ember);}
+  .sm-st.gate .sm-st-no{color:var(--ember);}
+  .sm-st.gate .sm-gatetag{position:absolute;top:-9px;left:50%;transform:translateX(-50%);
+    font-family:'IBM Plex Mono',monospace;font-size:.52rem;letter-spacing:.16em;text-transform:uppercase;
+    background:var(--fire);color:#06121a;padding:2px 8px;border-radius:9px;white-space:nowrap;font-weight:600;}
+  .sm-st.done .sm-st-n{color:var(--ok);}
+
+  /* Conductos de la línea principal */
+  .sm-cond{grid-row:1;align-self:center;height:3px;position:relative;background:var(--hair);border-radius:2px;}
+  .sm-cond.c1{grid-column:2;} .sm-cond.c2{grid-column:4;} .sm-cond.c3{grid-column:6;}
+  .sm-cond::after{content:"";position:absolute;right:-1px;top:50%;transform:translateY(-50%);
+    border-left:7px solid var(--hair);border-top:5px solid transparent;border-bottom:5px solid transparent;}
+  .sm-cond.flow{background:linear-gradient(90deg,#15414f,#1ec9ff);
+    background-size:14px 100%;background-image:repeating-linear-gradient(90deg,#1ec9ff 0 6px,transparent 6px 12px);
+    animation:sm-march .7s linear infinite;}
+  .sm-cond.flow::after{border-left-color:var(--fire);}
+
+  /* Lazo de realimentación: la FIRMA. El rechazo vuelve a generación; al 5º intento, a Fer. */
+  .sm-riser{width:3px;justify-self:center;background:var(--line);position:relative;}
+  .sm-riser.down{grid-column:5;grid-row:2;}   /* rechazo baja desde ESPERA */
+  .sm-riser.up{grid-column:3;grid-row:2;}      /* reintento sube a GENERANDO */
+  .sm-riser .lbl{position:absolute;top:50%;transform:translateY(-50%);white-space:nowrap;
+    font-family:'IBM Plex Mono',monospace;font-size:.55rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);}
+  .sm-riser.down .lbl{left:9px;color:var(--alarm);}
+  .sm-riser.up .lbl{right:9px;color:var(--ok);}
+  .sm-riser::after{content:"";position:absolute;left:50%;transform:translateX(-50%);
+    border-left:4px solid transparent;border-right:4px solid transparent;}
+  .sm-riser.down::after{bottom:-1px;border-top:6px solid var(--alarm);}  /* flecha abajo */
+  .sm-riser.up::after{top:-1px;border-bottom:6px solid var(--ok);}        /* flecha arriba */
+
+  .sm-correc{grid-column:3 / span 3;grid-row:3;border-top:3px solid var(--line);
+    display:flex;align-items:center;justify-content:center;gap:12px;padding:13px 16px 0;}
+  .sm-node{display:inline-flex;align-items:center;gap:11px;border:1px solid var(--line);
+    border-radius:10px;background:var(--panel);padding:10px 16px;}
+  .sm-node .ic{font-size:1.15rem;line-height:1;}
+  .sm-node .num{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:1.7rem;
+    line-height:.9;color:var(--white);font-variant-numeric:tabular-nums;}
+  .sm-node .tx{font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.06em;
+    text-transform:uppercase;color:var(--ash);line-height:1.35;}
+  .sm-node .tx b{display:block;color:var(--chalk);font-weight:400;letter-spacing:.09em;}
+  .sm-correc .sm-node{border-color:#3a3a33;}
+  .sm-correc .sm-node.live{border-color:var(--warn);box-shadow:0 0 24px -10px rgba(224,164,88,.7);}
+  .sm-correc .sm-node.live .ic{color:var(--warn);}
+  .sm-correc .sm-node.live .num{color:var(--warn);}
+
+  .sm-escal{grid-column:4;grid-row:4;width:3px;justify-self:center;background:var(--line);position:relative;}
+  .sm-escal::after{content:"";position:absolute;bottom:-1px;left:50%;transform:translateX(-50%);
+    border-left:4px solid transparent;border-right:4px solid transparent;border-top:6px solid var(--line);}
+  .sm-escal.hot{background:var(--alarm);} .sm-escal.hot::after{border-top-color:var(--alarm);}
+  .sm-fer{grid-column:3 / span 3;grid-row:5;display:flex;justify-content:center;}
+  .sm-fer .sm-node .ic{color:var(--ash);}
+  .sm-fer .sm-node.hot{border-color:var(--alarm);background:linear-gradient(180deg,#1c0f0e,#120b0a);
+    box-shadow:0 0 28px -8px rgba(229,103,90,.6);}
+  .sm-fer .sm-node.hot .ic{color:var(--alarm);animation:sm-blink 1.1s steps(1) infinite;}
+  .sm-fer .sm-node.hot .num{color:var(--alarm);}
+
+  /* ── Signos vitales: el latido de cada proceso del motor ── */
+  .sm-vitals{display:grid;grid-template-columns:repeat(auto-fill,minmax(218px,1fr));gap:14px;margin-top:18px;}
+  .sm-vit{border:1px solid var(--line);border-radius:9px;background:var(--panel);overflow:hidden;}
+  .sm-vit-h{display:flex;align-items:baseline;gap:8px;padding:12px 14px 8px;}
+  .sm-vit-n{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.12rem;
+    letter-spacing:.03em;text-transform:uppercase;color:var(--white);}
+  .sm-vit-d{font-family:'IBM Plex Mono',monospace;font-size:.55rem;letter-spacing:.04em;color:#55554f;margin-left:auto;text-transform:uppercase;}
+  .sm-mon{position:relative;height:54px;margin:0 14px;border-radius:6px;background:#070b0c;
+    border:1px solid #16191a;overflow:hidden;}
+  .sm-mon svg{display:block;width:100%;height:100%;}
+  .sm-mon .grid-h{stroke:#11181a;stroke-width:1;}
+  .sm-trace{fill:none;stroke-width:2;vector-effect:non-scaling-stroke;}
+  .sm-scan{position:absolute;top:0;bottom:0;width:36px;pointer-events:none;
+    background:linear-gradient(90deg,transparent,rgba(94,194,122,.16) 70%,rgba(94,194,122,.5));
+    animation:sm-sweep 2.6s linear infinite;}
+  .sm-vit.ok    .sm-trace{stroke:var(--ok);}    .sm-vit.ok .sm-scan{background:linear-gradient(90deg,transparent,rgba(94,194,122,.5));}
+  .sm-vit.warn  .sm-trace{stroke:var(--warn);}  .sm-vit.warn .sm-scan{background:linear-gradient(90deg,transparent,rgba(224,164,88,.5));animation-duration:3.8s;}
+  .sm-vit.caido .sm-trace{stroke:var(--alarm);} .sm-vit.caido .sm-scan{display:none;}
+  .sm-vit.caido .sm-mon{border-color:#3a1c19;box-shadow:inset 0 0 26px -6px rgba(229,103,90,.4);}
+  .sm-vit-f{display:flex;align-items:center;gap:8px;padding:9px 14px 12px;}
+  .sm-pill{font-family:'IBM Plex Mono',monospace;font-size:.56rem;letter-spacing:.06em;text-transform:uppercase;
+    padding:2px 8px;border-radius:9px;border:1px solid var(--line);color:var(--ash);flex:0 0 auto;}
+  .sm-vit.ok .sm-pill{color:var(--ok);border-color:#244a31;}
+  .sm-vit.warn .sm-pill{color:var(--warn);border-color:#4a3a20;}
+  .sm-vit.caido .sm-pill{color:var(--alarm);border-color:#4a221d;background:#160d0c;}
+  .sm-msg{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--ash);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sm-age{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:#6f6f68;margin-left:auto;flex:0 0 auto;}
+
+  /* ── Por marca: small multiples (la cápsula de cada marca, lectura rápida) ── */
+  .sm-brands{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:16px;}
+  .sm-brand{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:13px 15px;text-decoration:none;display:block;transition:.15s;}
+  .sm-brand:hover{border-color:var(--ember);}
+  .sm-brand.off{opacity:.5;}
+  .sm-brand-h{display:flex;align-items:center;gap:8px;}
+  .sm-brand-n{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.16rem;color:var(--white);text-transform:uppercase;letter-spacing:.02em;}
+  .sm-brand-off{font-family:'IBM Plex Mono',monospace;font-size:.5rem;text-transform:uppercase;color:var(--ash);border:1px solid var(--line);border-radius:7px;padding:1px 6px;}
+  .sm-bar{display:flex;height:6px;border-radius:4px;overflow:hidden;margin:11px 0 9px;background:#070808;}
+  .sm-bar i{display:block;height:100%;}
+  .sm-bar i.q{background:#3a3a33;} .sm-bar i.e{background:var(--fire);} .sm-bar i.p{background:var(--ok);}
+  .sm-brand-m{display:flex;gap:14px;font-family:'IBM Plex Mono',monospace;font-size:.58rem;letter-spacing:.04em;color:var(--ash);}
+  .sm-brand-m b{color:var(--chalk);font-weight:400;}
+  .sm-brand-m .e b{color:var(--ember);}
+
+  .sm-foot{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:#55554f;letter-spacing:.05em;
+    padding:18px 28px 0;display:flex;gap:16px;flex-wrap:wrap;}
+  .sm-empty{font-family:'IBM Plex Mono',monospace;font-size:.74rem;color:#55554f;padding:14px 0;}
+
+  a:focus-visible,button:focus-visible{outline:2px solid var(--ember);outline-offset:2px;}
+
+  @keyframes sm-march{to{background-position:14px 0;}}
+  @keyframes sm-sweep{from{transform:translateX(-40px);}to{transform:translateX(calc(100% + 40px));}}
+  @keyframes sm-breathe{0%,100%{opacity:1;}50%{opacity:.45;}}
+  @keyframes sm-blink{0%,49%{opacity:1;}50%,100%{opacity:.25;}}
+
+  /* ── Móvil: el esquema se apila; el lazo se cuenta en texto ── */
+  @media(max-width:760px){
+    .sm-grid{display:flex;flex-direction:column;gap:0;}
+    .sm-st{grid-column:auto!important;}
+    .sm-cond{grid-column:auto!important;height:22px;width:3px;align-self:center;margin:2px 0;
+      background:var(--hair);background-image:none!important;animation:none!important;}
+    .sm-cond::after{right:50%;top:auto;bottom:-1px;transform:translateX(50%);
+      border-left:5px solid transparent;border-right:5px solid transparent;border-top:7px solid var(--hair);border-bottom:0;}
+    .sm-cond.flow{background:var(--fire);} .sm-cond.flow::after{border-top-color:var(--fire);}
+    .sm-riser,.sm-escal{display:none;}
+    .sm-correc{grid-column:auto!important;border-top:0;flex-wrap:wrap;padding:14px 0 0;}
+    .sm-fer{grid-column:auto!important;margin-top:12px;}
+    .sm-reads{margin-left:0;gap:20px;}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .sm-cond.flow,.sm-scan,.sm-lamp,.sm-node.live .ic,.sm-fer .sm-node.hot .ic{animation:none!important;}
+    .sm-scan{display:none;}
+  }
+</style>
+</head>
+<body class="maq dash">
+  <header>
+    <a class="logo" href=".">Cla<b>U</b>sina<b class="dot">.</b></a>
+    <span class="sub">Sala de máquinas</span>
+    <span class="upd" id="upd"></span>
+    <nav>
+      <a href=".">Dashboard</a>
+      <a href="arquitectura">Arquitectura</a>
+      <button class="logout" onclick="salir()">Salir</button>
+    </nav>
+  </header>
+  <div id="toast"></div>
+
+  <div class="sm-console" id="console">
+    <div class="sm-master">
+      <span class="sm-lamp" id="lamp"></span>
+      <div class="sm-state" id="stateW">·····<small id="stateSub">leyendo el motor…</small></div>
+    </div>
+    <div class="sm-reads" id="reads"></div>
+  </div>
+
+  <div class="sm-wrap">
+    <section class="sm-sec">
+      <div class="sm-eyebrow">El motor · agnóstico de marca</div>
+      <div class="sm-h">El circuito<em>de la propuesta a la publicación · todas las marcas</em></div>
+      <div class="sm-flowwrap">
+        <div class="sm-grid" id="flow">
+          <div class="sm-st s1"><div class="sm-st-no">01</div><div class="sm-st-n" id="f-prop">·</div><div class="sm-st-l">Propuestas</div><div class="sm-st-d">esperan que las mandes</div></div>
+          <div class="sm-cond c1" id="c1"></div>
+          <div class="sm-st s2"><div class="sm-st-no">02</div><div class="sm-st-n" id="f-gen">·</div><div class="sm-st-l">Generando</div><div class="sm-st-d">el creativo arma la pieza</div></div>
+          <div class="sm-cond c2" id="c2"></div>
+          <div class="sm-st s3 gate"><span class="sm-gatetag">compuerta humana</span><div class="sm-st-no">03</div><div class="sm-st-n" id="f-esp">·</div><div class="sm-st-l">Espera tuya</div><div class="sm-st-d">nada sale sin tu visto</div></div>
+          <div class="sm-cond c3" id="c3"></div>
+          <div class="sm-st s4 done"><div class="sm-st-no">04</div><div class="sm-st-n" id="f-pub">·</div><div class="sm-st-l">Publicado</div><div class="sm-st-d" id="f-pubd">en la calle</div></div>
+
+          <div class="sm-riser down"><span class="lbl">rechazo</span></div>
+          <div class="sm-riser up"><span class="lbl">reintenta</span></div>
+          <div class="sm-correc">
+            <div class="sm-node" id="n-correc">
+              <span class="ic">&#8635;</span>
+              <span class="num" id="f-cor">·</span>
+              <span class="tx"><b>Corrección</b>reprocesa rechazos · reintenta sola</span>
+            </div>
+          </div>
+          <div class="sm-escal" id="escal"></div>
+          <div class="sm-fer">
+            <div class="sm-node" id="n-fer">
+              <span class="ic">&#9873;</span>
+              <span class="num" id="f-esc">·</span>
+              <span class="tx"><b>A vos</b>5º intento · pide tu intervención</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sm-sec">
+      <div class="sm-eyebrow">Signos vitales</div>
+      <div class="sm-h">Procesos del motor<em>cada proceso debe latir dentro de su intervalo</em></div>
+      <div class="sm-vitals" id="vitals"></div>
+    </section>
+
+    <section class="sm-sec">
+      <div class="sm-eyebrow">Las cápsulas</div>
+      <div class="sm-h">Por marca<em>una lectura por marca · cola, espera y publicado</em></div>
+      <div class="sm-brands" id="brands"></div>
+    </section>
+
+    <div class="sm-foot">
+      <span>cola → tg_briefs · espera → revisión pendiente_aprobacion · publicado → piezas publicadas</span>
+      <span id="foot-upd"></span>
+    </div>
+  </div>
+
+<script src="panel.js"></script>
+<script>
+const PROC = {
+  ingesta_briefs:{n:'Ingesta',   d:'entra lo de Telegram'},
+  propuestas:    {n:'Propuestas',d:'el creativo propone'},
+  worker:        {n:'Worker',    d:'procesa la cola Redis'},
+  dispatcher:    {n:'Dispatcher',d:'vigila la cola'},
+  correccion:    {n:'Corrección',d:'reprocesa rechazos'},
+};
+const DEF_INT = 300;
+
+function fmtAge(s){
+  if(s==null) return 'nunca';
+  if(s<90) return s+'s';
+  if(s<5400) return Math.round(s/60)+'m';
+  if(s<172800) return Math.round(s/3600)+'h';
+  return Math.round(s/86400)+'d';
+}
+function salud(p){
+  if(p.hace_s==null) return 'caido';
+  const r = p.hace_s/(p.intervalo_s||DEF_INT);
+  if(r<=1.5) return 'ok';
+  if(r<=3)   return 'warn';
+  return 'caido';
+}
+// Traza ECG: latido normal (PQRST) o flatline si no hay pulso.
+function ecgPath(beating){
+  const W=260,H=44,base=H/2;
+  if(!beating){
+    return `M0,${base} L${W*0.46},${base} l4,-2 l4,4 l4,-2 L${W},${base}`; // línea plana con un blip muerto
+  }
+  let d=`M0,${base}`, x=0; const beat=52;
+  while(x<W){
+    d+=` L${x+10},${base} q3,-4 6,0`;          // P
+    d+=` L${x+22},${base} L${x+25},${base-15} L${x+28},${base+17} L${x+31},${base}`; // QRS
+    d+=` L${x+38},${base} q4,-6 8,0 L${x+beat},${base}`; // T
+    x+=beat;
+  }
+  return d;
+}
+function vitCard(key,p){
+  const meta=PROC[key]||{n:key,d:''};
+  const st = p ? salud(p) : 'caido';
+  const beating = st!=='caido';
+  const msg = p ? (p.last_msg||'—') : 'nunca corrió';
+  const pill = st==='ok'?'al día':(st==='warn'?'atrasado':'sin latido');
+  return `<div class="sm-vit ${st}">
+    <div class="sm-vit-h"><span class="sm-vit-n">${esc(meta.n)}</span><span class="sm-vit-d">${esc(meta.d)}</span></div>
+    <div class="sm-mon">
+      <svg viewBox="0 0 260 44" preserveAspectRatio="none">
+        <line class="grid-h" x1="0" y1="22" x2="260" y2="22"></line>
+        <path class="sm-trace" d="${ecgPath(beating)}"></path>
+      </svg>
+      <div class="sm-scan"></div>
+    </div>
+    <div class="sm-vit-f"><span class="sm-pill">${pill}</span><span class="sm-msg">${esc(msg)}</span><span class="sm-age">${fmtAge(p?p.hace_s:null)}</span></div>
+  </div>`;
+}
+
+function setFlow(pl){
+  const set=(id,v)=>{document.getElementById(id).textContent=v;};
+  set('f-prop',pl.propuestas); set('f-gen',pl.generando); set('f-esp',pl.espera);
+  set('f-pub',pl.publicado); set('f-cor',pl.correccion); set('f-esc',pl.escalado);
+  document.getElementById('f-pubd').textContent = pl.publicado_hoy>0 ? `+${pl.publicado_hoy} hoy` : 'en la calle';
+  // Los conductos fluyen solo si hay contenido aguas arriba.
+  document.getElementById('c1').classList.toggle('flow', pl.propuestas>0);
+  document.getElementById('c2').classList.toggle('flow', pl.generando>0);
+  document.getElementById('c3').classList.toggle('flow', pl.espera>0);
+  document.getElementById('n-correc').classList.toggle('live', pl.correccion>0);
+  const esc5 = pl.escalado>0;
+  document.getElementById('escal').classList.toggle('hot', esc5);
+  document.getElementById('n-fer').classList.toggle('hot', esc5);
+}
+
+function setConsole(pl, procs){
+  const caidos = procs.filter(x=>salud(x)==='caido').length;
+  const faltan = Object.keys(PROC).length - procs.length; // procesos que ni figuran
+  const sinLatido = caidos + Math.max(0,faltan);
+  const pendHumano = (pl.espera||0)+(pl.escalado||0);
+  let estado, sub, cls;
+  if(sinLatido>0 || pl.errores>0){ estado='Revisar'; cls='paro';
+    sub = sinLatido>0 ? `${sinLatido} proceso(s) sin latido` : `${pl.errores} en error`; }
+  else if(pendHumano>0){ estado='Te espera'; cls='espera';
+    sub = `${pendHumano} pieza(s) requieren tu visto`; }
+  else { estado='En marcha'; cls='marcha'; sub='todo al día · sin pendientes tuyos'; }
+  const lamp=document.getElementById('lamp'); lamp.className='sm-lamp '+cls;
+  document.getElementById('stateW').firstChild.textContent=estado;
+  document.getElementById('stateSub').textContent=sub;
+  const reads=document.getElementById('reads');
+  reads.innerHTML = [
+    {b:pl.espera,   s:'esperan tu visto', act:pl.espera>0},
+    {b:pl.escalado, s:'escalados a vos',  bad:pl.escalado>0},
+    {b:pl.errores,  s:'en error',         bad:pl.errores>0},
+    {b:pl.publicado_hoy, s:'publicado hoy'},
+  ].map(r=>`<div class="sm-read ${r.act?'act':''} ${r.bad?'bad':''}"><b>${r.b}</b><span>${r.s}</span></div>`).join('');
+}
+
+function setVitals(procs){
+  const byKey={}; procs.forEach(p=>byKey[p.proceso]=p);
+  document.getElementById('vitals').innerHTML =
+    Object.keys(PROC).map(k=>vitCard(k, byKey[k])).join('');
+}
+
+function setBrands(ms){
+  const el=document.getElementById('brands');
+  if(!ms || !ms.length){ el.innerHTML='<div class="sm-empty">— sin marcas —</div>'; return; }
+  el.innerHTML = ms.map(m=>{
+    const esp=(m.ig_pend||0)+(m.av_pend||0);
+    const pub=(m.ig_pub||0)+(m.av_pub||0);
+    const cola=m.req_cola||0;
+    const tot=Math.max(1, cola+esp+pub);
+    const w=n=>Math.round(n/tot*100);
+    return `<a class="sm-brand ${m.activo?'':'off'}" href="#" onclick="entrar('${esc(m.slug)}');return false;">
+      <div class="sm-brand-h"><span class="sm-brand-n">${esc(m.nombre)}</span>${m.activo?'':'<span class="sm-brand-off">inactiva</span>'}</div>
+      <div class="sm-bar"><i class="q" style="width:${w(cola)}%"></i><i class="e" style="width:${w(esp)}%"></i><i class="p" style="width:${w(pub)}%"></i></div>
+      <div class="sm-brand-m"><span>cola <b>${cola}</b></span><span class="e">espera <b>${esp}</b></span><span>publicado <b>${pub}</b></span></div>
+    </a>`;
+  }).join('');
+}
+
+async function entrar(slug){
+  try{ await fetch('api/marca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})}); }catch(_){}
+  location.href='proyecto';
+}
+
+function offline(){
+  document.getElementById('lamp').className='sm-lamp paro';
+  document.getElementById('stateW').firstChild.textContent='Sin señal';
+  document.getElementById('stateSub').textContent='no hay conexión con el motor — reintentando';
+  document.getElementById('reads').innerHTML='';
+}
+
+async function cargar(){
+  try{
+    const [rm,ra] = await Promise.all([ fetch('api/maquinas'), fetch('api/agencia') ]);
+    if(rm.status===401||ra.status===401){ location.href='login'; return; }
+    const data = await rm.json();
+    const marcas = await ra.json();
+    setConsole(data.pipeline, data.procesos||[]);
+    setFlow(data.pipeline);
+    setVitals(data.procesos||[]);
+    setBrands(marcas);
+    const t='actualizado '+new Date().toLocaleTimeString('es-AR');
+    document.getElementById('upd').textContent=t;
+    document.getElementById('foot-upd').textContent=t;
+  }catch(e){ offline(); }
+}
+cargar();
+setInterval(cargar, 20000);
+</script>
+</body>
+</html>

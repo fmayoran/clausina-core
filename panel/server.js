@@ -174,6 +174,12 @@ app.get('/api/status', async (req, res) => {
   catch (e) { console.error('status', e.message); res.status(500).json({ error: 'db' }); }
 });
 
+// Sala de máquinas: pulso del motor (pipeline agregado + latido de procesos). No scopeado a una marca.
+app.get('/api/maquinas', async (req, res) => {
+  try { res.json(await db.getMaquinas()); }
+  catch (e) { console.error('maquinas', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 // Perfil del proyecto (registro de marca, por marca activa). Lo consume el creativo.
 app.get('/api/perfil', async (req, res) => {
   try { res.json(await db.getPerfil(req.proyectoId)); }

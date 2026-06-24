@@ -279,6 +279,35 @@ async function getStatus(_proyectoId) {
   return rows;
 }
 
+// Sala de máquinas: pulso operativo del MOTOR (agnóstico de marca). Dos lecturas:
+//  - pipeline: cuántas piezas hay en cada etapa del circuito, agregado de todas las marcas.
+//  - procesos: el latido de los crons/workers (batch_runs) con su intervalo esperado, para saber
+//    si cada proceso está al día o "sin latido" (atrasado respecto de intervalo_s).
+async function getMaquinas() {
+  const pipeline = (await pool.query(`
+    SELECT
+      ((SELECT count(*) FROM contenido.tg_briefs WHERE pieza_id IS NULL AND estado='propuesta')
+        + (SELECT count(*) FROM contenido.solicitudes_propuesta WHERE estado IN ('pendiente','procesando')))::int AS propuestas,
+      (SELECT count(*) FROM contenido.tg_briefs WHERE pieza_id IS NULL AND estado IN ('pendiente','procesando'))::int AS generando,
+      (SELECT count(*) FROM contenido.tg_briefs WHERE estado='error')::int AS errores,
+      (SELECT count(*) FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id=pz.revision_vigente
+         WHERE r.estado='pendiente_aprobacion')::int AS espera,
+      (SELECT count(*) FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id=pz.revision_vigente
+         WHERE r.estado='rechazada')::int AS correccion,
+      (SELECT count(*) FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id=pz.revision_vigente
+         WHERE r.estado='rechazada' AND r.nro>=5)::int AS escalado,
+      (SELECT count(*) FROM contenido.piezas WHERE estado='publicada')::int AS publicado,
+      (SELECT count(*) FROM contenido.piezas WHERE estado='publicada' AND actualizado_en::date = now()::date)::int AS publicado_hoy
+  `)).rows[0];
+  const procesos = (await pool.query(`
+    SELECT proceso, last_msg, intervalo_s,
+           EXTRACT(EPOCH FROM (now() - last_run))::int AS hace_s
+    FROM contenido.batch_runs
+    WHERE proceso IN ('worker','dispatcher','correccion','propuestas','ingesta_briefs')
+    ORDER BY array_position(ARRAY['ingesta_briefs','propuestas','worker','dispatcher','correccion'], proceso);`)).rows;
+  return { pipeline, procesos };
+}
+
 // Token de la revisión vigente SOLO si está pendiente de aprobación.
 // El token es la credencial que usan los webhooks de n8n (cf-pub-publish / cf-pub-decide).
 // Vive server-side: nunca se expone en la API pública del board.
@@ -509,7 +538,7 @@ async function health() {
 }
 
 module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, getResumenAgencia,
-  getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getTokenPendiente,
+  getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,
   addMaterialPorPieza, getMaterialesPorPieza, delMaterialPorPieza, generarReq, activarReq, descartarReq, insertMencion,
   getPostIdsPublicados, upsertMetricas,
