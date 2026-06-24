@@ -53,11 +53,13 @@
       <div class="sect">Identidad y contexto</div>
       <div class="fld full"><label>Logo <span class="hint">— subí el archivo oficial, o pegá una URL/descripción</span></label>
         <div style="display:flex;gap:8px;align-items:center;">
+          <span id="logoBox" style="display:none;width:44px;height:44px;flex:0 0 auto;border-radius:8px;background:#080806;border:1px solid var(--line);overflow:hidden;position:relative;">
+            <img id="logoPrev" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:5px;">
+          </span>
           <input type="text" id="logo" style="flex:1;">
           <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" style="display:none;" onchange="subirLogo(this)">
           <button type="button" class="ibtn" id="logoBtn" onclick="document.getElementById('logoFile').click()">Subir…</button>
         </div>
-        <img id="logoPrev" alt="logo" style="display:none;max-width:180px;max-height:120px;width:auto;height:auto;object-fit:contain;margin-top:8px;border:1px solid var(--line);border-radius:6px;background:#fff;padding:6px;">
       </div>
       <div class="fld full"><label>Brief <span class="hint">— todo el contexto: propuesta de valor, tono, público, lineamientos visuales, hacer/evitar, productos, datos clave</span></label><textarea id="brief_md"></textarea></div>
     </div>
@@ -87,9 +89,9 @@ async function guardar(){
   }catch(e){ toast('Error de conexión',true); }
 }
 function mostrarLogo(v){
-  const img=document.getElementById('logoPrev');
-  if(v && /^https?:\/\//.test(v)){ img.src=v; img.style.display='block'; }
-  else { img.removeAttribute('src'); img.style.display='none'; }
+  const box=document.getElementById('logoBox'), img=document.getElementById('logoPrev');
+  if(v && /^https?:\/\//.test(v)){ img.src=v; box.style.display='inline-block'; }
+  else { img.removeAttribute('src'); box.style.display='none'; }
 }
 async function subirLogo(input){
   const file=input.files&&input.files[0]; if(!file) return;
