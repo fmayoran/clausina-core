@@ -51,7 +51,14 @@
       <div class="fld"><label>Telegram chat ID <span class="hint">— chat para briefs/avisos</span></label><input type="text" id="telegram_chat_id"></div>
 
       <div class="sect">Identidad y contexto</div>
-      <div class="fld full"><label>Logo <span class="hint">— archivo/ubicación del logo oficial de la marca</span></label><input type="text" id="logo"></div>
+      <div class="fld full"><label>Logo <span class="hint">— subí el archivo oficial, o pegá una URL/descripción</span></label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="logo" style="flex:1;">
+          <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" style="display:none;" onchange="subirLogo(this)">
+          <button type="button" class="ibtn" id="logoBtn" onclick="document.getElementById('logoFile').click()">Subir…</button>
+        </div>
+        <img id="logoPrev" alt="logo" style="max-height:54px;margin-top:8px;display:none;border:1px solid var(--line);border-radius:6px;background:#fff;padding:4px;">
+      </div>
       <div class="fld full"><label>Brief <span class="hint">— todo el contexto: propuesta de valor, tono, público, lineamientos visuales, hacer/evitar, productos, datos clave</span></label><textarea id="brief_md"></textarea></div>
     </div>
     <div class="bar">
@@ -67,6 +74,7 @@ async function cargar(){
     const r=await fetch('api/perfil'); if(r.status===401){location.href='login';return;}
     const p=await r.json();
     CAMPOS.forEach(c=>{ const el=document.getElementById(c); if(el) el.value=p[c]||''; });
+    mostrarLogo(p.logo||'');
     document.getElementById('upd2').textContent = p.actualizado_en ? ('Última edición: '+fecha(p.actualizado_en)) : 'Sin cargar todavía';
   }catch(e){}
 }
@@ -77,6 +85,22 @@ async function guardar(){
     toast(d.ok?'Perfil guardado':'No se pudo guardar',!d.ok);
     if(d.ok) cargar();
   }catch(e){ toast('Error de conexión',true); }
+}
+function mostrarLogo(v){
+  const img=document.getElementById('logoPrev');
+  if(v && /^https?:\/\//.test(v)){ img.src=v; img.style.display='block'; }
+  else { img.removeAttribute('src'); img.style.display='none'; }
+}
+async function subirLogo(input){
+  const file=input.files&&input.files[0]; if(!file) return;
+  const btn=document.getElementById('logoBtn'); const txt=btn.textContent; btn.textContent='Subiendo…'; btn.disabled=true;
+  try{
+    const dataUrl=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); });
+    const d=await fetch('api/perfil/logo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl})}).then(r=>r.json());
+    if(d&&d.ok){ document.getElementById('logo').value=d.url; mostrarLogo(d.url); toast('Logo subido'); }
+    else { toast(d&&d.error==='muy_grande'?'Imagen muy grande (máx 5MB)':'No se pudo subir el logo',true); }
+  }catch(e){ toast('Error de conexión',true); }
+  finally{ btn.textContent=txt; btn.disabled=false; input.value=''; }
 }
 cargar();
 </script>

@@ -53,6 +53,16 @@ async function guardarPerfil(proyectoId, d) {
   _marcasAt = 0;   // el nombre pudo cambiar -> refrescar cache de marcas
   return true;
 }
+// Actualiza SOLO el logo (sin tocar slogan/brief). Lo usa la subida de archivo del perfil.
+async function setLogo(proyectoId, url) {
+  await pool.query(`
+    INSERT INTO contenido.proyecto_perfil (proyecto_id, logo, actualizado_en)
+    VALUES ($1,$2, now())
+    ON CONFLICT (proyecto_id) DO UPDATE SET logo=$2, actualizado_en=now()`,
+    [proyectoId, url]);
+  _marcasAt = 0;   // el logo se cachea en la lista de marcas
+  return true;
+}
 
 // Piezas con su revisión vigente + media principal (para el board por estado). Scopeado por marca.
 async function getPiezas(canal, proyectoId) {
@@ -498,7 +508,7 @@ async function health() {
   return true;
 }
 
-module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, getResumenAgencia,
+module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, getResumenAgencia,
   getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getTokenPendiente,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,
   addMaterialPorPieza, getMaterialesPorPieza, delMaterialPorPieza, generarReq, activarReq, descartarReq, insertMencion,

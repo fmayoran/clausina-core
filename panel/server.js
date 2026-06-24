@@ -3,6 +3,7 @@
 // Se sirve detrás del proxy de la landing en cortafuego.ar/panel/ (Nginx → este servicio).
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const archiver = require('archiver');
 const db = require('./db');
@@ -181,6 +182,25 @@ app.get('/api/perfil', async (req, res) => {
 app.put('/api/perfil', async (req, res) => {
   try { res.json({ ok: await db.guardarPerfil(req.proyectoId, req.body || {}) }); }
   catch (e) { console.error('guardar perfil', e.message); res.status(500).json({ ok: false }); }
+});
+
+// Subir/actualizar el logo de la marca activa: imagen (dataUrl base64) -> media store -> setea el campo logo.
+const LOGO_EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/svg+xml': 'svg', 'image/gif': 'gif' };
+app.post('/api/perfil/logo', async (req, res) => {
+  try {
+    const dataUrl = String((req.body && req.body.dataUrl) || '');
+    const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!m || !LOGO_EXT[m[1]]) return res.status(400).json({ ok: false, error: 'imagen_invalida' });
+    const buf = Buffer.from(m[2], 'base64');
+    if (buf.length > 5 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'muy_grande' });
+    const dir = path.join('/app/media', 'marca', req.marca);
+    await fs.promises.mkdir(dir, { recursive: true });
+    const fname = `logo-${Date.now()}.${LOGO_EXT[m[1]]}`;
+    await fs.promises.writeFile(path.join(dir, fname), buf);
+    const url = `https://${req.get('host')}/media/marca/${req.marca}/${fname}`;
+    await db.setLogo(req.proyectoId, url);
+    res.json({ ok: true, url });
+  } catch (e) { console.error('logo upload', e.message); res.status(500).json({ ok: false, error: 'upload' }); }
 });
 
 // --- Landing del proyecto (cambios con borrador -> preview -> aprobación -> producción) ---
