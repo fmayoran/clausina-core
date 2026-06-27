@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Estilo de marca</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23CCF24D'/%3E%3Cpath d='M9 8 V17 a7 7 0 0 0 14 0 V8' fill='none' stroke='%230A0B0D' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode:'class',
+  theme:{ extend:{
+    colors:{
+      ink:'#0A0B0D', surf:'#111317', line:'#20242B', mut:'#8A8F98', fg:'#ECEEF0',
+      paper:'#FAFAF9', psurf:'#FFFFFF', pline:'#E8E8E2', pmut:'#646A72', pfg:'#0A0B0D',
+      acc:'#CCF24D', accink:'#0A0B0D', cor:'#FF6A45'
+    },
+    fontFamily:{ display:['"Inter Tight"','system-ui','sans-serif'], sans:['Inter','system-ui','sans-serif'], mono:['"JetBrains Mono"','monospace'] }
+  }}
+}
+</script>
+<style>
+  body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  .display{font-family:'Inter Tight',sans-serif;} .mono{font-family:'JetBrains Mono',monospace;}
+  .acc-text{color:#5e7e00;} .dark .acc-text{color:#CCF24D;}
+  .cor-text{color:#dc451f;} .dark .cor-text{color:#FF6A45;}
+  .skel{position:relative;overflow:hidden;background:#ececea;border-radius:6px;} .dark .skel{background:#1a1d22;}
+  .skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,#00000010,transparent);animation:shimmer 1.5s infinite;}
+  .dark .skel::after{background:linear-gradient(90deg,transparent,#ffffff14,transparent);}
+  @keyframes shimmer{100%{transform:translateX(100%);}}
+  .live{animation:live 1.7s ease-in-out infinite;} @keyframes live{0%,100%{opacity:1;box-shadow:0 0 0 0 #ff6a4566;}50%{opacity:.5;box-shadow:0 0 0 5px #ff6a4500;}}
+  .float{animation:float 6s ease-in-out infinite;} @keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-6px);}}
+  /* logo motion — sin huecos */
+  .u-glow{animation:uglow 2.6s ease-in-out infinite;} @keyframes uglow{0%,100%{opacity:.55;filter:drop-shadow(0 0 0 #CCF24D00);}50%{opacity:1;filter:drop-shadow(0 0 5px #CCF24D88);}}
+  .emit{position:relative;} .emit::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:6px;border-radius:50%;transform:translate(-50%,-50%);animation:emit 1.9s ease-out infinite;}
+  @keyframes emit{0%{box-shadow:0 0 0 0 #CCF24D55;}70%,100%{box-shadow:0 0 0 12px #CCF24D00;}}
+  @media(prefers-reduced-motion:reduce){.skel::after,.live,.float,.u-glow,.emit::after{animation:none!important;}}
+  section{scroll-margin-top:80px;}
+</style>
+</head>
+<body class="min-h-[100dvh] bg-paper text-pfg dark:bg-ink dark:text-fg transition-colors">
+
+<header class="sticky top-0 z-20 backdrop-blur bg-paper/80 dark:bg-ink/80 border-b border-pline dark:border-line">
+  <div class="max-w-[1100px] mx-auto px-6 md:px-8 h-14 flex items-center gap-5">
+    <span class="display font-bold tracking-tight">ClaUsina</span>
+    <span class="mono text-[11px] text-pmut dark:text-mut">sistema de marca · v2</span>
+    <nav class="hidden md:flex items-center gap-5 ml-4 mono text-[11px] text-pmut dark:text-mut">
+      <a href="#logo" class="hover:text-pfg dark:hover:text-fg">Logo</a>
+      <a href="#color" class="hover:text-pfg dark:hover:text-fg">Color</a>
+      <a href="#tipo" class="hover:text-pfg dark:hover:text-fg">Tipografía</a>
+      <a href="#comp" class="hover:text-pfg dark:hover:text-fg">Componentes</a>
+      <a href="#estados" class="hover:text-pfg dark:hover:text-fg">Estados</a>
+      <a href="#voz" class="hover:text-pfg dark:hover:text-fg">Voz</a>
+    </nav>
+    <button onclick="document.documentElement.classList.toggle('dark')" class="ml-auto grid place-items-center w-9 h-9 rounded-lg border border-pline dark:border-line hover:border-acc transition" aria-label="modo">
+      <i data-lucide="sun-medium" class="w-4 h-4 hidden dark:block"></i><i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
+    </button>
+  </div>
+</header>
+
+<main class="max-w-[1100px] mx-auto px-6 md:px-8 py-14 space-y-24">
+
+  <section>
+    <div class="mono text-[11px] tracking-[0.22em] text-pmut dark:text-mut uppercase">/ sistema de marca</div>
+    <h1 class="display font-extrabold tracking-[-0.03em] leading-[0.95] mt-4 text-[clamp(2.4rem,6vw,4rem)]">Sobrio. Vibrante.<br>En <span class="acc-text">señal</span>.</h1>
+    <p class="mt-5 text-pmut dark:text-mut max-w-[52ch] text-lg">El sistema de ClaUsina en el cruce Comunicación × Tecnología. Lima eléctrico, coral solo para lo vivo, Inter Tight, dual dark/white. Cambiá el modo arriba a la derecha.</p>
+  </section>
+
+  <!-- LOGO — 4 opciones gap-free -->
+  <section id="logo">
+    <div class="mono text-[11px] tracking-[0.22em] text-pmut dark:text-mut uppercase mb-2">/ logo · símbolo separado del logotipo</div>
+    <h2 class="display font-bold text-2xl mb-1">Sistema de logo</h2>
+    <p class="text-pmut dark:text-mut mb-6 max-w-[64ch]">Símbolo elegido: la <b>U en órbita</b> (un punto de señal la recorre, sin huecos). El logo no se usa siempre igual: tres formas, según contexto. "ClaUsina" es texto puro; la U vive aparte.</p>
+
+    <!-- tres usos -->
+    <div class="grid sm:grid-cols-3 gap-4">
+      <!-- símbolo solo -->
+      <div class="rounded-2xl border border-pline dark:border-line bg-psurf dark:bg-surf p-6">
+        <div class="h-20 grid place-items-center">
+          <svg viewBox="0 0 28 34" width="38" height="46" fill="none">
+            <path id="uSym" d="M5 5 V19 a9 9 0 0 0 18 0 V5" class="stroke-pfg dark:stroke-fg" stroke-width="3.2" stroke-linecap="round"/>
+            <circle r="2.6" fill="#CCF24D"><animateMotion dur="2.6s" repeatCount="indefinite" rotate="auto"><mpath href="#uSym"/></animateMotion></circle>
+          </svg>
+        </div>
+        <div class="mono text-[11px] mt-4"><span class="acc-text">Símbolo</span> · la U sola</div>
+        <p class="text-pmut dark:text-mut text-sm mt-1">Favicon, app icon, avatar de redes, loader, marca de agua. Cuando la marca ya se reconoce.</p>
+      </div>
+      <!-- logotipo solo -->
+      <div class="rounded-2xl border border-pline dark:border-line bg-psurf dark:bg-surf p-6">
+        <div class="h-20 grid place-items-center"><span class="display font-bold text-3xl tracking-tight">ClaUsina<span class="acc-text">.</span></span></div>
+        <div class="mono text-[11px] mt-4"><span class="acc-text">Logotipo</span> · la palabra sola</div>
+        <p class="text-pmut dark:text-mut text-sm mt-1">Headers densos, cuerpo, footers, menciones inline, contextos formales. El símbolo sobra.</p>
+      </div>
+      <!-- lockup -->
+      <div class="rounded-2xl border border-pline dark:border-line bg-psurf dark:bg-surf p-6">
+        <div class="h-20 grid place-items-center">
+          <span class="flex items-center gap-2.5">
+            <svg viewBox="0 0 28 34" width="22" height="27" fill="none">
+              <path id="uLock" d="M5 5 V19 a9 9 0 0 0 18 0 V5" class="stroke-pfg dark:stroke-fg" stroke-width="3.4" stroke-linecap="round"/>
+              <circle r="2.4" fill="#CCF24D"><animateMotion dur="2.6s" repeatCount="indefinite" rotate="auto"><mpath href="#uLock"/></animateMotion></circle>
+            </svg>
+            <span class="display font-bold text-3xl tracking-tight">ClaUsina<span class="acc-text">.</span></span>
+          </span>
+        </div>
+        <div class="mono text-[11px] mt-4"><span class="acc-text">Lockup</span> · símbolo + palabra</div>
+        <p class="text-pmut dark:text-mut text-sm mt-1">Hero, portadas, presentaciones. Idealmente en movimiento.</p>
+      </div>
+    </div>
+
+    <!-- regla del estático -->
+    <div class="mt-4 rounded-2xl border border-pline dark:border-line p-5 flex flex-wrap items-center gap-x-8 gap-y-4">
+      <div class="flex items-center gap-3">
+        <span class="mono text-[10px] text-pmut dark:text-mut uppercase">estático plano</span>
+        <span class="display font-bold text-xl tracking-tight">ClaUsina<span class="acc-text">.</span></span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="mono text-[10px] text-pmut dark:text-mut uppercase">o símbolo</span>
+        <span class="grid place-items-center w-9 h-9"><svg viewBox="0 0 28 34" width="18" height="22" fill="none"><path d="M5 5 V19 a9 9 0 0 0 18 0 V5" class="stroke-pfg dark:stroke-fg" stroke-width="3.6" stroke-linecap="round"/><circle cx="23" cy="5" r="2.2" fill="#CCF24D"/></svg></span>
+      </div>
+      <div class="mono text-[11px] text-pmut dark:text-mut sm:ml-auto">sin movimiento: palabra sola o símbolo solo — nunca el lockup apagado.</div>
+    </div>
+
+    <!-- favicon: revisar -->
+    <div class="mt-4">
+      <div class="mono text-[11px] text-pmut dark:text-mut mb-3">favicon · elegí una variante (lectura a 16-32px)</div>
+      <div class="flex flex-wrap items-center gap-4">
+        <div class="text-center">
+          <span class="grid place-items-center w-12 h-12 rounded-xl bg-ink"><svg viewBox="0 0 28 34" width="17" height="21" fill="none"><path d="M5 5 V19 a9 9 0 0 0 18 0 V5" stroke="#CCF24D" stroke-width="4" stroke-linecap="round"/></svg></span>
+          <div class="mono text-[10px] text-pmut dark:text-mut mt-1.5">A · U lima<br>tile oscuro</div>
+        </div>
+        <div class="text-center">
+          <span class="grid place-items-center w-12 h-12 rounded-xl bg-acc"><svg viewBox="0 0 28 34" width="17" height="21" fill="none"><path d="M5 5 V19 a9 9 0 0 0 18 0 V5" stroke="#0A0B0D" stroke-width="4.4" stroke-linecap="round"/></svg></span>
+          <div class="mono text-[10px] text-pmut dark:text-mut mt-1.5">B · U oscura<br>tile lima</div>
+        </div>
+        <div class="text-center">
+          <span class="grid place-items-center w-12 h-12 rounded-xl border border-pline dark:border-line"><svg viewBox="0 0 28 34" width="17" height="21" fill="none"><path d="M5 5 V19 a9 9 0 0 0 18 0 V5" stroke="#CCF24D" stroke-width="4" stroke-linecap="round"/></svg></span>
+          <div class="mono text-[10px] text-pmut dark:text-mut mt-1.5">C · U sola<br>sin tile</div>
+        </div>
+        <div class="text-center">
+          <span class="grid place-items-center w-12 h-12 rounded-xl bg-ink relative"><svg viewBox="0 0 28 34" width="17" height="21" fill="none"><path d="M5 5 V19 a9 9 0 0 0 18 0 V5" stroke="#CCF24D" stroke-width="4" stroke-linecap="round"/><circle cx="23" cy="5" r="2.6" fill="#FF6A45"/></svg></span>
+          <div class="mono text-[10px] text-pmut dark:text-mut mt-1.5">D · con punto<br>de señal</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COLOR -->
+  <section id="color">
+    <div class="mono text-[11px] tracking-[0.22em] text-pmut dark:text-mut uppercase mb-2">/ color</div>
+    <h2 class="display font-bold text-2xl mb-1">Tokens</h2>
+    <p class="text-pmut dark:text-mut mb-6 max-w-[60ch]">Base neutra que deja respirar. <b class="acc-text">Lima</b> = marca y acción. <b class="cor-text">Coral</b> = exclusivo de lo vivo/alerta. Sin lila ni degradés protagonistas.</p>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="rounded-xl border border-pline dark:border-line overflow-hidden"><div class="h-16 bg-ink"></div><div class="p-3"><div class="display font-semibold text-sm">Ink</div><div class="mono text-[11px] text-pmut dark:text-mut">#0A0B0D · fondo dark</div></div></div>
+      <div class="rounded-xl border border-pline dark:border-line overflow-hidden"><div class="h-16 bg-surf border-b border-line"></div><div class="p-3"><div class="display font-semibold text-sm">Surface</div><div class="mono text-[11px] text-pmut dark:text-mut">#111317 · tarjetas</div></div></div>
+      <div class="rounded-xl border border-pline dark:border-line overflow-hidden"><div class="h-16 bg-paper border-b border-pline"></div><div class="p-3"><div class="display font-semibold text-sm">Paper</div><div class="mono text-[11px] text-pmut dark:text-mut">#FAFAF9 · fondo light</div></div></div>
+      <div class="rounded-xl border border-pline dark:border-line overflow-hidden"><div class="h-16" style="background:#8A8F98"></div><div class="p-3"><div class="display font-semibold text-sm">Muted</div><div class="mono text-[11px] text-pmut dark:text-mut">#8A8F98 · secundario</div></div></div>
+      <div class="rounded-xl border border-pline dark:border-line overflow-hidden"><div class="h-16 bg-acc"></div><div class="p-3"><div class="display font-semibold text-sm acc-text">Lima</div><div class="mono text-[11px] text-pmut dark:text-mut">#CCF24D · acción</div></div></div>
+      <div class="rounded-xl border border-pline dark:border-line overflow-hidden"><div class="h-16 bg-cor"></div><div class="p-3"><div class="display font-semibold text-sm cor-text">Coral</div><div class="mono text-[11px] text-pmut dark:text-mut">#FF6A45 · vivo/alerta</div></div></div>
+      <div class="rounded-xl border border-pline dark:border-line overflow-hidden"><div class="h-16" style="background:#20242B"></div><div class="p-3"><div class="display font-semibold text-sm">Line</div><div class="mono text-[11px] text-pmut dark:text-mut">#20242B · bordes dark</div></div></div>
+      <div class="rounded-xl border border-pline dark:border-line overflow-hidden"><div class="h-16 bg-psurf border-b border-pline"></div><div class="p-3"><div class="display font-semibold text-sm">White</div><div class="mono text-[11px] text-pmut dark:text-mut">#FFFFFF · tarjetas light</div></div></div>
+    </div>
+  </section>
+
+  <!-- TIPO -->
+  <section id="tipo">
+    <div class="mono text-[11px] tracking-[0.22em] text-pmut dark:text-mut uppercase mb-2">/ tipografía</div>
+    <h2 class="display font-bold text-2xl mb-6">Inter Tight · Inter · JetBrains Mono</h2>
+    <div class="space-y-3 border-l-2 border-acc pl-5">
+      <div class="display font-extrabold tracking-[-0.03em] text-[clamp(2rem,5vw,3.4rem)] leading-[0.95]">Display 800 — titulares</div>
+      <div class="display font-semibold text-2xl">Subtítulo 600 — Inter Tight</div>
+      <p class="text-pmut dark:text-mut max-w-[56ch]">Cuerpo en Inter 400/450: legible, neutro, sin competir con el titular. La jerarquía la hace el peso y el espacio, no el color.</p>
+      <div class="mono text-sm text-pmut dark:text-mut">JetBrains Mono — datos · 0123456789 · pieza #042 · v3 · live</div>
+    </div>
+  </section>
+
+  <!-- COMPONENTES -->
+  <section id="comp">
+    <div class="mono text-[11px] tracking-[0.22em] text-pmut dark:text-mut uppercase mb-2">/ componentes</div>
+    <h2 class="display font-bold text-2xl mb-6">Botones, chips y tarjetas</h2>
+    <div class="flex flex-wrap items-center gap-3 mb-8">
+      <button class="inline-flex items-center gap-2 bg-acc text-accink display font-semibold px-5 py-2.5 rounded-xl hover:brightness-95 transition">Acción primaria <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+      <button class="inline-flex items-center gap-2 border border-pline dark:border-line px-5 py-2.5 rounded-xl display font-medium hover:border-acc transition"><i data-lucide="git-branch" class="w-4 h-4 acc-text"></i> Secundaria</button>
+      <button class="inline-flex items-center gap-2 border border-cor cor-text px-5 py-2.5 rounded-xl display font-medium hover:bg-cor hover:text-white transition"><i data-lucide="bell" class="w-4 h-4"></i> Alerta</button>
+      <span class="inline-flex items-center gap-2 rounded-full border border-pline dark:border-line px-3 py-1 mono text-[11px] text-pmut dark:text-mut"><span class="w-1.5 h-1.5 rounded-full bg-cor live"></span> en vivo</span>
+      <span class="inline-flex items-center gap-2 rounded-full bg-acc/15 acc-text px-3 py-1 mono text-[11px]">aprobado</span>
+    </div>
+    <div class="grid md:grid-cols-6 gap-4">
+      <div class="md:col-span-4 rounded-2xl border border-pline dark:border-line bg-psurf dark:bg-surf p-6">
+        <div class="w-10 h-10 rounded-xl grid place-items-center border border-pline dark:border-line mb-4 float"><i data-lucide="audio-waveform" class="w-5 h-5 acc-text"></i></div>
+        <h3 class="display font-semibold text-xl">Tarjeta ancha</h3>
+        <p class="text-pmut dark:text-mut mt-2 max-w-[48ch]">Retícula bento asimétrica: spans distintos, alineación a izquierda, aire generoso.</p>
+      </div>
+      <div class="md:col-span-2 rounded-2xl border border-pline dark:border-line bg-psurf dark:bg-surf p-6">
+        <div class="w-10 h-10 rounded-xl grid place-items-center border border-pline dark:border-line mb-4"><i data-lucide="shield-check" class="w-5 h-5 acc-text"></i></div>
+        <h3 class="display font-semibold text-lg">Tarjeta angosta</h3>
+        <p class="text-pmut dark:text-mut mt-2 text-sm">Mismo lenguaje, otro span.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ESTADOS -->
+  <section id="estados">
+    <div class="mono text-[11px] tracking-[0.22em] text-pmut dark:text-mut uppercase mb-2">/ estados</div>
+    <h2 class="display font-bold text-2xl mb-1">Carga, vacío y vivo</h2>
+    <p class="text-pmut dark:text-mut mb-6 max-w-[60ch]">Skeleton mientras llega el dato; vacío como invitación a actuar; coral solo cuando algo está vivo o pide intervención.</p>
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="rounded-2xl border border-pline dark:border-line bg-psurf dark:bg-surf p-5">
+        <div class="mono text-[10px] text-pmut dark:text-mut uppercase mb-3">cargando</div>
+        <div class="skel h-7 w-2/3"></div><div class="skel h-3 w-full mt-3"></div><div class="skel h-3 w-4/5 mt-2"></div>
+      </div>
+      <div class="rounded-2xl border border-dashed border-pline dark:border-line p-5 grid place-items-center text-center min-h-[150px]">
+        <div><div class="w-11 h-11 rounded-xl grid place-items-center border border-pline dark:border-line mx-auto mb-3"><i data-lucide="inbox" class="w-5 h-5 text-pmut dark:text-mut"></i></div><div class="display font-medium">Sin nada en cola</div><p class="mono text-[11px] text-pmut dark:text-mut mt-1.5">Empezá un brief para verlo acá.</p></div>
+      </div>
+      <div class="rounded-2xl border border-cor/40 bg-cor/5 p-5">
+        <div class="flex items-center gap-2 mono text-[10px] cor-text uppercase mb-3"><span class="w-1.5 h-1.5 rounded-full bg-cor live"></span> requiere tu visto</div>
+        <div class="display font-bold text-3xl cor-text">5</div>
+        <p class="text-sm text-pmut dark:text-mut mt-1">piezas esperando aprobación</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- VOZ -->
+  <section id="voz">
+    <div class="mono text-[11px] tracking-[0.22em] text-pmut dark:text-mut uppercase mb-2">/ voz</div>
+    <h2 class="display font-bold text-2xl mb-4">Cómo habla ClaUsina</h2>
+    <div class="grid sm:grid-cols-3 gap-4">
+      <div class="rounded-2xl border border-pline dark:border-line p-5"><div class="acc-text mono text-[11px] uppercase mb-2">Directo</div><p class="text-pmut dark:text-mut text-sm">Verbo activo, sin vueltas. "Aprobá", no "Proceder con la aprobación".</p></div>
+      <div class="rounded-2xl border border-pline dark:border-line p-5"><div class="acc-text mono text-[11px] uppercase mb-2">Técnico, no frío</div><p class="text-pmut dark:text-mut text-sm">Precisión de ingeniería con calidez. Datos claros, nunca jerga vacía.</p></div>
+      <div class="rounded-2xl border border-pline dark:border-line p-5"><div class="acc-text mono text-[11px] uppercase mb-2">Soporte, no protagonista</div><p class="text-pmut dark:text-mut text-sm">ClaUsina potencia a cada marca; no le roba el centro de la escena.</p></div>
+    </div>
+  </section>
+
+  <footer class="border-t border-pline dark:border-line pt-7 mono text-[11px] text-pmut dark:text-mut flex flex-wrap gap-x-6 gap-y-1">
+    <span>ClaUsina — sistema de marca v2 · logo + styleguide</span>
+    <span class="ml-auto">borrador para aprobación</span>
+  </footer>
+</main>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>lucide.createIcons();</script>
+</body>
+</html>
