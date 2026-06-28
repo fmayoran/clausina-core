@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Web / Landing del proyecto</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<script>document.documentElement.classList.add('dark');</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
 <link rel="stylesheet" href="panel.css">
 <style>
   .wrap{padding:18px 28px 70px;max-width:1100px;margin:0 auto;}
@@ -46,6 +51,7 @@
       <button class="logout" onclick="salir()">Salir</button>
     </nav>
   </header>
+<div class="shell"><main class="min-w-0">
   <div id="toast"></div>
   <div class="wrap">
     <div class="intro">Pedí cambios en la landing del proyecto. El creativo arma un <b>borrador</b> que podés previsualizar acá; pasa a producción solo cuando lo <b>aprobás</b>.</div>
@@ -55,6 +61,10 @@
     </div>
     <div id="lista"><div class="empty">Cargando…</div></div>
   </div>
+</main></div>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="shell.js"></script>
+<script>ClausinaShell({active:'landing',darkOnly:true});</script>
 <script src="panel.js"></script>
 <script>
 const LBL={pendiente:'En cola',procesando:'Generando…',borrador:'Borrador listo',aprobada:'Aprobando…',en_produccion:'En producción',rechazada:'A modificar',error:'Error'};

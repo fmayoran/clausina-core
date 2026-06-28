@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Audiovisual — Pantallas y programación</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<script>document.documentElement.classList.add('dark');</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
 <link rel="stylesheet" href="panel.css">
 <link rel="icon" href="fonts/clausina-icono.png">
 <link rel="apple-touch-icon" href="fonts/clausina-icono-180.png">
@@ -78,6 +83,7 @@
       <button class="logout" onclick="salir()">Salir</button>
     </nav>
   </header>
+<div class="shell"><main class="min-w-0">
   <div id="toast"></div>
   <div class="wrap">
     <div class="toolbar">
@@ -118,6 +124,10 @@
     <div class="repbox"><div class="repframe" id="rep-frame-wrap"><iframe id="rep-frame" title="Reproductor" allow="autoplay"></iframe></div></div>
     <div class="repfoot" id="rep-foot"></div>
   </aside>
+</main></div>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="shell.js"></script>
+<script>ClausinaShell({active:'pantallas',darkOnly:true});</script>
 <script src="panel.js"></script>
 <script>
 let pantallas=[];

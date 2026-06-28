@@ -80,6 +80,14 @@
     var shell = document.querySelector('.shell');
     if (!shell) return;
     shell.insertAdjacentHTML('afterbegin', html(opts.active || ''));
+    // Páginas de contenido (panel.css) son dark-only: forzar dark y ocultar el toggle.
+    if (opts.darkOnly) {
+      document.documentElement.classList.add('dark');
+      shell.querySelectorAll('[aria-label="modo"]').forEach(function (b) { b.remove(); });
+    }
+    // Ocultar el header/statusbar legados (las páginas viejas tenían su propio chrome).
+    document.querySelectorAll('body > header').forEach(function (h) { h.style.display = 'none'; });
+    var sb = document.getElementById('statusbar'); if (sb) sb.style.display = 'none';
     if (window.lucide) lucide.createIcons();
     // poblar el selector con la marca activa
     fetch('api/marcas').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
