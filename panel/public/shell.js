@@ -14,6 +14,7 @@
       { id: 'arquitectura', label: 'Arquitectura',      icon: 'git-fork',         href: 'arquitectura' },
     ],
     'Marca activa': [
+      { id: 'propuestas', label: 'Propuestas',       icon: 'lightbulb',   href: 'propuestas' },
       { id: 'cola',      label: 'Cola y aprobación', icon: 'inbox',       href: 'proyecto' },
       { id: 'instagram', label: 'Instagram',         icon: 'instagram',   href: 'instagram' },
       { id: 'avisos',    label: 'Avisos',            icon: 'megaphone',   href: 'avisos' },
@@ -47,11 +48,14 @@
         '<span class="wordmark display font-bold tracking-tight">ClaUsina<span class="acc-text">.</span></span>' +
         '<button onclick="document.body.classList.toggle(\'col\')" class="ml-auto grid place-items-center w-7 h-7 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-pmut dark:text-mut" aria-label="colapsar menú"><i data-lucide="panel-left-close" class="w-4 h-4"></i></button>' +
       '</div>' +
-      '<button class="switch flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-pline dark:border-line mb-3 text-left opacity-90" title="Selector de marca (próximamente)">' +
-        '<span class="grid place-items-center w-6 h-6 rounded-lg bg-acc text-accink display font-bold text-xs shrink-0" id="sw-ini">·</span>' +
-        '<span class="switch-tx min-w-0"><span class="block text-sm display font-semibold truncate" id="sw-nombre">marca</span><span class="block mono text-[10px] text-pmut dark:text-mut">marca activa</span></span>' +
-        '<i data-lucide="chevrons-up-down" class="switch-tx w-4 h-4 ml-auto text-pmut dark:text-mut shrink-0"></i>' +
-      '</button>' +
+      '<div class="relative mb-3">' +
+        '<button onclick="var m=document.getElementById(\'sw-menu\');if(m)m.classList.toggle(\'hidden\')" class="switch w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-pline dark:border-line hover:border-acc transition text-left">' +
+          '<span class="grid place-items-center w-6 h-6 rounded-lg bg-acc text-accink display font-bold text-xs shrink-0" id="sw-ini">·</span>' +
+          '<span class="switch-tx min-w-0"><span class="block text-sm display font-semibold truncate" id="sw-nombre">marca</span><span class="block mono text-[10px] text-pmut dark:text-mut">cambiar marca</span></span>' +
+          '<i data-lucide="chevrons-up-down" class="switch-tx w-4 h-4 ml-auto text-pmut dark:text-mut shrink-0"></i>' +
+        '</button>' +
+        '<div id="sw-menu" class="hidden absolute left-0 right-0 top-full mt-1 z-30 rounded-xl border border-pline dark:border-line bg-side dark:bg-sideD shadow-xl p-1 max-h-72 overflow-auto"></div>' +
+      '</div>' +
       '<nav class="nav flex flex-col gap-0.5">' + nav(active) + '</nav>' +
       '<div class="mt-auto flex items-center gap-1 pt-3">' +
         '<button onclick="toggleMode()" class="grid place-items-center w-9 h-9 rounded-lg border border-pline dark:border-line hover:border-acc transition shrink-0" aria-label="modo"><i data-lucide="sun-medium" class="w-4 h-4 hidden dark:block"></i><i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i></button>' +
@@ -89,14 +93,36 @@
     document.querySelectorAll('body > header').forEach(function (h) { h.style.display = 'none'; });
     var sb = document.getElementById('statusbar'); if (sb) sb.style.display = 'none';
     if (window.lucide) lucide.createIcons();
-    // poblar el selector con la marca activa
+    // poblar el selector + dropdown de marcas
     fetch('api/marcas').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
       if (!d) return;
-      var a = (d.marcas || []).find(function (m) { return m.slug === d.activa; });
-      if (!a) return;
+      var marcas = d.marcas || [];
+      var a = marcas.find(function (m) { return m.slug === d.activa; });
       var ini = document.getElementById('sw-ini'), nom = document.getElementById('sw-nombre');
-      if (ini) ini.textContent = (a.nombre || '?').trim().charAt(0).toUpperCase() || '·';
-      if (nom) nom.textContent = a.nombre || 'marca';
+      if (a && ini) ini.textContent = (a.nombre || '?').trim().charAt(0).toUpperCase() || '·';
+      if (a && nom) nom.textContent = a.nombre || 'marca';
+      var menu = document.getElementById('sw-menu');
+      if (menu) {
+        menu.innerHTML = marcas.map(function (m) {
+          var on = m.slug === d.activa;
+          var cls = on ? 'text-pfg dark:text-fg bg-black/5 dark:bg-white/5'
+                       : 'text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg hover:bg-black/5 dark:hover:bg-white/5';
+          return '<button onclick="ClausinaSetMarca(\'' + esc(m.slug) + '\')" class="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left transition ' + cls + '">' +
+            '<span class="grid place-items-center w-5 h-5 rounded bg-acc text-accink display font-bold text-[10px] shrink-0">' + esc((m.nombre || '?').trim().charAt(0).toUpperCase()) + '</span>' +
+            '<span class="truncate display font-medium text-sm">' + esc(m.nombre || '—') + '</span>' +
+            (on ? '<i data-lucide="check" class="w-3.5 h-3.5 ml-auto acc-text shrink-0"></i>'
+                : (m.activo ? '' : '<span class="ml-auto mono text-[9px] text-pmut dark:text-mut shrink-0">inactiva</span>')) +
+          '</button>';
+        }).join('');
+        if (window.lucide) lucide.createIcons();
+      }
     }).catch(function () {});
+  };
+
+  function esc(s) { return (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+  window.ClausinaSetMarca = function (slug) {
+    fetch('api/marca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: slug }) })
+      .then(function () { location.reload(); })
+      .catch(function () { location.reload(); });
   };
 })();

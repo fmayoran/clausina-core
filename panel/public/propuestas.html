@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Propuestas del creativo</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<script>document.documentElement.classList.add('dark');</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
+<link rel="stylesheet" href="panel.css">
+<style>
+  .pp-wrap{padding:20px 28px 60px;display:flex;flex-direction:column;gap:18px;}
+  .pp-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .pp-head h1{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-.01em;color:var(--white);}
+  .pp-head .lead{font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.04em;color:var(--ash);}
+  .pp-ask{margin-left:auto;width:auto;flex:0 0 auto;padding:9px 16px;display:inline-flex;align-items:center;gap:8px;}
+  #c-prop{gap:8px;}
+  .card.prop .qhead,.card.men .qhead{padding:10px 12px;}
+  .qhead{width:100%;background:transparent;border:0;color:inherit;cursor:pointer;display:flex;align-items:center;gap:9px;padding:9px 12px;text-align:left;font-family:inherit;}
+  .qhead:hover{background:#0e0e0c;}
+  .qhead .rst{flex:0 0 auto;}
+  .qtt{flex:1;min-width:0;font-weight:700;font-size:.97rem;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .qchev{flex:0 0 auto;font-family:'JetBrains Mono',monospace;color:var(--ash);font-size:.8rem;width:16px;text-align:center;}
+  .phint{flex:0 0 auto;font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ember);}
+  /* modal de pedido */
+  #askmodal .modal-box{max-width:440px;}
+  #askmodal textarea,#askmodal select,#askmodal input{width:100%;background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);font-family:'Inter',sans-serif;font-size:.98rem;padding:9px 11px;outline:none;}
+  #askmodal textarea{min-height:70px;resize:vertical;}
+  #askmodal textarea:focus,#askmodal select:focus,#askmodal input:focus{border-color:var(--ember);}
+</style>
+</head>
+<body>
+<div class="shell"><main class="min-w-0">
+  <div id="statusbar"></div>
+  <div id="toast"></div>
+
+  <div class="pp-wrap">
+    <div class="pp-head">
+      <div>
+        <h1>Propuestas del creativo</h1>
+        <div class="lead">ideas que propone el creativo · revisás y generás la pieza</div>
+      </div>
+      <button class="btn ok pp-ask" onclick="openAsk()"><i data-lucide="sparkles" class="w-4 h-4"></i> Pedir propuestas</button>
+    </div>
+
+    <section class="col brief">
+      <h2><span class="dot"></span>Propuestas <span class="n" id="n-prop"></span></h2>
+      <div class="cards" id="c-prop"></div>
+    </section>
+  </div>
+
+  <!-- Modal: pedir propuestas al creativo -->
+  <div id="askmodal" class="modal hidden">
+    <div class="modal-bg" onclick="closeAsk()"></div>
+    <div class="modal-box">
+      <div class="modal-head"><div class="modal-tt">Pedir propuestas al creativo</div><button class="modal-x" onclick="closeAsk()" title="Cerrar">×</button></div>
+      <div class="modal-body">
+        <div class="modal-sec"><div class="modal-lbl">Énfasis (opcional)</div><textarea id="enfasis" maxlength="1000" placeholder="Qué destacar: un plato, una promo, el tono…"></textarea></div>
+        <div class="modal-sec"><div class="modal-lbl">Canal</div>
+          <select id="canalprop"><option value="instagram">Instagram</option><option value="aviso">Aviso pantalla</option></select>
+        </div>
+        <div class="modal-sec"><div class="modal-lbl">Cantidad (1 a 8)</div><input id="cantprop" type="number" min="1" max="8" value="5"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn ok" id="askbtn" onclick="pedirPropuestas()">Pedir propuestas</button>
+        <button class="btn no" onclick="closeAsk()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: interacción con el creativo sobre un requerimiento -->
+  <div id="reqmodal" class="modal hidden">
+    <div class="modal-bg" onclick="closeReqModal()"></div>
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-tt" id="rm-tt"></div>
+        <button class="modal-x" onclick="closeReqModal()" title="Cerrar">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="reqtext" id="rm-concepto"></div>
+        <div id="rm-link"></div>
+        <div class="needs" id="rm-needs"></div>
+        <div class="modal-sec">
+          <div class="modal-lbl">Material aportado</div>
+          <div class="gallery" id="rm-gallery"></div>
+          <label class="btn ok filelbl mt8"><span class="flbl">+ Agregar material</span><input type="file" accept="image/*,video/*" multiple onchange="rmAddFiles(this)"></label>
+        </div>
+        <div class="modal-sec">
+          <div class="modal-lbl">Comentarios para el creativo</div>
+          <textarea id="rm-coment" maxlength="2000" placeholder="Indicaciones: cuál foto va de portada, recortes, orden del carrusel, tono…"></textarea>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn ok" id="rm-gen" onclick="generarPublicacion()">Generar publicación</button>
+        <button class="btn del" id="rm-desc" onclick="descartarDesdeModal()">Descartar</button>
+        <button class="btn no" onclick="closeReqModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</main></div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="shell.js"></script>
+<script>ClausinaShell({active:'propuestas',darkOnly:true});</script>
+<script src="panel.js"></script>
+<script>
+  function openAsk(){ document.getElementById('askmodal').classList.remove('hidden'); }
+  function closeAsk(){ document.getElementById('askmodal').classList.add('hidden'); }
+  window.afterProponer = closeAsk;
+  currentLoad = loadCola; loadCola(); setInterval(loadCola, 6000);
+  lucide.createIcons();
+</script>
+</body>
+</html>

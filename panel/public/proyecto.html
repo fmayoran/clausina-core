@@ -95,7 +95,7 @@
     <!-- Resumen / dashboard -->
     <div class="resumen" id="resumen">
       <a class="statile c-cola"  href="#sec-cola"><span class="sv" id="st-cola">—</span><span class="sl">En cola</span><span class="sx">requerimientos por resolver</span></a>
-      <a class="statile c-prop"  href="#sec-prop"><span class="sv" id="st-prop">—</span><span class="sl">Propuestas</span><span class="sx" id="st-prop-x">del creativo, por revisar</span></a>
+      <a class="statile c-prop"  href="propuestas"><span class="sv" id="st-prop">—</span><span class="sl">Propuestas</span><span class="sx" id="st-prop-x">del creativo, por revisar</span></a>
       <a class="statile c-aprob" href="#sec-canales"><span class="sv" id="st-aprob">—</span><span class="sl">Por aprobar</span><span class="sx">piezas en revisión</span></a>
       <a class="statile c-pub"   href="#sec-canales"><span class="sv" id="st-pub">—</span><span class="sl">Publicadas</span><span class="sx">en feed y pantalla</span></a>
     </div>
@@ -108,23 +108,6 @@
           <div class="cards" id="c-cola"></div>
         </section>
 
-        <!-- Sección: propuestas del creativo + pedido -->
-        <section class="col brief" id="sec-prop">
-          <h2><span class="dot"></span>Propuestas del creativo <span class="n" id="n-prop"></span></h2>
-          <div class="askbox">
-            <span class="akl">Pedir propuestas</span>
-            <input id="enfasis" placeholder="Énfasis (opcional): qué destacar…" maxlength="1000">
-            <div class="akrow">
-              <select id="canalprop" title="Canal de las propuestas">
-                <option value="instagram">Canal: Instagram</option>
-                <option value="aviso">Canal: Aviso pantalla</option>
-              </select>
-              <input id="cantprop" type="number" min="1" max="8" value="5" title="Cantidad de propuestas (1 a 8)">
-            </div>
-            <button id="askbtn" onclick="pedirPropuestas()">Pedir propuestas al creativo</button>
-          </div>
-          <div class="cards" id="c-prop"></div>
-        </section>
       </div>
 
       <aside class="proj-right" id="sec-canales">

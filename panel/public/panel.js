@@ -275,7 +275,7 @@ async function pedirPropuestas(){
   try{
     const d=await fetch('api/proponer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enfasis:inp.value, canal: sel?sel.value:'instagram', cantidad})}).then(r=>r.json());
     toast(d.ok?`Pedido enviado (${cantidad}) — el creativo carga propuestas en unos minutos`:'No se pudo pedir', !d.ok);
-    if(d.ok) inp.value='';
+    if(d.ok){ inp.value=''; if(typeof window.afterProponer==='function') window.afterProponer(); }
   }catch(e){ toast('Error de conexión', true); }
   btn.disabled=false; btn.textContent=t;
 }
