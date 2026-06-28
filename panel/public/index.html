@@ -4,143 +4,165 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ClaUsina — Dashboard</title>
-<link rel="stylesheet" href="panel.css">
-<link rel="icon" href="fonts/clausina-icono.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23CCF24D'/%3E%3Cpath d='M9 8 V17 a7 7 0 0 0 14 0 V8' fill='none' stroke='%230A0B0D' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="fonts/clausina-icono-180.png">
-<style>
-  header .logo b.dot{color:#1ec9ff;}
-  .wrap{padding:20px 28px 60px;}
-  .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
-  .ft{font-family:'Barlow Condensed',sans-serif;font-size:1.6rem;color:var(--white);font-weight:700;}
-  .ibtn{background:transparent;border:1px solid var(--line);color:var(--ash);font-family:'IBM Plex Mono',monospace;font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;padding:7px 13px;border-radius:5px;cursor:pointer;text-decoration:none;display:inline-block;}
-  .ibtn:hover{color:var(--chalk);border-color:var(--ash);}
-  .ibtn.fire{color:var(--ember);border-color:#1d3a44;}
-  .ibtn.fire:hover{background:var(--fire);border-color:var(--fire);color:#0c0c0a;}
-  .navcta{color:#1ec9ff!important;border-color:#1ec9ff!important;}
-  .navcta:hover{background:#1ec9ff!important;color:#070708!important;}
-  .kpi.hot b{color:#1ec9ff;}
-  .wrap{padding-top:24px;}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;}
-  .pj{border:1px solid var(--line);border-radius:10px;background:#0c0c0a;padding:16px;display:flex;flex-direction:column;gap:11px;}
-  .pjtop{display:flex;align-items:center;gap:11px;}
-  .pjlogo{position:relative;width:64px;height:64px;border-radius:9px;background:#080806;border:1px solid var(--line);flex:0 0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden;}
-  .pjlogo .ini{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:2rem;color:var(--ash);}
-  .pjlogo img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:7px;}
-  .pj h3{margin:0;font-family:'Barlow Condensed',sans-serif;font-size:1.55rem;color:var(--white);font-weight:700;display:flex;align-items:center;gap:9px;}
-  .pj .inact{font-family:'IBM Plex Mono',monospace;font-size:.58rem;color:var(--ash);text-transform:uppercase;border:1px solid var(--line);border-radius:8px;padding:1px 7px;}
-  .pj .desc{font-size:.92rem;color:var(--ash);line-height:1.4;min-height:38px;}
-  .pj .links{display:flex;flex-wrap:wrap;gap:6px;}
-  .pj .lk{font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.03em;color:var(--ash);text-decoration:none;border:1px solid var(--line);border-radius:7px;padding:3px 8px;transition:.15s;}
-  .pj .lk:hover{color:#1ec9ff;border-color:#1ec9ff;}
-  .kpis{display:flex;gap:8px;flex-wrap:wrap;}
-  .kpi{flex:1;min-width:64px;background:#080806;border:1px solid var(--line);border-radius:7px;padding:8px 6px;text-align:center;}
-  .kpi b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;color:var(--white);line-height:1;}
-  .kpi.hot b{color:#1ec9ff;}
-  .kpi span{font-family:'IBM Plex Mono',monospace;font-size:.52rem;text-transform:uppercase;letter-spacing:.03em;color:var(--ash);}
-  .global-summary{margin-bottom:20px;padding:18px;border:1px solid var(--line);border-radius:12px;background:#080806;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;}
-  .gs-main{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
-  .gs-title{font-family:'Barlow Condensed',sans-serif;font-size:1.4rem;color:var(--white);font-weight:700;}
-  .gs-sub{font-family:'IBM Plex Mono',monospace;font-size:.82rem;color:var(--ash);margin-top:4px;}
-  .gs-badges{display:flex;gap:10px;flex-wrap:wrap;}
-  .pj .acts{display:flex;gap:8px;margin-top:2px;}
-  .pj .acts .ibtn{flex:1;text-align:center;}
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
 </head>
-<body class="dash">
-  <header>
-    <a class="logo" href=".">Cla<b>U</b>sina<b class="dot">.</b></a>
-    <span class="sub">Agencia · impulsada por Claude</span>
-    <span class="upd" id="upd"></span>
-    <nav>
-      <a href="maquinas">Sala de máquinas</a>
-      <a href="estilo">Estilo</a>
-      <a href="arquitectura">Arquitectura</a>
-      <a href="audiovisual" class="navcta">Gestión de Pantallas</a>
-      <button class="logout" onclick="salir()">Salir</button>
+<body class="bg-paper text-pfg dark:bg-ink dark:text-fg transition-colors">
+<div class="shell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar bg-side dark:bg-sideD border-r border-pline dark:border-line flex flex-col gap-1 px-3 py-4 sticky top-0 h-[100dvh] overflow-y-auto">
+    <div class="brandhead flex items-center gap-2.5 px-2 pb-3">
+      <svg viewBox="0 0 28 34" width="18" height="22" fill="none" class="shrink-0">
+        <path id="uS" d="M5 5 V19 a9 9 0 0 0 18 0 V5" class="stroke-pfg dark:stroke-fg" stroke-width="3.4" stroke-linecap="round"/>
+        <circle r="2.2" fill="#CCF24D"><animateMotion dur="2.6s" repeatCount="indefinite" rotate="auto"><mpath href="#uS"/></animateMotion></circle>
+      </svg>
+      <span class="wordmark display font-bold tracking-tight">ClaUsina<span class="acc-text">.</span></span>
+      <button onclick="document.body.classList.toggle('col')" class="ml-auto grid place-items-center w-7 h-7 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-pmut dark:text-mut" aria-label="colapsar menú"><i data-lucide="panel-left-close" class="w-4 h-4"></i></button>
+    </div>
+
+    <button class="switch flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-pline dark:border-line mb-3 text-left opacity-90" title="Selector de marca (próximamente)">
+      <span class="grid place-items-center w-6 h-6 rounded-lg bg-acc text-accink display font-bold text-xs shrink-0" id="sw-ini">C</span>
+      <span class="switch-tx min-w-0"><span class="block text-sm display font-semibold truncate" id="sw-nombre">Cortafuego</span><span class="block mono text-[10px] text-pmut dark:text-mut">marca activa</span></span>
+      <i data-lucide="chevrons-up-down" class="switch-tx w-4 h-4 ml-auto text-pmut dark:text-mut shrink-0"></i>
+    </button>
+
+    <nav class="nav flex flex-col gap-0.5">
+      <div class="nsec mono text-[10px] tracking-[0.16em] uppercase text-pmut dark:text-mut px-2.5 mb-1">Agencia</div>
+      <a href="." class="on flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm transition"><i data-lucide="layout-dashboard" class="w-4 h-4 shrink-0"></i><span class="nlabel">Inicio</span></a>
+      <a href="maquinas" class="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg hover:bg-black/5 dark:hover:bg-white/5 transition"><i data-lucide="gauge" class="w-4 h-4 shrink-0"></i><span class="nlabel">Sala de máquinas</span></a>
+      <a href="." class="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg hover:bg-black/5 dark:hover:bg-white/5 transition"><i data-lucide="boxes" class="w-4 h-4 shrink-0"></i><span class="nlabel">Marcas</span></a>
+      <a href="audiovisual" class="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg hover:bg-black/5 dark:hover:bg-white/5 transition"><i data-lucide="monitor" class="w-4 h-4 shrink-0"></i><span class="nlabel">Pantallas</span></a>
+      <a href="estilo" class="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg hover:bg-black/5 dark:hover:bg-white/5 transition"><i data-lucide="palette" class="w-4 h-4 shrink-0"></i><span class="nlabel">Estilo</span></a>
+      <a href="arquitectura" class="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg hover:bg-black/5 dark:hover:bg-white/5 transition"><i data-lucide="git-fork" class="w-4 h-4 shrink-0"></i><span class="nlabel">Arquitectura</span></a>
+
+      <div class="nsec mono text-[10px] tracking-[0.16em] uppercase text-pmut dark:text-mut px-2.5 mt-4 mb-1">Marca activa</div>
+      <a href="proyecto" class="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg hover:bg-black/5 dark:hover:bg-white/5 transition"><i data-lucide="inbox" class="w-4 h-4 shrink-0"></i><span class="nlabel">Cola y aprobación</span></a>
+      <a href="instagram" class="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg hover:bg-black/5 dark:hover:bg-white/5 transition"><i data-lucide="instagram" class="w-4 h-4 shrink-0"></i><span class="nlabel">Instagram</span></a>
+      <a href="avisos" class="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg hover:bg-black/5 dark:hover:bg-white/5 transition"><i data-lucide="megaphone" class="w-4 h-4 shrink-0"></i><span class="nlabel">Avisos</span></a>
+      <a href="landing" class="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg hover:bg-black/5 dark:hover:bg-white/5 transition"><i data-lucide="globe" class="w-4 h-4 shrink-0"></i><span class="nlabel">Landing</span></a>
+      <a href="perfil" class="flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg hover:bg-black/5 dark:hover:bg-white/5 transition"><i data-lucide="settings-2" class="w-4 h-4 shrink-0"></i><span class="nlabel">Perfil</span></a>
     </nav>
-  </header>
-  <div id="toast"></div>
-  <div class="wrap">
-    <div class="global-summary" id="globalSummary">
-      <div class="gs-main">
-        <div>
-          <div class="gs-title">Estado global de la plataforma</div>
-          <div class="gs-sub">Cargando estado global…</div>
-        </div>
-      </div>
+
+    <div class="mt-auto flex items-center gap-1 pt-3">
+      <button onclick="toggleMode()" class="grid place-items-center w-9 h-9 rounded-lg border border-pline dark:border-line hover:border-acc transition shrink-0" aria-label="modo">
+        <i data-lucide="sun-medium" class="w-4 h-4 hidden dark:block"></i><i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i>
+      </button>
+      <button onclick="salir()" class="nlabel flex-1 flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-pmut dark:text-mut hover:text-cor transition"><i data-lucide="log-out" class="w-4 h-4"></i> Salir</button>
     </div>
-    <div class="grid" id="grid"></div>
+  </aside>
+  <div class="backdrop" onclick="document.body.classList.remove('navopen')"></div>
+
+  <!-- mobile top -->
+  <div class="mtop flex items-center gap-2.5 px-5 h-14 bg-side dark:bg-sideD border-b border-pline dark:border-line">
+    <button onclick="document.body.classList.toggle('navopen')" class="grid place-items-center w-9 h-9 -ml-2 rounded-lg" aria-label="menú"><i data-lucide="menu" class="w-5 h-5"></i></button>
+    <span class="display font-bold tracking-tight">ClaUsina<span class="acc-text">.</span></span>
+    <button onclick="toggleMode()" class="ml-auto grid place-items-center w-9 h-9 rounded-lg border border-pline dark:border-line" aria-label="modo"><i data-lucide="sun-medium" class="w-4 h-4 hidden dark:block"></i><i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i></button>
   </div>
-<script src="panel.js"></script>
+
+  <!-- MAIN -->
+  <main class="px-6 md:px-9 py-8 min-w-0">
+    <div class="flex items-baseline gap-3 mb-4">
+      <h1 class="display font-bold text-xl tracking-tight hl"><span>Inicio</span></h1>
+      <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
+    </div>
+
+    <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card mb-7 px-2 py-1 overflow-x-auto" id="statusbar"></div>
+
+    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-3">Las marcas</div>
+    <section id="grid" class="grid md:grid-cols-2 gap-4"></section>
+  </main>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
 <script>
-function renderGlobal(ps){
-  const totals = ps.reduce((acc,p) => ({
-    projects: acc.projects + 1,
-    active: acc.active + (p.activo ? 1 : 0),
-    inactive: acc.inactive + (p.activo ? 0 : 1),
-    ig_pend: acc.ig_pend + (p.ig_pend || 0),
-    ig_pub: acc.ig_pub + (p.ig_pub || 0),
-    av_pend: acc.av_pend + (p.av_pend || 0),
-    av_pub: acc.av_pub + (p.av_pub || 0),
-    req_cola: acc.req_cola + (p.req_cola || 0),
-  }), {projects:0, active:0, inactive:0, ig_pend:0, ig_pub:0, av_pend:0, av_pub:0, req_cola:0});
-  const statusText = totals.req_cola > 0
-    ? `Plataforma activa · ${totals.req_cola} requerimiento(s) en la cola` 
-    : `Plataforma inactiva · no hay requerimientos en cola`;
-  document.getElementById('globalSummary').innerHTML = `
-    <div class="gs-main">
-      <div>
-        <div class="gs-title">Estado global de la plataforma</div>
-        <div class="gs-sub">${esc(statusText)}</div>
-      </div>
-      <div class="gs-badges">
-        ${kpi(totals.projects,'proyectos')}
-        ${kpi(totals.ig_pend,'IG pendientes',totals.ig_pend>0)}
-        ${kpi(totals.av_pend,'avisos pendientes',totals.av_pend>0)}
-        ${kpi(totals.req_cola,'requerimientos en cola',totals.req_cola>0)}
-      </div>
-    </div>
-  `;
-}
-async function cargar(){
-  try{
-    const r=await fetch('api/agencia'); if(r.status===401){location.href='login';return;}
-    const ps=await r.json();
-    renderGlobal(ps);
-    document.getElementById('grid').innerHTML = ps.length ? ps.map(card).join('') : '<div class="empty">— sin proyectos —</div>';
-    const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR');
-  }catch(e){}
-}
-function kpi(n,label,hot){ return `<div class="kpi ${hot&&n>0?'hot':''}"><b>${n}</b><span>${label}</span></div>`; }
-function card(p){
-  const ini=esc((p.nombre||'?').trim().charAt(0).toUpperCase()||'?');
-  const isUrl=p.logo && /^https?:\/\//.test(p.logo);
-  const logo=`<div class="pjlogo"><span class="ini">${ini}</span>${isUrl?`<img src="${esc(p.logo)}" alt="" onerror="this.remove()">`:''}</div>`;
-  const ig=p.ig_handle?`<a class="lk" href="https://instagram.com/${esc(p.ig_handle.replace(/^@/,''))}" target="_blank" rel="noopener">${esc(p.ig_handle)}</a>`:'';
-  const web=p.dominio_web?`<a class="lk" href="${/^https?:\/\//.test(p.dominio_web)?esc(p.dominio_web):'https://'+esc(p.dominio_web)}" target="_blank" rel="noopener">${esc(p.dominio_web)}</a>`:'';
-  const links=(ig||web)?`<div class="links">${ig}${web}</div>`:'';
-  return `<div class="pj">
-    <div class="pjtop">${logo}<h3>${esc(p.nombre)} ${p.activo?'':'<span class="inact">inactivo</span>'}</h3></div>
-    <div class="desc">${esc(p.descripcion||'Sin descripción — cargá el perfil del proyecto.')}</div>
-    ${links}
-    <div class="kpis">
-      ${kpi(p.req_cola,'en cola',true)}
-      ${kpi(p.ig_pend,'IG pend.',true)}
-      ${kpi(p.ig_pub,'IG public.')}
-      ${kpi(p.av_pend,'avisos pend.',true)}
-      ${kpi(p.av_pub,'en pantalla')}
-    </div>
-    <div class="acts">
-      <button class="ibtn fire" onclick="entrar('${esc(p.slug)}')">Entrar al proyecto →</button>
-      <button class="ibtn" onclick="entrar('${esc(p.slug)}','perfil')">Perfil</button>
-    </div>
+const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function toggleMode(){ const d=document.documentElement.classList.toggle('dark'); try{localStorage.setItem('clausina-mode',d?'dark':'light');}catch(_){}}
+(function(){ try{ if(localStorage.getItem('clausina-mode')==='dark') document.documentElement.classList.add('dark'); }catch(_){} })();
+async function salir(){ try{ await fetch('api/logout',{method:'POST'}); }catch(_){} location.href='login'; }
+async function entrar(slug){ try{ await fetch('api/marca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})}); }catch(_){} location.href='proyecto'; }
+
+function cell(n,label,cls){ return `<div class="px-5 py-3"><div class="display font-bold text-2xl leading-none ${cls||''}">${n}</div><div class="mono text-[10px] uppercase tracking-wide text-pmut dark:text-mut mt-1.5">${label}</div></div>`; }
+function salud(p){ if(p.hace_s==null) return 'caido'; const r=p.hace_s/(p.intervalo_s||300); return r<=1.5?'ok':(r<=3?'warn':'caido'); }
+
+function renderStatus(marcas, maq){
+  const espera = maq ? (maq.pipeline.espera||0) : marcas.reduce((a,m)=>a+(m.ig_pend||0)+(m.av_pend||0),0);
+  const cola = marcas.reduce((a,m)=>a+(m.req_cola||0),0);
+  const hoy = maq ? (maq.pipeline.publicado_hoy||0) : 0;
+  const escal = maq ? (maq.pipeline.escalado||0) : 0;
+  const errores = maq ? (maq.pipeline.errores||0) : 0;
+  const caidos = maq ? (maq.procesos||[]).filter(p=>salud(p)==='caido').length : 0;
+  const motorOk = maq && caidos===0 && errores===0;
+  const motor = !maq ? `<span class="display font-semibold text-base leading-none text-pmut dark:text-mut">s/d</span>`
+    : motorOk ? `<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-acc breathe"></span><span class="display font-semibold text-base leading-none">en marcha</span></span>`
+              : `<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-cor live"></span><span class="display font-semibold text-base leading-none cor-text">revisar</span></span>`;
+  document.getElementById('statusbar').innerHTML = `<div class="flex divide-x divide-pline dark:divide-line min-w-max">
+    ${cell(marcas.length,'marcas')}
+    ${cell(espera,'esperan tu visto',espera>0?'cor-text':'')}
+    ${cell(cola,'en cola')}
+    ${cell((hoy>0?'+':'')+hoy,'publicado hoy',hoy>0?'acc-text':'')}
+    <div class="px-5 py-3">${motor}<div class="mono text-[10px] uppercase tracking-wide text-pmut dark:text-mut mt-1.5">el motor</div></div>
+    ${cell(escal,'escalados',escal>0?'cor-text':'')}
   </div>`;
 }
-async function entrar(slug, dest){
-  try{ await fetch('api/marca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})}); }catch(_){}
-  location.href = dest || 'proyecto';
+
+function metric(n,label,hot){ return `<div><div class="display font-extrabold text-3xl leading-none ${hot&&n>0?'cor-text':''}">${n}</div><div class="mono text-[10px] uppercase tracking-wide text-pmut dark:text-mut mt-1.5">${label}</div></div>`; }
+function card(p, primary){
+  const espera=(p.ig_pend||0)+(p.av_pend||0), pub=(p.ig_pub||0)+(p.av_pub||0), needs=espera>0;
+  const ini = esc((p.nombre||'?').trim().charAt(0).toUpperCase()||'?');
+  const isUrl = p.logo && /^https?:\/\//.test(p.logo);
+  const logo = isUrl ? `<img src="${esc(p.logo)}" alt="" class="w-10 h-10 rounded-xl object-contain border border-pline dark:border-line bg-psurf dark:bg-ink shrink-0" onerror="this.outerHTML='<div class=&quot;grid place-items-center w-10 h-10 rounded-xl border border-pline dark:border-line display font-bold text-base text-pmut dark:text-mut shrink-0&quot;>${ini}</div>'">`
+                     : `<div class="grid place-items-center w-10 h-10 rounded-xl border border-pline dark:border-line display font-bold text-base text-pmut dark:text-mut shrink-0">${ini}</div>`;
+  const dot = needs
+    ? `<span class="w-2 h-2 rounded-full bg-cor live"></span><span class="mono text-[10px] cor-text uppercase tracking-wide">tu visto</span>`
+    : (p.activo ? `<span class="w-2 h-2 rounded-full bg-acc breathe"></span><span class="mono text-[10px] acc-text uppercase tracking-wide">en señal</span>`
+                : `<span class="w-2 h-2 rounded-full bg-mut"></span><span class="mono text-[10px] text-pmut dark:text-mut uppercase tracking-wide">inactiva</span>`);
+  const arrow = primary
+    ? `<span class="grid place-items-center w-10 h-10 rounded-full bg-acc text-accink shrink-0 group-hover:brightness-95 transition"><i data-lucide="arrow-up-right" class="w-5 h-5"></i></span>`
+    : `<span class="grid place-items-center w-10 h-10 rounded-full border border-current acc-text shrink-0 group-hover:bg-acc group-hover:text-accink group-hover:border-acc transition"><i data-lucide="arrow-up-right" class="w-5 h-5"></i></span>`;
+  return `<a href="#" onclick="entrar('${esc(p.slug)}');return false;" class="group rounded-2xl border ${needs?'border-cor/40':'border-pline dark:border-line'} bg-psurf dark:bg-surf card p-5 flex flex-col gap-5 hover:border-acc dark:hover:border-acc transition">
+    <div class="flex items-start gap-3">
+      ${logo}
+      <div class="min-w-0"><h3 class="display font-bold text-lg tracking-tight truncate">${esc(p.nombre)}</h3><div class="mono text-[11px] text-pmut dark:text-mut mt-0.5 truncate">${esc(p.descripcion||'Sin descripción')}</div></div>
+      <span class="ml-auto flex items-center gap-1.5 shrink-0">${dot}</span>
+    </div>
+    <div class="flex items-end justify-between">
+      <div class="flex items-end gap-6">${metric(p.req_cola||0,'en cola')}${metric(espera,'tu visto',true)}${metric(pub,'publicado')}</div>
+      ${arrow}
+    </div>
+  </a>`;
 }
+function vacio(){ return `<div class="rounded-2xl border border-dashed border-pline dark:border-line p-5 grid place-items-center text-center min-h-[120px]">
+  <div><div class="w-10 h-10 rounded-xl grid place-items-center border border-pline dark:border-line mx-auto mb-2.5"><i data-lucide="plus" class="w-5 h-5 text-pmut dark:text-mut"></i></div>
+  <div class="display font-medium">Sumá una marca</div><p class="mono text-[11px] text-pmut dark:text-mut mt-1">Onboarding de la próxima cápsula.</p></div></div>`; }
+function skel(){ return `<div class="rounded-2xl border border-pline dark:border-line bg-psurf dark:bg-surf card p-5">
+  <div class="flex gap-3"><div class="w-10 h-10 rounded-xl bg-pline dark:bg-line"></div><div class="flex-1"><div class="h-4 w-1/2 rounded bg-pline dark:bg-line"></div><div class="h-3 w-3/4 rounded bg-pline dark:bg-line mt-2"></div></div></div>
+  <div class="h-10 w-2/3 rounded bg-pline dark:bg-line mt-6"></div></div>`; }
+
+async function cargar(){
+  try{
+    const [ra, rm] = await Promise.all([ fetch('api/agencia'), fetch('api/maquinas') ]);
+    if(ra.status===401){ location.href='login'; return; }
+    const marcas = await ra.json();
+    const maq = rm.ok ? await rm.json() : null;
+    const activas = marcas.filter(m=>m.activo).length;
+    document.getElementById('sub').textContent = `agencia · ${activas} marca${activas===1?'':'s'} activa${activas===1?'':'s'}`;
+    renderStatus(marcas, maq);
+    document.getElementById('grid').innerHTML = marcas.length
+      ? marcas.map((m,i)=>card(m, i===0)).join('') + vacio()
+      : vacio();
+    lucide.createIcons();
+  }catch(e){
+    document.getElementById('sub').textContent = 'sin conexión';
+  }
+}
+document.getElementById('grid').innerHTML = skel()+skel();
+lucide.createIcons();
 cargar();
+setInterval(cargar, 30000);
 </script>
 </body>
 </html>

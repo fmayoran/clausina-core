@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Sistema de marca ClaUsina — capa custom (helpers, componentes, motion) ── */
+body{font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+.display{font-family:'Inter Tight',system-ui,sans-serif;}
+.mono{font-family:'JetBrains Mono',monospace;}
+
+/* acento como texto, legible en ambos modos */
+.acc-text{color:#4d6800;} .dark .acc-text{color:#CCF24D;}
+.cor-text{color:#d8401b;} .dark .cor-text{color:#FF6A45;}
+
+/* tarjetas: flotan con sombra en light, borde en dark */
+.card{box-shadow:0 1px 2px rgba(20,22,24,.05),0 4px 14px rgba(20,22,24,.06);}
+.dark .card{box-shadow:none;}
+
+/* motion */
+.live{animation:live 1.7s ease-in-out infinite;}
+@keyframes live{0%,100%{opacity:1;box-shadow:0 0 0 0 #ff6a4566;}50%{opacity:.5;box-shadow:0 0 0 5px #ff6a4500;}}
+.breathe{animation:breathe 2.4s ease-in-out infinite;}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.45}}
+.orbit{}
+@media(prefers-reduced-motion:reduce){.live,.breathe,circle animateMotion{animation:none!important}}
+
+/* resaltador lima (firma del modo claro) */
+.hl{position:relative;display:inline-block;}
+.hl>span{position:relative;z-index:1;}
+.hl::after{content:"";position:absolute;left:-3px;right:-3px;bottom:1px;height:44%;background:#CCF24D;z-index:0;border-radius:1px;transform:skewX(-4deg);}
+.dark .hl::after{height:2px;bottom:-1px;opacity:.9;}
+
+/* ítem de menú activo: barra lima + tinte */
+.nav a.on{position:relative;background:rgba(204,242,77,.14);color:#3f5800;}
+.dark .nav a.on{background:rgba(204,242,77,.10);color:#CCF24D;}
+.nav a.on::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);height:60%;width:3px;border-radius:2px;background:#CCF24D;}
+
+/* layout + colapso de sidebar (desktop) */
+.shell{display:grid;grid-template-columns:236px 1fr;min-height:100dvh;transition:grid-template-columns .22s ease;}
+body.col .shell{grid-template-columns:64px 1fr;}
+body.col .nlabel,body.col .nsec,body.col .switch-tx{display:none;}
+body.col .nav a,body.col .switch{justify-content:center;}
+body.col .brandhead .wordmark{display:none;}
+
+/* drawer en móvil */
+.backdrop{display:none;}
+@media(max-width:768px){
+  .shell{grid-template-columns:1fr!important;}
+  .sidebar{position:fixed;top:0;left:0;bottom:0;width:250px;z-index:50;transform:translateX(-100%);transition:transform .22s ease;}
+  body.navopen .sidebar{transform:translateX(0);}
+  .backdrop{position:fixed;inset:0;background:rgba(8,9,11,.45);z-index:40;}
+  body.navopen .backdrop{display:block;}
+}
+@media(min-width:769px){.mtop{display:none!important;}}
