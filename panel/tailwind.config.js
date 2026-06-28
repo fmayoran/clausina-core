@@ -1,7 +1,7 @@
 /** Sistema de marca ClaUsina — tokens del panel. Ver core/planes/SISTEMA_MARCA.md.
  *  Compilar: npm run build:css  (genera public/tw.css, que se commitea). */
 module.exports = {
-  content: ['./public/index.html'],
+  content: ['./public/index.html', './public/shell.js'],
   darkMode: 'class',
   theme: {
     extend: {
