@@ -44,8 +44,10 @@
     return '' +
     '<aside class="sidebar bg-side dark:bg-sideD border-r border-pline dark:border-line flex flex-col gap-1 px-3 py-4 sticky top-0 h-[100dvh] overflow-y-auto">' +
       '<div class="brandhead flex items-center gap-2.5 px-2 pb-3">' +
-        '<svg viewBox="0 0 28 34" width="18" height="22" fill="none" class="shrink-0"><path id="uS" d="M5 5 V19 a9 9 0 0 0 18 0 V5" class="stroke-pfg dark:stroke-fg" stroke-width="3.4" stroke-linecap="round"/><circle r="2.2" fill="#CCF24D"><animateMotion dur="2.6s" repeatCount="indefinite" rotate="auto"><mpath href="#uS"/></animateMotion></circle></svg>' +
-        '<span class="wordmark display font-bold tracking-tight">ClaUsina<span class="acc-text">.</span></span>' +
+        '<a href="." class="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition" title="Ir al inicio">' +
+          '<svg viewBox="0 0 28 34" width="18" height="22" fill="none" class="shrink-0"><path id="uS" d="M5 5 V19 a9 9 0 0 0 18 0 V5" class="stroke-pfg dark:stroke-fg" stroke-width="3.4" stroke-linecap="round"/><circle r="2.2" fill="#CCF24D"><animateMotion dur="2.6s" repeatCount="indefinite" rotate="auto"><mpath href="#uS"/></animateMotion></circle></svg>' +
+          '<span class="wordmark display font-bold tracking-tight">ClaUsina<span class="acc-text">.</span></span>' +
+        '</a>' +
         '<button onclick="document.body.classList.toggle(\'col\')" class="ml-auto grid place-items-center w-7 h-7 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-pmut dark:text-mut" aria-label="colapsar menú"><i data-lucide="panel-left-close" class="w-4 h-4"></i></button>' +
       '</div>' +
       '<div class="relative mb-3">' +
@@ -65,7 +67,7 @@
     '<div class="backdrop" onclick="document.body.classList.remove(\'navopen\')"></div>' +
     '<div class="mtop flex items-center gap-2.5 px-5 h-14 bg-side dark:bg-sideD border-b border-pline dark:border-line">' +
       '<button onclick="document.body.classList.toggle(\'navopen\')" class="grid place-items-center w-9 h-9 -ml-2 rounded-lg" aria-label="menú"><i data-lucide="menu" class="w-5 h-5"></i></button>' +
-      '<span class="display font-bold tracking-tight">ClaUsina<span class="acc-text">.</span></span>' +
+      '<a href="." class="display font-bold tracking-tight">ClaUsina<span class="acc-text">.</span></a>' +
       '<button onclick="toggleMode()" class="ml-auto grid place-items-center w-9 h-9 rounded-lg border border-pline dark:border-line" aria-label="modo"><i data-lucide="sun-medium" class="w-4 h-4 hidden dark:block"></i><i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i></button>' +
     '</div>';
   }

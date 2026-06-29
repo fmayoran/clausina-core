@@ -20,13 +20,23 @@
   .statile{position:relative;display:flex;flex-direction:column;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:15px 16px 14px;text-decoration:none;cursor:pointer;transition:.15s;overflow:hidden;}
   .statile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ash);}
   .statile.c-cola::before{background:#8a8a82;} .statile.c-prop::before{background:var(--ember);}
-  .statile.c-aprob::before{background:#e9c9a6;} .statile.c-pub::before{background:#5ec27a;}
+  .statile.c-aprob::before{background:var(--alarm);} .statile.c-pub::before{background:#5ec27a;}
   .statile:hover{border-color:var(--ember);}
   .statile .sv{font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:2.15rem;line-height:.95;color:var(--white);}
   .statile .sl{font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);}
   .statile .sx{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:#6f6f68;letter-spacing:.03em;}
-  .statile.alert .sv{color:var(--fire);}
-  .statile.alert::before{background:var(--fire);}
+  .statile.alert .sv{color:var(--alarm);}
+  .statile.alert::before{background:var(--alarm);}
+  .statile.alert{border-color:rgba(255,106,69,.4);}
+  /* acciones del proyecto */
+  .proj-actions{display:flex;flex-wrap:wrap;gap:9px;}
+  .proj-actions .btn{width:auto;display:inline-flex;align-items:center;justify-content:center;gap:7px;}
+  .actl{display:inline-flex;align-items:center;gap:7px;font-family:'Inter Tight',sans-serif;font-weight:700;font-size:.84rem;letter-spacing:.03em;text-transform:uppercase;padding:8px 14px;border-radius:5px;border:1px solid var(--line);color:var(--ash);text-decoration:none;transition:.15s;}
+  .actl:hover{color:var(--chalk);border-color:var(--ash);}
+  #askmodal .modal-box{max-width:440px;}
+  #askmodal textarea,#askmodal select,#askmodal input{width:100%;background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);font-family:'Inter',sans-serif;font-size:.98rem;padding:9px 11px;outline:none;}
+  #askmodal textarea{min-height:70px;resize:vertical;}
+  #askmodal textarea:focus,#askmodal select:focus,#askmodal input:focus{border-color:var(--ember);}
 
   /* Grilla principal: dos mitades — operativo (izq) + canales protagonistas (der) */
   .proj-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start;}
@@ -42,7 +52,7 @@
   .proj-right .mt{font-size:1.65rem;}
   .proj-right .md{line-height:1.35;}
   .proj-right .mn{font-size:.8rem;margin-top:auto;padding-top:8px;}
-  .menucard .mn.alert{color:#1ec9ff;font-weight:700;}
+  .menucard .mn.alert{color:var(--alarm);font-weight:700;}
 
   /* Caja "pedir propuestas" dentro de la sección Propuestas */
   .askbox{margin:12px;padding:13px 14px 14px;background:#0c0c0a;border:1px dashed #1d3a44;border-radius:8px;display:flex;flex-direction:column;gap:9px;}
@@ -92,6 +102,13 @@
   <div id="toast"></div>
 
   <div class="proj-wrap">
+    <!-- Acciones del proyecto -->
+    <div class="proj-actions">
+      <button class="btn ok" onclick="openAsk()"><i data-lucide="sparkles" class="w-4 h-4"></i> Pedir propuestas</button>
+      <a class="actl" href="propuestas"><i data-lucide="lightbulb" class="w-4 h-4"></i> Ver propuestas</a>
+      <a class="actl" href="perfil"><i data-lucide="settings-2" class="w-4 h-4"></i> Perfil de la marca</a>
+    </div>
+
     <!-- Resumen / dashboard -->
     <div class="resumen" id="resumen">
       <a class="statile c-cola"  href="#sec-cola"><span class="sv" id="st-cola">—</span><span class="sl">En cola</span><span class="sx">requerimientos por resolver</span></a>
@@ -151,11 +168,35 @@
       </div>
     </div>
   </div>
+  <!-- Modal: pedir propuestas al creativo -->
+  <div id="askmodal" class="modal hidden">
+    <div class="modal-bg" onclick="closeAsk()"></div>
+    <div class="modal-box">
+      <div class="modal-head"><div class="modal-tt">Pedir propuestas al creativo</div><button class="modal-x" onclick="closeAsk()" title="Cerrar">×</button></div>
+      <div class="modal-body">
+        <div class="modal-sec"><div class="modal-lbl">Énfasis (opcional)</div><textarea id="enfasis" maxlength="1000" placeholder="Qué destacar: un plato, una promo, el tono…"></textarea></div>
+        <div class="modal-sec"><div class="modal-lbl">Canal</div>
+          <select id="canalprop"><option value="instagram">Instagram</option><option value="aviso">Aviso pantalla</option></select>
+        </div>
+        <div class="modal-sec"><div class="modal-lbl">Cantidad (1 a 8)</div><input id="cantprop" type="number" min="1" max="8" value="5"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn ok" id="askbtn" onclick="pedirPropuestas()">Pedir propuestas</button>
+        <button class="btn no" onclick="closeAsk()">Cancelar</button>
+      </div>
+    </div>
+  </div>
 </main></div>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="shell.js"></script>
 <script>ClausinaShell({active:'cola',darkOnly:true});</script>
 <script src="panel.js"></script>
-<script>currentLoad=loadCola; loadCola(); setInterval(loadCola,6000);</script>
+<script>
+  function openAsk(){ document.getElementById('askmodal').classList.remove('hidden'); }
+  function closeAsk(){ document.getElementById('askmodal').classList.add('hidden'); }
+  window.afterProponer = closeAsk;
+  currentLoad=loadCola; loadCola(); setInterval(loadCola,6000);
+  lucide.createIcons();
+</script>
 </body>
 </html>
