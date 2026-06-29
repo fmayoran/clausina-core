@@ -52,16 +52,17 @@
   /* pastillas del perfil */
   .proj-top{display:flex;align-items:center;justify-content:space-between;gap:12px;}
   .proj-title{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1.15rem;color:var(--white);}
-  .ptiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
-  .ptile{position:relative;display:flex;flex-direction:column;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:15px 48px 14px 16px;text-decoration:none;cursor:pointer;transition:.15s;overflow:hidden;}
-  .ptile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ash);}
-  .ptile.ok::before{background:#CCF24D;} .ptile.no::before{background:var(--alarm);}
+  .ptiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(244px,1fr));gap:14px;}
+  .ptile{position:relative;display:flex;flex-direction:column;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 54px 16px 18px;min-height:116px;text-decoration:none;cursor:pointer;transition:.15s;}
   .ptile:hover{border-color:var(--ember);}
-  .ptl{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1.05rem;color:var(--white);}
-  .pts{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.03em;color:var(--ash);text-transform:uppercase;}
-  .ptile.ok .pts{color:#9bb84a;} .ptile.no .pts{color:#e9a08c;}
-  .parrow{position:absolute;top:50%;right:13px;transform:translateY(-50%);width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--ash);transition:.15s;}
+  .ptile.no{border-color:rgba(255,106,69,.5);}
+  .ptl{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1.32rem;letter-spacing:-.01em;color:var(--white);line-height:1.05;}
+  .ptd{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.02em;color:var(--ash);line-height:1.4;}
+  .pts{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-top:auto;padding-top:8px;}
+  .ptile.ok .pts{color:#9bb84a;} .ptile.no .pts{color:#FF6A45;}
+  .parrow{position:absolute;top:50%;right:14px;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--ash);transition:.15s;}
   .ptile:hover .parrow{border-color:var(--ember);color:var(--ember);}
+  .ptile.no .parrow{border-color:rgba(255,106,69,.5);color:#FF6A45;}
   .ibtn.ghost{border-color:var(--line);color:var(--ash);}
   .ibtn.ghost:hover{background:transparent;border-color:var(--ash);color:var(--chalk);}
   .modal-body .grid{margin:0;}
@@ -88,10 +89,10 @@
     </div>
 
     <div class="ptiles">
-      <a class="ptile" id="t-ident" href="#" onclick="openM('ident');return false;"><span class="ptl">Identidad</span><span class="pts" id="s-ident">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
-      <a class="ptile" id="t-redes" href="#" onclick="openM('redes');return false;"><span class="ptl">Redes y enlaces</span><span class="pts" id="s-redes">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
-      <a class="ptile" id="t-brief" href="#" onclick="openM('brief');return false;"><span class="ptl">Brief</span><span class="pts" id="s-brief">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
-      <a class="ptile" id="t-estilo" href="#" onclick="openM('estilo');return false;"><span class="ptl">Estilo de marca</span><span class="pts" id="s-estilo">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+      <a class="ptile" id="t-ident" href="#" onclick="openM('ident');return false;"><span class="ptl">Identidad</span><span class="ptd">marca, slogan y logo</span><span class="pts" id="s-ident">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+      <a class="ptile" id="t-redes" href="#" onclick="openM('redes');return false;"><span class="ptl">Redes y enlaces</span><span class="ptd">IG, web, email y contactos</span><span class="pts" id="s-redes">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+      <a class="ptile" id="t-brief" href="#" onclick="openM('brief');return false;"><span class="ptl">Brief</span><span class="ptd">contexto para el creativo</span><span class="pts" id="s-brief">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+      <a class="ptile" id="t-estilo" href="#" onclick="openM('estilo');return false;"><span class="ptl">Estilo de marca</span><span class="ptd">identidad visual de la marca</span><span class="pts" id="s-estilo">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
     </div>
     <div class="intro" style="margin-top:14px">Registro de marca que consume el creativo. Entrá a cada bloque para verlo y editarlo. El color de cada pastilla indica si está completa. Para cambiar de marca, usá el selector del menú.</div>
 
