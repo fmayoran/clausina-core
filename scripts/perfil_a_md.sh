@@ -23,3 +23,17 @@ LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id = pr.id
 WHERE pr.slug = :'slug';
 SQL
 [ -s "$OUT" ] && echo "perfil -> $OUT ($(wc -l <"$OUT") líneas)" || { echo "vacío, no escribo"; exit 1; }
+
+# Sistema de diseño (estilo_md en la base) -> contexto/ESTILO.md, si está cargado.
+OUT_EST="/root/clausina/marcas/$SLUG/contexto/ESTILO.md"
+TMP_EST="$(mktemp)"
+docker exec -i "$CID" psql -U postgres -d claude -At -v slug="$SLUG" >"$TMP_EST" <<'SQL'
+SELECT coalesce(pp.estilo_md,'')
+FROM contenido.proyectos pr LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id = pr.id
+WHERE pr.slug = :'slug';
+SQL
+if grep -q '[^[:space:]]' "$TMP_EST" 2>/dev/null; then
+  mv "$TMP_EST" "$OUT_EST"; echo "estilo -> $OUT_EST ($(wc -l <"$OUT_EST") líneas)"
+else
+  rm -f "$TMP_EST"; echo "estilo: sin estilo_md para $SLUG (no escribo ESTILO.md)"
+fi

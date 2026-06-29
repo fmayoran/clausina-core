@@ -34,7 +34,7 @@ async function getProyectoId(slug) {
 async function getPerfil(proyectoId) {
   const { rows: [r] } = await pool.query(
     `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email, p.whatsapp,
-            pp.slogan, pp.logo, pp.brief_md, pp.actualizado_en
+            pp.slogan, pp.logo, pp.brief_md, pp.estilo_md, pp.actualizado_en
        FROM contenido.proyectos p LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id
       WHERE p.id=$1`, [proyectoId]);
   return r || {};
@@ -46,10 +46,10 @@ async function guardarPerfil(proyectoId, d) {
     `UPDATE contenido.proyectos SET ig_handle=$2, dominio_web=$3, ig_user_id=$4, telegram_chat_id=$5, email=$6, whatsapp=$7 WHERE id=$1`,
     [proyectoId, nn(d.ig_handle), nn(d.dominio_web), nn(d.ig_user_id), nn(d.telegram_chat_id), nn(d.email), nn(d.whatsapp)]);
   await pool.query(`
-    INSERT INTO contenido.proyecto_perfil (proyecto_id, slogan, logo, brief_md, actualizado_en)
-    VALUES ($1,$2,$3,$4, now())
-    ON CONFLICT (proyecto_id) DO UPDATE SET slogan=$2, logo=$3, brief_md=$4, actualizado_en=now()`,
-    [proyectoId, nn(d.slogan), nn(d.logo), nn(d.brief_md)]);
+    INSERT INTO contenido.proyecto_perfil (proyecto_id, slogan, logo, brief_md, estilo_md, actualizado_en)
+    VALUES ($1,$2,$3,$4,$5, now())
+    ON CONFLICT (proyecto_id) DO UPDATE SET slogan=$2, logo=$3, brief_md=$4, estilo_md=$5, actualizado_en=now()`,
+    [proyectoId, nn(d.slogan), nn(d.logo), nn(d.brief_md), nn(d.estilo_md)]);
   _marcasAt = 0;   // el nombre pudo cambiar -> refrescar cache de marcas
   return true;
 }

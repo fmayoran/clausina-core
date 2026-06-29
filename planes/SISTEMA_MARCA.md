@@ -136,7 +136,7 @@ Jerarquía por **peso y espacio**, no por color.
 
 ## Pendientes
 - [x] Bajar el sistema al panel (HECHO 2026-06-29: todas las páginas migradas; shell.js + tw.css compilado).
-- [ ] Logo definitivo como assets exportables (SVG símbolo animado + estático, favicon, lockup).
+- [x] Logo como assets exportables (HECHO 2026-06-29): `core/panel/public/brand/` (simbolo.svg, simbolo-animado.svg, lockup.svg, favicon.svg) + kit en `/logo` (variantes, descargas, reglas). Pendiente fino: outline del wordmark del lockup para imprenta.
 - [ ] Self-hostear fuentes (Inter Tight/Inter/JetBrains Mono) e íconos (Lucide) para no depender de Google Fonts/unpkg.
 - [ ] Aplicar el sistema a clausina.ar (web pública).
 - [ ] Páginas de contenido en dual dark/light (hoy dark-only) + cablear el switcher en el flujo de marca completo.

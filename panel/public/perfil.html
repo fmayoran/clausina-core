@@ -68,6 +68,7 @@
   .modal-body .grid{margin:0;}
   #m-brief .modal-box,#m-estilo .modal-box{max-width:640px;}
   #m-brief textarea{min-height:300px;}
+  #m-estilo textarea{min-height:240px;font-family:'JetBrains Mono',monospace;font-size:.86rem;}
 </style>
 </head>
 <body>
@@ -149,8 +150,11 @@
       <div class="modal-bg" onclick="closeM('estilo')"></div>
       <div class="modal-box">
         <div class="modal-head"><div class="modal-tt">Estilo de marca</div><button class="modal-x" onclick="closeM('estilo')">×</button></div>
-        <div class="modal-body"><div id="estilo-marca"><div class="est-empty">cargando…</div></div></div>
-        <div class="modal-foot"><button class="ibtn ghost" onclick="closeM('estilo')">Cerrar</button></div>
+        <div class="modal-body">
+          <div class="fld"><label>Sistema de diseño <span class="hint">— markdown: tokens, tipografía, logo, layout, voz. Es la fuente de verdad; el creativo lo lee y baja a la cápsula como ESTILO.md.</span></label><textarea id="estilo_md"></textarea></div>
+          <div class="est-block"><div class="est-h" style="margin-top:6px">Vista previa</div><div id="estilo-marca"><div class="est-empty">cargando…</div></div></div>
+        </div>
+        <div class="modal-foot"><button class="ibtn" onclick="guardar()">Guardar</button><button class="ibtn ghost" onclick="closeM('estilo')">Cerrar</button></div>
       </div>
     </div>
   </div>
@@ -160,7 +164,7 @@
 <script>ClausinaShell({active:'perfil',darkOnly:true});</script>
 <script src="panel.js"></script>
 <script>
-const CAMPOS=['nombre','slogan','ig_handle','dominio_web','email','whatsapp','ig_user_id','telegram_chat_id','logo','brief_md'];
+const CAMPOS=['nombre','slogan','ig_handle','dominio_web','email','whatsapp','ig_user_id','telegram_chat_id','logo','brief_md','estilo_md'];
 function openM(k){ const m=document.getElementById('m-'+k); if(m) m.classList.remove('hidden'); }
 function closeM(k){ const m=document.getElementById('m-'+k); if(m) m.classList.add('hidden'); }
 function closeAllModals(){ document.querySelectorAll('.modal').forEach(m=>m.classList.add('hidden')); }
@@ -173,6 +177,8 @@ function setTiles(){
   setTile('redes', n>=2, n+'/6 cargados');
   const brief = fval('brief_md').length>20;
   setTile('brief', brief, brief?'cargado':'sin cargar');
+  const est = fval('estilo_md').length>20;
+  setTile('estilo', est, est?'definido':'por definir');
 }
 async function cargar(){
   try{
@@ -250,7 +256,7 @@ function renderEstilo(slug){
     <a class="est-link" href="estilo">&rarr; Ver el sistema de marca completo</a>`;
 }
 cargar();
-fetch('api/marcas').then(r=>r.ok?r.json():null).then(d=>{ const slug=d&&d.activa; renderEstilo(slug); const has=!!BRAND_STYLE[slug]; setTile('estilo', has, has?'definido':'por definir'); }).catch(()=>{ renderEstilo(null); setTile('estilo', false, 'por definir'); });
+fetch('api/marcas').then(r=>r.ok?r.json():null).then(d=>renderEstilo(d&&d.activa)).catch(()=>renderEstilo(null));
 </script>
 </body>
 </html>
