@@ -4,7 +4,7 @@
 > Fuente de verdad escrita; el styleguide vivo (renderizado) está en el panel: **panel.clausina.ar/estilo**.
 > Aplica a la marca ClaUsina (@clausina.ar, clausina.ar) y a la piel del panel/motor. Las otras marcas conservan su propia identidad en sus cápsulas.
 
-Estado: **v1 — borrador aprobado en lo esencial** (logo, color, tipografía, componentes, estados, voz). Pendiente: bajar al panel real y a clausina.ar (Fase 4).
+Estado: **v1 aplicado al panel** (2026-06-29). Sistema definido (logo "U en órbita" + favicon B, color lima/coral, Inter Tight/JetBrains Mono, componentes, estados, voz) y bajado a TODO el panel: shell reutilizable (`shell.js`), Tailwind compilado (`tw.css`), dual dark/light en dashboard/máquinas/arquitectura y dark en las páginas de contenido. Pendiente: clausina.ar (web pública) y refinamientos.
 
 ---
 
@@ -135,6 +135,9 @@ Jerarquía por **peso y espacio**, no por color.
 ---
 
 ## Pendientes
-- [ ] Logo definitivo como assets (SVG símbolo animado + estático, favicon B export, lockup).
-- [ ] Bajar el sistema al panel real y a clausina.ar (Fase 4).
+- [x] Bajar el sistema al panel (HECHO 2026-06-29: todas las páginas migradas; shell.js + tw.css compilado).
+- [ ] Logo definitivo como assets exportables (SVG símbolo animado + estático, favicon, lockup).
+- [ ] Self-hostear fuentes (Inter Tight/Inter/JetBrains Mono) e íconos (Lucide) para no depender de Google Fonts/unpkg.
+- [ ] Aplicar el sistema a clausina.ar (web pública).
+- [ ] Páginas de contenido en dual dark/light (hoy dark-only) + cablear el switcher en el flujo de marca completo.
 - [ ] Skill de sistema de diseño (agnóstico, ClaUsina piloto) que cargue este manual + reglas y aplique con checklist.

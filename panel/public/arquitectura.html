@@ -151,7 +151,7 @@
   <p class="sub">La plataforma de contenido y operaciones multi-marca. Un motor agnóstico de marca que prepara, aprueba y publica contenido con generación asistida por IA, y una cápsula aislada por cada marca.</p>
   <div class="meta">
     <span class="pill">Documento vivo</span>
-    <span class="pill">Actualizado: 2026-06-23</span>
+    <span class="pill">Actualizado: 2026-06-29</span>
     <span class="pill">3 marcas activas</span>
     <span class="pill">Monorepo + 4 submodules</span>
   </div>
@@ -373,6 +373,7 @@
   <table class="chg">
     <thead><tr><th>Fecha</th><th>Cambio</th></tr></thead>
     <tbody>
+      <tr><td>2026-06-29</td><td><b>Sistema de marca ClaUsina + rediseño del panel.</b> Identidad nueva (logo "U en órbita" + favicon, lima/coral, Inter Tight/JetBrains Mono, dual dark/light). Panel migrado a un <b>shell reutilizable</b> (<code>shell.js</code>: sidebar + selector de marca funcional) con <b>Tailwind compilado</b> (<code>tw.css</code> commiteado, sin tocar el build). Dashboard, Sala de máquinas y Arquitectura en dark/light; páginas de contenido en dark. Lineamiento en <code>core/planes/SISTEMA_MARCA.md</code> y styleguide vivo en <code>/estilo</code>. Reorganización de <code>/proyecto</code> (pastillas con acción, cola en modal, propuestas en página propia).</td></tr>
       <tr><td>2026-06-23</td><td>Contexto de marca en 3 capas: <b>motor + guardrails</b> en el <code>CLAUDE.md</code> raíz (compartido, código); <b>voz/identidad</b> en <code>contexto/CONTEXTO_MARCA.md</code> (desde la base, editable en el panel); <b>lo propio de la marca</b> en un <code>CLAUDE.md</code> de cápsula fino. Se deduplicó el motor que se repetía en cada marca.</td></tr>
       <tr><td>2026-06-23</td><td>Orden de carpetas: la raíz <code>claudefolder</code> pasó a <code>clausina</code> y el motor <code>plataforma/</code> a <code>core/</code> (coincide con el repo <code>clausina-core</code>). Symlink de compatibilidad mientras la sesión viva corre desde la ruta vieja.</td></tr>
       <tr><td>2026-06-23</td><td>Primera versión de este documento de arquitectura (HTML vivo).</td></tr>
