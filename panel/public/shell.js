@@ -40,6 +40,25 @@
     return out;
   }
 
+  function labelOf(id){ for(var s in NAV){ for(var i=0;i<NAV[s].length;i++) if(NAV[s][i].id===id) return NAV[s][i].label; } return ''; }
+  function sectionOf(id){ for(var s in NAV){ for(var i=0;i<NAV[s].length;i++) if(NAV[s][i].id===id) return s; } return ''; }
+  // Breadcrumb contextual: Inicio › Marca › Página. La Marca enlaza al proyecto (home de la marca).
+  function crumb(active){
+    if(!active || active==='inicio') return '';
+    var lab=labelOf(active); if(!lab) return '';
+    var L='mono text-[11px] text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg transition';
+    var S='<span class="mono text-[11px] text-pmut dark:text-mut opacity-50">/</span>';
+    var CUR='mono text-[11px] text-pfg dark:text-fg';
+    var out='<nav class="flex items-center flex-wrap gap-2 mb-6"><a class="'+L+'" href=".">Inicio</a>';
+    if(sectionOf(active)==='Marca activa'){
+      if(active==='cola'){ out+=S+'<span class="'+CUR+'" id="cr-marca">marca</span>'; }
+      else { out+=S+'<a class="'+L+'" href="proyecto" id="cr-marca">marca</a>'+S+'<span class="'+CUR+'">'+lab+'</span>'; }
+    } else {
+      out+=S+'<span class="'+CUR+'">'+lab+'</span>';
+    }
+    return out+'</nav>';
+  }
+
   function html(active) {
     return '' +
     '<aside class="sidebar bg-side dark:bg-sideD border-r border-pline dark:border-line flex flex-col gap-1 px-3 py-4 sticky top-0 h-[100dvh] overflow-y-auto">' +
@@ -94,6 +113,9 @@
     // Ocultar el header/statusbar legados (las páginas viejas tenían su propio chrome).
     document.querySelectorAll('body > header').forEach(function (h) { h.style.display = 'none'; });
     var sb = document.getElementById('statusbar'); if (sb) sb.style.display = 'none';
+    // Breadcrumb al tope del contenido
+    var main = shell.querySelector('main');
+    if (main) { var ch = crumb(opts.active || ''); if (ch) main.insertAdjacentHTML('afterbegin', ch); }
     if (window.lucide) lucide.createIcons();
     // poblar el selector + dropdown de marcas
     fetch('api/marcas').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
@@ -103,6 +125,7 @@
       var ini = document.getElementById('sw-ini'), nom = document.getElementById('sw-nombre');
       if (a && ini) ini.textContent = (a.nombre || '?').trim().charAt(0).toUpperCase() || '·';
       if (a && nom) nom.textContent = a.nombre || 'marca';
+      var crm = document.getElementById('cr-marca'); if (crm && a) crm.textContent = a.nombre || 'marca';
       var menu = document.getElementById('sw-menu');
       if (menu) {
         menu.innerHTML = marcas.map(function (m) {
