@@ -28,11 +28,20 @@
   .statile.alert .sv{color:var(--alarm);}
   .statile.alert::before{background:var(--alarm);}
   .statile.alert{border-color:rgba(255,106,69,.4);}
-  /* acciones del proyecto */
-  .proj-actions{display:flex;flex-wrap:wrap;gap:9px;}
-  .proj-actions .btn{width:auto;display:inline-flex;align-items:center;justify-content:center;gap:7px;}
-  .actl{display:inline-flex;align-items:center;gap:7px;font-family:'Inter Tight',sans-serif;font-weight:700;font-size:.84rem;letter-spacing:.03em;text-transform:uppercase;padding:8px 14px;border-radius:5px;border:1px solid var(--line);color:var(--ash);text-decoration:none;transition:.15s;}
-  .actl:hover{color:var(--chalk);border-color:var(--ash);}
+  /* encabezado: título + acceso a perfil */
+  .proj-top{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .proj-title{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1.05rem;color:var(--chalk);letter-spacing:.01em;}
+  .proj-set{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:9px;border:1px solid var(--line);color:var(--ash);text-decoration:none;transition:.15s;flex:0 0 auto;}
+  .proj-set:hover{color:var(--chalk);border-color:var(--ember);}
+  /* flecha de acción dentro de la pastilla (como en el panel) */
+  .statile{padding-right:48px;}
+  .sarrow{position:absolute;top:50%;right:13px;transform:translateY(-50%);width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--ash);transition:.15s;}
+  .statile:hover .sarrow{border-color:var(--ember);color:var(--ember);background:rgba(204,242,77,.08);}
+  .statile.alert .sarrow{border-color:var(--alarm);color:var(--alarm);}
+  /* modal de cola */
+  #colamodal .modal-box{max-width:560px;}
+  #colamodal #c-cola{padding:0;margin-top:2px;}
+  #colamodal #cm-ask{width:auto;display:inline-flex;align-items:center;gap:7px;}
   #askmodal .modal-box{max-width:440px;}
   #askmodal textarea,#askmodal select,#askmodal input{width:100%;background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);font-family:'Inter',sans-serif;font-size:.98rem;padding:9px 11px;outline:none;}
   #askmodal textarea{min-height:70px;resize:vertical;}
@@ -44,7 +53,7 @@
   .proj-main{display:flex;flex-direction:column;gap:22px;min-width:0;}
   .proj-right{display:flex;flex-direction:column;gap:14px;}
   .proj-right h3.sech{font-family:'IBM Plex Mono',monospace;font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ash);margin:2px 2px -2px;}
-  .chan-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .chan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
   @media(max-width:520px){.chan-grid{grid-template-columns:1fr;}}
   .proj-right .menucard{padding:22px 20px;min-height:140px;gap:8px;position:relative;overflow:hidden;}
   .proj-right .menucard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--line);transition:.15s;}
@@ -102,40 +111,42 @@
   <div id="toast"></div>
 
   <div class="proj-wrap">
-    <!-- Acciones del proyecto -->
-    <div class="proj-actions">
-      <button class="btn ok" onclick="openAsk()"><i data-lucide="sparkles" class="w-4 h-4"></i> Pedir propuestas</button>
-      <a class="actl" href="propuestas"><i data-lucide="lightbulb" class="w-4 h-4"></i> Ver propuestas</a>
-      <a class="actl" href="perfil"><i data-lucide="settings-2" class="w-4 h-4"></i> Perfil de la marca</a>
+    <div class="proj-top">
+      <div class="proj-title">Panel del proyecto</div>
+      <a href="perfil" class="proj-set" title="Perfil de la marca"><i data-lucide="settings" class="w-5 h-5"></i></a>
     </div>
 
-    <!-- Resumen / dashboard -->
+    <!-- Resumen: cada pastilla con su flecha de acción -->
     <div class="resumen" id="resumen">
-      <a class="statile c-cola"  href="#sec-cola"><span class="sv" id="st-cola">—</span><span class="sl">En cola</span><span class="sx">requerimientos por resolver</span></a>
-      <a class="statile c-prop"  href="propuestas"><span class="sv" id="st-prop">—</span><span class="sl">Propuestas</span><span class="sx" id="st-prop-x">del creativo, por revisar</span></a>
-      <a class="statile c-aprob" href="#sec-canales"><span class="sv" id="st-aprob">—</span><span class="sl">Por aprobar</span><span class="sx">piezas en revisión</span></a>
-      <a class="statile c-pub"   href="#sec-canales"><span class="sv" id="st-pub">—</span><span class="sl">Publicadas</span><span class="sx">en feed y pantalla</span></a>
+      <a class="statile c-cola" href="#" onclick="openCola();return false;"><span class="sv" id="st-cola">—</span><span class="sl">En cola</span><span class="sx">requerimientos por resolver</span><span class="sarrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+      <a class="statile c-prop" href="propuestas"><span class="sv" id="st-prop">—</span><span class="sl">Propuestas</span><span class="sx" id="st-prop-x">del creativo, por revisar</span><span class="sarrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+      <a class="statile c-aprob" href="instagram"><span class="sv" id="st-aprob">—</span><span class="sl">Por aprobar</span><span class="sx">piezas en revisión</span><span class="sarrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+      <a class="statile c-pub" href="instagram"><span class="sv" id="st-pub">—</span><span class="sl">Publicadas</span><span class="sx">en feed y pantalla</span><span class="sarrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
     </div>
 
-    <div class="proj-cols">
-      <div class="proj-main">
-        <!-- Sección: cola de requerimientos (compacta) — lo que más atención requiere, va arriba -->
-        <section class="col pend" id="sec-cola">
-          <h2><span class="dot"></span>Cola de requerimientos <span class="n" id="n-cola"></span></h2>
-          <div class="cards" id="c-cola"></div>
-        </section>
-
+    <aside class="proj-right" id="sec-canales">
+      <h3 class="sech">Canales del proyecto</h3>
+      <div class="chan-grid">
+        <a class="menucard" href="instagram"><span class="mt">Instagram</span><span class="md">Publicaciones del feed</span><span class="mn" id="mc-ig"></span></a>
+        <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Avisos para la pantalla de calle</span><span class="mn" id="mc-av"></span></a>
+        <a class="menucard" href="landing"><span class="mt">Web / Landing</span><span class="md">Cambios en la landing del proyecto</span><span class="mn" id="mc-web"></span></a>
+        <a class="menucard" href="auditoria"><span class="mt">Auditoría</span><span class="md">Presencia digital: KPIs, gráficos y recomendaciones</span><span class="mn" id="mc-aud"></span></a>
       </div>
+    </aside>
+  </div>
 
-      <aside class="proj-right" id="sec-canales">
-        <h3 class="sech">Canales del proyecto</h3>
-        <div class="chan-grid">
-          <a class="menucard" href="instagram"><span class="mt">Instagram</span><span class="md">Publicaciones del feed</span><span class="mn" id="mc-ig"></span></a>
-          <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Avisos para la pantalla de calle</span><span class="mn" id="mc-av"></span></a>
-          <a class="menucard" href="landing"><span class="mt">Web / Landing</span><span class="md">Cambios en la landing del proyecto</span><span class="mn" id="mc-web"></span></a>
-          <a class="menucard" href="auditoria"><span class="mt">Auditoría</span><span class="md">Presencia digital: KPIs, gráficos y recomendaciones</span><span class="mn" id="mc-aud"></span></a>
-        </div>
-      </aside>
+  <!-- Modal: cola de requerimientos + pedir propuestas -->
+  <div id="colamodal" class="modal hidden">
+    <div class="modal-bg" onclick="closeCola()"></div>
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-tt">Cola de requerimientos <span class="n" id="n-cola"></span></div>
+        <button class="modal-x" onclick="closeCola()" title="Cerrar">×</button>
+      </div>
+      <div class="modal-body">
+        <button class="btn ok" id="cm-ask" onclick="openAsk()"><i data-lucide="sparkles" class="w-4 h-4"></i> Pedir propuestas al creativo</button>
+        <div class="cards" id="c-cola"></div>
+      </div>
     </div>
   </div>
 
@@ -194,6 +205,8 @@
 <script>
   function openAsk(){ document.getElementById('askmodal').classList.remove('hidden'); }
   function closeAsk(){ document.getElementById('askmodal').classList.add('hidden'); }
+  function openCola(){ document.getElementById('colamodal').classList.remove('hidden'); }
+  function closeCola(){ document.getElementById('colamodal').classList.add('hidden'); }
   window.afterProponer = closeAsk;
   currentLoad=loadCola; loadCola(); setInterval(loadCola,6000);
   lucide.createIcons();
