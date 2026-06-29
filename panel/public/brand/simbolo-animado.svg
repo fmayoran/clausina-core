@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 28 34" fill="none" role="img" aria-label="ClaUsina">
+  <title>ClaUsina — símbolo animado (señal en órbita)</title>
+  <path id="u" d="M5 5 V19 a9 9 0 0 0 18 0 V5" stroke="currentColor" stroke-width="3.6" stroke-linecap="round"/>
+  <circle r="2.4" fill="#CCF24D">
+    <animateMotion dur="2.6s" repeatCount="indefinite" rotate="auto">
+      <mpath href="#u" xlink:href="#u"/>
+    </animateMotion>
+  </circle>
+</svg>

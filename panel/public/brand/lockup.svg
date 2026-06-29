@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 196 40" fill="none" role="img" aria-label="ClaUsina">
+  <title>ClaUsina — lockup (símbolo + logotipo)</title>
+  <path d="M5 9 V21 a8.5 8.5 0 0 0 17 0 V9" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/>
+  <circle cx="22" cy="9" r="2.1" fill="#CCF24D"/>
+  <text x="33" y="30.5" font-family="'Inter Tight','Helvetica Neue',Arial,sans-serif" font-weight="700" font-size="29" letter-spacing="-0.6" fill="currentColor">ClaUsina<tspan fill="#CCF24D">.</tspan></text>
+</svg>
