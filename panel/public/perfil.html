@@ -49,6 +49,24 @@
   .est-voz span{font-family:'JetBrains Mono',monospace;font-size:.62rem;border:1px solid var(--line);border-radius:8px;padding:4px 9px;color:var(--chalk);}
   .est-link{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--ember);text-decoration:none;}
   .est-link:hover{color:var(--fire);}
+  /* pastillas del perfil */
+  .proj-top{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .proj-title{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1.15rem;color:var(--white);}
+  .ptiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
+  .ptile{position:relative;display:flex;flex-direction:column;gap:5px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:15px 48px 14px 16px;text-decoration:none;cursor:pointer;transition:.15s;overflow:hidden;}
+  .ptile::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--ash);}
+  .ptile.ok::before{background:#CCF24D;} .ptile.no::before{background:var(--alarm);}
+  .ptile:hover{border-color:var(--ember);}
+  .ptl{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1.05rem;color:var(--white);}
+  .pts{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.03em;color:var(--ash);text-transform:uppercase;}
+  .ptile.ok .pts{color:#9bb84a;} .ptile.no .pts{color:#e9a08c;}
+  .parrow{position:absolute;top:50%;right:13px;transform:translateY(-50%);width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--ash);transition:.15s;}
+  .ptile:hover .parrow{border-color:var(--ember);color:var(--ember);}
+  .ibtn.ghost{border-color:var(--line);color:var(--ash);}
+  .ibtn.ghost:hover{background:transparent;border-color:var(--ash);color:var(--chalk);}
+  .modal-body .grid{margin:0;}
+  #m-brief .modal-box,#m-estilo .modal-box{max-width:640px;}
+  #m-brief textarea{min-height:300px;}
 </style>
 </head>
 <body>
@@ -64,38 +82,75 @@
 <div class="shell"><main class="min-w-0">
   <div id="toast"></div>
   <div class="wrap">
-    <div class="intro">Registro de marca que consume el creativo. Es la fuente de verdad del contexto. Para cambiar de proyecto, volvé al panel principal (Agencia).</div>
-    <div class="grid">
-      <div class="fld"><label>Marca</label><input type="text" id="nombre"></div>
-      <div class="fld"><label>Slogan</label><input type="text" id="slogan"></div>
-
-      <div class="sect">Canales y enlaces</div>
-      <div class="fld"><label>Instagram <span class="hint">— usuario de la cuenta, con @</span></label><input type="text" id="ig_handle" placeholder="@cuenta"></div>
-      <div class="fld"><label>Web <span class="hint">— dominio del sitio</span></label><input type="text" id="dominio_web" placeholder="marca.ar"></div>
-      <div class="fld"><label>Email del proyecto <span class="hint">— de la marca, para email marketing / contacto (los avisos del sistema salen de ClaUsina)</span></label><input type="text" id="email" placeholder="hola@marca.ar"></div>
-      <div class="fld"><label>WhatsApp <span class="hint">— número de la marca para interactuar con clientes (formato +54...)</span></label><input type="text" id="whatsapp" placeholder="+54 9 11 ..."></div>
-      <div class="fld"><label>IG User ID <span class="hint">— ID de la cuenta en la API de Instagram</span></label><input type="text" id="ig_user_id"></div>
-      <div class="fld"><label>Telegram chat ID <span class="hint">— chat para briefs/avisos</span></label><input type="text" id="telegram_chat_id"></div>
-
-      <div class="sect">Identidad y contexto</div>
-      <div class="fld full"><label>Logo <span class="hint">— subí el archivo oficial, o pegá una URL/descripción</span></label>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <span id="logoBox" style="display:none;width:44px;height:44px;flex:0 0 auto;border-radius:8px;background:#080806;border:1px solid var(--line);overflow:hidden;position:relative;">
-            <img id="logoPrev" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:5px;">
-          </span>
-          <input type="text" id="logo" style="flex:1;">
-          <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" style="display:none;" onchange="subirLogo(this)">
-          <button type="button" class="ibtn" id="logoBtn" onclick="document.getElementById('logoFile').click()">Subir…</button>
-        </div>
-      </div>
-      <div class="fld full"><label>Brief <span class="hint">— todo el contexto: propuesta de valor, tono, público, lineamientos visuales, hacer/evitar, productos, datos clave</span></label><textarea id="brief_md"></textarea></div>
-
-      <div class="sect">Estilo de marca <span class="hint" style="text-transform:none;letter-spacing:0;color:var(--ash)">— identidad visual de la marca</span></div>
-      <div class="fld full" id="estilo-marca"><div class="est-empty">cargando…</div></div>
-    </div>
-    <div class="bar">
-      <button class="ibtn" onclick="guardar()">Guardar perfil</button>
+    <div class="proj-top" style="margin-bottom:14px">
+      <div class="proj-title">Perfil de la marca</div>
       <span class="upd2" id="upd2"></span>
+    </div>
+
+    <div class="ptiles">
+      <a class="ptile" id="t-ident" href="#" onclick="openM('ident');return false;"><span class="ptl">Identidad</span><span class="pts" id="s-ident">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+      <a class="ptile" id="t-redes" href="#" onclick="openM('redes');return false;"><span class="ptl">Redes y enlaces</span><span class="pts" id="s-redes">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+      <a class="ptile" id="t-brief" href="#" onclick="openM('brief');return false;"><span class="ptl">Brief</span><span class="pts" id="s-brief">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+      <a class="ptile" id="t-estilo" href="#" onclick="openM('estilo');return false;"><span class="ptl">Estilo de marca</span><span class="pts" id="s-estilo">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+    </div>
+    <div class="intro" style="margin-top:14px">Registro de marca que consume el creativo. Entrá a cada bloque para verlo y editarlo. El color de cada pastilla indica si está completa. Para cambiar de marca, usá el selector del menú.</div>
+
+    <!-- Modal: Identidad -->
+    <div id="m-ident" class="modal hidden">
+      <div class="modal-bg" onclick="closeM('ident')"></div>
+      <div class="modal-box">
+        <div class="modal-head"><div class="modal-tt">Identidad</div><button class="modal-x" onclick="closeM('ident')">×</button></div>
+        <div class="modal-body">
+          <div class="fld"><label>Marca</label><input type="text" id="nombre"></div>
+          <div class="fld"><label>Slogan</label><input type="text" id="slogan"></div>
+          <div class="fld"><label>Logo <span class="hint">— subí el archivo, o pegá una URL</span></label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span id="logoBox" style="display:none;width:44px;height:44px;flex:0 0 auto;border-radius:8px;background:#080806;border:1px solid var(--line);overflow:hidden;position:relative;"><img id="logoPrev" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:5px;"></span>
+              <input type="text" id="logo" style="flex:1;">
+              <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" style="display:none;" onchange="subirLogo(this)">
+              <button type="button" class="ibtn" id="logoBtn" onclick="document.getElementById('logoFile').click()">Subir…</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot"><button class="ibtn" onclick="guardar()">Guardar</button><button class="ibtn ghost" onclick="closeM('ident')">Cerrar</button></div>
+      </div>
+    </div>
+
+    <!-- Modal: Redes -->
+    <div id="m-redes" class="modal hidden">
+      <div class="modal-bg" onclick="closeM('redes')"></div>
+      <div class="modal-box">
+        <div class="modal-head"><div class="modal-tt">Redes y enlaces</div><button class="modal-x" onclick="closeM('redes')">×</button></div>
+        <div class="modal-body"><div class="grid">
+          <div class="fld"><label>Instagram <span class="hint">— con @</span></label><input type="text" id="ig_handle" placeholder="@cuenta"></div>
+          <div class="fld"><label>Web <span class="hint">— dominio</span></label><input type="text" id="dominio_web" placeholder="marca.ar"></div>
+          <div class="fld"><label>Email <span class="hint">— de la marca</span></label><input type="text" id="email" placeholder="hola@marca.ar"></div>
+          <div class="fld"><label>WhatsApp <span class="hint">— +54...</span></label><input type="text" id="whatsapp" placeholder="+54 9 11 ..."></div>
+          <div class="fld"><label>IG User ID</label><input type="text" id="ig_user_id"></div>
+          <div class="fld"><label>Telegram chat ID</label><input type="text" id="telegram_chat_id"></div>
+        </div></div>
+        <div class="modal-foot"><button class="ibtn" onclick="guardar()">Guardar</button><button class="ibtn ghost" onclick="closeM('redes')">Cerrar</button></div>
+      </div>
+    </div>
+
+    <!-- Modal: Brief -->
+    <div id="m-brief" class="modal hidden">
+      <div class="modal-bg" onclick="closeM('brief')"></div>
+      <div class="modal-box">
+        <div class="modal-head"><div class="modal-tt">Brief</div><button class="modal-x" onclick="closeM('brief')">×</button></div>
+        <div class="modal-body"><div class="fld"><label>Contexto <span class="hint">— propuesta de valor, tono, público, lineamientos visuales, hacer/evitar, productos, datos clave</span></label><textarea id="brief_md"></textarea></div></div>
+        <div class="modal-foot"><button class="ibtn" onclick="guardar()">Guardar</button><button class="ibtn ghost" onclick="closeM('brief')">Cerrar</button></div>
+      </div>
+    </div>
+
+    <!-- Modal: Estilo -->
+    <div id="m-estilo" class="modal hidden">
+      <div class="modal-bg" onclick="closeM('estilo')"></div>
+      <div class="modal-box">
+        <div class="modal-head"><div class="modal-tt">Estilo de marca</div><button class="modal-x" onclick="closeM('estilo')">×</button></div>
+        <div class="modal-body"><div id="estilo-marca"><div class="est-empty">cargando…</div></div></div>
+        <div class="modal-foot"><button class="ibtn ghost" onclick="closeM('estilo')">Cerrar</button></div>
+      </div>
     </div>
   </div>
 </main></div>
@@ -105,6 +160,19 @@
 <script src="panel.js"></script>
 <script>
 const CAMPOS=['nombre','slogan','ig_handle','dominio_web','email','whatsapp','ig_user_id','telegram_chat_id','logo','brief_md'];
+function openM(k){ const m=document.getElementById('m-'+k); if(m) m.classList.remove('hidden'); }
+function closeM(k){ const m=document.getElementById('m-'+k); if(m) m.classList.add('hidden'); }
+function closeAllModals(){ document.querySelectorAll('.modal').forEach(m=>m.classList.add('hidden')); }
+function fval(id){ const e=document.getElementById(id); return e?String(e.value||'').trim():''; }
+function setTile(id, ok, txt){ const t=document.getElementById('t-'+id); if(t){ t.classList.toggle('ok',ok); t.classList.toggle('no',!ok); } const s=document.getElementById('s-'+id); if(s) s.textContent=txt; }
+function setTiles(){
+  const ident = !!fval('nombre') && !!fval('slogan');
+  setTile('ident', ident, ident?'completo':'faltan datos');
+  const n=['ig_handle','dominio_web','email','whatsapp','ig_user_id','telegram_chat_id'].filter(f=>fval(f)).length;
+  setTile('redes', n>=2, n+'/6 cargados');
+  const brief = fval('brief_md').length>20;
+  setTile('brief', brief, brief?'cargado':'sin cargar');
+}
 async function cargar(){
   try{
     const r=await fetch('api/perfil'); if(r.status===401){location.href='login';return;}
@@ -112,6 +180,7 @@ async function cargar(){
     CAMPOS.forEach(c=>{ const el=document.getElementById(c); if(el) el.value=p[c]||''; });
     mostrarLogo(p.logo||'');
     document.getElementById('upd2').textContent = p.actualizado_en ? ('Última edición: '+fecha(p.actualizado_en)) : 'Sin cargar todavía';
+    setTiles();
   }catch(e){}
 }
 async function guardar(){
@@ -119,7 +188,7 @@ async function guardar(){
   try{
     const d=await fetch('api/perfil',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
     toast(d.ok?'Perfil guardado':'No se pudo guardar',!d.ok);
-    if(d.ok) cargar();
+    if(d.ok){ cargar(); closeAllModals(); }
   }catch(e){ toast('Error de conexión',true); }
 }
 function mostrarLogo(v){
@@ -180,7 +249,7 @@ function renderEstilo(slug){
     <a class="est-link" href="estilo">&rarr; Ver el sistema de marca completo</a>`;
 }
 cargar();
-fetch('api/marcas').then(r=>r.ok?r.json():null).then(d=>renderEstilo(d&&d.activa)).catch(()=>renderEstilo(null));
+fetch('api/marcas').then(r=>r.ok?r.json():null).then(d=>{ const slug=d&&d.activa; renderEstilo(slug); const has=!!BRAND_STYLE[slug]; setTile('estilo', has, has?'definido':'por definir'); }).catch(()=>{ renderEstilo(null); setTile('estilo', false, 'por definir'); });
 </script>
 </body>
 </html>
