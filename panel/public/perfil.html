@@ -28,6 +28,27 @@
   .ibtn{background:transparent;border:1px solid var(--ember);color:var(--ember);font-family:'IBM Plex Mono',monospace;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;padding:9px 18px;border-radius:6px;cursor:pointer;}
   .ibtn:hover{background:var(--fire);border-color:var(--fire);color:#0c0c0a;}
   .upd2{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--ash);}
+  /* Estilo de marca */
+  .est-empty{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--ash);line-height:1.5;}
+  .est-block{margin-bottom:18px;}
+  .est-h{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ember);margin-bottom:9px;}
+  .est-logos{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;}
+  .est-tile{display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:11px;padding:16px 22px;background:var(--panel);min-width:90px;}
+  .est-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+  .est-sw{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--panel);}
+  .est-sw .chip{height:44px;}
+  .est-sw .lab{padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:.56rem;}
+  .est-sw .lab b{display:block;color:var(--white);text-transform:uppercase;letter-spacing:.05em;font-weight:400;font-size:.62rem;}
+  .est-sw .lab span{color:var(--ash);}
+  .est-type{display:flex;flex-direction:column;gap:9px;}
+  .est-trow{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--line);padding-bottom:9px;}
+  .est-trow .rol{font-family:'JetBrains Mono',monospace;font-size:.56rem;text-transform:uppercase;color:var(--ash);width:62px;flex:0 0 auto;}
+  .est-trow .sam{color:var(--white);font-size:1.15rem;min-width:0;}
+  .est-trow .fn{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:.56rem;color:var(--ash);flex:0 0 auto;}
+  .est-voz{display:flex;gap:8px;flex-wrap:wrap;}
+  .est-voz span{font-family:'JetBrains Mono',monospace;font-size:.62rem;border:1px solid var(--line);border-radius:8px;padding:4px 9px;color:var(--chalk);}
+  .est-link{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--ember);text-decoration:none;}
+  .est-link:hover{color:var(--fire);}
 </style>
 </head>
 <body>
@@ -68,6 +89,9 @@
         </div>
       </div>
       <div class="fld full"><label>Brief <span class="hint">— todo el contexto: propuesta de valor, tono, público, lineamientos visuales, hacer/evitar, productos, datos clave</span></label><textarea id="brief_md"></textarea></div>
+
+      <div class="sect">Estilo de marca <span class="hint" style="text-transform:none;letter-spacing:0;color:var(--ash)">— identidad visual de la marca</span></div>
+      <div class="fld full" id="estilo-marca"><div class="est-empty">cargando…</div></div>
     </div>
     <div class="bar">
       <button class="ibtn" onclick="guardar()">Guardar perfil</button>
@@ -114,7 +138,49 @@ async function subirLogo(input){
   }catch(e){ toast('Error de conexión',true); }
   finally{ btn.textContent=txt; btn.disabled=false; input.value=''; }
 }
+// --- Estilo de marca (piloto ClaUsina; a futuro, una por marca) ---
+const BRAND_STYLE = {
+  clausina: {
+    paleta:[
+      {n:'Lima',hex:'#CCF24D',uso:'acción / marca'},
+      {n:'Coral',hex:'#FF6A45',uso:'vivo / alerta'},
+      {n:'Ink',hex:'#0A0B0D',uso:'fondo'},
+      {n:'Surface',hex:'#111317',uso:'tarjetas'},
+      {n:'Tiza',hex:'#ECEEF0',uso:'texto'},
+    ],
+    tipos:[
+      {rol:'Display',fn:'Inter Tight',sam:'ClaUsina',ff:"'Inter Tight',sans-serif",fw:700},
+      {rol:'Cuerpo',fn:'Inter',sam:'Comunicación con motor propio.',ff:"'Inter',sans-serif",fw:400},
+      {rol:'Datos',fn:'JetBrains Mono',sam:'0123456789 · live',ff:"'JetBrains Mono',monospace",fw:400},
+    ],
+    voz:['Directo','Técnico, no frío','Soporte, no protagonista'],
+  }
+};
+function uSvg(stroke,dot){
+  if(dot) return '<svg viewBox="0 0 28 34" width="26" height="32" fill="none"><path id="epA" d="M5 5 V19 a9 9 0 0 0 18 0 V5" stroke="'+stroke+'" stroke-width="3.4" stroke-linecap="round"/><circle r="2.2" fill="#CCF24D"><animateMotion dur="2.6s" repeatCount="indefinite" rotate="auto"><mpath href="#epA"/></animateMotion></circle></svg>';
+  return '<svg viewBox="0 0 28 34" width="26" height="32" fill="none"><path d="M5 5 V19 a9 9 0 0 0 18 0 V5" stroke="'+stroke+'" stroke-width="3.4" stroke-linecap="round"/></svg>';
+}
+function renderEstilo(slug){
+  const box=document.getElementById('estilo-marca'); if(!box) return;
+  const s=BRAND_STYLE[slug];
+  if(!s){ box.innerHTML='<div class="est-empty">El estilo de esta marca todavía no está definido. ClaUsina es el piloto; el resto lo desarrollamos cuando le toque.</div>'; return; }
+  const sw=s.paleta.map(c=>`<div class="est-sw"><div class="chip" style="background:${c.hex}"></div><div class="lab"><b>${c.n}</b><span>${c.hex} · ${c.uso}</span></div></div>`).join('');
+  const tp=s.tipos.map(t=>`<div class="est-trow"><span class="rol">${t.rol}</span><span class="sam" style="font-family:${t.ff};font-weight:${t.fw}">${t.sam}</span><span class="fn">${t.fn}</span></div>`).join('');
+  const vz=s.voz.map(v=>`<span>${v}</span>`).join('');
+  box.innerHTML=`
+    <div class="est-block"><div class="est-h">Logo</div><div class="est-logos">
+      <div class="est-tile" style="color:#ECEEF0">${uSvg('currentColor',true)}</div>
+      <div class="est-tile" style="color:#F5F2EC"><span style="font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1.4rem;display:flex;align-items:center;gap:8px">${uSvg('currentColor',false)}<span>ClaUsina<span style="color:#CCF24D">.</span></span></span></div>
+      <div class="est-tile" style="background:#CCF24D">${uSvg('#0A0B0D',false)}</div>
+      <a class="est-link" href="logo" style="align-self:center">&rarr; kit completo</a>
+    </div></div>
+    <div class="est-block"><div class="est-h">Paleta</div><div class="est-grid">${sw}</div></div>
+    <div class="est-block"><div class="est-h">Tipografía</div><div class="est-type">${tp}</div></div>
+    <div class="est-block"><div class="est-h">Voz</div><div class="est-voz">${vz}</div></div>
+    <a class="est-link" href="estilo">&rarr; Ver el sistema de marca completo</a>`;
+}
 cargar();
+fetch('api/marcas').then(r=>r.ok?r.json():null).then(d=>renderEstilo(d&&d.activa)).catch(()=>renderEstilo(null));
 </script>
 </body>
 </html>
