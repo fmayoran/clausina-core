@@ -177,22 +177,28 @@ function setFlow(pl){
   const e5=pl.escalado>0; document.getElementById('escal').classList.toggle('hot',e5); document.getElementById('n-fer').classList.toggle('hot',e5);
 }
 function read(b,label,cls){ return `<div><div class="display font-bold text-2xl leading-none ${cls||''}">${b}</div><div class="mono text-[10px] uppercase tracking-wide text-pmut dark:text-mut mt-1.5">${label}</div></div>`; }
-function setConsole(pl,procs){
+function setConsole(pl,procs,lg){
+  lg=lg||{};
   const caidos=procs.filter(x=>salud(x)==='caido').length;
   const faltan=Object.keys(PROC).length-procs.length;
   const sinLatido=caidos+Math.max(0,faltan);
-  const pend=(pl.espera||0)+(pl.escalado||0);
+  const errores=(pl.errores||0)+(lg.errores||0);
+  const pend=(pl.espera||0)+(pl.escalado||0)+(lg.borrador||0);
+  const trabajando=(pl.generando||0)+(pl.propuestas||0)+(lg.generando||0);
   let estado,sub,cls,sc='';
-  if(sinLatido>0||pl.errores>0){ estado='Revisar';cls='paro';sc='cor-text'; sub=sinLatido>0?`${sinLatido} proceso(s) sin latido`:`${pl.errores} en error`; }
-  else if(pend>0){ estado='Te espera';cls='espera'; sub=`${pend} pieza(s) requieren tu visto`; }
+  if(sinLatido>0||errores>0){ estado='Revisar';cls='paro';sc='cor-text'; sub=sinLatido>0?`${sinLatido} proceso(s) sin latido`:`${errores} en error`; }
+  else if(pend>0){ estado='Te espera';cls='espera'; sub=`${pend} pendiente(s) para tu visto`; }
+  else if(trabajando>0){ estado='Trabajando';cls='espera'; sub=`${trabajando} en curso · sin pendientes tuyos`; }
   else { estado='En marcha';cls='marcha'; sub='todo al día · sin pendientes tuyos'; }
   document.getElementById('lamp').className='lamp '+cls;
   const w=document.getElementById('stateW'); w.textContent=estado; w.className='display font-extrabold text-2xl leading-none tracking-tight '+sc;
   document.getElementById('stateSub').textContent=sub;
   document.getElementById('reads').innerHTML=[
     {b:pl.espera,s:'esperan tu visto',c:pl.espera>0?'cor-text':''},
+    {b:(lg.borrador||0),s:'borradores web',c:(lg.borrador||0)>0?'cor-text':''},
+    {b:(lg.generando||0),s:'web generando',c:(lg.generando||0)>0?'acc-text':''},
     {b:pl.escalado,s:'escalados a vos',c:pl.escalado>0?'cor-text':''},
-    {b:pl.errores,s:'en error',c:pl.errores>0?'cor-text':''},
+    {b:errores,s:'en error',c:errores>0?'cor-text':''},
     {b:(pl.publicado_hoy>0?'+':'')+(pl.publicado_hoy||0),s:'publicado hoy',c:pl.publicado_hoy>0?'acc-text':''},
   ].map(r=>read(r.b,r.s,r.c)).join('');
 }
@@ -219,7 +225,7 @@ async function cargar(){
     const [rm,ra]=await Promise.all([fetch('api/maquinas'),fetch('api/agencia')]);
     if(rm.status===401||ra.status===401){ location.href='login'; return; }
     const data=await rm.json(); const marcas=await ra.json();
-    setConsole(data.pipeline,data.procesos||[]); setFlow(data.pipeline); setVitals(data.procesos||[]); setBrands(marcas);
+    setConsole(data.pipeline,data.procesos||[],data.landing||{}); setFlow(data.pipeline); setVitals(data.procesos||[]); setBrands(marcas);
     const t='actualizado '+new Date().toLocaleTimeString('es-AR');
     document.getElementById('upd').textContent=t; document.getElementById('foot-upd').textContent='· '+t;
     lucide.createIcons();

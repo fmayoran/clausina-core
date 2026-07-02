@@ -305,7 +305,15 @@ async function getMaquinas() {
     FROM contenido.batch_runs
     WHERE proceso IN ('worker','dispatcher','correccion','propuestas','ingesta_briefs')
     ORDER BY array_position(ARRAY['ingesta_briefs','propuestas','worker','dispatcher','correccion'], proceso);`)).rows;
-  return { pipeline, procesos };
+  // Flujo de landing/web (contenido.landing_cambios): otra máquina del motor.
+  const landing = (await pool.query(`
+    SELECT
+      count(*) FILTER (WHERE estado IN ('pendiente','procesando'))::int AS generando,
+      count(*) FILTER (WHERE estado='borrador')::int AS borrador,
+      count(*) FILTER (WHERE estado='aprobada')::int AS publicando,
+      count(*) FILTER (WHERE estado='error')::int AS errores
+    FROM contenido.landing_cambios`)).rows[0];
+  return { pipeline, procesos, landing };
 }
 
 // Token de la revisión vigente SOLO si está pendiente de aprobación.

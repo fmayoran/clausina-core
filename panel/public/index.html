@@ -23,6 +23,10 @@
       <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
     </div>
 
+    <div class="flex items-center justify-between mb-3">
+      <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut">Sala de máquinas</div>
+      <a href="maquinas" class="group inline-flex items-center gap-2 mono text-[11px] text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg transition">ver detalle <span class="grid place-items-center w-7 h-7 rounded-full border border-pline dark:border-line group-hover:border-acc transition"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+    </div>
     <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card mb-7 px-2 py-1 overflow-x-auto" id="statusbar"></div>
 
     <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-3">Las marcas</div>
@@ -47,13 +51,17 @@ function renderStatus(marcas, maq){
   const escal = maq ? (maq.pipeline.escalado||0) : 0;
   const errores = maq ? (maq.pipeline.errores||0) : 0;
   const caidos = maq ? (maq.procesos||[]).filter(p=>salud(p)==='caido').length : 0;
-  const motorOk = maq && caidos===0 && errores===0;
+  const lg = maq ? (maq.landing||{}) : {};
+  const borr = lg.borrador||0, gen = lg.generando||0, lgErr = lg.errores||0;
+  const motorOk = maq && caidos===0 && errores===0 && lgErr===0;
   const motor = !maq ? `<span class="display font-semibold text-base leading-none text-pmut dark:text-mut">s/d</span>`
     : motorOk ? `<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-acc breathe"></span><span class="display font-semibold text-base leading-none">en marcha</span></span>`
               : `<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-cor live"></span><span class="display font-semibold text-base leading-none cor-text">revisar</span></span>`;
   document.getElementById('statusbar').innerHTML = `<div class="flex divide-x divide-pline dark:divide-line min-w-max">
     ${cell(marcas.length,'marcas')}
     ${cell(espera,'esperan tu visto',espera>0?'cor-text':'')}
+    ${cell(borr,'borradores web',borr>0?'cor-text':'')}
+    ${cell(gen,'web generando',gen>0?'acc-text':'')}
     ${cell(cola,'en cola')}
     ${cell((hoy>0?'+':'')+hoy,'publicado hoy',hoy>0?'acc-text':'')}
     <div class="px-5 py-3">${motor}<div class="mono text-[10px] uppercase tracking-wide text-pmut dark:text-mut mt-1.5">el motor</div></div>
