@@ -68,13 +68,19 @@
 <script src="panel.js"></script>
 <script>
 const LBL={pendiente:'En cola',procesando:'Generando…',borrador:'Borrador listo',aprobada:'Aprobando…',en_produccion:'En producción',rechazada:'A modificar',error:'Error'};
+let _sig='';
 async function load(){
   try{
     const r=await fetch('api/landing'); if(r.status===401){location.href='login';return;}
     const items=await r.json();
+    const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR');
+    // Firma de lo que importa para el render. Si no cambió, NO redibujamos:
+    // así el <iframe> del preview no se recarga y el scroll no salta al tope.
+    const sig=JSON.stringify(items.map(c=>[c.id,c.estado,c.preview_url,c.requerimiento]));
+    if(sig===_sig) return;
+    _sig=sig;
     const cont=document.getElementById('lista');
     cont.innerHTML = items.length ? items.map(card).join('') : '<div class="empty">— Sin cambios todavía. Pedí el primero arriba. —</div>';
-    const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR');
   }catch(e){}
 }
 function card(c){
