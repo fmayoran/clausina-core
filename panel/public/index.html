@@ -10,6 +10,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tw.css">
+<style>
+  .lamp{width:13px;height:13px;border-radius:50%;background:#9aa0a8;flex:0 0 auto;}
+  .lamp.marcha{background:#CCF24D;box-shadow:0 0 0 4px rgba(204,242,77,.18);animation:lb 3.2s ease-in-out infinite;}
+  .lamp.espera{background:#E0A458;box-shadow:0 0 0 4px rgba(224,164,88,.18);animation:lb 2s ease-in-out infinite;}
+  .lamp.paro{background:#FF6A45;box-shadow:0 0 0 4px rgba(255,106,69,.22);animation:lk 1s steps(1) infinite;}
+  @keyframes lb{0%,100%{opacity:1}50%{opacity:.5}} @keyframes lk{0%,49%{opacity:1}50%,100%{opacity:.3}}
+  @media(prefers-reduced-motion:reduce){.lamp{animation:none!important}}
+</style>
 </head>
 <body class="bg-paper text-pfg dark:bg-ink dark:text-fg transition-colors">
 <div class="shell">
@@ -23,11 +31,17 @@
       <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
     </div>
 
-    <div class="flex items-center justify-between mb-3">
-      <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut">Sala de máquinas</div>
-      <a href="maquinas" class="group inline-flex items-center gap-2 mono text-[11px] text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg transition">ver detalle <span class="grid place-items-center w-7 h-7 rounded-full border border-pline dark:border-line group-hover:border-acc transition"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
-    </div>
-    <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card mb-7 px-2 py-1 overflow-x-auto" id="statusbar"></div>
+    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-3">Sala de máquinas</div>
+    <a href="maquinas" class="group block rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card mb-7 p-5 hover:border-acc dark:hover:border-acc transition" title="Ir a Sala de máquinas">
+      <div class="flex flex-wrap items-center gap-x-8 gap-y-4">
+        <div class="flex items-center gap-3.5">
+          <span class="lamp" id="sm-lamp"></span>
+          <div><div class="display font-extrabold text-2xl leading-none tracking-tight" id="sm-state">·····</div><div class="mono text-[10px] uppercase tracking-[0.14em] text-pmut dark:text-mut mt-1.5" id="sm-sub">leyendo el motor…</div></div>
+        </div>
+        <div class="flex flex-wrap gap-x-7 gap-y-3 overflow-x-auto" id="sm-reads"></div>
+        <span class="ml-auto grid place-items-center w-10 h-10 rounded-full border border-pline dark:border-line group-hover:border-acc transition shrink-0"><i data-lucide="arrow-up-right" class="w-5 h-5"></i></span>
+      </div>
+    </a>
 
     <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-3">Las marcas</div>
     <section id="grid" class="grid md:grid-cols-2 gap-4"></section>
@@ -44,29 +58,35 @@ async function entrar(slug){ try{ await fetch('api/marca',{method:'POST',headers
 function cell(n,label,cls){ return `<div class="px-5 py-3"><div class="display font-bold text-2xl leading-none ${cls||''}">${n}</div><div class="mono text-[10px] uppercase tracking-wide text-pmut dark:text-mut mt-1.5">${label}</div></div>`; }
 function salud(p){ if(p.hace_s==null) return 'caido'; const r=p.hace_s/(p.intervalo_s||300); return r<=1.5?'ok':(r<=3?'warn':'caido'); }
 
-function renderStatus(marcas, maq){
-  const espera = maq ? (maq.pipeline.espera||0) : marcas.reduce((a,m)=>a+(m.ig_pend||0)+(m.av_pend||0),0);
-  const cola = marcas.reduce((a,m)=>a+(m.req_cola||0),0);
-  const hoy = maq ? (maq.pipeline.publicado_hoy||0) : 0;
-  const escal = maq ? (maq.pipeline.escalado||0) : 0;
-  const errores = maq ? (maq.pipeline.errores||0) : 0;
-  const caidos = maq ? (maq.procesos||[]).filter(p=>salud(p)==='caido').length : 0;
-  const lg = maq ? (maq.landing||{}) : {};
-  const borr = lg.borrador||0, gen = lg.generando||0, lgErr = lg.errores||0;
-  const motorOk = maq && caidos===0 && errores===0 && lgErr===0;
-  const motor = !maq ? `<span class="display font-semibold text-base leading-none text-pmut dark:text-mut">s/d</span>`
-    : motorOk ? `<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-acc breathe"></span><span class="display font-semibold text-base leading-none">en marcha</span></span>`
-              : `<span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-cor live"></span><span class="display font-semibold text-base leading-none cor-text">revisar</span></span>`;
-  document.getElementById('statusbar').innerHTML = `<div class="flex divide-x divide-pline dark:divide-line min-w-max">
-    ${cell(marcas.length,'marcas')}
-    ${cell(espera,'esperan tu visto',espera>0?'cor-text':'')}
-    ${cell(borr,'borradores web',borr>0?'cor-text':'')}
-    ${cell(gen,'web generando',gen>0?'acc-text':'')}
-    ${cell(cola,'en cola')}
-    ${cell((hoy>0?'+':'')+hoy,'publicado hoy',hoy>0?'acc-text':'')}
-    <div class="px-5 py-3">${motor}<div class="mono text-[10px] uppercase tracking-wide text-pmut dark:text-mut mt-1.5">el motor</div></div>
-    ${cell(escal,'escalados',escal>0?'cor-text':'')}
-  </div>`;
+function smRead(b,label,c){ return `<div><div class="display font-bold text-2xl leading-none ${c||''}">${b}</div><div class="mono text-[10px] uppercase tracking-wide text-pmut dark:text-mut mt-1.5">${label}</div></div>`; }
+// Consola de Sala de máquinas (misma que /maquinas): lámpara + estado + indicadores.
+function renderConsola(marcas, maq){
+  const lampEl=document.getElementById('sm-lamp'), stEl=document.getElementById('sm-state'), subEl=document.getElementById('sm-sub'), rdEl=document.getElementById('sm-reads');
+  if(!maq){ lampEl.className='lamp paro'; stEl.textContent='Sin señal'; stEl.className='display font-extrabold text-2xl leading-none tracking-tight cor-text'; subEl.textContent='sin conexión con el motor'; rdEl.innerHTML=''; return; }
+  const pl=maq.pipeline||{}, lg=maq.landing||{}, procs=maq.procesos||[];
+  const caidos=procs.filter(p=>salud(p)==='caido').length;
+  const sinLatido=caidos+Math.max(0,5-procs.length);
+  const errores=(pl.errores||0)+(lg.errores||0);
+  const espera=pl.espera||0, escal=pl.escalado||0, borr=lg.borrador||0, gen=lg.generando||0;
+  const cola=marcas.reduce((a,m)=>a+(m.req_cola||0),0), hoy=pl.publicado_hoy||0;
+  const pend=espera+escal+borr;
+  const trab=(pl.generando||0)+(pl.propuestas||0)+gen;
+  let estado,sub,cls;
+  if(sinLatido>0||errores>0){ estado='Revisar';cls='paro'; sub=sinLatido>0?`${sinLatido} proceso(s) sin latido`:`${errores} en error`; }
+  else if(pend>0){ estado='Te espera';cls='espera'; sub=`${pend} pendiente(s) para tu visto`; }
+  else if(trab>0){ estado='Trabajando';cls='espera'; sub=`${trab} en curso · sin pendientes tuyos`; }
+  else { estado='En marcha';cls='marcha'; sub='todo al día · sin pendientes tuyos'; }
+  lampEl.className='lamp '+cls;
+  stEl.textContent=estado; stEl.className='display font-extrabold text-2xl leading-none tracking-tight '+(cls==='paro'?'cor-text':'');
+  subEl.textContent=sub;
+  rdEl.innerHTML=[
+    smRead(espera,'esperan tu visto',espera>0?'cor-text':''),
+    smRead(borr,'borradores web',borr>0?'cor-text':''),
+    smRead(gen,'web generando',gen>0?'acc-text':''),
+    smRead(cola,'en cola'),
+    smRead(escal,'escalados',escal>0?'cor-text':''),
+    smRead((hoy>0?'+':'')+hoy,'publicado hoy',hoy>0?'acc-text':''),
+  ].join('');
 }
 
 function metric(n,label,hot){ return `<div><div class="display font-extrabold text-3xl leading-none ${hot&&n>0?'cor-text':''}">${n}</div><div class="mono text-[10px] uppercase tracking-wide text-pmut dark:text-mut mt-1.5">${label}</div></div>`; }
@@ -110,7 +130,7 @@ async function cargar(){
     const maq = rm.ok ? await rm.json() : null;
     const activas = marcas.filter(m=>m.activo).length;
     document.getElementById('sub').textContent = `agencia · ${activas} marca${activas===1?'':'s'} activa${activas===1?'':'s'}`;
-    renderStatus(marcas, maq);
+    renderConsola(marcas, maq);
     document.getElementById('grid').innerHTML = marcas.length
       ? marcas.map((m,i)=>card(m, i===0)).join('') + vacio()
       : vacio();
