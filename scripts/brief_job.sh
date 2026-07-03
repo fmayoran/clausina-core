@@ -111,7 +111,17 @@ fi
 timeout 1200 claude -p "$PROMPT" --model sonnet --allowedTools "Bash" Read Write Edit Glob Grep >> "$LOG" 2>&1
 rc=$?
 
-if [ $rc -eq 0 ]; then psql "UPDATE contenido.tg_briefs SET estado='procesado', procesado_en=now(), transcripcion=left(\$tr\$$transcript\$tr\$,4000) WHERE id='$bid';" >/dev/null
+if [ $rc -eq 0 ]; then
+  # rc=0 NO garantiza pieza: el creativo puede salir OK avisando que faltó material (Reel sin videos, etc.).
+  # Solo es 'procesado' si realmente se registró la pieza (cf-crear-pendiente setea tg_briefs.pieza_id).
+  tienepieza=$(psql "SELECT (pieza_id IS NOT NULL)::text FROM contenido.tg_briefs WHERE id='$bid';")
+  if [ "$tienepieza" = "true" ]; then
+    psql "UPDATE contenido.tg_briefs SET estado='procesado', procesado_en=now(), transcripcion=left(\$tr\$$transcript\$tr\$,4000) WHERE id='$bid';" >/dev/null
+  else
+    # No se creó pieza -> vuelve a 'propuesta' para que Fer la siga viendo y pueda reintentar (p.ej. sumando el material). El creativo ya avisó por Telegram el motivo.
+    psql "UPDATE contenido.tg_briefs SET estado='propuesta', procesado_en=now() WHERE id='$bid';" >/dev/null
+    echo "$(ts) brief $bid rc=0 SIN pieza -> vuelve a 'propuesta' (¿faltó material? revisar aviso)" >> "$LOG"
+  fi
 else psql "UPDATE contenido.tg_briefs SET estado='error', procesado_en=now() WHERE id='$bid';" >/dev/null
   curl -s -X POST -H "Content-Type: application/json" -d "{\"asunto\":\"Brief con error\",\"cuerpo\":\"No pude procesar un brief por voz. Revisá el log.\",\"marca\":\"$NOMBRE\"}" "https://crm-n8n.dhmtev.easypanel.host/webhook/cf-avisar" >/dev/null 2>&1
 fi
