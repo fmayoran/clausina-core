@@ -184,6 +184,7 @@ function solicitudCard(b){
 function reqClass(b){
   if(b.es_solicitud) return 'work';
   if(b.brief_estado==='revisar' || b.brief_estado==='revisando') return 'work';   // propuesta que el creativo está reescribiendo
+  if(!b.pieza_id && (b.brief_estado==='pendiente' || b.brief_estado==='procesando')) return 'work';  // el creativo está armando la pieza
   if(b.brief_estado==='propuesta' && (b.origen==='mencion' || b.origen==='creativo')) return 'prop';
   return 'cola';
 }
@@ -193,6 +194,14 @@ function revisandoCard(b){
     <div class="meta2"><span class="rst proc">Preparando nueva versión…</span>${canalBadge(b)}</div>
     <div class="ptt">${esc(b.req_titulo||'Propuesta')}</div>
     <div class="reqtext">El creativo está ajustando el concepto con tus comentarios.</div>
+  </div></div>`;
+}
+// Pieza generándose tras "Generar publicación": visible hasta que aparece en Cola y aprobación.
+function generandoCard(b){
+  return `<div class="card prop"><div class="reqbody">
+    <div class="meta2"><span class="rst proc">Generando la pieza…</span>${canalBadge(b)}</div>
+    <div class="ptt">${esc(b.req_titulo||'Propuesta')}</div>
+    <div class="reqtext">El creativo está armando la publicación. Cuando esté lista aparece en Cola y aprobación para tu visto.</div>
   </div></div>`;
 }
 const firstLine = (t,n=64) => { t=(t||'').trim().split('\n')[0]; return t.length>n ? t.slice(0,n).trim()+'…' : t; };
@@ -344,21 +353,28 @@ async function loadMateriales(){
     g.innerHTML = (mats&&mats.length) ? mats.map(matTile).join('') : '<div class="empty">— sin material aún —</div>';
   }catch(e){}
 }
+const MAT_MAX=45*1024*1024;   // tope práctico por archivo (Telegram bot ~50MB); dejamos margen para el base64
 async function rmAddFiles(input){
   const files=[...(input.files||[])]; if(!files.length||acting||!modalId) return;
   const lbl=input.closest('label'), txt=lbl.querySelector('.flbl'), base=txt.textContent;
   acting=true; lbl.style.pointerEvents='none';
-  let okc=0;
+  let okc=0, pesados=0, fallos=0;
   for(let i=0;i<files.length;i++){
+    if(files[i].size>MAT_MAX){ pesados++; continue; }
     txt.textContent='Subiendo '+(i+1)+'/'+files.length+'…';
     try{
       const dataUrl=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(files[i]);});
-      const d=await fetch('api/requerimientos/'+modalId+'/material',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,filename:files[i].name})}).then(r=>r.json());
-      if(d.ok) okc++;
-    }catch(e){}
+      const rp=await fetch('api/requerimientos/'+modalId+'/material',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,filename:files[i].name})});
+      const d=await rp.json().catch(()=>({ok:false}));
+      if(d.ok){ okc++; await loadMateriales(); }        // refresco en vivo: se ve cada archivo apenas sube
+      else { fallos++; if(rp.status===413) pesados++; }
+    }catch(e){ fallos++; }
   }
   input.value=''; txt.textContent=base; lbl.style.pointerEvents=''; acting=false;
-  toast(okc?okc+' material(es) agregado(s)':'No se pudo subir', !okc);
+  let msg = okc ? okc+' material(es) agregado(s)' : 'No se pudo subir el material';
+  if(pesados) msg += ` · ${pesados} muy pesado(s) (máx ~45MB)`;
+  else if(!okc && fallos) msg += ' (probá de nuevo)';
+  toast(msg, !okc);
   loadMateriales();
 }
 async function rmDelMaterial(mid){
@@ -441,7 +457,10 @@ function renderCola(){
   const prop=_reqList.filter(b=>reqClass(b)==='prop');
   const cola=_reqList.filter(b=>reqClass(b)==='cola');
   // Propuestas: primero los pedidos en curso (estado), después las propuestas/menciones accionables.
-  const propHtml = work.map(b => (b.brief_estado==='revisar'||b.brief_estado==='revisando') ? revisandoCard(b) : solicitudCard(b)).join('')
+  const propHtml = work.map(b =>
+      (b.brief_estado==='revisar'||b.brief_estado==='revisando') ? revisandoCard(b)
+      : (!b.pieza_id && (b.brief_estado==='pendiente'||b.brief_estado==='procesando')) ? generandoCard(b)
+      : solicitudCard(b)).join('')
     + prop.map(b => b.origen==='mencion' ? mentionCard(b) : propCard(b)).join('');
   fill('c-prop','n-prop', propHtml);
   fill('c-cola','n-cola', cola.map(reqRow).join(''));

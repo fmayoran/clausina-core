@@ -76,7 +76,7 @@ function readCookie(req) {
 }
 
 app.disable('x-powered-by');
-app.use(express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '75mb' }));  // material/logo van como dataURL base64; un video sube ~33% -> holgura para archivos de hasta ~50MB (tope de Telegram)
 
 // Públicos (sin sesión): health, pantalla de login y sus fuentes, login/logout.
 app.get('/api/health', async (req, res) => { try { await db.health(); res.json({ ok: true }); } catch { res.status(500).json({ ok: false }); } });
