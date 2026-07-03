@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "brief", "landing"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -57,6 +57,19 @@ def det_propuesta():
     return jobs
 
 
+def det_revision():
+    # Propuestas que Fer mandó a reescribir (loop "pedir nueva versión"): estado='revisar'.
+    jobs = []
+    for row in _lines("SELECT b.id||'|'||COALESCE(p.slug,'cortafuego') "
+                      "FROM contenido.tg_briefs b "
+                      "LEFT JOIN contenido.proyectos p ON p.id=b.proyecto_id "
+                      "WHERE b.estado='revisar' ORDER BY b.creado_en"):
+        bid, slug = row.split('|', 1)
+        jobs.append({"tipo": "revision", "proyecto_slug": slug,
+                     "payload": {"brief_id": bid}, "lock_key": f"revision:{bid}"})
+    return jobs
+
+
 def det_brief():
     jobs = []
     for row in _lines("SELECT b.id||'|'||COALESCE(p.slug,'cortafuego') "
@@ -84,6 +97,7 @@ def det_landing():
 DETECTORS = {
     "correccion": det_correccion,
     "propuesta": det_propuesta,
+    "revision": det_revision,
     "brief": det_brief,
     "landing": det_landing,
 }
@@ -91,7 +105,7 @@ DETECTORS = {
 
 def run():
     encolados = 0
-    for tipo in ("correccion", "propuesta", "brief", "landing"):
+    for tipo in ("correccion", "propuesta", "revision", "brief", "landing"):
         if tipo not in MIGRATED:
             continue
         try:

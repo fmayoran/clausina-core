@@ -183,8 +183,17 @@ function solicitudCard(b){
 //   'work' = pedido en curso (creativo elaborando) · 'prop' = propuesta/mención por revisar · 'cola' = requerimiento en pipeline.
 function reqClass(b){
   if(b.es_solicitud) return 'work';
+  if(b.brief_estado==='revisar' || b.brief_estado==='revisando') return 'work';   // propuesta que el creativo está reescribiendo
   if(b.brief_estado==='propuesta' && (b.origen==='mencion' || b.origen==='creativo')) return 'prop';
   return 'cola';
+}
+// Propuesta en proceso de reescritura (loop "pedir nueva versión"): visible mientras el creativo la ajusta.
+function revisandoCard(b){
+  return `<div class="card prop"><div class="reqbody">
+    <div class="meta2"><span class="rst proc">Preparando nueva versión…</span>${canalBadge(b)}</div>
+    <div class="ptt">${esc(b.req_titulo||'Propuesta')}</div>
+    <div class="reqtext">El creativo está ajustando el concepto con tus comentarios.</div>
+  </div></div>`;
 }
 const firstLine = (t,n=64) => { t=(t||'').trim().split('\n')[0]; return t.length>n ? t.slice(0,n).trim()+'…' : t; };
 
@@ -369,6 +378,20 @@ async function generarPublicacion(){
   }catch(e){ toast('Error de conexión', true); }
   btn.disabled=false; btn.textContent='Generar publicación'; acting=false; setTimeout(currentLoad,500);
 }
+// "Pedir nueva versión": manda tus comentarios y el creativo reescribe el concepto (loop de refinamiento, sin generar la pieza).
+async function pedirNuevaVersion(){
+  if(!modalId||acting) return;
+  const coment=document.getElementById('rm-coment').value.trim();
+  if(!coment){ toast('Escribí qué querés ajustar del concepto', true); return; }
+  const id=modalId, btn=document.getElementById('rm-rev');
+  acting=true; if(btn){btn.disabled=true; btn.textContent='Enviando…';}
+  try{
+    const d=await fetch('api/requerimientos/'+id+'/revisar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({comentarios:coment})}).then(r=>r.json());
+    if(d.ok){ toast('El creativo está preparando una nueva versión'); modalId=null; document.getElementById('reqmodal').classList.add('hidden'); }
+    else toast('No se pudo'+(d.error?' ('+d.error+')':''), true);
+  }catch(e){ toast('Error de conexión', true); }
+  if(btn){btn.disabled=false; btn.textContent='Pedir nueva versión';} acting=false; setTimeout(currentLoad,500);
+}
 
 /* ---------- Loaders por pantalla ---------- */
 // Estado del resumen (dashboard), alimentado desde loadCola (cola/prop/work) y updateMenuCounts (aprob/pub).
@@ -418,7 +441,7 @@ function renderCola(){
   const prop=_reqList.filter(b=>reqClass(b)==='prop');
   const cola=_reqList.filter(b=>reqClass(b)==='cola');
   // Propuestas: primero los pedidos en curso (estado), después las propuestas/menciones accionables.
-  const propHtml = work.map(solicitudCard).join('')
+  const propHtml = work.map(b => (b.brief_estado==='revisar'||b.brief_estado==='revisando') ? revisandoCard(b) : solicitudCard(b)).join('')
     + prop.map(b => b.origen==='mencion' ? mentionCard(b) : propCard(b)).join('');
   fill('c-prop','n-prop', propHtml);
   fill('c-cola','n-cola', cola.map(reqRow).join(''));

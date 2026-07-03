@@ -9,12 +9,13 @@ import traceback
 
 import jobqueue
 from db import heartbeat
-from handlers import correccion, propuesta, brief, landing
+from handlers import correccion, propuesta, revision, brief, landing
 
 # Registry de handlers por tipo de job.
 HANDLERS = {
     "correccion": correccion.handle,
     "propuesta": propuesta.handle,
+    "revision": revision.handle,
     "brief": brief.handle,
     "landing": landing.handle,
 }

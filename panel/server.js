@@ -332,6 +332,15 @@ app.post('/api/requerimientos/:id/generar', async (req, res) => {
   } catch (e) { console.error('generar req', e.message); res.status(500).json({ ok: false }); }
 });
 
+// "Pedir nueva versión": guarda comentarios y manda la propuesta a que el creativo reescriba el concepto -> 'revisar'.
+app.post('/api/requerimientos/:id/revisar', async (req, res) => {
+  try {
+    const comentarios = String((req.body && req.body.comentarios) || '').trim();
+    if (!comentarios) return res.status(400).json({ ok: false, error: 'comentarios_requerido' });
+    res.json({ ok: await db.revisarReq(req.params.id, comentarios) });
+  } catch (e) { console.error('revisar req', e.message); res.status(500).json({ ok: false }); }
+});
+
 // Galería de materiales aportados a un requerimiento (para el modal de interacción).
 app.get('/api/requerimientos/:id/materiales', async (req, res) => {
   try { res.json(await db.getMateriales(req.params.id)); }

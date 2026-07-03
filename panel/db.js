@@ -143,7 +143,7 @@ async function getRequerimientos(proyectoId) {
     LEFT JOIN contenido.piezas pz ON pz.id = b.pieza_id
     LEFT JOIN contenido.revisiones r ON r.id = pz.revision_vigente
     WHERE b.proyecto_id = $1 AND (
-            (b.pieza_id IS NULL AND b.estado IN ('propuesta','pendiente','procesando','error'))
+            (b.pieza_id IS NULL AND b.estado IN ('propuesta','pendiente','procesando','error','revisar','revisando'))
          OR (b.pieza_id IS NOT NULL AND r.estado IN ('pendiente_aprobacion','rechazada','aprobada','borrador')))
     ORDER BY (b.estado='propuesta') DESC, b.creado_en DESC
     LIMIT 100;`, [proyectoId]);
@@ -243,6 +243,15 @@ async function generarReq(id, comentarios) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.tg_briefs SET comentarios=$2, estado='pendiente'
       WHERE id=$1 AND estado IN ('propuesta','error')`, [id, (comentarios || '').slice(0, 2000) || null]);
+  return rowCount > 0;
+}
+
+// "Pedir nueva versión": guarda los comentarios y manda la propuesta a que el creativo
+// REESCRIBA el concepto (loop de refinamiento) -> 'revisar'. NO genera la pieza.
+async function revisarReq(id, comentarios) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.tg_briefs SET comentarios=$2, estado='revisar'
+      WHERE id=$1 AND pieza_id IS NULL AND estado='propuesta'`, [id, (comentarios || '').slice(0, 2000) || null]);
   return rowCount > 0;
 }
 
@@ -548,7 +557,7 @@ async function health() {
 module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, getResumenAgencia,
   getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,
-  addMaterialPorPieza, getMaterialesPorPieza, delMaterialPorPieza, generarReq, activarReq, descartarReq, insertMencion,
+  addMaterialPorPieza, getMaterialesPorPieza, delMaterialPorPieza, generarReq, revisarReq, activarReq, descartarReq, insertMencion,
   getPostIdsPublicados, upsertMetricas,
   getPantallaActiva, getPantallaPorSlug, getPantallas, crearPantalla, actualizarPantalla, eliminarPantalla, getProgramaActivo,
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
