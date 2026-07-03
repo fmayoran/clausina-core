@@ -46,24 +46,25 @@ bash "$MOTOR/scripts/perfil_a_md.sh" "$slug" >/dev/null 2>&1 || true
 # Se descarga con el bot de la marca (mismo file_id que sube el panel) y se inyecta al prompt por pieza_id.
 BOT=$(grep '^TELEGRAM_BOT_TOKEN=' "$REPO/$slug.env" 2>/dev/null | cut -d= -f2-)
 dl(){ local fid="$1" out="$2"; local fp=$(curl -s "https://api.telegram.org/bot$BOT/getFile?file_id=$fid" | python3 -c "import sys,json;print(json.load(sys.stdin)['result']['file_path'])" 2>/dev/null); [ -z "$fp" ] && return 1; curl -s "https://api.telegram.org/file/bot$BOT/$fp" -o "$out"; }
+# Preferimos el media store en disco (media_path, sin límite de tamaño); Telegram (file_id) queda como legacy.
+HOST_MEDIA="/var/lib/docker/volumes/clausina_panel_clausina-media/_data"
 rm -f /tmp/fix_mat_*
 MATCTX=""; mi=0
-if [ -n "$BOT" ]; then
-  while IFS=$'\t' read -r pieza fid mt; do
-    [ -z "$fid" ] && continue
-    ext="jpg"; [ "$mt" = "video" ] && ext="mp4"
-    out="/tmp/fix_mat_$mi.$ext"
-    if dl "$fid" "$out"; then MATCTX+="- pieza_id=$pieza -> $out ($mt)"$'\n'; fi
-    mi=$((mi+1))
-  done < <(psql "SELECT b.pieza_id::text || E'\t' || bm.file_id || E'\t' || COALESCE(bm.media_type,'photo')
-                 FROM contenido.brief_material bm
-                 JOIN contenido.tg_briefs b ON b.id=bm.brief_id
-                 JOIN contenido.piezas pz ON pz.id=b.pieza_id
-                 JOIN contenido.revisiones r ON r.id=pz.revision_vigente
-                 JOIN contenido.proyectos p ON p.id=pz.proyecto_id
-                 WHERE r.estado='rechazada' AND r.derivado_en IS NULL AND p.slug='$slug'
-                 ORDER BY bm.orden, bm.creado_en")
-fi
+while IFS=$'\t' read -r pieza fid mt mpath; do
+  [ -z "$fid$mpath" ] && continue
+  if [ -n "$mpath" ]; then ext="${mpath##*.}"; else ext="jpg"; [ "$mt" = "video" ] && ext="mp4"; fi
+  out="/tmp/fix_mat_$mi.$ext"
+  if [ -n "$mpath" ] && [ -f "$HOST_MEDIA/$mpath" ]; then cp "$HOST_MEDIA/$mpath" "$out" && MATCTX+="- pieza_id=$pieza -> $out ($mt)"$'\n'
+  elif [ -n "$fid" ] && [ -n "$BOT" ] && dl "$fid" "$out"; then MATCTX+="- pieza_id=$pieza -> $out ($mt)"$'\n'; fi
+  mi=$((mi+1))
+done < <(psql "SELECT b.pieza_id::text || E'\t' || COALESCE(bm.file_id,'') || E'\t' || COALESCE(bm.media_type,'photo') || E'\t' || COALESCE(bm.media_path,'')
+               FROM contenido.brief_material bm
+               JOIN contenido.tg_briefs b ON b.id=bm.brief_id
+               JOIN contenido.piezas pz ON pz.id=b.pieza_id
+               JOIN contenido.revisiones r ON r.id=pz.revision_vigente
+               JOIN contenido.proyectos p ON p.id=pz.proyecto_id
+               WHERE r.estado='rechazada' AND r.derivado_en IS NULL AND p.slug='$slug'
+               ORDER BY bm.orden, bm.creado_en")
 [ -n "$MATCTX" ] && echo "$(ts)    material aportado al rechazo ($mi archivo/s)" >> "$LOG"
 echo "$(ts) -> $slug (revisiones: $REVIDS)" >> "$LOG"
 hb "$slug: corrigiendo"

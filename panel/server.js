@@ -76,7 +76,7 @@ function readCookie(req) {
 }
 
 app.disable('x-powered-by');
-app.use(express.json({ limit: '75mb' }));  // material/logo van como dataURL base64; un video sube ~33% -> holgura para archivos de hasta ~50MB (tope de Telegram)
+app.use(express.json({ limit: '120mb' }));  // material/logo van como dataURL base64; un video sube ~33% -> holgura para archivos de ~85MB
 
 // Públicos (sin sesión): health, pantalla de login y sus fuentes, login/logout.
 app.get('/api/health', async (req, res) => { try { await db.health(); res.json({ ok: true }); } catch { res.status(500).json({ ok: false }); } });
@@ -262,8 +262,10 @@ app.get('/api/brief/:id/media', async (req, res) => {
 app.get('/api/material/:mid/media', async (req, res) => {
   try {
     const m = await db.getMaterialFile(req.params.mid);
-    if (!m || m.media_type !== 'photo') return res.status(404).end();
-    await proxyTelegramPhoto(res, m.media_file_id);
+    if (!m) return res.status(404).end();
+    if (m.media_path) return res.redirect('/media/' + m.media_path.split('/').map(encodeURIComponent).join('/'));  // media store en disco
+    if (m.media_type !== 'photo') return res.status(404).end();
+    await proxyTelegramPhoto(res, m.media_file_id);   // legacy: material viejo en Telegram
   } catch (e) { console.error('material media', e.message); res.status(500).end(); }
 });
 
@@ -353,6 +355,25 @@ app.delete('/api/requerimientos/:id/material/:mid', async (req, res) => {
   catch (e) { console.error('del material', e.message); res.status(500).json({ ok: false }); }
 });
 
+// Guarda un archivo (dataURL base64) en el media store en disco (/app/media/<subdir>/<uuid>.<ext>)
+// y devuelve {mediaPath, mediaType, filename}. Reemplaza a Telegram: el Bot API descarga hasta 20MB,
+// insuficiente para videos. El volumen es el mismo que lee el creativo (host) — sin límite de tamaño.
+async function guardarMaterialDisco(body, subdir) {
+  const dataUrl = String((body && body.dataUrl) || '');
+  const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!m) { const e = new Error('archivo_invalido'); e.http = 400; throw e; }
+  const mime = m[1];
+  const buf = Buffer.from(m[2], 'base64');
+  const mediaType = mime.startsWith('video/') ? 'video' : 'photo';
+  const filename = String((body && body.filename) || (mediaType === 'video' ? 'material.mp4' : 'material.jpg'));
+  const ext = ((filename.match(/\.([a-z0-9]{2,5})$/i) || [, ''])[1] || (mediaType === 'video' ? 'mp4' : 'jpg')).toLowerCase();
+  const rel = path.posix.join(subdir, `${crypto.randomUUID()}.${ext}`);
+  const abs = path.join('/app/media', rel);
+  await fs.promises.mkdir(path.dirname(abs), { recursive: true });
+  await fs.promises.writeFile(abs, buf);
+  return { mediaPath: rel, mediaType, filename };
+}
+
 // Sube un archivo (base64) al bot como documento (preserva calidad) y devuelve {fileId, mediaType, filename}.
 // Lanza un Error con .http para que el handler responda el status correcto.
 async function subirMaterialTg(body, caption) {
@@ -378,8 +399,8 @@ async function subirMaterialTg(body, caption) {
 // generación (eso lo hace el botón "Generar publicación").
 app.post('/api/requerimientos/:id/material', async (req, res) => {
   try {
-    const { fileId, mediaType, filename } = await subirMaterialTg(req.body, 'Material para una propuesta (vía panel).');
-    const mat = await db.addMaterial(req.params.id, fileId, mediaType, filename);
+    const { mediaPath, mediaType, filename } = await guardarMaterialDisco(req.body, path.posix.join('material/req', req.params.id));
+    const mat = await db.addMaterial(req.params.id, mediaPath, mediaType, filename);
     if (!mat) return res.status(409).json({ ok: false, error: 'estado' });
     res.json({ ok: true, material: mat });
   } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
@@ -392,8 +413,8 @@ app.get('/api/piezas/:id/materiales', async (req, res) => {
 });
 app.post('/api/piezas/:id/material', async (req, res) => {
   try {
-    const { fileId, mediaType, filename } = await subirMaterialTg(req.body, 'Material para corregir un rechazo (vía panel).');
-    const mat = await db.addMaterialPorPieza(req.params.id, fileId, mediaType, filename);
+    const { mediaPath, mediaType, filename } = await guardarMaterialDisco(req.body, path.posix.join('material/pieza', req.params.id));
+    const mat = await db.addMaterialPorPieza(req.params.id, mediaPath, mediaType, filename);
     if (!mat) return res.status(409).json({ ok: false, error: 'no_pendiente' });
     res.json({ ok: true, material: mat });
   } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }

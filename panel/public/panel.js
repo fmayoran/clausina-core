@@ -353,7 +353,7 @@ async function loadMateriales(){
     g.innerHTML = (mats&&mats.length) ? mats.map(matTile).join('') : '<div class="empty">— sin material aún —</div>';
   }catch(e){}
 }
-const MAT_MAX=45*1024*1024;   // tope práctico por archivo (Telegram bot ~50MB); dejamos margen para el base64
+const MAT_MAX=85*1024*1024;   // tope por archivo (media store en disco; margen para el base64 del body)
 async function rmAddFiles(input){
   const files=[...(input.files||[])]; if(!files.length||acting||!modalId) return;
   const lbl=input.closest('label'), txt=lbl.querySelector('.flbl'), base=txt.textContent;
@@ -372,7 +372,7 @@ async function rmAddFiles(input){
   }
   input.value=''; txt.textContent=base; lbl.style.pointerEvents=''; acting=false;
   let msg = okc ? okc+' material(es) agregado(s)' : 'No se pudo subir el material';
-  if(pesados) msg += ` · ${pesados} muy pesado(s) (máx ~45MB)`;
+  if(pesados) msg += ` · ${pesados} muy pesado(s) (máx ~85MB)`;
   else if(!okc && fallos) msg += ' (probá de nuevo)';
   toast(msg, !okc);
   loadMateriales();

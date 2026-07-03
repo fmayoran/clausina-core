@@ -178,12 +178,12 @@ async function pedirPropuestas(enfasis, canal, cantidad, proyectoId) {
 
 // Agrega un material (file_id de Telegram) a la galería del requerimiento. NO cambia el estado:
 // el requerimiento sigue como 'propuesta' hasta que Fer aprieta "Generar publicación".
-async function addMaterial(briefId, fileId, mediaType, filename) {
+async function addMaterial(briefId, mediaPath, mediaType, filename) {
   const { rows } = await pool.query(
-    `INSERT INTO contenido.brief_material (brief_id, file_id, media_type, filename, orden)
+    `INSERT INTO contenido.brief_material (brief_id, media_path, media_type, filename, orden)
        SELECT $1, $2, $3, $4, COALESCE((SELECT max(orden)+1 FROM contenido.brief_material WHERE brief_id=$1), 0)
        WHERE EXISTS (SELECT 1 FROM contenido.tg_briefs WHERE id=$1 AND estado IN ('propuesta','error'))
-     RETURNING id, media_type, filename, orden`, [briefId, fileId, mediaType, filename || null]);
+     RETURNING id, media_type, filename, orden`, [briefId, mediaPath, mediaType, filename || null]);
   return rows[0] || null;
 }
 
@@ -195,10 +195,10 @@ async function getMateriales(briefId) {
   return rows;
 }
 
-// file_id de un material puntual (para el proxy de miniatura).
+// Origen de un material puntual (para el proxy de miniatura): media_path (disco) o file_id (Telegram legacy).
 async function getMaterialFile(mid) {
   const { rows } = await pool.query(
-    `SELECT file_id AS media_file_id, media_type FROM contenido.brief_material WHERE id=$1`, [mid]);
+    `SELECT file_id AS media_file_id, media_type, media_path FROM contenido.brief_material WHERE id=$1`, [mid]);
   return rows[0] || null;
 }
 
@@ -213,15 +213,15 @@ async function delMaterial(briefId, mid) {
 // Se adjunta a la galería del brief que generó la pieza (brief.pieza_id), para que la rutina de
 // corrección lo descargue y lo use al reprocesar. Solo mientras la pieza está pendiente de aprobación
 // (el panel sube el material ANTES de confirmar el rechazo).
-async function addMaterialPorPieza(piezaId, fileId, mediaType, filename) {
+async function addMaterialPorPieza(piezaId, mediaPath, mediaType, filename) {
   const { rows } = await pool.query(
-    `INSERT INTO contenido.brief_material (brief_id, file_id, media_type, filename, orden)
+    `INSERT INTO contenido.brief_material (brief_id, media_path, media_type, filename, orden)
        SELECT b.id, $2, $3, $4, COALESCE((SELECT max(orden)+1 FROM contenido.brief_material WHERE brief_id=b.id), 0)
        FROM contenido.tg_briefs b
        JOIN contenido.piezas pz ON pz.id = b.pieza_id
        JOIN contenido.revisiones r ON r.id = pz.revision_vigente
        WHERE b.pieza_id = $1 AND r.estado = 'pendiente_aprobacion'
-     RETURNING id, media_type, filename, orden`, [piezaId, fileId, mediaType, filename || null]);
+     RETURNING id, media_type, filename, orden`, [piezaId, mediaPath, mediaType, filename || null]);
   return rows[0] || null;
 }
 async function getMaterialesPorPieza(piezaId) {

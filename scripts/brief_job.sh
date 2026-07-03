@@ -65,20 +65,23 @@ if [ -n "$media" ]; then
   if dl "$media" "/tmp/brief_media_$bid.$ext"; then medialocal="/tmp/brief_media_$bid.$ext"; fi
 fi
 
-# TODOS los materiales aportados desde el panel (galería brief_material, en orden)
-rm -f /tmp/brief_mat_${bid}_*.jpg /tmp/brief_mat_${bid}_*.mp4
-mats=$(psql "SELECT COALESCE(json_agg(json_build_object('file_id',file_id,'media_type',media_type) ORDER BY orden, creado_en),'[]') FROM contenido.brief_material WHERE brief_id='$bid';")
+# TODOS los materiales aportados desde el panel (galería brief_material, en orden).
+# Preferimos el media store en disco (media_path, sin límite de tamaño); Telegram (file_id) queda como legacy.
+HOST_MEDIA="/var/lib/docker/volumes/clausina_panel_clausina-media/_data"
+rm -f /tmp/brief_mat_${bid}_*
+mats=$(psql "SELECT COALESCE(json_agg(json_build_object('file_id',file_id,'media_type',media_type,'media_path',media_path) ORDER BY orden, creado_en),'[]') FROM contenido.brief_material WHERE brief_id='$bid';")
 matlines=""
 i=0
-while IFS=$'\t' read -r fid mt; do
-  [ -z "$fid" ] && continue
-  ext="jpg"; [ "$mt" = "video" ] && ext="mp4"
+while IFS=$'\t' read -r fid mt mpath; do
+  [ -z "$fid$mpath" ] && continue
+  if [ -n "$mpath" ]; then ext="${mpath##*.}"; else ext="jpg"; [ "$mt" = "video" ] && ext="mp4"; fi
   out="/tmp/brief_mat_${bid}_$i.$ext"
-  if dl "$fid" "$out"; then matlines+="$out|$mt"$'\n'; fi
+  if [ -n "$mpath" ] && [ -f "$HOST_MEDIA/$mpath" ]; then cp "$HOST_MEDIA/$mpath" "$out" && matlines+="$out|$mt"$'\n'
+  elif [ -n "$fid" ] && dl "$fid" "$out"; then matlines+="$out|$mt"$'\n'; fi
   i=$((i+1))
 done < <(echo "$mats" | python3 -c "import sys,json
 for m in json.load(sys.stdin):
-    print((m.get('file_id') or '')+'\t'+(m.get('media_type') or 'photo'))")
+    print((m.get('file_id') or '')+'\t'+(m.get('media_type') or 'photo')+'\t'+(m.get('media_path') or ''))")
 matlist=$(printf '%s' "$matlines" | python3 -c "import sys,json
 out=[]
 for line in sys.stdin:
