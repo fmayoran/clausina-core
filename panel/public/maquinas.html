@@ -122,7 +122,7 @@
 
     <!-- VITALS -->
     <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1">Signos vitales</div>
-    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">cada proceso debe latir dentro de su intervalo</p>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-3" id="vit-sum">leyendo procesos…</p>
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8" id="vitals"></div>
 
     <!-- BRANDS -->
@@ -152,19 +152,47 @@ function salud(p){ if(p.hace_s==null)return'caido'; const r=p.hace_s/(p.interval
 function ecgPath(beating){ const W=260,base=22; if(!beating) return `M0,${base} L${W*0.46},${base} l4,-2 l4,4 l4,-2 L${W},${base}`;
   let d=`M0,${base}`,x=0; const beat=52; while(x<W){ d+=` L${x+10},${base} q3,-4 6,0`; d+=` L${x+22},${base} L${x+25},${base-15} L${x+28},${base+17} L${x+31},${base}`; d+=` L${x+38},${base} q4,-6 8,0 L${x+beat},${base}`; x+=beat; } return d; }
 
+// Estado de salud -> palabra + color + borde. La lámpara/traza ya colorean; acá reforzamos en texto.
+const VIT={
+  ok:   {w:'Al día',    dot:'bg-acc',       txt:'acc-text',                        bord:'border-pline dark:border-line'},
+  warn: {w:'Atrasado',  dot:'bg-[#E0A458]', txt:'text-[#b9791f] dark:text-[#E0A458]', bord:'border-[#E0A458]'},
+  caido:{w:'Sin señal', dot:'bg-cor',       txt:'cor-text',                        bord:'border-cor'},
+};
+// Limpia el mensaje de latido: saca UUIDs largos y colapsa espacios (deja algo legible).
+const cleanMsg = m => (m||'—').replace(/\s*[0-9a-f]{8}-[0-9a-f-]{27,}/gi,'').replace(/\s{2,}/g,' ').trim() || '—';
 function vitCard(key,p){
   const meta=PROC[key]||{n:key,d:''};
-  const st=p?salud(p):'caido'; const beating=st!=='caido';
-  const msg=p?(p.last_msg||'—'):'nunca corrió';
-  const pill=st==='ok'?'al día':(st==='warn'?'atrasado':'sin latido');
-  const pillc=st==='ok'?'acc-text':(st==='warn'?'text-[#b9791f] dark:text-[#E0A458]':'cor-text');
-  return `<div class="vit ${st} rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card p-3.5">
-    <div class="flex items-baseline gap-2 mb-2.5"><span class="display font-bold text-base">${esc(meta.n)}</span><span class="mono text-[9px] uppercase text-pmut dark:text-mut ml-auto">${esc(meta.d)}</span></div>
+  const st=p?salud(p):'caido'; const beating=st!=='caido'; const v=VIT[st];
+  const msg=p?cleanMsg(p.last_msg):'nunca corrió';
+  const age=p?fmtAge(p.hace_s):null;
+  const ageTxt = st==='caido' ? (age?`hace ${age}`:'nunca corrió') : `latió hace ${age}`;
+  return `<div class="vit ${st} rounded-2xl bg-psurf dark:bg-surf border ${v.bord} card p-4">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="display font-bold text-[15px] tracking-tight">${esc(meta.n)}</span>
+      <span class="mono text-[9px] uppercase text-pmut dark:text-mut ml-auto text-right leading-tight max-w-[55%]">${esc(meta.d)}</span>
+    </div>
     <div class="mon"><svg viewBox="0 0 260 44" preserveAspectRatio="none"><line class="grid-h" x1="0" y1="22" x2="260" y2="22"></line><path class="trace" d="${ecgPath(beating)}"></path></svg><div class="scan"></div></div>
-    <div class="flex items-center gap-2 mt-2.5"><span class="mono text-[10px] uppercase ${pillc}">${pill}</span><span class="mono text-[10px] text-pmut dark:text-mut truncate">${esc(msg)}</span><span class="mono text-[10px] text-pmut dark:text-mut ml-auto shrink-0">${fmtAge(p?p.hace_s:null)}</span></div>
+    <div class="flex items-center gap-2 mt-3">
+      <span class="w-2 h-2 rounded-full ${v.dot} shrink-0"></span>
+      <span class="mono text-[11px] uppercase tracking-wide ${v.txt}">${v.w}</span>
+      <span class="mono text-[10px] text-pmut dark:text-mut ml-auto shrink-0">${ageTxt}</span>
+    </div>
+    <div class="mono text-[10px] text-pmut dark:text-mut mt-1.5 truncate" title="${esc(msg)}"><span class="text-pmut/70 dark:text-mut/70">última señal ·</span> ${esc(msg)}</div>
   </div>`;
 }
-function setVitals(procs){ const by={}; procs.forEach(p=>by[p.proceso]=p); document.getElementById('vitals').innerHTML=Object.keys(PROC).map(k=>vitCard(k,by[k])).join(''); }
+function setVitals(procs){
+  const by={}; procs.forEach(p=>by[p.proceso]=p);
+  const keys=Object.keys(PROC);
+  document.getElementById('vitals').innerHTML=keys.map(k=>vitCard(k,by[k])).join('');
+  // Resumen de la sección (pantallazo): cuántos al día / atrasados / sin señal.
+  let ok=0,warn=0,caido=0;
+  keys.forEach(k=>{ const st=by[k]?salud(by[k]):'caido'; if(st==='ok')ok++; else if(st==='warn')warn++; else caido++; });
+  const parts=[];
+  if(ok)    parts.push(`<span class="acc-text">${ok} al día</span>`);
+  if(warn)  parts.push(`<span class="text-[#b9791f] dark:text-[#E0A458]">${warn} atrasado${warn>1?'s':''}</span>`);
+  if(caido) parts.push(`<span class="cor-text">${caido} sin señal</span>`);
+  const sum=document.getElementById('vit-sum'); if(sum) sum.innerHTML=`${keys.length} procesos · `+parts.join(' · ');
+}
 
 function setFlow(pl){
   const set=(id,v)=>document.getElementById(id).textContent=v;
