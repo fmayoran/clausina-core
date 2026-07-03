@@ -67,20 +67,21 @@ function renderConsola(marcas, maq){
   const caidos=procs.filter(p=>salud(p)==='caido').length;
   const sinLatido=caidos+Math.max(0,5-procs.length);
   const errores=(pl.errores||0)+(lg.errores||0);
-  const espera=pl.espera||0, escal=pl.escalado||0, borr=lg.borrador||0, gen=lg.generando||0;
+  const espera=pl.espera||0, escal=pl.escalado||0, borr=lg.borrador||0, gen=lg.generando||0, rev=pl.revisando||0;
   const cola=marcas.reduce((a,m)=>a+(m.req_cola||0),0), hoy=pl.publicado_hoy||0;
   const pend=espera+escal+borr;
-  const trab=(pl.generando||0)+(pl.propuestas||0)+gen;
+  const trab=(pl.generando||0)+rev+gen;
   let estado,sub,cls;
   if(sinLatido>0||errores>0){ estado='Revisar';cls='paro'; sub=sinLatido>0?`${sinLatido} proceso(s) sin latido`:`${errores} en error`; }
   else if(pend>0){ estado='Te espera';cls='espera'; sub=`${pend} pendiente(s) para tu visto`; }
-  else if(trab>0){ estado='Trabajando';cls='espera'; sub=`${trab} en curso · sin pendientes tuyos`; }
+  else if(trab>0){ estado='Trabajando';cls='espera'; sub=rev>0?`el creativo prepara ${rev} nueva(s) versión(es)`:`${trab} en curso · sin pendientes tuyos`; }
   else { estado='En marcha';cls='marcha'; sub='todo al día · sin pendientes tuyos'; }
   lampEl.className='lamp '+cls;
   stEl.textContent=estado; stEl.className='display font-extrabold text-2xl leading-none tracking-tight '+(cls==='paro'?'cor-text':'');
   subEl.textContent=sub;
   rdEl.innerHTML=[
     smRead(espera,'esperan tu visto',espera>0?'cor-text':''),
+    smRead(rev,'en revisión',rev>0?'acc-text':''),
     smRead(borr,'borradores web',borr>0?'cor-text':''),
     smRead(gen,'web generando',gen>0?'acc-text':''),
     smRead(cola,'en cola'),

@@ -298,6 +298,7 @@ async function getMaquinas() {
       ((SELECT count(*) FROM contenido.tg_briefs WHERE pieza_id IS NULL AND estado='propuesta')
         + (SELECT count(*) FROM contenido.solicitudes_propuesta WHERE estado IN ('pendiente','procesando')))::int AS propuestas,
       (SELECT count(*) FROM contenido.tg_briefs WHERE pieza_id IS NULL AND estado IN ('pendiente','procesando'))::int AS generando,
+      (SELECT count(*) FROM contenido.tg_briefs WHERE pieza_id IS NULL AND estado IN ('revisar','revisando'))::int AS revisando,
       (SELECT count(*) FROM contenido.tg_briefs WHERE estado='error')::int AS errores,
       (SELECT count(*) FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id=pz.revision_vigente
          WHERE r.estado='pendiente_aprobacion')::int AS espera,
