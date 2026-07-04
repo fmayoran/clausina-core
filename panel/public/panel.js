@@ -63,9 +63,12 @@ function pendCard(p){
   if(p.estado==='rechazada') return modCard(p,'instagram');
   const t = thumbSrc(p.media);
   const medios = Array.isArray(p.medios) ? p.medios : [];
+  const m = p.media || {};
   const thumb = medios.length>1
     ? mediaGallery(medios)
-    : (t ? `<img class="thumb" loading="lazy" src="${esc(t)}" onerror="this.style.display='none'">` : '<div class="thumb"></div>');
+    : (m.tipo==='video' && m.url)
+      ? `<video class="thumb" style="object-fit:contain;background:#000" src="${esc(m.url)}" ${m.poster_url?`poster="${esc(m.poster_url)}"`:''} preload="metadata" playsinline muted loop controls></video>`
+      : (t ? `<img class="thumb" loading="lazy" src="${esc(t)}" onerror="this.style.display='none'">` : '<div class="thumb"></div>');
   const copy = p.caption ? `<div class="copy">${esc(p.caption).replace(/\n/g,'<br>')}</div>` : '';
   return `<div class="card">${thumb}<div class="body">
     <div class="tt">${esc(p.titulo_interno)} <span class="intlbl" title="Nombre interno — no se publica">interno</span></div>
