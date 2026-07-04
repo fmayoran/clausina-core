@@ -205,9 +205,9 @@ async function getMaterialFile(mid) {
 
 // Quita un material de la galería (antes de generar).
 async function delMaterial(briefId, mid) {
-  const { rowCount } = await pool.query(
-    `DELETE FROM contenido.brief_material WHERE id=$1 AND brief_id=$2`, [mid, briefId]);
-  return rowCount > 0;
+  const { rows } = await pool.query(
+    `DELETE FROM contenido.brief_material WHERE id=$1 AND brief_id=$2 RETURNING media_path`, [mid, briefId]);
+  return rows[0] || null;   // { media_path } si borró (para limpiar el archivo), null si no
 }
 
 // --- Material aportado AL RECHAZAR una pieza ---
@@ -233,10 +233,10 @@ async function getMaterialesPorPieza(piezaId) {
   return rows;
 }
 async function delMaterialPorPieza(piezaId, mid) {
-  const { rowCount } = await pool.query(
+  const { rows } = await pool.query(
     `DELETE FROM contenido.brief_material bm USING contenido.tg_briefs b
-      WHERE bm.id = $2 AND bm.brief_id = b.id AND b.pieza_id = $1`, [piezaId, mid]);
-  return rowCount > 0;
+      WHERE bm.id = $2 AND bm.brief_id = b.id AND b.pieza_id = $1 RETURNING bm.media_path`, [mid, piezaId]);
+  return rows[0] || null;
 }
 
 // "Generar publicación": guarda los comentarios y manda el requerimiento al circuito -> 'pendiente'.

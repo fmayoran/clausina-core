@@ -356,8 +356,13 @@ app.get('/api/requerimientos/:id/materiales', async (req, res) => {
 });
 
 // Quitar un material de la galería (antes de generar).
+// Borra del media store un archivo relativo (guard contra path traversal; media_path viene de nuestra DB).
+function borrarMediaFile(rel) {
+  if (!rel || rel.includes('..') || rel.startsWith('/')) return;
+  fs.promises.unlink(path.join('/app/media', rel)).catch(() => {});
+}
 app.delete('/api/requerimientos/:id/material/:mid', async (req, res) => {
-  try { res.json({ ok: await db.delMaterial(req.params.id, req.params.mid) }); }
+  try { const row = await db.delMaterial(req.params.id, req.params.mid); if (row) borrarMediaFile(row.media_path); res.json({ ok: !!row }); }
   catch (e) { console.error('del material', e.message); res.status(500).json({ ok: false }); }
 });
 
@@ -426,7 +431,7 @@ app.post('/api/piezas/:id/material', async (req, res) => {
   } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
 });
 app.delete('/api/piezas/:id/material/:mid', async (req, res) => {
-  try { res.json({ ok: await db.delMaterialPorPieza(req.params.id, req.params.mid) }); }
+  try { const row = await db.delMaterialPorPieza(req.params.id, req.params.mid); if (row) borrarMediaFile(row.media_path); res.json({ ok: !!row }); }
   catch (e) { console.error('del material pieza', e.message); res.status(500).json({ ok: false }); }
 });
 
