@@ -72,7 +72,8 @@ rm -f /tmp/brief_mat_${bid}_*
 mats=$(psql "SELECT COALESCE(json_agg(json_build_object('file_id',file_id,'media_type',media_type,'media_path',media_path) ORDER BY orden, creado_en),'[]') FROM contenido.brief_material WHERE brief_id='$bid';")
 matlines=""
 i=0
-while IFS=$'\t' read -r fid mt mpath; do
+# Separador \x1f (unit separator, NO whitespace): así un file_id vacío (subidas a disco) NO corre los campos.
+while IFS=$'\x1f' read -r fid mt mpath; do
   [ -z "$fid$mpath" ] && continue
   if [ -n "$mpath" ]; then ext="${mpath##*.}"; else ext="jpg"; [ "$mt" = "video" ] && ext="mp4"; fi
   out="/tmp/brief_mat_${bid}_$i.$ext"
@@ -81,7 +82,7 @@ while IFS=$'\t' read -r fid mt mpath; do
   i=$((i+1))
 done < <(echo "$mats" | python3 -c "import sys,json
 for m in json.load(sys.stdin):
-    print((m.get('file_id') or '')+'\t'+(m.get('media_type') or 'photo')+'\t'+(m.get('media_path') or ''))")
+    print((m.get('file_id') or '')+'\x1f'+(m.get('media_type') or 'photo')+'\x1f'+(m.get('media_path') or ''))")
 matlist=$(printf '%s' "$matlines" | python3 -c "import sys,json
 out=[]
 for line in sys.stdin:

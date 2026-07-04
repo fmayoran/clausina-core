@@ -50,14 +50,15 @@ dl(){ local fid="$1" out="$2"; local fp=$(curl -s "https://api.telegram.org/bot$
 HOST_MEDIA="/var/lib/docker/volumes/clausina_panel_clausina-media/_data"
 rm -f /tmp/fix_mat_*
 MATCTX=""; mi=0
-while IFS=$'\t' read -r pieza fid mt mpath; do
+# Separador \x1f (unit separator, NO whitespace): un file_id vacío (subidas a disco) NO corre los campos.
+while IFS=$'\x1f' read -r pieza fid mt mpath; do
   [ -z "$fid$mpath" ] && continue
   if [ -n "$mpath" ]; then ext="${mpath##*.}"; else ext="jpg"; [ "$mt" = "video" ] && ext="mp4"; fi
   out="/tmp/fix_mat_$mi.$ext"
   if [ -n "$mpath" ] && [ -f "$HOST_MEDIA/$mpath" ]; then cp "$HOST_MEDIA/$mpath" "$out" && MATCTX+="- pieza_id=$pieza -> $out ($mt)"$'\n'
   elif [ -n "$fid" ] && [ -n "$BOT" ] && dl "$fid" "$out"; then MATCTX+="- pieza_id=$pieza -> $out ($mt)"$'\n'; fi
   mi=$((mi+1))
-done < <(psql "SELECT b.pieza_id::text || E'\t' || COALESCE(bm.file_id,'') || E'\t' || COALESCE(bm.media_type,'photo') || E'\t' || COALESCE(bm.media_path,'')
+done < <(psql "SELECT b.pieza_id::text || chr(31) || COALESCE(bm.file_id,'') || chr(31) || COALESCE(bm.media_type,'photo') || chr(31) || COALESCE(bm.media_path,'')
                FROM contenido.brief_material bm
                JOIN contenido.tg_briefs b ON b.id=bm.brief_id
                JOIN contenido.piezas pz ON pz.id=b.pieza_id
