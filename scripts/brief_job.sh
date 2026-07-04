@@ -107,11 +107,16 @@ fi
 # Claude Code arma la pieza — ruteo por canal del requerimiento
 cd "$REPO" || exit 1
 bash "$MOTOR/scripts/perfil_a_md.sh" "$(basename "$REPO")" >/dev/null 2>&1 || true
+# Bitácora de generación (alto nivel) que revisa Fer desde el panel. Se pide en el prompt y se guarda tras crear la pieza.
+rm -f "/tmp/bitacora_$bid.md"
+BITACORA="Además, aparte de la pieza, escribí en /tmp/bitacora_$bid.md una bitácora BREVE de ALTO NIVEL (markdown; para que Fer entienda cómo la pensaste, SIN comandos crudos ni tecnicismos), con EXACTAMENTE estas secciones: '## Qué entendí' (el pedido en 1-2 líneas), '## Cómo lo resolví' (formato elegido y 2-4 decisiones creativas clave), '## Herramientas' (qué usaste y para qué; ej: 'ffmpeg — ensamblé 4 clips a 1080x1920 con fondo difuminado', 'Higgsfield nano_banana — edité la foto'), '## Material' (qué material usaste). Máximo ~180 palabras. Escribila SIEMPRE, incluso si avisás que faltó material."
 if [ "$canal" = "aviso" ]; then
   PROMPT="Procesá un requerimiento de AVISO de pantalla (DOOH) siguiendo EXACTAMENTE $MOTOR/scripts/brief_aviso.md. Los datos están en /tmp/brief_ctx_$bid.json: leelo primero (incluye 'materiales': lista de archivos aportados, 'media': adjunto legacy, y 'comentarios': indicaciones de Fer, que debés respetar). Producí un spot 2:3 mudo de ~10s con la estética de marca, guardá mp4+poster en assets/landing/publicaciones/ (commit+push, verificá 200), registralo con cf-crear-pendiente (canal_pieza='aviso' + tags de contexto + brief_id) y avisá con cf-avisar. NUNCA uses cf-pub-notify ni publiques. Si falta material que no podés generar, avisá con cf-avisar. En cada cf-avisar incluí el campo \"marca\":\"$NOMBRE\". Resumí en una línea."
 else
   PROMPT="Procesá un brief dictado por Fer siguiendo EXACTAMENTE $MOTOR/scripts/brief_dictado.md. Los datos del brief están en /tmp/brief_ctx_$bid.json: leelo primero. Incluye 'materiales' (lista de archivos aportados desde el panel, en orden; usalos TODOS — si son varios fotos en Instagram, armá carrusel), 'media' (adjunto único legacy, fallback si 'materiales' está vacío), 'comentarios' (indicaciones de Fer sobre el material: respetalas), 'texto', 'chat_id' y 'brief_id'. Acondicioná la media si hace falta, redactá el copy con la voz de marca, insertá la pieza pendiente vía cf-crear-pendiente y notificá con cf-pub-notify. NUNCA publiques en Instagram. Si falta material o algo no se entiende, avisá a Fer con cf-avisar. En cada cf-avisar incluí el campo \"marca\":\"$NOMBRE\". Resumí en una línea."
 fi
+PROMPT="$PROMPT
+$BITACORA"
 timeout 1200 claude -p "$PROMPT" --model sonnet --allowedTools "Bash" Read Write Edit Glob Grep >> "$LOG" 2>&1
 rc=$?
 
@@ -121,6 +126,19 @@ if [ $rc -eq 0 ]; then
   tienepieza=$(psql "SELECT (pieza_id IS NOT NULL)::text FROM contenido.tg_briefs WHERE id='$bid';")
   if [ "$tienepieza" = "true" ]; then
     psql "UPDATE contenido.tg_briefs SET estado='procesado', procesado_en=now(), transcripcion=left(\$tr\$$transcript\$tr\$,4000) WHERE id='$bid';" >/dev/null
+    # Guarda la bitácora de generación en la revisión vigente de la pieza (dollar-quoting seguro vía python).
+    if [ -s "/tmp/bitacora_$bid.md" ]; then
+      CID="$CID" BID="$bid" python3 - <<'PY'
+import os, secrets, subprocess
+bid=os.environ["BID"]; cid=os.environ["CID"]
+txt=open(f"/tmp/bitacora_{bid}.md").read().strip()[:8000]
+if txt:
+    t="b"+secrets.token_hex(6)
+    sql=(f"UPDATE contenido.revisiones SET bitacora=${t}${txt}${t}$ "
+         f"WHERE id=(SELECT revision_vigente FROM contenido.piezas WHERE id=(SELECT pieza_id FROM contenido.tg_briefs WHERE id='{bid}'));")
+    subprocess.run(["docker","exec","-i",cid,"psql","-U","postgres","-d","claude","-q","-c",sql])
+PY
+    fi
   else
     # No se creó pieza -> vuelve a 'propuesta' para que Fer la siga viendo y pueda reintentar (p.ej. sumando el material). El creativo ya avisó por Telegram el motivo.
     psql "UPDATE contenido.tg_briefs SET estado='propuesta', procesado_en=now() WHERE id='$bid';" >/dev/null

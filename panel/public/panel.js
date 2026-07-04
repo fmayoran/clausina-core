@@ -26,6 +26,42 @@ function fill(id, n, html){
   const nn=document.getElementById(n); if(nn) nn.textContent = (c.querySelectorAll('.card').length)||'';
 }
 
+/* ---------- Bitácora de generación ("cómo se generó") ---------- */
+// Render markdown-lite (## títulos, - bullets, **negrita**) con estilos inline (páginas dark-only).
+function mdLite(s){
+  const lines = String(s||'').split('\n'); let html=''; let inList=false;
+  const bold = t => esc(t).replace(/\*\*(.+?)\*\*/g,'<b style="color:#ECEEF0">$1</b>');
+  const close = () => { if(inList){ html+='</ul>'; inList=false; } };
+  for(let raw of lines){
+    const ln = raw.trim();
+    if(!ln){ close(); continue; }
+    if(/^#{1,4}\s+/.test(ln)){ close(); html+=`<div style="font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:#CCF24D;margin:16px 0 6px">${bold(ln.replace(/^#{1,4}\s+/,''))}</div>`; }
+    else if(/^[-*]\s+/.test(ln)){ if(!inList){ html+='<ul style="margin:0 0 6px;padding-left:18px;list-style:disc">'; inList=true; } html+=`<li style="font-size:13.5px;line-height:1.5;margin-bottom:4px;color:#cfd3d8">${bold(ln.replace(/^[-*]\s+/,''))}</li>`; }
+    else { close(); html+=`<p style="margin:0 0 8px;font-size:13.5px;line-height:1.55;color:#cfd3d8">${bold(ln)}</p>`; }
+  }
+  close(); return html || '<p style="color:#8A8F98">Sin contenido.</p>';
+}
+function cerrarBitacora(){ const o=document.getElementById('bit-ov'); if(o) o.remove(); }
+async function verBitacora(piezaId){
+  let d=null;
+  try{ const r=await fetch('api/piezas/'+piezaId+'/bitacora'); if(r.ok) d=await r.json(); }catch(e){}
+  cerrarBitacora();
+  const ov=document.createElement('div'); ov.id='bit-ov';
+  ov.style.cssText='position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.62)';
+  ov.onclick=e=>{ if(e.target===ov) cerrarBitacora(); };
+  const cont = (d && d.bitacora) ? mdLite(d.bitacora) : '<p style="color:#8A8F98;font-size:13.5px">No se registró bitácora para esta generación (piezas anteriores a esta función).</p>';
+  const tt = d ? esc(d.titulo_interno||'Pieza') : 'Pieza';
+  ov.innerHTML = `<div style="max-width:640px;width:100%;max-height:82vh;overflow:auto;background:#111317;border:1px solid #20242B;border-radius:16px;padding:20px 24px;color:#ECEEF0;font-family:Inter,system-ui,sans-serif">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8A8F98">Cómo se generó</span>
+      <button onclick="cerrarBitacora()" style="margin-left:auto;background:none;border:0;color:#8A8F98;font-size:22px;cursor:pointer;line-height:1">×</button>
+    </div>
+    <div style="font-family:'Inter Tight',sans-serif;font-weight:700;font-size:16px;margin-bottom:12px">${tt}</div>
+    <div>${cont}</div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
 /* ---------- Tarjetas Instagram ---------- */
 // Tira de medios para revisar un carrusel completo (cada uno abre la imagen/video original).
 function mediaGallery(medios){
@@ -74,6 +110,7 @@ function pendCard(p){
     <div class="tt">${esc(p.titulo_interno)} <span class="intlbl" title="Nombre interno — no se publica">interno</span></div>
     <div class="meta">${cfBadge(p)}${fmtBadge(p)}${revBadge(p)}${carrBadge(p)}<span>${fecha(p.actualizado_en)}</span></div>
     ${copy}
+    ${p.tiene_bitacora ? `<button class="bitlink" onclick="verBitacora('${p.id}')">↳ cómo se generó</button>` : ''}
     </div>
     <div class="acts">
       <button class="btn ok" onclick="aprobar('${p.id}',this)">Aprobar y publicar</button>
@@ -112,6 +149,7 @@ function avisoPendCard(p){
     <div class="meta">${cfBadge(p)}${revBadge(p)}<span>${fecha(p.actualizado_en)}</span></div>
     <div class="ctx">${ctxBadges(p)}</div>
     ${copy}
+    ${p.tiene_bitacora ? `<button class="bitlink" onclick="verBitacora('${p.id}')">↳ cómo se generó</button>` : ''}
     </div>
     <div class="acts">
       <button class="btn ok" onclick="aprobar('${p.id}',this)">Aprobar (a pantalla)</button>

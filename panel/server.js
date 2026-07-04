@@ -343,6 +343,12 @@ app.post('/api/requerimientos/:id/revisar', async (req, res) => {
   } catch (e) { console.error('revisar req', e.message); res.status(500).json({ ok: false }); }
 });
 
+// Bitácora de generación de una pieza (cómo la armó el creativo: lógica + herramientas).
+app.get('/api/piezas/:id/bitacora', async (req, res) => {
+  try { const b = await db.getBitacora(req.params.id); b ? res.json(b) : res.status(404).json({ error: 'no_existe' }); }
+  catch (e) { console.error('bitacora', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 // Galería de materiales aportados a un requerimiento (para el modal de interacción).
 app.get('/api/requerimientos/:id/materiales', async (req, res) => {
   try { res.json(await db.getMateriales(req.params.id)); }

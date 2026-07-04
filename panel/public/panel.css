@@ -45,6 +45,8 @@ header .marcasel:hover{border-color:var(--fire);}
 .card .tt{font-weight:700;font-size:1.02rem;line-height:1.1;color:var(--white);}
 .intlbl{font-family:'JetBrains Mono',monospace;font-weight:400;font-size:.54rem;letter-spacing:.1em;text-transform:uppercase;color:#55554f;border:1px solid var(--line);border-radius:8px;padding:1px 5px;vertical-align:middle;white-space:nowrap;}
 .copy{margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-size:.95rem;line-height:1.32;color:#cfcbc2;}
+.bitlink{margin-top:9px;background:none;border:0;padding:0;color:var(--ash);font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;display:inline-block;}
+.bitlink:hover{color:var(--fire);}
 .meta{font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.06em;color:var(--ash);margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
 .badge{border:1px solid var(--line);border-radius:10px;padding:1px 7px;text-transform:uppercase;}
 .badge.fmt{color:var(--ember);border-color:#1d3a44;}

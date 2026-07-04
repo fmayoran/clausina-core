@@ -72,6 +72,7 @@ async function getPiezas(canal, proyectoId) {
   const { rows } = await pool.query(`
     SELECT pz.id, pz.numero, pz.canal, pz.titulo_interno, pz.estado, pz.creado_en, pz.actualizado_en,
            r.nro, r.formato, r.motivo_rechazo, r.derivado_en,
+           (r.bitacora IS NOT NULL) AS tiene_bitacora,
            r.ig_post_id, r.ig_permalink, r.publicado_en, r.caption,
            r.daypart, r.clima, r.transito, r.momento, r.duracion_s,
            im.views AS m_views, im.reach AS m_reach, im.likes AS m_likes,
@@ -326,6 +327,15 @@ async function getMaquinas() {
   return { pipeline, procesos, landing };
 }
 
+// Bitácora de generación (relato de alto nivel) de la revisión vigente de una pieza.
+async function getBitacora(piezaId) {
+  const { rows } = await pool.query(
+    `SELECT r.bitacora, pz.titulo_interno, r.nro
+       FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id = pz.revision_vigente
+      WHERE pz.id = $1`, [piezaId]);
+  return rows[0] || null;
+}
+
 // Token de la revisión vigente SOLO si está pendiente de aprobación.
 // El token es la credencial que usan los webhooks de n8n (cf-pub-publish / cf-pub-decide).
 // Vive server-side: nunca se expone en la API pública del board.
@@ -556,7 +566,7 @@ async function health() {
 }
 
 module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, getResumenAgencia,
-  getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente,
+  getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,
   addMaterialPorPieza, getMaterialesPorPieza, delMaterialPorPieza, generarReq, revisarReq, activarReq, descartarReq, insertMencion,
   getPostIdsPublicados, upsertMetricas,
