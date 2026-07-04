@@ -347,6 +347,9 @@ app.post('/api/requerimientos/:id/revisar', async (req, res) => {
 app.get('/api/biblioteca', async (req, res) => {
   try {
     const data = await db.getBiblioteca(req.proyectoId);
+    // Logo actual del perfil (puede ser URL del media store o de la landing; distinto del archivo en disco).
+    const logoUrl = (data.logo && /^(https?:\/\/|\/media\/)/.test(data.logo)) ? data.logo : null;
+    const logoBase = logoUrl ? decodeURIComponent(logoUrl.split('?')[0].split('/').pop() || '') : null;
     let marca = [];
     try {
       const dir = path.join('/app/media', 'marca', req.marca);
@@ -356,9 +359,11 @@ app.get('/api/biblioteca', async (req, res) => {
         const tipo = /\.(mp4|webm|mov)$/i.test(f) ? 'video' : 'image';
         return { url: '/media/marca/' + encodeURIComponent(req.marca) + '/' + encodeURIComponent(f), filename: f, tipo, fecha: st ? st.mtime : null };
       }));
-      marca = items.sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+      marca = items.filter(it => it.filename !== logoBase).sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
     } catch (_) { /* sin carpeta de marca todavía */ }
-    res.json({ ...data, marca, resumen: { piezas: data.piezas.length, material: data.material.length, marca: marca.length } });
+    // El logo del perfil va primero (sea del store o de la landing).
+    if (logoUrl) marca.unshift({ url: logoUrl, filename: logoBase || 'logo de marca', tipo: /\.(mp4|webm|mov)$/i.test(logoUrl) ? 'video' : 'image', fecha: null });
+    res.json({ piezas: data.piezas, material: data.material, marca, resumen: { piezas: data.piezas.length, material: data.material.length, marca: marca.length } });
   } catch (e) { console.error('biblioteca', e.message); res.status(500).json({ error: 'db' }); }
 });
 

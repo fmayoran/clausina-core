@@ -345,7 +345,8 @@ async function getBiblioteca(proyectoId) {
       JOIN contenido.tg_briefs b ON b.id = bm.brief_id
      WHERE b.proyecto_id = $1 AND bm.media_path IS NOT NULL
      ORDER BY bm.creado_en DESC`, [proyectoId])).rows;
-  return { piezas, material };
+  const perfil = (await pool.query(`SELECT logo FROM contenido.proyecto_perfil WHERE proyecto_id = $1`, [proyectoId])).rows[0] || {};
+  return { piezas, material, logo: perfil.logo || null };
 }
 
 // Bitácora de generación (relato de alto nivel) de la revisión vigente de una pieza.

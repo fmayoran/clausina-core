@@ -14,6 +14,7 @@
   .mcell{position:relative;border-radius:12px;overflow:hidden;background:#0c0f12;aspect-ratio:1;cursor:pointer;border:1px solid #1c2128;transition:.15s;}
   .mcell:hover{border-color:#CCF24D;}
   .mcell img,.mcell video{width:100%;height:100%;object-fit:cover;display:block;}
+  .mcell.logocell img{object-fit:contain;padding:16px;}
   .mcell .play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.55);display:grid;place-items:center;color:#fff;font-size:13px;pointer-events:none;}
   .mcell .cap{position:absolute;left:0;right:0;bottom:0;padding:14px 8px 6px;background:linear-gradient(transparent,rgba(0,0,0,.82));font-family:'Inter',sans-serif;font-size:10.5px;line-height:1.25;color:#eceef0;pointer-events:none;}
   .mcell .badge{position:absolute;top:6px;left:6px;font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.6);color:#cfd3d8;padding:2px 6px;border-radius:7px;}
@@ -85,7 +86,7 @@ function cell(sec, i){
     : `<img loading="lazy" src="${esc(m.url)}" onerror="this.style.opacity=.15">`;
   const badge = m.badge ? `<span class="badge ${m.badgeCls}">${esc(m.badge)}</span>` : '';
   const cap = m.cap ? `<span class="cap">${esc(m.cap)}</span>` : '';
-  return `<div class="mcell" onclick="preview('${sec}',${i})">${thumb}${badge}${cap}</div>`;
+  return `<div class="mcell${sec==='marca'?' logocell':''}" onclick="preview('${sec}',${i})">${thumb}${badge}${cap}</div>`;
 }
 function renderSec(sec){
   const g=document.getElementById('g-'+sec), n=document.getElementById('n-'+sec), arr=LIB[sec];
