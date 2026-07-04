@@ -19,6 +19,7 @@
       { id: 'instagram', label: 'Instagram',         icon: 'instagram',   href: 'instagram' },
       { id: 'avisos',    label: 'Avisos',            icon: 'megaphone',   href: 'avisos' },
       { id: 'landing',   label: 'Landing',           icon: 'globe',       href: 'landing' },
+      { id: 'biblioteca',label: 'Biblioteca',        icon: 'images',      href: 'biblioteca' },
       { id: 'perfil',    label: 'Perfil',            icon: 'settings-2',  href: 'perfil' },
     ],
   };

@@ -131,6 +131,7 @@
         <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Avisos para la pantalla de calle</span><span class="mn" id="mc-av"></span></a>
         <a class="menucard" href="landing"><span class="mt">Web / Landing</span><span class="md">Cambios en la landing del proyecto</span><span class="mn" id="mc-web"></span></a>
         <a class="menucard" href="auditoria"><span class="mt">Auditoría</span><span class="md">Presencia digital: KPIs, gráficos y recomendaciones</span><span class="mn" id="mc-aud"></span></a>
+        <a class="menucard" href="biblioteca"><span class="mt">Biblioteca de medios</span><span class="md">Piezas, material aportado y assets de la marca</span><span class="mn" id="mc-bib"></span></a>
       </div>
     </aside>
   </div>
@@ -209,6 +210,11 @@
   function closeCola(){ document.getElementById('colamodal').classList.add('hidden'); }
   window.afterProponer = closeAsk;
   currentLoad=loadCola; loadCola(); setInterval(loadCola,6000);
+  // Resumen de la biblioteca de medios (pastilla).
+  fetch('api/biblioteca').then(r=>r.ok?r.json():null).then(d=>{
+    const e=document.getElementById('mc-bib'); if(!e||!d) return;
+    const R=d.resumen||{}; e.textContent = `${R.piezas||0} pieza(s) · ${R.material||0} material(es) · ${R.marca||0} de marca`;
+  }).catch(()=>{});
   lucide.createIcons();
 </script>
 </body>

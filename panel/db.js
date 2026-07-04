@@ -327,6 +327,27 @@ async function getMaquinas() {
   return { pipeline, procesos, landing };
 }
 
+// Biblioteca de medios de la marca: piezas (de la base) + material aportado (media store).
+async function getBiblioteca(proyectoId) {
+  const piezas = (await pool.query(`
+    SELECT m.url, m.tipo, m.poster_url, m.orden,
+           pz.id AS pieza_id, pz.canal::text AS canal, pz.titulo_interno AS titulo,
+           r.estado::text AS estado, COALESCE(r.publicado_en, pz.actualizado_en) AS fecha
+      FROM contenido.media m
+      JOIN contenido.piezas pz ON pz.id = m.pieza_id
+      JOIN contenido.revisiones r ON r.id = pz.revision_vigente
+     WHERE pz.proyecto_id = $1 AND r.estado <> 'descartada'
+     ORDER BY COALESCE(r.publicado_en, pz.actualizado_en) DESC, m.orden`, [proyectoId])).rows;
+  const material = (await pool.query(`
+    SELECT bm.media_path, bm.media_type, bm.filename, bm.creado_en,
+           CASE WHEN bm.media_path LIKE 'material/pieza/%' THEN 'de un rechazo' ELSE 'de una propuesta' END AS contexto
+      FROM contenido.brief_material bm
+      JOIN contenido.tg_briefs b ON b.id = bm.brief_id
+     WHERE b.proyecto_id = $1 AND bm.media_path IS NOT NULL
+     ORDER BY bm.creado_en DESC`, [proyectoId])).rows;
+  return { piezas, material };
+}
+
 // Bitácora de generación (relato de alto nivel) de la revisión vigente de una pieza.
 async function getBitacora(piezaId) {
   const { rows } = await pool.query(
@@ -566,7 +587,7 @@ async function health() {
 }
 
 module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, getResumenAgencia,
-  getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora,
+  getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,
   addMaterialPorPieza, getMaterialesPorPieza, delMaterialPorPieza, generarReq, revisarReq, activarReq, descartarReq, insertMencion,
   getPostIdsPublicados, upsertMetricas,

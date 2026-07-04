@@ -343,6 +343,25 @@ app.post('/api/requerimientos/:id/revisar', async (req, res) => {
   } catch (e) { console.error('revisar req', e.message); res.status(500).json({ ok: false }); }
 });
 
+// Biblioteca de medios de la marca activa: piezas + material aportado + assets de marca (logos).
+app.get('/api/biblioteca', async (req, res) => {
+  try {
+    const data = await db.getBiblioteca(req.proyectoId);
+    let marca = [];
+    try {
+      const dir = path.join('/app/media', 'marca', req.marca);
+      const files = await fs.promises.readdir(dir);
+      const items = await Promise.all(files.filter(f => !f.startsWith('.')).map(async f => {
+        const st = await fs.promises.stat(path.join(dir, f)).catch(() => null);
+        const tipo = /\.(mp4|webm|mov)$/i.test(f) ? 'video' : 'image';
+        return { url: '/media/marca/' + encodeURIComponent(req.marca) + '/' + encodeURIComponent(f), filename: f, tipo, fecha: st ? st.mtime : null };
+      }));
+      marca = items.sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+    } catch (_) { /* sin carpeta de marca todavía */ }
+    res.json({ ...data, marca, resumen: { piezas: data.piezas.length, material: data.material.length, marca: marca.length } });
+  } catch (e) { console.error('biblioteca', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 // Bitácora de generación de una pieza (cómo la armó el creativo: lógica + herramientas).
 app.get('/api/piezas/:id/bitacora', async (req, res) => {
   try { const b = await db.getBitacora(req.params.id); b ? res.json(b) : res.status(404).json({ error: 'no_existe' }); }

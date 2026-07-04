@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Biblioteca de medios</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<script>document.documentElement.classList.add('dark');</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
+<style>
+  .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px;}
+  .mcell{position:relative;border-radius:12px;overflow:hidden;background:#0c0f12;aspect-ratio:1;cursor:pointer;border:1px solid #1c2128;transition:.15s;}
+  .mcell:hover{border-color:#CCF24D;}
+  .mcell img,.mcell video{width:100%;height:100%;object-fit:cover;display:block;}
+  .mcell .play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.55);display:grid;place-items:center;color:#fff;font-size:13px;pointer-events:none;}
+  .mcell .cap{position:absolute;left:0;right:0;bottom:0;padding:14px 8px 6px;background:linear-gradient(transparent,rgba(0,0,0,.82));font-family:'Inter',sans-serif;font-size:10.5px;line-height:1.25;color:#eceef0;pointer-events:none;}
+  .mcell .badge{position:absolute;top:6px;left:6px;font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.6);color:#cfd3d8;padding:2px 6px;border-radius:7px;}
+  .mcell .badge.pub{color:#0A0B0D;background:#CCF24D;}
+  .mcell .badge.pend{color:#0A0B0D;background:#E0A458;}
+  .sk{background:linear-gradient(90deg,#14171b,#1c2128,#14171b);background-size:200% 100%;animation:sh 1.3s linear infinite;}
+  @keyframes sh{to{background-position:-200% 0}}
+  @media(prefers-reduced-motion:reduce){.sk{animation:none}}
+  /* Lightbox */
+  #lb{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.86);}
+  #lb.on{display:flex;}
+  #lb .box{max-width:min(92vw,900px);max-height:88vh;display:flex;flex-direction:column;gap:10px;}
+  #lb img,#lb video{max-width:100%;max-height:78vh;border-radius:12px;object-fit:contain;background:#000;}
+  #lb .cap{font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A8F98;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  #lb .x{position:fixed;top:18px;right:22px;background:none;border:0;color:#cfd3d8;font-size:30px;cursor:pointer;line-height:1;}
+  #lb a.dl{color:#CCF24D;text-decoration:none;}
+</style>
+</head>
+<body class="bg-paper text-pfg dark:bg-ink dark:text-fg transition-colors">
+<div class="shell"><main class="px-6 md:px-9 py-8 min-w-0">
+  <div class="flex items-baseline gap-3 mb-1">
+    <h1 class="display font-bold text-xl tracking-tight">Biblioteca de medios</h1>
+    <span class="mono text-[11px] text-pmut dark:text-mut" id="sum">cargando…</span>
+  </div>
+  <p class="mono text-[11px] text-pmut dark:text-mut mb-7">toda la media asociada a la marca · tocá una pieza para verla</p>
+
+  <section class="mb-9">
+    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1">Piezas <span id="n-piezas" class="text-pmut/70 dark:text-mut/70"></span></div>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">lo que generó el creativo (publicado y pendiente)</p>
+    <div class="mgrid" id="g-piezas"></div>
+  </section>
+
+  <section class="mb-9">
+    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1">Material aportado <span id="n-material" class="text-pmut/70 dark:text-mut/70"></span></div>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">fotos y videos que subiste como insumo</p>
+    <div class="mgrid" id="g-material"></div>
+  </section>
+
+  <section class="mb-9">
+    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1">Marca <span id="n-marca" class="text-pmut/70 dark:text-mut/70"></span></div>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">logos y assets de identidad</p>
+    <div class="mgrid" id="g-marca"></div>
+  </section>
+</main></div>
+
+<div id="lb"><button class="x" onclick="cerrarLb()">×</button><div class="box" id="lb-box"></div></div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="shell.js"></script>
+<script>ClausinaShell({active:'biblioteca',darkOnly:true});</script>
+<script>
+const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fecha = s => { if(!s) return ''; const d=new Date(s); return isNaN(d)?'':d.toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'2-digit'}); };
+const LIB = { piezas:[], material:[], marca:[] };
+const ESTLBL = { publicada:{t:'publicada',c:'pub'}, pendiente_aprobacion:{t:'pendiente',c:'pend'}, aprobada:{t:'aprobando',c:'pend'}, rechazada:{t:'a modificar',c:'pend'}, borrador:{t:'borrador',c:''} };
+
+// Normaliza cada origen a {url, tipo, poster, cap, sub, badge, badgeCls, dl}
+function norm(sec, x){
+  if(sec==='piezas'){ const e=ESTLBL[x.estado]||{t:x.estado,c:''};
+    return { url:x.url, tipo:x.tipo, poster:x.poster_url, cap:x.titulo, sub:[x.canal, fecha(x.fecha)].filter(Boolean).join(' · '), badge:e.t, badgeCls:e.c, dl:x.url }; }
+  if(sec==='material'){ const u='media/'+x.media_path;
+    return { url:u, tipo:x.media_type, poster:null, cap:x.filename, sub:[x.contexto, fecha(x.creado_en)].filter(Boolean).join(' · '), badge:x.media_type==='video'?'video':'foto', badgeCls:'', dl:u }; }
+  return { url:x.url, tipo:x.tipo, poster:null, cap:x.filename, sub:fecha(x.fecha), badge:'logo', badgeCls:'', dl:x.url };
+}
+function cell(sec, i){
+  const m = norm(sec, LIB[sec][i]);
+  const thumb = (m.tipo==='video')
+    ? (m.poster ? `<img loading="lazy" src="${esc(m.poster)}" onerror="this.style.opacity=.15">` : `<video src="${esc(m.url)}#t=0.1" preload="metadata" muted playsinline></video>`) + '<span class="play">▶</span>'
+    : `<img loading="lazy" src="${esc(m.url)}" onerror="this.style.opacity=.15">`;
+  const badge = m.badge ? `<span class="badge ${m.badgeCls}">${esc(m.badge)}</span>` : '';
+  const cap = m.cap ? `<span class="cap">${esc(m.cap)}</span>` : '';
+  return `<div class="mcell" onclick="preview('${sec}',${i})">${thumb}${badge}${cap}</div>`;
+}
+function renderSec(sec){
+  const g=document.getElementById('g-'+sec), n=document.getElementById('n-'+sec), arr=LIB[sec];
+  if(n) n.textContent = arr.length ? '· '+arr.length : '';
+  g.innerHTML = arr.length ? arr.map((_,i)=>cell(sec,i)).join('') : '<div class="mono text-[11px] text-pmut dark:text-mut py-2">— vacío —</div>';
+}
+function preview(sec, i){
+  const m = norm(sec, LIB[sec][i]);
+  const media = (m.tipo==='video')
+    ? `<video src="${esc(m.url)}" ${m.poster?`poster="${esc(m.poster)}"`:''} controls autoplay playsinline loop></video>`
+    : `<img src="${esc(m.url)}">`;
+  document.getElementById('lb-box').innerHTML = media +
+    `<div class="cap"><span>${esc(m.cap||'')}</span>${m.sub?`<span>${esc(m.sub)}</span>`:''}<a class="dl" href="${esc(m.dl)}" target="_blank" rel="noopener">abrir ↗</a></div>`;
+  document.getElementById('lb').classList.add('on');
+}
+function cerrarLb(){ const lb=document.getElementById('lb'); lb.classList.remove('on'); document.getElementById('lb-box').innerHTML=''; }
+document.getElementById('lb').addEventListener('click', e=>{ if(e.target.id==='lb') cerrarLb(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') cerrarLb(); });
+
+function skel(id,n){ document.getElementById(id).innerHTML = Array.from({length:n}).map(()=>'<div class="mcell sk"></div>').join(''); }
+async function cargar(){
+  ['piezas','material','marca'].forEach(s=>skel('g-'+s,6));
+  try{
+    const r = await fetch('api/biblioteca'); if(r.status===401){ location.href='login'; return; }
+    const d = await r.json();
+    LIB.piezas=d.piezas||[]; LIB.material=d.material||[]; LIB.marca=d.marca||[];
+    ['piezas','material','marca'].forEach(renderSec);
+    const R=d.resumen||{};
+    document.getElementById('sum').textContent = `${R.piezas||0} piezas · ${R.material||0} materiales · ${R.marca||0} de marca`;
+  }catch(e){ document.getElementById('sum').textContent='error al cargar'; }
+}
+cargar();
+</script>
+</body>
+</html>
