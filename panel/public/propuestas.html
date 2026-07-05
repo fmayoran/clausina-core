@@ -15,7 +15,7 @@
   .pp-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
   .pp-head h1{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-.01em;color:var(--white);}
   .pp-head .lead{font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.04em;color:var(--ash);}
-  .pp-ask{margin-left:auto;width:auto;flex:0 0 auto;padding:9px 16px;display:inline-flex;align-items:center;gap:8px;}
+  .pp-ask{margin-left:auto;flex:0 0 auto;width:40px;height:40px;padding:0;display:inline-grid;place-items:center;border-radius:10px;}
   #c-prop{gap:8px;}
   .card.prop .qhead,.card.men .qhead{padding:10px 12px;}
   .qhead{width:100%;background:transparent;border:0;color:inherit;cursor:pointer;display:flex;align-items:center;gap:9px;padding:9px 12px;text-align:left;font-family:inherit;}
@@ -42,7 +42,7 @@
         <h1>Propuestas del creativo</h1>
         <div class="lead">ideas que propone el creativo · revisás y generás la pieza</div>
       </div>
-      <button class="btn ok pp-ask" onclick="openAsk()"><i data-lucide="sparkles" class="w-4 h-4"></i> Pedir propuestas</button>
+      <button class="btn ok pp-ask" onclick="openAsk()" title="Pedir propuestas al creativo" aria-label="Pedir propuestas al creativo"><i data-lucide="sparkles" class="w-5 h-5"></i></button>
     </div>
 
     <section class="col brief">
