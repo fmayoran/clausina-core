@@ -59,8 +59,10 @@ header .marcasel:hover{border-color:var(--fire);}
 .bpcell:hover{border-color:var(--fire);}
 .bpcell img,.bpcell video{width:100%;height:100%;object-fit:cover;}
 .bpcell .bpcode{position:absolute;bottom:4px;left:4px;font-family:'JetBrains Mono',monospace;font-size:8px;background:rgba(0,0,0,.6);color:var(--fire);padding:1px 5px;border-radius:5px;}
-.bpcell.bpadded{border-color:var(--fire);}
-.bpcell.bpadded::after{content:"\2713";position:absolute;top:3px;right:5px;color:var(--fire);font-weight:700;font-size:13px;}
+.bpcell.bpadded{border-color:var(--fire);box-shadow:0 0 0 2px var(--fire) inset;}
+.bpcell.bpadded::before{content:"";position:absolute;inset:0;background:rgba(204,242,77,.30);z-index:1;}
+.bpcell.bpadded::after{content:"\2713 agregado";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;background:var(--fire);color:#0A0B0D;font-weight:700;padding:4px 9px;border-radius:8px;white-space:nowrap;}
+.bpcell .bpcode{z-index:2;}
 .bpempty{padding:24px;color:var(--ash);font-family:'JetBrains Mono',monospace;font-size:12px;}
 .meta{font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.06em;color:var(--ash);margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
 .badge{border:1px solid var(--line);border-radius:10px;padding:1px 7px;text-transform:uppercase;}
