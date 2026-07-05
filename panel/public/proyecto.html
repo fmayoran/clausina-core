@@ -113,7 +113,10 @@
   <div class="proj-wrap">
     <div class="proj-top">
       <div class="proj-title">Panel del proyecto</div>
-      <a href="perfil" class="proj-set" title="Perfil de la marca"><i data-lucide="settings" class="w-5 h-5"></i></a>
+      <div style="display:flex;gap:8px;flex:0 0 auto">
+        <a href="auditoria" class="proj-set" title="Auditoría · KPIs y presencia digital"><i data-lucide="chart-column" class="w-5 h-5"></i></a>
+        <a href="perfil" class="proj-set" title="Perfil de la marca"><i data-lucide="settings" class="w-5 h-5"></i></a>
+      </div>
     </div>
 
     <!-- Resumen: cada pastilla con su flecha de acción -->
@@ -130,8 +133,7 @@
         <a class="menucard" href="instagram"><span class="mt">Instagram</span><span class="md">Publicaciones del feed</span><span class="mn" id="mc-ig"></span></a>
         <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Avisos para la pantalla de calle</span><span class="mn" id="mc-av"></span></a>
         <a class="menucard" href="landing"><span class="mt">Web / Landing</span><span class="md">Cambios en la landing del proyecto</span><span class="mn" id="mc-web"></span></a>
-        <a class="menucard" href="auditoria"><span class="mt">Auditoría</span><span class="md">Presencia digital: KPIs, gráficos y recomendaciones</span><span class="mn" id="mc-aud"></span></a>
-        <a class="menucard" href="biblioteca"><span class="mt">Biblioteca de medios</span><span class="md">Piezas, material aportado y assets de la marca</span><span class="mn" id="mc-bib"></span></a>
+        <a class="menucard" href="biblioteca"><span class="mt">Biblioteca de medios</span><span class="md">Creá, subí y organizá el material de la marca</span><span class="mn" id="mc-bib"></span></a>
       </div>
     </aside>
   </div>
@@ -213,7 +215,9 @@
   // Resumen de la biblioteca de medios (pastilla).
   fetch('api/biblioteca').then(r=>r.ok?r.json():null).then(d=>{
     const e=document.getElementById('mc-bib'); if(!e||!d) return;
-    const R=d.resumen||{}; e.textContent = `${R.piezas||0} pieza(s) · ${R.material||0} material(es) · ${R.marca||0} de marca`;
+    const enProc=(d.items||[]).filter(i=>i.carpeta==='En proceso').length+(d.material||[]).length;
+    const term=(d.items||[]).filter(i=>i.carpeta==='Terminado').length;
+    e.textContent = `${(d.piezas||[]).length} piezas · ${enProc} en proceso · ${term} en base`;
   }).catch(()=>{});
   lucide.createIcons();
 </script>
