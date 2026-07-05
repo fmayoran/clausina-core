@@ -48,6 +48,17 @@ done < <(psql "
      JOIN contenido.piezas pz ON pz.id=b.pieza_id JOIN contenido.revisiones r ON r.id=pz.revision_vigente
    WHERE bm.media_path LIKE 'material/pieza/%' AND r.estado IN ('publicada','descartada')")
 
+# --- A2) Taller "En proceso" del bibliotecario/subidas: se depura pasada la gracia. "Terminado" NO. ---
+while IFS= read -r mp; do
+  [ -z "$mp" ] && continue
+  f="$MEDIA/$mp"; b=$(sz "$f"); termB=$((termB+b)); termN=$((termN+1))
+  echo "  [taller En proceso] $mp ($(human "$b"))"
+  if [ "$APPLY" = 1 ]; then
+    rm -f "$f"
+    psql "DELETE FROM contenido.biblioteca_item WHERE media_path='$mp'" >/dev/null
+  fi
+done < <(psql "SELECT media_path FROM contenido.biblioteca_item WHERE carpeta='En proceso' AND creado_en < now()-interval '$GRACE days'")
+
 # --- B) Archivos HUÉRFANOS (sin fila en brief_material que los referencie) ---
 refs=$(mktemp)
 psql "SELECT media_path FROM contenido.brief_material WHERE media_path IS NOT NULL" | sort -u > "$refs"

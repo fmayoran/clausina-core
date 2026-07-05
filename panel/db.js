@@ -380,11 +380,11 @@ async function delCarpetaBiblioteca(proyectoId, nombre) {
   await pool.query(`DELETE FROM contenido.biblioteca_carpeta WHERE proyecto_id=$1 AND nombre=$2`, [proyectoId, nombre]);
   return true;
 }
-async function crearItemBiblioteca(proyectoId, mediaPath, tipo, nombre, carpeta) {
+async function crearItemBiblioteca(proyectoId, mediaPath, tipo, nombre, carpeta, origen) {
   const { rows } = await pool.query(
     `INSERT INTO contenido.biblioteca_item (proyecto_id, media_path, tipo, nombre, carpeta, origen)
-     VALUES ($1,$2,$3,$4,$5,'subido') RETURNING id`,
-    [proyectoId, mediaPath, tipo === 'video' ? 'video' : 'image', (nombre || '').slice(0, 120) || null, carpeta || 'En proceso']);
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+    [proyectoId, mediaPath, tipo === 'video' ? 'video' : 'image', (nombre || '').slice(0, 120) || null, carpeta || 'En proceso', origen || 'subido']);
   return rows[0].id;
 }
 async function moverItemBiblioteca(proyectoId, id, carpeta) {

@@ -377,6 +377,22 @@ app.post('/api/biblioteca/subir', async (req, res) => {
     res.json({ ok: true, id });
   } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
 });
+// Preservar un asset (p.ej. material aportado, que se depura) copiándolo a la base "Terminado".
+app.post('/api/biblioteca/preservar', async (req, res) => {
+  try {
+    const srcRel = String((req.body && req.body.media_path) || '').replace(/^\/+/, '').replace(/^media\//, '');
+    if (!srcRel || srcRel.includes('..')) return res.status(400).json({ ok: false });
+    const src = path.join('/app/media', srcRel);
+    const ext = ((srcRel.match(/\.([a-z0-9]{2,5})$/i) || [, ''])[1] || 'jpg').toLowerCase();
+    const rel = path.posix.join('biblioteca', req.marca, crypto.randomUUID() + '.' + ext);
+    const dst = path.join('/app/media', rel);
+    await fs.promises.mkdir(path.dirname(dst), { recursive: true });
+    await fs.promises.copyFile(src, dst);
+    const tipo = (req.body && req.body.tipo === 'video') ? 'video' : 'image';
+    const id = await db.crearItemBiblioteca(req.proyectoId, rel, tipo, (req.body && req.body.nombre) || null, 'Terminado', 'aportado');
+    res.json({ ok: true, id });
+  } catch (e) { console.error('preservar', e.message); res.status(500).json({ ok: false }); }
+});
 // Crear / borrar carpeta del taller.
 app.post('/api/biblioteca/carpeta', async (req, res) => {
   try {

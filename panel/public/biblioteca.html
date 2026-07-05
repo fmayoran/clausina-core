@@ -17,7 +17,7 @@
   .mcell.logocell img{object-fit:contain;padding:16px;}
   .mcell .play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.55);display:grid;place-items:center;color:#fff;font-size:13px;pointer-events:none;}
   .mcell .badge{position:absolute;top:6px;left:6px;font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.6);color:#cfd3d8;padding:2px 6px;border-radius:7px;}
-  .mcell .badge.ia{color:#0A0B0D;background:#CCF24D;}
+  .mcell .badge.ia{color:#0A0B0D;background:#CCF24D;} .mcell .badge.mat{color:#0A0B0D;background:#8A8F98;}
   .mcell .gx{position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:15px;line-height:1;cursor:pointer;display:none;}
   .mcell:hover .gx{display:block;}
   .mcell.gwork{cursor:default;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px;text-align:center;}
@@ -27,18 +27,14 @@
   .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;}
   .fcard{position:relative;border-radius:14px;overflow:hidden;background:#0f1216;border:1px solid #20242B;cursor:pointer;transition:.15s;}
   .fcard:hover{border-color:#CCF24D;}
-  .fcover{aspect-ratio:16/9;background:#0c0f12;position:relative;}
-  .fcover img,.fcover video{width:100%;height:100%;object-fit:cover;}
-  .fcover.empty{display:grid;place-items:center;color:#3a3f47;}
+  .fcover{aspect-ratio:16/9;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2px;background:#0c0f12;}
+  .ftile{overflow:hidden;background:#0e1114;}
+  .ftile img,.ftile video{width:100%;height:100%;object-fit:cover;}
   .fmeta{padding:11px 13px;display:flex;align-items:center;gap:8px;}
   .fmeta .fn{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:14px;color:#ECEEF0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .fmeta .fc{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#8A8F98;}
-  .ftag{position:absolute;top:8px;left:8px;font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.6);padding:2px 7px;border-radius:7px;}
+  .ftag{position:absolute;top:8px;left:8px;z-index:1;font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.6);padding:2px 7px;border-radius:7px;}
   .ftag.sis{color:#8A8F98;} .ftag.tal{color:#0A0B0D;background:#CCF24D;}
-  .fcard .fdel{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:14px;cursor:pointer;display:none;}
-  .fcard:hover .fdel{display:block;}
-  .fcard.newf{display:grid;place-items:center;min-height:150px;border-style:dashed;color:#8A8F98;font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.08em;}
-  .fcard.newf:hover{color:#CCF24D;}
   .bibio{border:1px solid #20242B;background:#0f1216;border-radius:14px;padding:14px 16px;margin-bottom:24px;}
   .bibio .row{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;}
   .bibio input{flex:1;min-width:240px;background:#0c0f12;border:1px solid #20242B;border-radius:9px;color:#ECEEF0;font-family:'Inter',sans-serif;font-size:14px;padding:11px 13px;outline:none;}
@@ -52,6 +48,7 @@
   .srcchip button{background:none;border:0;color:#8A8F98;font-size:17px;cursor:pointer;}
   .abtn{background:none;border:1px solid #2a3038;color:#cfd3d8;font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:8px 14px;border-radius:8px;cursor:pointer;}
   .abtn:hover{border-color:#CCF24D;color:#CCF24D;}
+  .seclbl{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8A8F98;}
   .crumb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .crumb a{color:#8A8F98;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;text-decoration:none;} .crumb a:hover{color:#CCF24D;}
   .hidden{display:none;}
@@ -66,7 +63,6 @@
   #lb .cap button,#lb .cap a{background:none;border:1px solid #2a3038;color:#CCF24D;font-family:'JetBrains Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;padding:5px 10px;border-radius:7px;cursor:pointer;text-decoration:none;}
   #lb .cap button:hover,#lb .cap a:hover{border-color:#CCF24D;}
   #lb .cap button.del{color:#FF6A45;border-color:#5a2b25;}
-  #lb .mv{color:#8A8F98;}
   #lb .x{position:fixed;top:18px;right:22px;background:none;border:0;color:#cfd3d8;font-size:30px;cursor:pointer;}
 </style>
 </head>
@@ -76,7 +72,7 @@
     <h1 class="display font-bold text-xl tracking-tight">Biblioteca de medios</h1>
     <span class="mono text-[11px] text-pmut dark:text-mut" id="sum">cargando…</span>
   </div>
-  <p class="mono text-[11px] text-pmut dark:text-mut mb-5">gestioná todo el material de la marca · pedile al bibliotecario, subí y organizá</p>
+  <p class="mono text-[11px] text-pmut dark:text-mut mb-5">gestioná el material de la marca · pedile al bibliotecario, subí y organizá</p>
 
   <div class="bibio">
     <div id="src-chip" class="srcchip hidden"></div>
@@ -102,53 +98,56 @@ const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;
 const fecha = s => { if(!s) return ''; const d=new Date(s); return isNaN(d)?'':d.toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'2-digit'}); };
 const haceMin = s => { if(!s) return ''; const m=Math.max(0,Math.floor((Date.now()-new Date(s).getTime())/60000)); return m<1?'recién':('hace '+m+'m'); };
 const absUrl = u => /^https?:/.test(u) ? u : ('/'+String(u).replace(/^\/+/,''));
-let DATA={piezas:[],material:[],marca:[],items:[],carpetas:[],trabajando:[]}, CUR=null, SRC=null, _pollT=null, _uploadFolder='En proceso';
+let DATA={piezas:[],material:[],marca:[],items:[],trabajando:[]}, CUR=null, SRC=null, _pollT=null, _uploadFolder='En proceso';
 let _FOLDERS=[], _VITEMS=[];
 let _toastT; function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.classList.toggle('err',!!e); t.classList.add('show'); clearTimeout(_toastT); _toastT=setTimeout(()=>t.classList.remove('show'),3600); }
 const ESTLBL={ publicada:'publicada', pendiente_aprobacion:'pendiente', aprobada:'aprobando', rechazada:'a modificar', borrador:'borrador' };
 
-function vPieza(x){ return {url:x.url,tipo:x.tipo,poster:x.poster_url,nombre:x.titulo,sub:[x.canal,ESTLBL[x.estado]||'',fecha(x.fecha)].filter(Boolean).join(' · '),sistema:true,edit:absUrl(x.url),editTipo:x.tipo}; }
-function vMarca(x){ return {url:x.url,tipo:x.tipo,poster:null,nombre:x.filename,sub:fecha(x.fecha),sistema:true,logo:true,edit:absUrl(x.url),editTipo:x.tipo}; }
-function vMat(x){ const u='media/'+x.media_path; return {url:u,tipo:x.media_type,poster:null,nombre:x.filename,sub:[x.contexto,fecha(x.creado_en)].filter(Boolean).join(' · '),sistema:true,edit:absUrl(u),editTipo:x.media_type}; }
-function vItem(x){ const u='media/'+x.media_path; return {id:x.id,url:u,tipo:x.tipo,poster:null,nombre:x.nombre||(x.origen==='bibliotecario'?'Generado con IA':'archivo'),sub:[(x.origen==='bibliotecario'?'IA':'subido'),fecha(x.creado_en)].filter(Boolean).join(' · '),resumen:x.resumen,sistema:false,carpeta:x.carpeta,edit:absUrl(u),editTipo:x.tipo}; }
+function vPieza(x){ return {kind:'sys',url:x.url,tipo:x.tipo,poster:x.poster_url,nombre:x.titulo,sub:[x.canal,ESTLBL[x.estado]||'',fecha(x.fecha)].filter(Boolean).join(' · '),edit:absUrl(x.url),editTipo:x.tipo}; }
+function vMarca(x){ return {kind:'sys',url:x.url,tipo:x.tipo,poster:null,nombre:x.filename,sub:fecha(x.fecha),logo:true,edit:absUrl(x.url),editTipo:x.tipo}; }
+function vMat(x){ const u='media/'+x.media_path; return {kind:'mat',url:u,tipo:x.media_type,poster:null,nombre:x.filename,sub:[x.contexto,fecha(x.creado_en)].filter(Boolean).join(' · '),media_path:x.media_path,edit:absUrl(u),editTipo:x.media_type}; }
+function vItem(x){ const u='media/'+x.media_path; return {kind:'item',id:x.id,url:u,tipo:x.tipo,poster:null,nombre:x.nombre||(x.origen==='bibliotecario'?'Generado con IA':'archivo'),sub:[(x.origen==='bibliotecario'?'IA':x.origen),fecha(x.creado_en)].filter(Boolean).join(' · '),resumen:x.resumen,carpeta:x.carpeta,ia:x.origen==='bibliotecario',edit:absUrl(u),editTipo:x.tipo}; }
 
-function folders(){
-  const taller = (DATA.carpetas||[]).map(c=>({ nombre:c, tipo:'taller', items:DATA.items.filter(i=>i.carpeta===c).map(vItem), trabajando: c==='En proceso'?DATA.trabajando:[] }));
-  const sys = [
-    {nombre:'Piezas', tipo:'sistema', items:DATA.piezas.map(vPieza)},
-    {nombre:'Material aportado', tipo:'sistema', items:DATA.material.map(vMat)},
-    {nombre:'Marca', tipo:'sistema', items:DATA.marca.map(vMarca)},
-  ].filter(f=>f.items.length);
-  return [...taller, ...sys];
+function tallerFolders(){
+  return [
+    { nombre:'En proceso', tipo:'taller', items:[...DATA.items.filter(i=>i.carpeta==='En proceso').map(vItem), ...DATA.material.map(vMat)], trabajando:DATA.trabajando },
+    { nombre:'Terminado',  tipo:'taller', items:DATA.items.filter(i=>i.carpeta==='Terminado').map(vItem), trabajando:[] },
+  ];
 }
-const DEFAULTF = n => n==='En proceso'||n==='Terminado';
+function sysFolders(){
+  return [ {nombre:'Piezas',tipo:'sistema',items:DATA.piezas.map(vPieza)}, {nombre:'Marca',tipo:'sistema',items:DATA.marca.map(vMarca)} ].filter(f=>f.items.length);
+}
 function thumb(m){
   return (m.tipo==='video')
     ? (m.poster ? `<img loading="lazy" src="${esc(m.poster)}" onerror="this.style.opacity=.15">` : `<video src="${esc(m.url)}#t=0.1" preload="metadata" muted playsinline></video>`) + '<span class="play">▶</span>'
     : `<img loading="lazy" src="${esc(m.url)}" onerror="this.style.opacity=.15">`;
 }
-
-/* ----- Overview de carpetas ----- */
+function cover(items){
+  let s='';
+  for(let i=0;i<4;i++){ const m=items[i];
+    s += m ? `<div class="ftile">${m.tipo==='video'&&!m.poster?`<video src="${esc(m.url)}#t=0.1" muted></video>`:`<img src="${esc(m.poster||m.url)}" onerror="this.style.opacity=.1">`}</div>` : '<div class="ftile"></div>';
+  }
+  return `<div class="fcover">${s}</div>`;
+}
+function fcard(f, idx){
+  const n=f.items.length+(f.trabajando?f.trabajando.length:0);
+  return `<div class="fcard" onclick="entrar(${idx})"><span class="ftag ${f.tipo==='taller'?'tal':'sis'}">${f.tipo==='taller'?'taller':'auto'}</span>${cover(f.items)}<div class="fmeta"><span class="fn">${esc(f.nombre)}</span><span class="fc">${n}</span></div></div>`;
+}
 function overview(){
-  _FOLDERS = folders();
-  let html = `<div class="crumb mb-4"><span class="mono text-[11px] text-pmut dark:text-mut">carpetas</span><button class="abtn" style="margin-left:auto" onclick="subir()">⬆ Subir</button></div><div class="fgrid">`;
-  _FOLDERS.forEach((f,idx)=>{
-    const n = f.items.length + (f.trabajando?f.trabajando.length:0);
-    const c = f.items[0];
-    const cov = c ? `<div class="fcover">${c.tipo==='video'&&!c.poster?`<video src="${esc(c.url)}#t=0.1" muted></video>`:`<img src="${esc(c.poster||c.url)}" onerror="this.style.opacity=.1">`}</div>`
-                  : `<div class="fcover empty"><i data-lucide="folder" class="w-7 h-7"></i></div>`;
-    const del = (f.tipo==='taller' && !DEFAULTF(f.nombre)) ? `<button class="fdel" title="Borrar carpeta" onclick="event.stopPropagation();borrarCarpeta(${idx})">×</button>` : '';
-    html += `<div class="fcard" onclick="entrar(${idx})"><span class="ftag ${f.tipo==='taller'?'tal':'sis'}">${f.tipo==='taller'?'taller':'auto'}</span>${del}${cov}<div class="fmeta"><span class="fn">${esc(f.nombre)}</span><span class="fc">${n}</span></div></div>`;
-  });
-  html += `<div class="fcard newf" onclick="nuevaCarpeta()">+ nueva carpeta</div></div>`;
-  document.getElementById('view').innerHTML = html;
+  const taller=tallerFolders(), sys=sysFolders();
+  _FOLDERS=[...taller, ...sys];
+  let html = `<div class="crumb mb-3"><span class="seclbl">Tu taller</span><button class="abtn" style="margin-left:auto" onclick="subir()">⬆ Subir</button></div>`;
+  html += `<div class="fgrid mb-8">${taller.map((f,i)=>fcard(f,i)).join('')}</div>`;
+  if(sys.length){
+    html += `<div class="seclbl mb-3">Del sistema · solo lectura</div><div class="fgrid">${sys.map((f,i)=>fcard(f, taller.length+i)).join('')}</div>`;
+  }
+  document.getElementById('view').innerHTML=html;
   if(window.lucide) lucide.createIcons();
 }
 
-/* ----- Dentro de una carpeta ----- */
 function itemCell(idx, m, taller){
-  const badge = m.resumen!==undefined ? '<span class="badge ia">IA</span>' : '';
-  const del = taller ? `<button class="gx" title="Borrar" onclick="event.stopPropagation();borrarItem('${m.id}')">×</button>` : '';
+  const badge = m.kind==='item'&&m.ia ? '<span class="badge ia">IA</span>' : (m.kind==='mat'?'<span class="badge mat">aportado</span>':'');
+  const del = (taller && m.kind==='item') ? `<button class="gx" title="Borrar" onclick="event.stopPropagation();borrarItem('${m.id}')">×</button>` : '';
   return `<div class="mcell${m.logo?' logocell':''}" onclick="abrir(${idx})" title="${esc(m.nombre||'')}">${thumb(m)}${badge}${del}</div>`;
 }
 function workCell(g){
@@ -157,34 +156,33 @@ function workCell(g){
   return `<div class="mcell sk gwork"><span class="gwlbl">generando…${el?' · '+el:''}</span><span class="gwtx">${esc(g.instruccion||'')}</span>${tarda?'<span class="gwtx" style="color:#E0A458">tardando más de lo normal</span>':''}</div>`;
 }
 function folderView(){
-  _FOLDERS = folders();
-  const f = _FOLDERS.find(x=>x.nombre===CUR);
+  _FOLDERS=[...tallerFolders(), ...sysFolders()];
+  const f=_FOLDERS.find(x=>x.nombre===CUR);
   if(!f){ CUR=null; return overview(); }
-  const taller = f.tipo==='taller'; _VITEMS = f.items;
+  const taller=f.tipo==='taller'; _VITEMS=f.items;
   let html = `<div class="crumb mb-4"><a onclick="salir()">← Biblioteca</a><span class="mono text-[11px] text-pmut dark:text-mut">/</span><span class="mono text-[11px]" style="color:#ECEEF0">${esc(f.nombre)}</span>`;
   if(taller) html += `<button class="abtn" style="margin-left:auto" onclick="subir()">⬆ Subir aquí</button>`;
   html += `</div>`;
-  const work = (f.trabajando||[]).map(workCell).join('');
-  const cells = f.items.map((m,i)=>itemCell(i,m,taller)).join('');
-  const inner = (work+cells) || '<div class="mono text-[11px] text-pmut dark:text-mut py-3">— carpeta vacía —</div>';
-  html += `<div class="mgrid">${inner}</div>`;
-  document.getElementById('view').innerHTML = html;
+  const work=(f.trabajando||[]).map(workCell).join('');
+  const cells=f.items.map((m,i)=>itemCell(i,m,taller)).join('');
+  html += `<div class="mgrid">${(work+cells)||'<div class="mono text-[11px] text-pmut dark:text-mut py-3">— carpeta vacía —</div>'}</div>`;
+  document.getElementById('view').innerHTML=html;
 }
 function render(){ CUR ? folderView() : overview(); }
 function entrar(i){ const f=_FOLDERS[i]; if(f){ CUR=f.nombre; render(); } }
 function salir(){ CUR=null; render(); }
 
-/* ----- Lightbox ----- */
 function abrir(idx){
   const m=_VITEMS[idx]; if(!m) return;
-  const media = (m.tipo==='video') ? `<video src="${esc(m.url)}" controls autoplay playsinline loop></video>` : `<img src="${esc(m.url)}">`;
-  let acc = `<a href="${esc(absUrl(m.url))}" target="_blank" rel="noopener">abrir ↗</a>`;
-  acc += `<button onclick="editarIdx(${idx})">✎ modificar con IA</button>`;
-  if(!m.sistema && m.id){
-    (DATA.carpetas||[]).forEach((c,ci)=>{ if(c!==m.carpeta){ if(!acc.includes('mover a')) acc+=`<span class="mv">mover a:</span>`; acc+=`<button onclick="moverItem('${m.id}',${ci})">${esc(c)}</button>`; }});
-    acc += `<button class="del" onclick="borrarItem('${m.id}')">borrar</button>`;
+  const media=(m.tipo==='video')?`<video src="${esc(m.url)}" controls autoplay playsinline loop></video>`:`<img src="${esc(m.url)}">`;
+  let acc=`<a href="${esc(absUrl(m.url))}" target="_blank" rel="noopener">abrir ↗</a><button onclick="editarIdx(${idx})">✎ modificar con IA</button>`;
+  if(m.kind==='item'){
+    const dest=m.carpeta==='En proceso'?'Terminado':'En proceso';
+    acc+=`<button onclick="moverItemA('${m.id}','${dest}')">mover a ${dest}</button><button class="del" onclick="borrarItem('${m.id}')">borrar</button>`;
+  } else if(m.kind==='mat'){
+    acc+=`<button onclick="preservar(${idx})">guardar en Terminado</button>`;
   }
-  const sub = [m.sub, m.resumen].filter(Boolean).join(' — ');
+  const sub=[m.sub,m.resumen].filter(Boolean).join(' — ');
   document.getElementById('lb-box').innerHTML = media + (m.nombre?`<div class="nm">${esc(m.nombre)}</div>`:'') + (sub?`<div class="cap"><span>${esc(sub)}</span></div>`:'') + `<div class="cap">${acc}</div>`;
   document.getElementById('lb').classList.add('on');
 }
@@ -192,10 +190,9 @@ function cerrarLb(){ document.getElementById('lb').classList.remove('on'); docum
 document.getElementById('lb').addEventListener('click', e=>{ if(e.target.id==='lb') cerrarLb(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') cerrarLb(); });
 
-/* ----- Bibliotecario ----- */
-function setSource(url, tipo, cap){ SRC={url,tipo,cap}; const c=document.getElementById('src-chip'); c.innerHTML=`${tipo==='video'?`<video src="${esc(url)}" muted></video>`:`<img src="${esc(url)}">`}<span class="t">editando: <b>${esc((cap||'este asset')).slice(0,44)}</b></span><button onclick="clearSource()">×</button>`; c.classList.remove('hidden'); }
+function setSource(url,tipo,cap){ SRC={url,tipo,cap}; const c=document.getElementById('src-chip'); c.innerHTML=`${tipo==='video'?`<video src="${esc(url)}" muted></video>`:`<img src="${esc(url)}">`}<span class="t">editando: <b>${esc((cap||'este asset')).slice(0,44)}</b></span><button onclick="clearSource()">×</button>`; c.classList.remove('hidden'); }
 function clearSource(){ SRC=null; document.getElementById('src-chip').classList.add('hidden'); }
-function editarIdx(idx){ const m=_VITEMS[idx]; if(!m) return; setSource(m.edit, m.editTipo||'image', m.nombre); cerrarLb(); const i=document.getElementById('bib-instr'); i.scrollIntoView({behavior:'smooth',block:'center'}); i.focus(); }
+function editarIdx(idx){ const m=_VITEMS[idx]; if(!m) return; setSource(m.edit,m.editTipo||'image',m.nombre); cerrarLb(); const i=document.getElementById('bib-instr'); i.scrollIntoView({behavior:'smooth',block:'center'}); i.focus(); }
 async function pedirBiblio(){
   const el=document.getElementById('bib-instr'), t=el.value.trim();
   if(!t){ toast('Escribí qué querés que haga',true); return; }
@@ -207,9 +204,7 @@ async function pedirBiblio(){
   }catch(e){ toast('Error de conexión',true); }
   b.disabled=false; b.textContent='Crear';
 }
-
-/* ----- Taller ----- */
-function subir(){ _uploadFolder = CUR || 'En proceso'; document.getElementById('fileup').click(); }
+function subir(){ _uploadFolder = (CUR==='Terminado'?'Terminado':'En proceso'); document.getElementById('fileup').click(); }
 async function subirArchivos(input){
   const files=[...(input.files||[])]; input.value=''; if(!files.length) return;
   let ok=0, pes=0;
@@ -221,39 +216,27 @@ async function subirArchivos(input){
     }catch(e){}
   }
   toast((ok?ok+' subido(s) a “'+_uploadFolder+'”':'No se pudo subir')+(pes?` · ${pes} muy pesado(s) (máx ~85MB)`:''), !ok);
-  if(ok) CUR=_uploadFolder;
-  cargar();
+  if(ok) CUR=_uploadFolder; cargar();
 }
-async function nuevaCarpeta(){
-  const n=prompt('Nombre de la carpeta nueva:'); if(!n||!n.trim()) return;
-  try{ const d=await fetch('api/biblioteca/carpeta',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n.trim()})}).then(r=>r.json());
-    toast(d.ok?'Carpeta creada':'No se pudo', !d.ok); cargar();
-  }catch(e){ toast('Error de conexión',true); }
-}
-async function borrarCarpeta(i){
-  const f=_FOLDERS[i]; if(!f) return;
-  if(!confirm(`Borrar la carpeta “${f.nombre}”. Solo se puede si está vacía.`)) return;
-  const d=await fetch('api/biblioteca/carpeta/'+encodeURIComponent(f.nombre),{method:'DELETE'}).then(r=>r.json()).catch(()=>({ok:false}));
-  toast(d.ok?'Carpeta borrada':'No se pudo (¿tiene archivos?)', !d.ok); cargar();
-}
-async function moverItem(id, carpetaIdx){
-  const carpeta=(DATA.carpetas||[])[carpetaIdx]; if(!carpeta) return;
+async function moverItemA(id, carpeta){
   const d=await fetch('api/biblioteca/item/'+id+'/mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({carpeta})}).then(r=>r.json()).catch(()=>({ok:false}));
-  if(d.ok){ toast('Movido a “'+carpeta+'”'); cerrarLb(); } else toast('No se pudo mover',true);
-  cargar();
+  if(d.ok){ toast('Movido a “'+carpeta+'”'); cerrarLb(); } else toast('No se pudo mover',true); cargar();
 }
-async function borrarItem(id){
-  if(!confirm('Borrar este archivo. ¿Confirmás?')) return;
-  await fetch('api/biblioteca/item/'+id,{method:'DELETE'}).catch(()=>{}); cerrarLb(); cargar();
+async function preservar(idx){
+  const m=_VITEMS[idx]; if(!m||!m.media_path) return;
+  const d=await fetch('api/biblioteca/preservar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({media_path:m.media_path,tipo:m.tipo,nombre:m.nombre})}).then(r=>r.json()).catch(()=>({ok:false}));
+  if(d.ok){ toast('Guardado en Terminado'); cerrarLb(); } else toast('No se pudo guardar',true); cargar();
 }
+async function borrarItem(id){ if(!confirm('Borrar este archivo. ¿Confirmás?')) return; await fetch('api/biblioteca/item/'+id,{method:'DELETE'}).catch(()=>{}); cerrarLb(); cargar(); }
 async function borrarTrabajo(id){ await fetch('api/biblioteca/generado/'+id,{method:'DELETE'}).catch(()=>{}); cargar(); }
 
-/* ----- Carga + polling ----- */
 async function cargar(){
   try{
     const r=await fetch('api/biblioteca'); if(r.status===401){ location.href='login'; return; }
     DATA=await r.json();
-    document.getElementById('sum').textContent=`${DATA.piezas.length} piezas · ${DATA.material.length} materiales · ${DATA.items.length} en taller · ${DATA.marca.length} de marca`;
+    const enProc=DATA.items.filter(i=>i.carpeta==='En proceso').length+DATA.material.length;
+    const term=DATA.items.filter(i=>i.carpeta==='Terminado').length;
+    document.getElementById('sum').textContent=`${enProc} en proceso · ${term} en base · ${DATA.piezas.length} piezas · ${DATA.marca.length} de marca`;
     render();
     const trab=(DATA.trabajando||[]).some(g=>g.estado==='pendiente'||g.estado==='procesando');
     clearTimeout(_pollT); if(trab) _pollT=setTimeout(cargar, 8000);
