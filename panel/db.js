@@ -346,12 +346,56 @@ async function getBiblioteca(proyectoId) {
      WHERE b.proyecto_id = $1 AND bm.media_path IS NOT NULL
      ORDER BY bm.creado_en DESC`, [proyectoId])).rows;
   const perfil = (await pool.query(`SELECT logo FROM contenido.proyecto_perfil WHERE proyecto_id = $1`, [proyectoId])).rows[0] || {};
-  const generados = (await pool.query(`
-    SELECT id, instruccion, origen_url, estado, resultado_path, resultado_tipo, resumen, creado_en
+  const items = (await pool.query(`
+    SELECT id, media_path, tipo, nombre, carpeta, origen, resumen, creado_en
+      FROM contenido.biblioteca_item WHERE proyecto_id = $1 ORDER BY creado_en DESC`, [proyectoId])).rows;
+  const carpetas = (await pool.query(`
+    SELECT nombre FROM contenido.biblioteca_carpeta WHERE proyecto_id = $1 ORDER BY orden, nombre`, [proyectoId])).rows.map(r => r.nombre);
+  const trabajando = (await pool.query(`
+    SELECT id, instruccion, estado, resumen, creado_en
       FROM contenido.solicitudes_biblioteca
-     WHERE proyecto_id = $1 AND estado IN ('pendiente','procesando','listo','error')
-     ORDER BY creado_en DESC LIMIT 60`, [proyectoId])).rows;
-  return { piezas, material, logo: perfil.logo || null, generados };
+     WHERE proyecto_id = $1 AND estado IN ('pendiente','procesando','error')
+     ORDER BY creado_en DESC LIMIT 40`, [proyectoId])).rows;
+  return { piezas, material, logo: perfil.logo || null, items, carpetas, trabajando };
+}
+
+// Garantiza las carpetas de taller por defecto para un proyecto.
+async function ensureCarpetasBiblioteca(proyectoId) {
+  await pool.query(
+    `INSERT INTO contenido.biblioteca_carpeta (proyecto_id, nombre, orden)
+     VALUES ($1,'En proceso',10),($1,'Terminado',20)
+     ON CONFLICT (proyecto_id, nombre) DO NOTHING`, [proyectoId]);
+}
+async function crearCarpetaBiblioteca(proyectoId, nombre) {
+  await pool.query(
+    `INSERT INTO contenido.biblioteca_carpeta (proyecto_id, nombre) VALUES ($1,$2)
+     ON CONFLICT (proyecto_id, nombre) DO NOTHING`, [proyectoId, String(nombre).slice(0, 60)]);
+  return true;
+}
+// Borra una carpeta solo si está vacía y no es una de las por defecto.
+async function delCarpetaBiblioteca(proyectoId, nombre) {
+  if (nombre === 'En proceso' || nombre === 'Terminado') return false;
+  const { rows } = await pool.query(`SELECT count(*)::int AS n FROM contenido.biblioteca_item WHERE proyecto_id=$1 AND carpeta=$2`, [proyectoId, nombre]);
+  if (rows[0].n > 0) return false;
+  await pool.query(`DELETE FROM contenido.biblioteca_carpeta WHERE proyecto_id=$1 AND nombre=$2`, [proyectoId, nombre]);
+  return true;
+}
+async function crearItemBiblioteca(proyectoId, mediaPath, tipo, nombre, carpeta) {
+  const { rows } = await pool.query(
+    `INSERT INTO contenido.biblioteca_item (proyecto_id, media_path, tipo, nombre, carpeta, origen)
+     VALUES ($1,$2,$3,$4,$5,'subido') RETURNING id`,
+    [proyectoId, mediaPath, tipo === 'video' ? 'video' : 'image', (nombre || '').slice(0, 120) || null, carpeta || 'En proceso']);
+  return rows[0].id;
+}
+async function moverItemBiblioteca(proyectoId, id, carpeta) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.biblioteca_item SET carpeta=$3 WHERE id=$1 AND proyecto_id=$2`, [id, proyectoId, String(carpeta).slice(0, 60)]);
+  return rowCount > 0;
+}
+async function delItemBiblioteca(proyectoId, id) {
+  const { rows } = await pool.query(
+    `DELETE FROM contenido.biblioteca_item WHERE id=$1 AND proyecto_id=$2 RETURNING media_path`, [id, proyectoId]);
+  return rows[0] || null;
 }
 
 // Nueva solicitud al bibliotecario (crear/editar un asset). La toma el worker.
@@ -610,6 +654,7 @@ async function health() {
 
 module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, getResumenAgencia,
   getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
+  ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,
   addMaterialPorPieza, getMaterialesPorPieza, delMaterialPorPieza, generarReq, revisarReq, activarReq, descartarReq, insertMencion,
   getPostIdsPublicados, upsertMetricas,

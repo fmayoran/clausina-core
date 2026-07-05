@@ -10,54 +10,64 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tw.css">
 <style>
-  .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px;}
+  .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
   .mcell{position:relative;border-radius:12px;overflow:hidden;background:#0c0f12;aspect-ratio:1;cursor:pointer;border:1px solid #1c2128;transition:.15s;}
   .mcell:hover{border-color:#CCF24D;}
   .mcell img,.mcell video{width:100%;height:100%;object-fit:cover;display:block;}
   .mcell.logocell img{object-fit:contain;padding:16px;}
   .mcell .play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.55);display:grid;place-items:center;color:#fff;font-size:13px;pointer-events:none;}
-  .mcell .cap{position:absolute;left:0;right:0;bottom:0;padding:14px 8px 6px;background:linear-gradient(transparent,rgba(0,0,0,.82));font-family:'Inter',sans-serif;font-size:10.5px;line-height:1.25;color:#eceef0;pointer-events:none;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
   .mcell .badge{position:absolute;top:6px;left:6px;font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.6);color:#cfd3d8;padding:2px 6px;border-radius:7px;}
-  .mcell .badge.pub{color:#0A0B0D;background:#CCF24D;}
-  .mcell .badge.pend{color:#0A0B0D;background:#E0A458;}
   .mcell .badge.ia{color:#0A0B0D;background:#CCF24D;}
   .mcell .gx{position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:15px;line-height:1;cursor:pointer;display:none;}
   .mcell:hover .gx{display:block;}
   .mcell.gwork{cursor:default;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px;text-align:center;}
   .mcell.gwork .gwlbl{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#E0A458;}
-  .mcell.gwork .gwtx{font-family:'Inter',sans-serif;font-size:10.5px;color:#8A8F98;line-height:1.3;}
+  .mcell.gwork .gwtx,.mcell.gerr .gwtx{font-family:'Inter',sans-serif;font-size:10.5px;color:#8A8F98;line-height:1.3;}
   .mcell.gerr{cursor:default;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:12px;text-align:center;border-color:#5a2b25;}
-  .mcell.gerr .gwtx{font-family:'Inter',sans-serif;font-size:10.5px;color:#FF6A45;line-height:1.3;}
-  .sk{background:linear-gradient(90deg,#14171b,#1c2128,#14171b);background-size:200% 100%;animation:sh 1.3s linear infinite;}
-  @keyframes sh{to{background-position:-200% 0}}
-  @media(prefers-reduced-motion:reduce){.sk{animation:none}}
-  /* Barra del bibliotecario */
-  .bibio{border:1px solid #20242B;background:#0f1216;border-radius:14px;padding:14px 16px;margin-bottom:26px;}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;}
+  .fcard{position:relative;border-radius:14px;overflow:hidden;background:#0f1216;border:1px solid #20242B;cursor:pointer;transition:.15s;}
+  .fcard:hover{border-color:#CCF24D;}
+  .fcover{aspect-ratio:16/9;background:#0c0f12;position:relative;}
+  .fcover img,.fcover video{width:100%;height:100%;object-fit:cover;}
+  .fcover.empty{display:grid;place-items:center;color:#3a3f47;}
+  .fmeta{padding:11px 13px;display:flex;align-items:center;gap:8px;}
+  .fmeta .fn{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:14px;color:#ECEEF0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .fmeta .fc{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#8A8F98;}
+  .ftag{position:absolute;top:8px;left:8px;font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.6);padding:2px 7px;border-radius:7px;}
+  .ftag.sis{color:#8A8F98;} .ftag.tal{color:#0A0B0D;background:#CCF24D;}
+  .fcard .fdel{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:14px;cursor:pointer;display:none;}
+  .fcard:hover .fdel{display:block;}
+  .fcard.newf{display:grid;place-items:center;min-height:150px;border-style:dashed;color:#8A8F98;font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.08em;}
+  .fcard.newf:hover{color:#CCF24D;}
+  .bibio{border:1px solid #20242B;background:#0f1216;border-radius:14px;padding:14px 16px;margin-bottom:24px;}
   .bibio .row{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;}
-  .bibio input{flex:1;min-width:260px;background:#0c0f12;border:1px solid #20242B;border-radius:9px;color:#ECEEF0;font-family:'Inter',sans-serif;font-size:14px;padding:11px 13px;outline:none;}
+  .bibio input{flex:1;min-width:240px;background:#0c0f12;border:1px solid #20242B;border-radius:9px;color:#ECEEF0;font-family:'Inter',sans-serif;font-size:14px;padding:11px 13px;outline:none;}
   .bibio input:focus{border-color:#CCF24D;}
   .bibio button{background:#CCF24D;color:#0A0B0D;border:0;border-radius:9px;font-family:'Inter Tight',sans-serif;font-weight:700;font-size:14px;padding:0 20px;cursor:pointer;white-space:nowrap;}
-  .bibio button:hover{filter:brightness(1.05);} .bibio button:disabled{opacity:.5;cursor:default;}
-  .bibio .hint{font-family:'JetBrains Mono',monospace;font-size:10px;color:#8A8F98;margin-top:9px;letter-spacing:.03em;}
+  .bibio button:disabled{opacity:.5;cursor:default;}
+  .bibio .hint{font-family:'JetBrains Mono',monospace;font-size:10px;color:#8A8F98;margin-top:9px;}
   .srcchip{display:flex;align-items:center;gap:9px;margin-bottom:10px;padding:6px 8px;border:1px solid #2a3038;border-radius:9px;background:#0c0f12;width:fit-content;max-width:100%;}
   .srcchip img,.srcchip video{width:34px;height:34px;object-fit:cover;border-radius:6px;}
-  .srcchip .t{font-family:'JetBrains Mono',monospace;font-size:10px;color:#cfd3d8;letter-spacing:.03em;}
-  .srcchip .t b{color:#CCF24D;font-weight:400;}
-  .srcchip button{background:none;border:0;color:#8A8F98;font-size:17px;cursor:pointer;line-height:1;padding:0 2px;}
+  .srcchip .t{font-family:'JetBrains Mono',monospace;font-size:10px;color:#cfd3d8;} .srcchip .t b{color:#CCF24D;font-weight:400;}
+  .srcchip button{background:none;border:0;color:#8A8F98;font-size:17px;cursor:pointer;}
+  .abtn{background:none;border:1px solid #2a3038;color:#cfd3d8;font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:8px 14px;border-radius:8px;cursor:pointer;}
+  .abtn:hover{border-color:#CCF24D;color:#CCF24D;}
+  .crumb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .crumb a{color:#8A8F98;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:12px;text-decoration:none;} .crumb a:hover{color:#CCF24D;}
   .hidden{display:none;}
   #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#14171b;border:1px solid #20242B;color:#ECEEF0;font-family:'Inter',sans-serif;font-size:13px;padding:10px 16px;border-radius:10px;z-index:210;opacity:0;transition:.2s;pointer-events:none;}
-  #toast.show{opacity:1;}
-  #toast.err{border-color:#5a2b25;color:#FF6A45;}
-  /* Lightbox */
+  #toast.show{opacity:1;} #toast.err{border-color:#5a2b25;color:#FF6A45;}
   #lb{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.86);}
   #lb.on{display:flex;}
-  #lb .box{max-width:min(92vw,900px);max-height:88vh;display:flex;flex-direction:column;gap:10px;}
-  #lb img,#lb video{max-width:100%;max-height:76vh;border-radius:12px;object-fit:contain;background:#000;}
-  #lb .cap{font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A8F98;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
-  #lb .cap .edit{background:none;border:1px solid #2a3038;color:#CCF24D;font-family:'JetBrains Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;padding:5px 11px;border-radius:7px;cursor:pointer;}
-  #lb .cap .edit:hover{border-color:#CCF24D;}
-  #lb .x{position:fixed;top:18px;right:22px;background:none;border:0;color:#cfd3d8;font-size:30px;cursor:pointer;line-height:1;}
-  #lb a.dl{color:#CCF24D;text-decoration:none;}
+  #lb .box{max-width:min(92vw,880px);max-height:88vh;display:flex;flex-direction:column;gap:10px;}
+  #lb img,#lb video{max-width:100%;max-height:70vh;border-radius:12px;object-fit:contain;background:#000;}
+  #lb .nm{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:15px;color:#ECEEF0;}
+  #lb .cap{font-family:'JetBrains Mono',monospace;font-size:11px;color:#8A8F98;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  #lb .cap button,#lb .cap a{background:none;border:1px solid #2a3038;color:#CCF24D;font-family:'JetBrains Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;padding:5px 10px;border-radius:7px;cursor:pointer;text-decoration:none;}
+  #lb .cap button:hover,#lb .cap a:hover{border-color:#CCF24D;}
+  #lb .cap button.del{color:#FF6A45;border-color:#5a2b25;}
+  #lb .mv{color:#8A8F98;}
+  #lb .x{position:fixed;top:18px;right:22px;background:none;border:0;color:#cfd3d8;font-size:30px;cursor:pointer;}
 </style>
 </head>
 <body class="bg-paper text-pfg dark:bg-ink dark:text-fg transition-colors">
@@ -66,42 +76,21 @@
     <h1 class="display font-bold text-xl tracking-tight">Biblioteca de medios</h1>
     <span class="mono text-[11px] text-pmut dark:text-mut" id="sum">cargando…</span>
   </div>
-  <p class="mono text-[11px] text-pmut dark:text-mut mb-5">toda la media de la marca · pedile al bibliotecario que cree o edite assets</p>
+  <p class="mono text-[11px] text-pmut dark:text-mut mb-5">gestioná todo el material de la marca · pedile al bibliotecario, subí y organizá</p>
 
   <div class="bibio">
     <div id="src-chip" class="srcchip hidden"></div>
     <div class="row">
-      <input id="bib-instr" placeholder="Pedile al bibliotecario: “creá una imagen de…”, “sacale el fondo”, “variante nocturna”…" onkeydown="if(event.key==='Enter')pedirBiblio()">
+      <input id="bib-instr" placeholder="Pedile al bibliotecario: “creá una imagen de…”, “sacale el fondo”…" onkeydown="if(event.key==='Enter')pedirBiblio()">
       <button id="bib-go" onclick="pedirBiblio()">Crear</button>
     </div>
-    <div class="hint">Genera un asset (imagen o video) con la estética de la marca. No se publica: queda en la biblioteca.</div>
+    <div class="hint">Crea/edita un asset con IA (queda en “En proceso”). No se publica.</div>
   </div>
 
-  <section class="mb-9" id="sec-generados">
-    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1">Del bibliotecario <span id="n-generados" class="text-pmut/70 dark:text-mut/70"></span></div>
-    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">assets creados o editados con IA · no publicados</p>
-    <div class="mgrid" id="g-generados"></div>
-  </section>
-
-  <section class="mb-9">
-    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1">Piezas <span id="n-piezas" class="text-pmut/70 dark:text-mut/70"></span></div>
-    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">lo que generó el creativo (publicado y pendiente)</p>
-    <div class="mgrid" id="g-piezas"></div>
-  </section>
-
-  <section class="mb-9">
-    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1">Material aportado <span id="n-material" class="text-pmut/70 dark:text-mut/70"></span></div>
-    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">fotos y videos que subiste como insumo</p>
-    <div class="mgrid" id="g-material"></div>
-  </section>
-
-  <section class="mb-9">
-    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1">Marca <span id="n-marca" class="text-pmut/70 dark:text-mut/70"></span></div>
-    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">logos y assets de identidad</p>
-    <div class="mgrid" id="g-marca"></div>
-  </section>
+  <div id="view"></div>
 </main></div>
 
+<input type="file" id="fileup" accept="image/*,video/*" multiple class="hidden" onchange="subirArchivos(this)">
 <div id="lb"><button class="x" onclick="cerrarLb()">×</button><div class="box" id="lb-box"></div></div>
 <div id="toast"></div>
 
@@ -111,120 +100,166 @@
 <script>
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fecha = s => { if(!s) return ''; const d=new Date(s); return isNaN(d)?'':d.toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'2-digit'}); };
-const LIB = { piezas:[], material:[], marca:[], generados:[] };
-const ESTLBL = { publicada:{t:'publicada',c:'pub'}, pendiente_aprobacion:{t:'pendiente',c:'pend'}, aprobada:{t:'aprobando',c:'pend'}, rechazada:{t:'a modificar',c:'pend'}, borrador:{t:'borrador',c:''} };
-let _toastT;
-function toast(msg,err){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.toggle('err',!!err); t.classList.add('show'); clearTimeout(_toastT); _toastT=setTimeout(()=>t.classList.remove('show'),3600); }
-const absUrl = u => /^https?:/.test(u) ? u : ('/'+String(u).replace(/^\/+/,''));
 const haceMin = s => { if(!s) return ''; const m=Math.max(0,Math.floor((Date.now()-new Date(s).getTime())/60000)); return m<1?'recién':('hace '+m+'m'); };
+const absUrl = u => /^https?:/.test(u) ? u : ('/'+String(u).replace(/^\/+/,''));
+let DATA={piezas:[],material:[],marca:[],items:[],carpetas:[],trabajando:[]}, CUR=null, SRC=null, _pollT=null, _uploadFolder='En proceso';
+let _FOLDERS=[], _VITEMS=[];
+let _toastT; function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.classList.toggle('err',!!e); t.classList.add('show'); clearTimeout(_toastT); _toastT=setTimeout(()=>t.classList.remove('show'),3600); }
+const ESTLBL={ publicada:'publicada', pendiente_aprobacion:'pendiente', aprobada:'aprobando', rechazada:'a modificar', borrador:'borrador' };
 
-function norm(sec, x){
-  if(sec==='piezas'){ const e=ESTLBL[x.estado]||{t:x.estado,c:''};
-    return { url:x.url, tipo:x.tipo, poster:x.poster_url, cap:x.titulo, sub:[x.canal, fecha(x.fecha)].filter(Boolean).join(' · '), badge:e.t, badgeCls:e.c, dl:x.url }; }
-  if(sec==='material'){ const u='media/'+x.media_path;
-    return { url:u, tipo:x.media_type, poster:null, cap:x.filename, sub:[x.contexto, fecha(x.creado_en)].filter(Boolean).join(' · '), badge:x.media_type==='video'?'video':'foto', badgeCls:'', dl:u }; }
-  return { url:x.url, tipo:x.tipo, poster:null, cap:x.filename, sub:fecha(x.fecha), badge:'logo', badgeCls:'', dl:x.url };
+function vPieza(x){ return {url:x.url,tipo:x.tipo,poster:x.poster_url,nombre:x.titulo,sub:[x.canal,ESTLBL[x.estado]||'',fecha(x.fecha)].filter(Boolean).join(' · '),sistema:true,edit:absUrl(x.url),editTipo:x.tipo}; }
+function vMarca(x){ return {url:x.url,tipo:x.tipo,poster:null,nombre:x.filename,sub:fecha(x.fecha),sistema:true,logo:true,edit:absUrl(x.url),editTipo:x.tipo}; }
+function vMat(x){ const u='media/'+x.media_path; return {url:u,tipo:x.media_type,poster:null,nombre:x.filename,sub:[x.contexto,fecha(x.creado_en)].filter(Boolean).join(' · '),sistema:true,edit:absUrl(u),editTipo:x.media_type}; }
+function vItem(x){ const u='media/'+x.media_path; return {id:x.id,url:u,tipo:x.tipo,poster:null,nombre:x.nombre||(x.origen==='bibliotecario'?'Generado con IA':'archivo'),sub:[(x.origen==='bibliotecario'?'IA':'subido'),fecha(x.creado_en)].filter(Boolean).join(' · '),resumen:x.resumen,sistema:false,carpeta:x.carpeta,edit:absUrl(u),editTipo:x.tipo}; }
+
+function folders(){
+  const taller = (DATA.carpetas||[]).map(c=>({ nombre:c, tipo:'taller', items:DATA.items.filter(i=>i.carpeta===c).map(vItem), trabajando: c==='En proceso'?DATA.trabajando:[] }));
+  const sys = [
+    {nombre:'Piezas', tipo:'sistema', items:DATA.piezas.map(vPieza)},
+    {nombre:'Material aportado', tipo:'sistema', items:DATA.material.map(vMat)},
+    {nombre:'Marca', tipo:'sistema', items:DATA.marca.map(vMarca)},
+  ].filter(f=>f.items.length);
+  return [...taller, ...sys];
 }
-function thumbHtml(m){
+const DEFAULTF = n => n==='En proceso'||n==='Terminado';
+function thumb(m){
   return (m.tipo==='video')
     ? (m.poster ? `<img loading="lazy" src="${esc(m.poster)}" onerror="this.style.opacity=.15">` : `<video src="${esc(m.url)}#t=0.1" preload="metadata" muted playsinline></video>`) + '<span class="play">▶</span>'
     : `<img loading="lazy" src="${esc(m.url)}" onerror="this.style.opacity=.15">`;
 }
-function cell(sec, i){
-  const m = norm(sec, LIB[sec][i]);
-  const badge = m.badge ? `<span class="badge ${m.badgeCls}">${esc(m.badge)}</span>` : '';
-  const cap = m.cap ? `<span class="cap">${esc(m.cap)}</span>` : '';
-  return `<div class="mcell${sec==='marca'?' logocell':''}" onclick="preview('${sec}',${i})">${thumbHtml(m)}${badge}${cap}</div>`;
+
+/* ----- Overview de carpetas ----- */
+function overview(){
+  _FOLDERS = folders();
+  let html = `<div class="crumb mb-4"><span class="mono text-[11px] text-pmut dark:text-mut">carpetas</span><button class="abtn" style="margin-left:auto" onclick="subir()">⬆ Subir</button></div><div class="fgrid">`;
+  _FOLDERS.forEach((f,idx)=>{
+    const n = f.items.length + (f.trabajando?f.trabajando.length:0);
+    const c = f.items[0];
+    const cov = c ? `<div class="fcover">${c.tipo==='video'&&!c.poster?`<video src="${esc(c.url)}#t=0.1" muted></video>`:`<img src="${esc(c.poster||c.url)}" onerror="this.style.opacity=.1">`}</div>`
+                  : `<div class="fcover empty"><i data-lucide="folder" class="w-7 h-7"></i></div>`;
+    const del = (f.tipo==='taller' && !DEFAULTF(f.nombre)) ? `<button class="fdel" title="Borrar carpeta" onclick="event.stopPropagation();borrarCarpeta(${idx})">×</button>` : '';
+    html += `<div class="fcard" onclick="entrar(${idx})"><span class="ftag ${f.tipo==='taller'?'tal':'sis'}">${f.tipo==='taller'?'taller':'auto'}</span>${del}${cov}<div class="fmeta"><span class="fn">${esc(f.nombre)}</span><span class="fc">${n}</span></div></div>`;
+  });
+  html += `<div class="fcard newf" onclick="nuevaCarpeta()">+ nueva carpeta</div></div>`;
+  document.getElementById('view').innerHTML = html;
+  if(window.lucide) lucide.createIcons();
 }
-function renderSec(sec){
-  const g=document.getElementById('g-'+sec), n=document.getElementById('n-'+sec), arr=LIB[sec];
-  if(n) n.textContent = arr.length ? '· '+arr.length : '';
-  g.innerHTML = arr.length ? arr.map((_,i)=>cell(sec,i)).join('') : '<div class="mono text-[11px] text-pmut dark:text-mut py-2">— vacío —</div>';
+
+/* ----- Dentro de una carpeta ----- */
+function itemCell(idx, m, taller){
+  const badge = m.resumen!==undefined ? '<span class="badge ia">IA</span>' : '';
+  const del = taller ? `<button class="gx" title="Borrar" onclick="event.stopPropagation();borrarItem('${m.id}')">×</button>` : '';
+  return `<div class="mcell${m.logo?' logocell':''}" onclick="abrir(${idx})" title="${esc(m.nombre||'')}">${thumb(m)}${badge}${del}</div>`;
 }
-// Generados (bibliotecario): con estado (listo / trabajando / error) y borrado.
-function genCell(g){
-  if(g.estado==='listo' && g.resultado_path){
-    const m={ url:'media/'+g.resultado_path, tipo:g.resultado_tipo, poster:null };
-    return `<div class="mcell" onclick="previewGen('${g.id}')" title="${esc(g.instruccion||'')}">${thumbHtml(m)}<span class="badge ia">IA</span><button class="gx" title="Borrar" onclick="event.stopPropagation();delGen('${g.id}')">×</button></div>`;
-  }
-  if(g.estado==='error'){
-    return `<div class="mcell gerr"><span class="gwtx" style="color:#FF6A45">${esc(g.resumen||'No se pudo generar')}</span><span class="gwtx" style="color:#8A8F98;margin-top:3px">${esc(g.instruccion||'')}</span><button class="gx" style="display:block" title="Quitar" onclick="delGen('${g.id}')">×</button></div>`;
-  }
+function workCell(g){
+  if(g.estado==='error') return `<div class="mcell gerr"><span class="gwtx" style="color:#FF6A45">${esc(g.resumen||'No se pudo generar')}</span><span class="gwtx">${esc(g.instruccion||'')}</span><button class="gx" style="display:block" onclick="borrarTrabajo('${g.id}')">×</button></div>`;
   const el=haceMin(g.creado_en), tarda=(Date.now()-new Date(g.creado_en).getTime())>10*60000;
   return `<div class="mcell sk gwork"><span class="gwlbl">generando…${el?' · '+el:''}</span><span class="gwtx">${esc(g.instruccion||'')}</span>${tarda?'<span class="gwtx" style="color:#E0A458">tardando más de lo normal</span>':''}</div>`;
 }
-function renderGenerados(){
-  const g=document.getElementById('g-generados'), n=document.getElementById('n-generados'), arr=LIB.generados;
-  const listos=arr.filter(x=>x.estado==='listo').length;
-  if(n) n.textContent = listos ? '· '+listos : '';
-  g.innerHTML = arr.length ? arr.map(genCell).join('') : '<div class="mono text-[11px] text-pmut dark:text-mut py-2">— todavía no pediste nada. Escribí arriba. —</div>';
+function folderView(){
+  _FOLDERS = folders();
+  const f = _FOLDERS.find(x=>x.nombre===CUR);
+  if(!f){ CUR=null; return overview(); }
+  const taller = f.tipo==='taller'; _VITEMS = f.items;
+  let html = `<div class="crumb mb-4"><a onclick="salir()">← Biblioteca</a><span class="mono text-[11px] text-pmut dark:text-mut">/</span><span class="mono text-[11px]" style="color:#ECEEF0">${esc(f.nombre)}</span>`;
+  if(taller) html += `<button class="abtn" style="margin-left:auto" onclick="subir()">⬆ Subir aquí</button>`;
+  html += `</div>`;
+  const work = (f.trabajando||[]).map(workCell).join('');
+  const cells = f.items.map((m,i)=>itemCell(i,m,taller)).join('');
+  const inner = (work+cells) || '<div class="mono text-[11px] text-pmut dark:text-mut py-3">— carpeta vacía —</div>';
+  html += `<div class="mgrid">${inner}</div>`;
+  document.getElementById('view').innerHTML = html;
 }
+function render(){ CUR ? folderView() : overview(); }
+function entrar(i){ const f=_FOLDERS[i]; if(f){ CUR=f.nombre; render(); } }
+function salir(){ CUR=null; render(); }
 
-/* ---------- Lightbox ---------- */
-function openLb(url, tipo, cap, sub, dl, editUrl, editTipo){
-  const media = (tipo==='video')
-    ? `<video src="${esc(url)}" controls autoplay playsinline loop></video>`
-    : `<img src="${esc(url)}">`;
-  const editBtn = editUrl ? `<button class="edit" onclick="editarDesdeLb('${esc(editUrl)}','${esc(editTipo||'image')}',${JSON.stringify(cap||'')})">✎ modificar con IA</button>` : '';
-  document.getElementById('lb-box').innerHTML = media +
-    `<div class="cap"><span>${esc(cap||'')}</span>${sub?`<span>${esc(sub)}</span>`:''}<a class="dl" href="${esc(dl)}" target="_blank" rel="noopener">abrir ↗</a>${editBtn}</div>`;
+/* ----- Lightbox ----- */
+function abrir(idx){
+  const m=_VITEMS[idx]; if(!m) return;
+  const media = (m.tipo==='video') ? `<video src="${esc(m.url)}" controls autoplay playsinline loop></video>` : `<img src="${esc(m.url)}">`;
+  let acc = `<a href="${esc(absUrl(m.url))}" target="_blank" rel="noopener">abrir ↗</a>`;
+  acc += `<button onclick="editarIdx(${idx})">✎ modificar con IA</button>`;
+  if(!m.sistema && m.id){
+    (DATA.carpetas||[]).forEach((c,ci)=>{ if(c!==m.carpeta){ if(!acc.includes('mover a')) acc+=`<span class="mv">mover a:</span>`; acc+=`<button onclick="moverItem('${m.id}',${ci})">${esc(c)}</button>`; }});
+    acc += `<button class="del" onclick="borrarItem('${m.id}')">borrar</button>`;
+  }
+  const sub = [m.sub, m.resumen].filter(Boolean).join(' — ');
+  document.getElementById('lb-box').innerHTML = media + (m.nombre?`<div class="nm">${esc(m.nombre)}</div>`:'') + (sub?`<div class="cap"><span>${esc(sub)}</span></div>`:'') + `<div class="cap">${acc}</div>`;
   document.getElementById('lb').classList.add('on');
 }
-function preview(sec, i){ const m=norm(sec,LIB[sec][i]); openLb(m.url, m.tipo, m.cap, m.sub, m.dl, absUrl(m.url), m.tipo); }
-function previewGen(id){ const g=LIB.generados.find(x=>x.id===id); if(!g) return; const url='media/'+g.resultado_path; openLb(url, g.resultado_tipo, g.resumen||g.instruccion, fecha(g.creado_en), url, absUrl(url), g.resultado_tipo); }
 function cerrarLb(){ document.getElementById('lb').classList.remove('on'); document.getElementById('lb-box').innerHTML=''; }
 document.getElementById('lb').addEventListener('click', e=>{ if(e.target.id==='lb') cerrarLb(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') cerrarLb(); });
 
-/* ---------- Bibliotecario ---------- */
-let SRC = null;  // {url, tipo, cap}
-function setSource(url, tipo, cap){
-  SRC = { url, tipo, cap };
-  const c=document.getElementById('src-chip');
-  const thumb = tipo==='video' ? `<video src="${esc(url)}" muted></video>` : `<img src="${esc(url)}">`;
-  c.innerHTML = `${thumb}<span class="t">editando: <b>${esc((cap||'este asset')).slice(0,48)}</b></span><button onclick="clearSource()" title="Quitar">×</button>`;
-  c.classList.remove('hidden');
-}
+/* ----- Bibliotecario ----- */
+function setSource(url, tipo, cap){ SRC={url,tipo,cap}; const c=document.getElementById('src-chip'); c.innerHTML=`${tipo==='video'?`<video src="${esc(url)}" muted></video>`:`<img src="${esc(url)}">`}<span class="t">editando: <b>${esc((cap||'este asset')).slice(0,44)}</b></span><button onclick="clearSource()">×</button>`; c.classList.remove('hidden'); }
 function clearSource(){ SRC=null; document.getElementById('src-chip').classList.add('hidden'); }
-function editarDesdeLb(url, tipo, cap){ setSource(url, tipo, cap); cerrarLb(); const i=document.getElementById('bib-instr'); i.scrollIntoView({behavior:'smooth',block:'center'}); i.focus(); }
+function editarIdx(idx){ const m=_VITEMS[idx]; if(!m) return; setSource(m.edit, m.editTipo||'image', m.nombre); cerrarLb(); const i=document.getElementById('bib-instr'); i.scrollIntoView({behavior:'smooth',block:'center'}); i.focus(); }
 async function pedirBiblio(){
   const el=document.getElementById('bib-instr'), t=el.value.trim();
-  if(!t){ toast('Escribí qué querés que haga', true); return; }
-  const btn=document.getElementById('bib-go'); btn.disabled=true; btn.textContent='Enviando…';
-  try{
-    const body={ instruccion:t };
-    if(SRC){ body.origen_url=SRC.url; body.origen_tipo=SRC.tipo; }
+  if(!t){ toast('Escribí qué querés que haga',true); return; }
+  const b=document.getElementById('bib-go'); b.disabled=true; b.textContent='Enviando…';
+  try{ const body={instruccion:t}; if(SRC){ body.origen_url=SRC.url; body.origen_tipo=SRC.tipo; }
     const d=await fetch('api/biblioteca/solicitar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
-    if(d.ok){ toast('Pedido enviado — el bibliotecario está trabajando'); el.value=''; clearSource(); setTimeout(cargar,600); }
-    else toast('No se pudo'+(d.error?' ('+d.error+')':''), true);
-  }catch(e){ toast('Error de conexión', true); }
-  btn.disabled=false; btn.textContent='Crear';
-}
-async function delGen(id){
-  if(!confirm('Borrar este asset del bibliotecario. ¿Confirmás?')) return;
-  try{ await fetch('api/biblioteca/generado/'+id,{method:'DELETE'}); }catch(e){}
-  cargar();
+    if(d.ok){ toast('Pedido enviado — el bibliotecario está trabajando'); el.value=''; clearSource(); CUR='En proceso'; setTimeout(cargar,500); }
+    else toast('No se pudo'+(d.error?' ('+d.error+')':''),true);
+  }catch(e){ toast('Error de conexión',true); }
+  b.disabled=false; b.textContent='Crear';
 }
 
-/* ---------- Carga + polling ---------- */
-let _pollT=null;
-function skel(id,n){ document.getElementById(id).innerHTML = Array.from({length:n}).map(()=>'<div class="mcell sk"></div>').join(''); }
-async function cargar(first){
-  if(first){ ['piezas','material','marca'].forEach(s=>skel('g-'+s,6)); }
+/* ----- Taller ----- */
+function subir(){ _uploadFolder = CUR || 'En proceso'; document.getElementById('fileup').click(); }
+async function subirArchivos(input){
+  const files=[...(input.files||[])]; input.value=''; if(!files.length) return;
+  let ok=0, pes=0;
+  for(const f of files){
+    if(f.size>85*1024*1024){ pes++; continue; }
+    try{ const dataUrl=await new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.onerror=j;rd.readAsDataURL(f);});
+      const d=await fetch('api/biblioteca/subir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,filename:f.name,carpeta:_uploadFolder})}).then(r=>r.json());
+      if(d.ok) ok++;
+    }catch(e){}
+  }
+  toast((ok?ok+' subido(s) a “'+_uploadFolder+'”':'No se pudo subir')+(pes?` · ${pes} muy pesado(s) (máx ~85MB)`:''), !ok);
+  if(ok) CUR=_uploadFolder;
+  cargar();
+}
+async function nuevaCarpeta(){
+  const n=prompt('Nombre de la carpeta nueva:'); if(!n||!n.trim()) return;
+  try{ const d=await fetch('api/biblioteca/carpeta',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:n.trim()})}).then(r=>r.json());
+    toast(d.ok?'Carpeta creada':'No se pudo', !d.ok); cargar();
+  }catch(e){ toast('Error de conexión',true); }
+}
+async function borrarCarpeta(i){
+  const f=_FOLDERS[i]; if(!f) return;
+  if(!confirm(`Borrar la carpeta “${f.nombre}”. Solo se puede si está vacía.`)) return;
+  const d=await fetch('api/biblioteca/carpeta/'+encodeURIComponent(f.nombre),{method:'DELETE'}).then(r=>r.json()).catch(()=>({ok:false}));
+  toast(d.ok?'Carpeta borrada':'No se pudo (¿tiene archivos?)', !d.ok); cargar();
+}
+async function moverItem(id, carpetaIdx){
+  const carpeta=(DATA.carpetas||[])[carpetaIdx]; if(!carpeta) return;
+  const d=await fetch('api/biblioteca/item/'+id+'/mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({carpeta})}).then(r=>r.json()).catch(()=>({ok:false}));
+  if(d.ok){ toast('Movido a “'+carpeta+'”'); cerrarLb(); } else toast('No se pudo mover',true);
+  cargar();
+}
+async function borrarItem(id){
+  if(!confirm('Borrar este archivo. ¿Confirmás?')) return;
+  await fetch('api/biblioteca/item/'+id,{method:'DELETE'}).catch(()=>{}); cerrarLb(); cargar();
+}
+async function borrarTrabajo(id){ await fetch('api/biblioteca/generado/'+id,{method:'DELETE'}).catch(()=>{}); cargar(); }
+
+/* ----- Carga + polling ----- */
+async function cargar(){
   try{
-    const r = await fetch('api/biblioteca'); if(r.status===401){ location.href='login'; return; }
-    const d = await r.json();
-    LIB.piezas=d.piezas||[]; LIB.material=d.material||[]; LIB.marca=d.marca||[]; LIB.generados=d.generados||[];
-    renderGenerados(); ['piezas','material','marca'].forEach(renderSec);
-    const R=d.resumen||{};
-    document.getElementById('sum').textContent = `${R.piezas||0} piezas · ${R.material||0} materiales · ${R.generados||0} del bibliotecario · ${R.marca||0} de marca`;
-    // Polling mientras haya pedidos en curso.
-    const trabajando = LIB.generados.some(g=>g.estado==='pendiente'||g.estado==='procesando');
-    clearTimeout(_pollT);
-    if(trabajando) _pollT=setTimeout(cargar, 8000);
+    const r=await fetch('api/biblioteca'); if(r.status===401){ location.href='login'; return; }
+    DATA=await r.json();
+    document.getElementById('sum').textContent=`${DATA.piezas.length} piezas · ${DATA.material.length} materiales · ${DATA.items.length} en taller · ${DATA.marca.length} de marca`;
+    render();
+    const trab=(DATA.trabajando||[]).some(g=>g.estado==='pendiente'||g.estado==='procesando');
+    clearTimeout(_pollT); if(trab) _pollT=setTimeout(cargar, 8000);
   }catch(e){ document.getElementById('sum').textContent='error al cargar'; }
 }
-cargar(true);
+cargar();
 </script>
 </body>
 </html>

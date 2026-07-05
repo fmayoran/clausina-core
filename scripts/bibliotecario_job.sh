@@ -62,7 +62,7 @@ if [ ! -s "/tmp/biblio_res_$sid.json" ]; then
 fi
 
 # Copiar el asset al media store + actualizar la solicitud (listo o error, con motivo). Tags dollar-quote SIEMPRE con prefijo de letra.
-res=$(CID="$CID" SID="$sid" SLUG="$slug" HOST_MEDIA="$HOST_MEDIA" python3 - <<'PY'
+res=$(CID="$CID" SID="$sid" SLUG="$slug" HOST_MEDIA="$HOST_MEDIA" INSTR="$instr" python3 - <<'PY'
 import json, os, secrets, subprocess, shutil, pathlib
 sid=os.environ["SID"]; cid=os.environ["CID"]; slug=os.environ["SLUG"]; hm=os.environ["HOST_MEDIA"]
 def dq(v):                       # dollar-quote con tag válido (empieza con letra)
@@ -83,6 +83,12 @@ ext=(pathlib.Path(src).suffix.lower().lstrip(".")) or ("mp4" if tipo=="video" el
 rel=f"biblioteca/{slug}/{secrets.token_hex(12)}.{ext}"; dst=os.path.join(hm, rel)
 os.makedirs(os.path.dirname(dst), exist_ok=True); shutil.copyfile(src, dst); os.chmod(dst, 0o644)
 upd(f"estado='listo', resultado_path={dq(rel)}, resultado_tipo='{tipo}', resumen={dq(resumen)}")
+# El asset entra al TALLER de la biblioteca, carpeta "En proceso".
+nombre=(os.environ.get("INSTR") or "Generado con IA").strip()[:80]
+ins=("INSERT INTO contenido.biblioteca_item (proyecto_id, media_path, tipo, nombre, carpeta, origen, resumen) "
+     f"SELECT proyecto_id, {dq(rel)}, '{tipo}', {dq(nombre)}, 'En proceso', 'bibliotecario', {dq(resumen)} "
+     f"FROM contenido.solicitudes_biblioteca WHERE id='{sid}';")
+subprocess.run(["docker","exec","-i",cid,"psql","-U","postgres","-d","claude","-q","-c",ins])
 print("ok:"+rel)
 PY
 )

@@ -346,6 +346,7 @@ app.post('/api/requerimientos/:id/revisar', async (req, res) => {
 // Biblioteca de medios de la marca activa: piezas + material aportado + assets de marca (logos).
 app.get('/api/biblioteca', async (req, res) => {
   try {
+    await db.ensureCarpetasBiblioteca(req.proyectoId);
     const data = await db.getBiblioteca(req.proyectoId);
     // Logo actual del perfil (puede ser URL del media store o de la landing; distinto del archivo en disco).
     const logoUrl = (data.logo && /^(https?:\/\/|\/media\/)/.test(data.logo)) ? data.logo : null;
@@ -363,8 +364,45 @@ app.get('/api/biblioteca', async (req, res) => {
     } catch (_) { /* sin carpeta de marca todavía */ }
     // El logo del perfil va primero (sea del store o de la landing).
     if (logoUrl) marca.unshift({ url: logoUrl, filename: logoBase || 'logo de marca', tipo: /\.(mp4|webm|mov)$/i.test(logoUrl) ? 'video' : 'image', fecha: null });
-    res.json({ piezas: data.piezas, material: data.material, marca, generados: data.generados || [], resumen: { piezas: data.piezas.length, material: data.material.length, marca: marca.length, generados: (data.generados || []).filter(g => g.estado === 'listo').length } });
+    res.json({ piezas: data.piezas, material: data.material, marca, items: data.items || [], carpetas: data.carpetas || [], trabajando: data.trabajando || [] });
   } catch (e) { console.error('biblioteca', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+// Subir un archivo nuevo al taller (a una carpeta).
+app.post('/api/biblioteca/subir', async (req, res) => {
+  try {
+    const carpeta = String((req.body && req.body.carpeta) || 'En proceso').slice(0, 60);
+    const { mediaPath, mediaType, filename } = await guardarMaterialDisco(req.body, path.posix.join('biblioteca', req.marca));
+    const id = await db.crearItemBiblioteca(req.proyectoId, mediaPath, mediaType, filename, carpeta);
+    res.json({ ok: true, id });
+  } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
+});
+// Crear / borrar carpeta del taller.
+app.post('/api/biblioteca/carpeta', async (req, res) => {
+  try {
+    const nombre = String((req.body && req.body.nombre) || '').trim();
+    if (!nombre) return res.status(400).json({ ok: false, error: 'nombre_requerido' });
+    res.json({ ok: await db.crearCarpetaBiblioteca(req.proyectoId, nombre) });
+  } catch (e) { console.error('biblio carpeta', e.message); res.status(500).json({ ok: false }); }
+});
+app.delete('/api/biblioteca/carpeta/:nombre', async (req, res) => {
+  try { res.json({ ok: await db.delCarpetaBiblioteca(req.proyectoId, decodeURIComponent(req.params.nombre)) }); }
+  catch (e) { console.error('biblio del carpeta', e.message); res.status(500).json({ ok: false }); }
+});
+// Mover / borrar un ítem del taller.
+app.post('/api/biblioteca/item/:id/mover', async (req, res) => {
+  try {
+    const carpeta = String((req.body && req.body.carpeta) || '').trim();
+    if (!carpeta) return res.status(400).json({ ok: false, error: 'carpeta_requerida' });
+    res.json({ ok: await db.moverItemBiblioteca(req.proyectoId, req.params.id, carpeta) });
+  } catch (e) { console.error('biblio mover', e.message); res.status(500).json({ ok: false }); }
+});
+app.delete('/api/biblioteca/item/:id', async (req, res) => {
+  try {
+    const row = await db.delItemBiblioteca(req.proyectoId, req.params.id);
+    if (row && row.media_path) borrarMediaFile(row.media_path);
+    res.json({ ok: !!row });
+  } catch (e) { console.error('biblio del item', e.message); res.status(500).json({ ok: false }); }
 });
 
 // Pedido al bibliotecario: crear/editar un asset (instruccion + fuente opcional). Lo procesa el worker.
