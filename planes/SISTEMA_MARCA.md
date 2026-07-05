@@ -112,6 +112,7 @@ Jerarquía por **peso y espacio**, no por color.
 - **Botón primario:** fondo lima, texto ink. Acción principal.
 - **Botón secundario:** borde + texto neutro, hover a lima.
 - **Botón alerta:** borde/texto coral (solo cuando corresponde a lo vivo).
+- **Botón ícono (preferido para acciones secundarias):** ante todo, **evitar botones grandes con mucho texto**. Para acciones secundarias o repetitivas usar un **ícono con tooltip** (`title` + `aria-label`) en vez de un botón con label. Reservar los botones con texto para la acción **primaria** o cuando el texto sea imprescindible. Menos ruido visual, panel más limpio. Migrar de a poco lo existente; aplicarlo sí o sí en lo nuevo.
 - **Chips:** pill con borde fino; "en vivo" lleva punto coral pulsante; "aprobado" en lima tenue.
 - **Tarjetas:** `surface`/`white`, borde `line`/`pline`, radios generosos (rounded-2xl), ícono en recuadro.
 
