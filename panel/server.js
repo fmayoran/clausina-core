@@ -364,7 +364,17 @@ app.get('/api/biblioteca', async (req, res) => {
     } catch (_) { /* sin carpeta de marca todavía */ }
     // El logo del perfil va primero (sea del store o de la landing).
     if (logoUrl) marca.unshift({ url: logoUrl, filename: logoBase || 'logo de marca', tipo: /\.(mp4|webm|mov)$/i.test(logoUrl) ? 'video' : 'image', fecha: null });
-    res.json({ piezas: data.piezas, material: data.material, marca, items: data.items || [], carpetas: data.carpetas || [], trabajando: data.trabajando || [] });
+    // Espacio por carpeta (stat de los archivos en disco; Piezas es externa -> sin tamaño).
+    const fbytes = async rel => { try { const st = await fs.promises.stat(path.join('/app/media', String(rel).replace(/^\/?(media\/)?/, ''))); return st.size; } catch { return 0; } };
+    const sumB = async arr => (await Promise.all(arr.map(fbytes))).reduce((a, b) => a + b, 0);
+    const [bEnProcI, bTerm, bMat, bMarca] = await Promise.all([
+      sumB(data.items.filter(i => i.carpeta === 'En proceso').map(i => i.media_path)),
+      sumB(data.items.filter(i => i.carpeta === 'Terminado').map(i => i.media_path)),
+      sumB(data.material.map(m => m.media_path)),
+      sumB(marca.filter(m => /^\/media\//.test(m.url)).map(m => m.url)),
+    ]);
+    const folderSizes = { 'En proceso': bEnProcI + bMat, 'Terminado': bTerm, 'Marca': bMarca };
+    res.json({ piezas: data.piezas, material: data.material, marca, items: data.items || [], carpetas: data.carpetas || [], trabajando: data.trabajando || [], folderSizes });
   } catch (e) { console.error('biblioteca', e.message); res.status(500).json({ error: 'db' }); }
 });
 

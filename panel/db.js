@@ -347,7 +347,7 @@ async function getBiblioteca(proyectoId) {
      ORDER BY bm.creado_en DESC`, [proyectoId])).rows;
   const perfil = (await pool.query(`SELECT logo FROM contenido.proyecto_perfil WHERE proyecto_id = $1`, [proyectoId])).rows[0] || {};
   const items = (await pool.query(`
-    SELECT id, media_path, tipo, nombre, carpeta, origen, resumen, creado_en
+    SELECT id, codigo, media_path, tipo, nombre, carpeta, origen, resumen, creado_en
       FROM contenido.biblioteca_item WHERE proyecto_id = $1 ORDER BY creado_en DESC`, [proyectoId])).rows;
   const carpetas = (await pool.query(`
     SELECT nombre FROM contenido.biblioteca_carpeta WHERE proyecto_id = $1 ORDER BY orden, nombre`, [proyectoId])).rows.map(r => r.nombre);
