@@ -83,6 +83,10 @@ def det_brief():
 
 
 def det_bibliotecario():
+    # Recuperación: solicitudes 'procesando' atascadas (worker caído / job muerto) -> 'error'.
+    # El job puede tardar hasta ~25 min (timeout de claude); 40 min es margen seguro.
+    psql("UPDATE contenido.solicitudes_biblioteca SET estado='error', procesado_en=now() "
+         "WHERE estado='procesando' AND creado_en < now() - interval '40 minutes'")
     # Solicitudes del bibliotecario (crear/editar assets de la biblioteca): estado='pendiente'.
     jobs = []
     for row in _lines("SELECT s.id||'|'||COALESCE(p.slug,'cortafuego') "
