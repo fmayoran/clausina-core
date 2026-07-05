@@ -526,6 +526,24 @@ app.post('/api/requerimientos/:id/material', async (req, res) => {
   } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
 });
 
+// Agregar material a una propuesta ELIGIÉNDOLO de la biblioteca: se copia el archivo a la propuesta.
+app.post('/api/requerimientos/:id/material-biblioteca', async (req, res) => {
+  try {
+    const srcRel = String((req.body && req.body.media_path) || '').replace(/^\/+/, '').replace(/^media\//, '');
+    if (!srcRel || srcRel.includes('..')) return res.status(400).json({ ok: false, error: 'ruta' });
+    const src = path.join('/app/media', srcRel);
+    const ext = ((srcRel.match(/\.([a-z0-9]{2,5})$/i) || [, ''])[1] || 'jpg').toLowerCase();
+    const rel = path.posix.join('material/req', req.params.id, crypto.randomUUID() + '.' + ext);
+    const dst = path.join('/app/media', rel);
+    await fs.promises.mkdir(path.dirname(dst), { recursive: true });
+    await fs.promises.copyFile(src, dst);
+    const tipo = (req.body && req.body.tipo === 'video') ? 'video' : 'image';
+    const mat = await db.addMaterial(req.params.id, rel, tipo, (req.body && req.body.filename) || null);
+    if (!mat) { await fs.promises.unlink(dst).catch(() => {}); return res.status(409).json({ ok: false, error: 'estado' }); }
+    res.json({ ok: true, material: mat });
+  } catch (e) { console.error('material-biblioteca', e.message); res.status(500).json({ ok: false }); }
+});
+
 // --- Material aportado al RECHAZAR una pieza (se adjunta al brief que la generó, para la corrección) ---
 app.get('/api/piezas/:id/materiales', async (req, res) => {
   try { res.json(await db.getMaterialesPorPieza(req.params.id)); }

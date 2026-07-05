@@ -423,6 +423,31 @@ async function rmDelMaterial(mid){
   try{ await fetch('api/requerimientos/'+modalId+'/material/'+mid,{method:'DELETE'}); }catch(e){}
   acting=false; loadMateriales();
 }
+// --- Elegir material desde la biblioteca (taller) para una propuesta ---
+let _pickItems=[];
+async function abrirPickerBiblio(){
+  if(!modalId) return;
+  let data; try{ data=await fetch('api/biblioteca').then(r=>r.json()); }catch(e){ toast('No se pudo abrir la biblioteca',true); return; }
+  _pickItems=(data.items||[]).filter(i=>i.carpeta==='En proceso'||i.carpeta==='Terminado');
+  let ov=document.getElementById('bp-ov');
+  if(!ov){ ov=document.createElement('div'); ov.id='bp-ov'; ov.className='bpov'; document.body.appendChild(ov); ov.addEventListener('click',e=>{ if(e.target===ov) cerrarPicker(); }); }
+  const cells=_pickItems.length ? _pickItems.map((m,i)=>{
+    const u='media/'+m.media_path;
+    const th=m.tipo==='video'?`<video src="${esc(u)}#t=0.1" muted></video>`:`<img src="${esc(u)}" onerror="this.style.opacity=.15">`;
+    return `<div class="bpcell" onclick="attachBiblio(${i},this)" title="${esc(m.nombre||'')}">${th}<span class="bpcode">${esc(m.codigo||'')}</span></div>`;
+  }).join('') : '<div class="bpempty">— la biblioteca (taller) está vacía; subí o generá material primero —</div>';
+  ov.innerHTML=`<div class="bpbox"><div class="bphead"><b>Agregar desde la biblioteca</b><span>elegí uno o varios · se copian a esta propuesta</span><button onclick="cerrarPicker()" title="Cerrar">×</button></div><div class="bpgrid">${cells}</div></div>`;
+  ov.style.display='flex';
+}
+async function attachBiblio(i, el){
+  const m=_pickItems[i]; if(!m||!modalId||el.classList.contains('bpadded')) return;
+  el.classList.add('bpadded');
+  try{ const d=await fetch('api/requerimientos/'+modalId+'/material-biblioteca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({media_path:m.media_path,tipo:m.tipo,filename:m.nombre||m.codigo})}).then(r=>r.json());
+    if(d.ok){ toast('Agregado: '+(m.codigo||'material')); loadMateriales(); }
+    else { toast('No se pudo agregar'+(d.error?' ('+d.error+')':''),true); el.classList.remove('bpadded'); }
+  }catch(e){ toast('Error de conexión',true); el.classList.remove('bpadded'); }
+}
+function cerrarPicker(){ const o=document.getElementById('bp-ov'); if(o) o.style.display='none'; }
 async function generarPublicacion(){
   if(!modalId||acting) return;
   if(!confirm('Generar la publicación: se manda a crear la pieza y entra al circuito de aprobación. ¿Confirmás?')) return;
