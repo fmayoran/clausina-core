@@ -16,7 +16,7 @@
   .mcell img,.mcell video{width:100%;height:100%;object-fit:cover;display:block;}
   .mcell.logocell img{object-fit:contain;padding:16px;}
   .mcell .play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.55);display:grid;place-items:center;color:#fff;font-size:13px;pointer-events:none;}
-  .mcell .cap{position:absolute;left:0;right:0;bottom:0;padding:14px 8px 6px;background:linear-gradient(transparent,rgba(0,0,0,.82));font-family:'Inter',sans-serif;font-size:10.5px;line-height:1.25;color:#eceef0;pointer-events:none;}
+  .mcell .cap{position:absolute;left:0;right:0;bottom:0;padding:14px 8px 6px;background:linear-gradient(transparent,rgba(0,0,0,.82));font-family:'Inter',sans-serif;font-size:10.5px;line-height:1.25;color:#eceef0;pointer-events:none;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}
   .mcell .badge{position:absolute;top:6px;left:6px;font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.6);color:#cfd3d8;padding:2px 6px;border-radius:7px;}
   .mcell .badge.pub{color:#0A0B0D;background:#CCF24D;}
   .mcell .badge.pend{color:#0A0B0D;background:#E0A458;}
@@ -145,8 +145,7 @@ function renderSec(sec){
 function genCell(g){
   if(g.estado==='listo' && g.resultado_path){
     const m={ url:'media/'+g.resultado_path, tipo:g.resultado_tipo, poster:null };
-    const cap = g.resumen || g.instruccion || '';
-    return `<div class="mcell" onclick="previewGen('${g.id}')">${thumbHtml(m)}<span class="badge ia">IA</span><span class="cap">${esc(cap)}</span><button class="gx" title="Borrar" onclick="event.stopPropagation();delGen('${g.id}')">×</button></div>`;
+    return `<div class="mcell" onclick="previewGen('${g.id}')" title="${esc(g.instruccion||'')}">${thumbHtml(m)}<span class="badge ia">IA</span><button class="gx" title="Borrar" onclick="event.stopPropagation();delGen('${g.id}')">×</button></div>`;
   }
   if(g.estado==='error'){
     return `<div class="mcell gerr"><span class="gwtx" style="color:#FF6A45">${esc(g.resumen||'No se pudo generar')}</span><span class="gwtx" style="color:#8A8F98;margin-top:3px">${esc(g.instruccion||'')}</span><button class="gx" style="display:block" title="Quitar" onclick="delGen('${g.id}')">×</button></div>`;
