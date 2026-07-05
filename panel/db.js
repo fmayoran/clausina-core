@@ -346,7 +346,28 @@ async function getBiblioteca(proyectoId) {
      WHERE b.proyecto_id = $1 AND bm.media_path IS NOT NULL
      ORDER BY bm.creado_en DESC`, [proyectoId])).rows;
   const perfil = (await pool.query(`SELECT logo FROM contenido.proyecto_perfil WHERE proyecto_id = $1`, [proyectoId])).rows[0] || {};
-  return { piezas, material, logo: perfil.logo || null };
+  const generados = (await pool.query(`
+    SELECT id, instruccion, origen_url, estado, resultado_path, resultado_tipo, resumen, creado_en
+      FROM contenido.solicitudes_biblioteca
+     WHERE proyecto_id = $1 AND estado IN ('pendiente','procesando','listo','error')
+     ORDER BY creado_en DESC LIMIT 60`, [proyectoId])).rows;
+  return { piezas, material, logo: perfil.logo || null, generados };
+}
+
+// Nueva solicitud al bibliotecario (crear/editar un asset). La toma el worker.
+async function crearSolicitudBiblioteca(proyectoId, instruccion, origenUrl, origenTipo) {
+  const { rows } = await pool.query(
+    `INSERT INTO contenido.solicitudes_biblioteca (proyecto_id, instruccion, origen_url, origen_tipo)
+     VALUES ($1,$2,$3,$4) RETURNING id`,
+    [proyectoId, String(instruccion).slice(0, 2000), origenUrl || null, origenTipo || null]);
+  return rows[0].id;
+}
+
+// Borra una solicitud/asset del bibliotecario; devuelve resultado_path para limpiar el archivo.
+async function delSolicitudBiblioteca(proyectoId, id) {
+  const { rows } = await pool.query(
+    `DELETE FROM contenido.solicitudes_biblioteca WHERE id=$1 AND proyecto_id=$2 RETURNING resultado_path`, [id, proyectoId]);
+  return rows[0] || null;
 }
 
 // Bitácora de generación (relato de alto nivel) de la revisión vigente de una pieza.
@@ -588,7 +609,7 @@ async function health() {
 }
 
 module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, getResumenAgencia,
-  getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca,
+  getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,
   addMaterialPorPieza, getMaterialesPorPieza, delMaterialPorPieza, generarReq, revisarReq, activarReq, descartarReq, insertMencion,
   getPostIdsPublicados, upsertMetricas,

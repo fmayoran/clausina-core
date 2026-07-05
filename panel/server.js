@@ -363,8 +363,29 @@ app.get('/api/biblioteca', async (req, res) => {
     } catch (_) { /* sin carpeta de marca todavía */ }
     // El logo del perfil va primero (sea del store o de la landing).
     if (logoUrl) marca.unshift({ url: logoUrl, filename: logoBase || 'logo de marca', tipo: /\.(mp4|webm|mov)$/i.test(logoUrl) ? 'video' : 'image', fecha: null });
-    res.json({ piezas: data.piezas, material: data.material, marca, resumen: { piezas: data.piezas.length, material: data.material.length, marca: marca.length } });
+    res.json({ piezas: data.piezas, material: data.material, marca, generados: data.generados || [], resumen: { piezas: data.piezas.length, material: data.material.length, marca: marca.length, generados: (data.generados || []).filter(g => g.estado === 'listo').length } });
   } catch (e) { console.error('biblioteca', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+// Pedido al bibliotecario: crear/editar un asset (instruccion + fuente opcional). Lo procesa el worker.
+app.post('/api/biblioteca/solicitar', async (req, res) => {
+  try {
+    const instruccion = String((req.body && req.body.instruccion) || '').trim();
+    if (!instruccion) return res.status(400).json({ ok: false, error: 'instruccion_requerida' });
+    const origenUrl = (req.body && req.body.origen_url) ? String(req.body.origen_url).slice(0, 1000) : null;
+    const origenTipo = (req.body && req.body.origen_tipo === 'video') ? 'video' : (origenUrl ? 'image' : null);
+    const id = await db.crearSolicitudBiblioteca(req.proyectoId, instruccion, origenUrl, origenTipo);
+    res.json({ ok: true, id });
+  } catch (e) { console.error('biblio solicitar', e.message); res.status(500).json({ ok: false }); }
+});
+
+// Borrar un asset/solicitud del bibliotecario (y su archivo).
+app.delete('/api/biblioteca/generado/:id', async (req, res) => {
+  try {
+    const row = await db.delSolicitudBiblioteca(req.proyectoId, req.params.id);
+    if (row && row.resultado_path) borrarMediaFile(row.resultado_path);
+    res.json({ ok: !!row });
+  } catch (e) { console.error('biblio del', e.message); res.status(500).json({ ok: false }); }
 });
 
 // Bitácora de generación de una pieza (cómo la armó el creativo: lógica + herramientas).
