@@ -116,6 +116,7 @@ const ESTLBL = { publicada:{t:'publicada',c:'pub'}, pendiente_aprobacion:{t:'pen
 let _toastT;
 function toast(msg,err){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.toggle('err',!!err); t.classList.add('show'); clearTimeout(_toastT); _toastT=setTimeout(()=>t.classList.remove('show'),3600); }
 const absUrl = u => /^https?:/.test(u) ? u : ('/'+String(u).replace(/^\/+/,''));
+const haceMin = s => { if(!s) return ''; const m=Math.max(0,Math.floor((Date.now()-new Date(s).getTime())/60000)); return m<1?'recién':('hace '+m+'m'); };
 
 function norm(sec, x){
   if(sec==='piezas'){ const e=ESTLBL[x.estado]||{t:x.estado,c:''};
@@ -148,9 +149,10 @@ function genCell(g){
     return `<div class="mcell" onclick="previewGen('${g.id}')">${thumbHtml(m)}<span class="badge ia">IA</span><span class="cap">${esc(cap)}</span><button class="gx" title="Borrar" onclick="event.stopPropagation();delGen('${g.id}')">×</button></div>`;
   }
   if(g.estado==='error'){
-    return `<div class="mcell gerr"><span class="gwtx">no se pudo generar</span><span class="gwtx" style="color:#8A8F98">${esc(g.instruccion||'')}</span><button class="gx" style="display:block" title="Quitar" onclick="delGen('${g.id}')">×</button></div>`;
+    return `<div class="mcell gerr"><span class="gwtx" style="color:#FF6A45">${esc(g.resumen||'No se pudo generar')}</span><span class="gwtx" style="color:#8A8F98;margin-top:3px">${esc(g.instruccion||'')}</span><button class="gx" style="display:block" title="Quitar" onclick="delGen('${g.id}')">×</button></div>`;
   }
-  return `<div class="mcell sk gwork"><span class="gwlbl">generando…</span><span class="gwtx">${esc(g.instruccion||'')}</span></div>`;
+  const el=haceMin(g.creado_en), tarda=(Date.now()-new Date(g.creado_en).getTime())>10*60000;
+  return `<div class="mcell sk gwork"><span class="gwlbl">generando…${el?' · '+el:''}</span><span class="gwtx">${esc(g.instruccion||'')}</span>${tarda?'<span class="gwtx" style="color:#E0A458">tardando más de lo normal</span>':''}</div>`;
 }
 function renderGenerados(){
   const g=document.getElementById('g-generados'), n=document.getElementById('n-generados'), arr=LIB.generados;

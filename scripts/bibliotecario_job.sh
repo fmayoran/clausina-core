@@ -56,39 +56,42 @@ timeout 1500 claude -p "$PROMPT" --model sonnet --allowedTools "Bash" Read Write
 
 if [ ! -s "/tmp/biblio_res_$sid.json" ]; then
   echo "$(ts) ERROR: sin resultado $sid" >> "$LOG"
-  psql "UPDATE contenido.solicitudes_biblioteca SET estado='error', procesado_en=now() WHERE id='$sid';" >/dev/null
+  psql "UPDATE contenido.solicitudes_biblioteca SET estado='error', resumen='El bibliotecario no dejó un resultado. Probá reformular el pedido.', procesado_en=now() WHERE id='$sid';" >/dev/null
   [ -n "$BOT" ] && curl -s "https://api.telegram.org/bot$BOT/sendMessage" --data-urlencode "chat_id=$CHAT" --data-urlencode "text=El bibliotecario no pudo completar el pedido. Proba reformulando." -o /dev/null 2>&1
   exit 1
 fi
 
-# Copiar el asset generado al media store + actualizar la solicitud (dollar-quoting seguro).
-ok=$(CID="$CID" SID="$sid" SLUG="$slug" HOST_MEDIA="$HOST_MEDIA" python3 - <<'PY'
+# Copiar el asset al media store + actualizar la solicitud (listo o error, con motivo). Tags dollar-quote SIEMPRE con prefijo de letra.
+res=$(CID="$CID" SID="$sid" SLUG="$slug" HOST_MEDIA="$HOST_MEDIA" python3 - <<'PY'
 import json, os, secrets, subprocess, shutil, pathlib
 sid=os.environ["SID"]; cid=os.environ["CID"]; slug=os.environ["SLUG"]; hm=os.environ["HOST_MEDIA"]
-d=json.load(open(f"/tmp/biblio_res_{sid}.json"))
-src=(d.get("path") or "").strip()
-if not src or not os.path.isfile(src):
-    print("0-nofile"); raise SystemExit
+def dq(v):                       # dollar-quote con tag válido (empieza con letra)
+    t="x"+secrets.token_hex(8)
+    return f"${t}${v}${t}$"
+def upd(sets):
+    subprocess.run(["docker","exec","-i",cid,"psql","-U","postgres","-d","claude","-q","-c",
+                    f"UPDATE contenido.solicitudes_biblioteca SET {sets}, procesado_en=now() WHERE id='{sid}';"])
+try: d=json.load(open(f"/tmp/biblio_res_{sid}.json"))
+except Exception: d={}
+src=(d.get("path") or "").strip(); err=(d.get("error") or "").strip()
+if err or not src or not os.path.isfile(src):
+    reason=(err or "El bibliotecario no generó el archivo.")[:2000]
+    upd(f"estado='error', resumen={dq(reason)}"); print("err:"+reason[:180]); raise SystemExit
 tipo=(d.get("tipo") or ("video" if src.lower().endswith((".mp4",".webm",".mov")) else "image")).strip()
 resumen=(d.get("resumen") or "").strip()[:2000]
 ext=(pathlib.Path(src).suffix.lower().lstrip(".")) or ("mp4" if tipo=="video" else "png")
-rel=f"biblioteca/{slug}/{secrets.token_hex(12)}.{ext}"
-dst=os.path.join(hm, rel)
-os.makedirs(os.path.dirname(dst), exist_ok=True)
-shutil.copyfile(src, dst); os.chmod(dst, 0o644)
-t=secrets.token_hex(6)
-sql=(f"UPDATE contenido.solicitudes_biblioteca SET estado='listo', resultado_path=${t}${rel}${t}$, "
-     f"resultado_tipo='{tipo}', resumen=${t}b${resumen}${t}b$, procesado_en=now() WHERE id='{sid}';")
-r=subprocess.run(["docker","exec","-i",cid,"psql","-U","postgres","-d","claude","-q","-c",sql],capture_output=True,text=True)
-print("1" if not (r.stderr or "").strip() else "0-"+r.stderr.strip())
+rel=f"biblioteca/{slug}/{secrets.token_hex(12)}.{ext}"; dst=os.path.join(hm, rel)
+os.makedirs(os.path.dirname(dst), exist_ok=True); shutil.copyfile(src, dst); os.chmod(dst, 0o644)
+upd(f"estado='listo', resultado_path={dq(rel)}, resultado_tipo='{tipo}', resumen={dq(resumen)}")
+print("ok:"+rel)
 PY
 )
-if [[ "$ok" == 1* ]]; then
+if [[ "$res" == ok:* ]]; then
   echo "$(ts) listo $sid" >> "$LOG"
   [ -n "$BOT" ] && curl -s "https://api.telegram.org/bot$BOT/sendMessage" --data-urlencode "chat_id=$CHAT" --data-urlencode "text=El bibliotecario dejo un asset nuevo en la biblioteca. Miralo en https://panel.clausina.ar" -o /dev/null 2>&1
 else
-  echo "$(ts) ERROR aplicando resultado $sid: $ok" >> "$LOG"
-  psql "UPDATE contenido.solicitudes_biblioteca SET estado='error', procesado_en=now() WHERE id='$sid';" >/dev/null
+  echo "$(ts) error $sid: ${res#err:}" >> "$LOG"
+  [ -n "$BOT" ] && curl -s "https://api.telegram.org/bot$BOT/sendMessage" --data-urlencode "chat_id=$CHAT" --data-urlencode "text=El bibliotecario no pudo: ${res#err:}" -o /dev/null 2>&1
 fi
 rm -f "/tmp/biblio_ctx_$sid.json" "/tmp/biblio_res_$sid.json" "/tmp/biblio_src_$sid".*
 echo "$(ts) fin solicitud $sid" >> "$LOG"

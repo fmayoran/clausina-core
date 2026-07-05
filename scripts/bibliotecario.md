@@ -26,4 +26,8 @@ Guardá el archivo final en `/tmp` (`.png`/`.webp`/`.jpg` para imagen; `.mp4` pa
 ```json
 {"path":"<ruta absoluta del archivo generado>","tipo":"image|video","resumen":"<qué hiciste, alto nivel, 1-3 frases: enfoque + herramienta usada>"}
 ```
+Si NO podés cumplir el pedido (falta material, no se entiende, la herramienta falló), escribí igual el JSON pero con el motivo, para que Fer lo vea:
+```json
+{"error":"<motivo breve y claro, en español>"}
+```
 No hagas nada más.
