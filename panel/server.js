@@ -277,6 +277,7 @@ app.post('/api/piezas/:id/aprobar', async (req, res) => {
     const p = await db.getPiezaCanal(req.params.id);
     if (!p || p.estado !== 'pendiente_aprobacion') return res.status(409).json({ ok: false, error: 'no_pendiente' });
     if (p.canal === 'aviso') return res.json({ ok: await db.avisoEstado(req.params.id, 'publicada') });
+    if (req.body && Array.isArray(req.body.colaboradores)) await db.setColaboradores(req.params.id, req.body.colaboradores);
     const status = await callWebhook(`${N8N}/cf-pub-publish?token=${encodeURIComponent(p.token)}`);
     res.json({ ok: status >= 200 && status < 300, status });
   } catch (e) { console.error('aprobar', e.message); res.status(500).json({ ok: false, error: 'webhook' }); }

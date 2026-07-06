@@ -64,6 +64,24 @@ header .marcasel:hover{border-color:var(--fire);}
 .bpcell.bpadded::after{content:"\2713";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;width:36px;height:36px;border-radius:50%;background:var(--alarm);color:#fff;font-weight:800;font-size:18px;display:grid;place-items:center;box-shadow:0 2px 10px rgba(0,0,0,.55);}
 .bpcell .bpcode{z-index:2;}
 .bpempty{padding:24px;color:var(--ash);font-family:'JetBrains Mono',monospace;font-size:12px;}
+/* Colaboradores (Collab) */
+.badge.collab{color:var(--fire);border-color:#3a4a1e;background:rgba(204,242,77,.08);}
+.colabov{position:fixed;inset:0;z-index:130;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(0,0,0,.66);}
+.colabbox{background:#111317;border:1px solid #20242B;border-radius:14px;max-width:460px;width:100%;padding:18px 20px;}
+.colabhead{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+.colabhead b{font-family:'Inter Tight',sans-serif;font-size:16px;color:#ECEEF0;}
+.colabhead .colx{margin-left:auto;background:none;border:0;color:var(--ash);font-size:22px;cursor:pointer;line-height:1;}
+.colabhint{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ash);line-height:1.5;margin-bottom:12px;}
+.colchips{display:flex;flex-wrap:wrap;gap:7px;min-height:30px;margin-bottom:12px;}
+.colchip{display:inline-flex;align-items:center;gap:6px;background:rgba(204,242,77,.1);border:1px solid #3a4a1e;color:var(--fire);font-family:'JetBrains Mono',monospace;font-size:12px;padding:4px 8px 4px 10px;border-radius:9px;}
+.colchip button{background:none;border:0;color:var(--fire);font-size:15px;cursor:pointer;line-height:1;padding:0;}
+.colnone{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ash);}
+.coladd{display:flex;gap:8px;margin-bottom:16px;}
+.coladd input{flex:1;background:#0c0c0a;border:1px solid var(--line);border-radius:8px;color:var(--white);font-family:'Inter',sans-serif;font-size:14px;padding:9px 11px;outline:none;}
+.coladd input:focus{border-color:var(--fire);}
+.coladd button{background:transparent;border:1px solid var(--line);color:var(--ash);font-size:18px;width:40px;border-radius:8px;cursor:pointer;}
+.coladd button:hover{border-color:var(--fire);color:var(--fire);}
+.colabfoot{display:flex;gap:8px;}
 .meta{font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.06em;color:var(--ash);margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
 .badge{border:1px solid var(--line);border-radius:10px;padding:1px 7px;text-transform:uppercase;}
 .badge.fmt{color:var(--ember);border-color:#1d3a44;}

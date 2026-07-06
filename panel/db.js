@@ -72,6 +72,7 @@ async function getPiezas(canal, proyectoId) {
   const { rows } = await pool.query(`
     SELECT pz.id, pz.numero, pz.canal, pz.titulo_interno, pz.estado, pz.creado_en, pz.actualizado_en,
            r.nro, r.formato, r.motivo_rechazo, r.derivado_en,
+           COALESCE(r.colaboradores, (SELECT ig_colaboradores FROM contenido.proyectos WHERE id=pz.proyecto_id)) AS colaboradores,
            (r.bitacora IS NOT NULL) AS tiene_bitacora,
            r.ig_post_id, r.ig_permalink, r.publicado_en, r.caption,
            r.daypart, r.clima, r.transito, r.momento, r.duracion_s,
@@ -423,6 +424,17 @@ async function getBitacora(piezaId) {
   return rows[0] || null;
 }
 
+// Collaborators por-post (IG Collab): NULL=default de marca, {}=sin collab, {handles}=invitar. Los fija Fer al aprobar.
+async function setColaboradores(piezaId, list) {
+  const clean = [...new Set((Array.isArray(list) ? list : [])
+    .map(h => String(h).trim().replace(/^@+/, '').toLowerCase()).filter(Boolean).slice(0, 20))];
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.revisiones SET colaboradores=$2
+       WHERE id=(SELECT revision_vigente FROM contenido.piezas WHERE id=$1) AND estado='pendiente_aprobacion'`,
+    [piezaId, clean]);
+  return rowCount > 0;
+}
+
 // Token de la revisión vigente SOLO si está pendiente de aprobación.
 // El token es la credencial que usan los webhooks de n8n (cf-pub-publish / cf-pub-decide).
 // Vive server-side: nunca se expone en la API pública del board.
@@ -653,7 +665,7 @@ async function health() {
 }
 
 module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, getResumenAgencia,
-  getPiezas, getPiezaCanal, avisoEstado, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
+  getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,
   addMaterialPorPieza, getMaterialesPorPieza, delMaterialPorPieza, generarReq, revisarReq, activarReq, descartarReq, insertMencion,

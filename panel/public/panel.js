@@ -113,7 +113,7 @@ function pendCard(p){
     ${p.tiene_bitacora ? `<button class="bitlink" onclick="verBitacora('${p.id}')">↳ cómo se generó</button>` : ''}
     </div>
     <div class="acts">
-      <button class="btn ok" onclick="aprobar('${p.id}',this)">Aprobar y publicar</button>
+      <button class="btn ok" onclick='aprobarIG("${p.id}", ${JSON.stringify(p.colaboradores||[])})'>Aprobar y publicar</button>
       <div class="acts-row">
         <button class="btn no" onclick="rechazar('${p.id}',this)">Modificar</button>
         <button class="btn del" onclick="descartar('${p.id}',this)">Descartar</button>
@@ -126,9 +126,10 @@ function pubCard(p){
   const mini = t ? `<a class="mw" href="${esc(full)}" target="_blank" rel="noopener" title="Abrir completa"><img class="mini" loading="lazy" src="${esc(t)}" onerror="this.style.display='none'"></a>` : '';
   const ig = p.ig_permalink ? `<a class="link" href="${esc(p.ig_permalink)}" target="_blank" rel="noopener">Ver en Instagram ↗</a>` : '';
   const met = (p.m_views!=null) ? `<div class="metr"><b>${nf(p.m_views)}</b> vistas · ${nf(p.m_reach)} alcance · ${nf(p.m_likes)} likes</div>` : '';
+  const collab = (p.colaboradores && p.colaboradores.length) ? `<span class="badge collab" title="Colaboración (Collab)">Collab: ${p.colaboradores.map(h=>'@'+esc(h)).join(', ')}</span>` : '';
   return `<div class="card row">${mini}<div class="rbody">
     <div class="tt">${esc(p.titulo_interno)}</div>
-    <div class="meta">${cfBadge(p)}${fmtBadge(p)}${revBadge(p)}<span>${fecha(p.publicado_en)}</span></div>
+    <div class="meta">${cfBadge(p)}${fmtBadge(p)}${revBadge(p)}${collab}<span>${fecha(p.publicado_en)}</span></div>
     ${met}${ig}</div></div>`;
 }
 
@@ -304,15 +305,41 @@ function renderStatus(rows){
 function setUpd(){ const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR'); }
 
 /* ---------- Acciones sobre piezas (canal-neutrales; el backend ramifica) ---------- */
-async function aprobar(id, btn){
+async function aprobar(id, btn, colaboradores){
   if(acting) return;
-  if(!confirm('Aprobar y publicar esta pieza. ¿Confirmás?')) return;
+  const conColab = Array.isArray(colaboradores);   // IG: viene del modal de collabs (ya es la confirmación)
+  if(!conColab && !confirm('Aprobar y publicar esta pieza. ¿Confirmás?')) return;
   acting=true; busy(btn,'Publicando…');
-  try{ const d=await fetch('api/piezas/'+id+'/aprobar',{method:'POST'}).then(r=>r.json());
+  try{ const opt = conColab ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({colaboradores})} : {method:'POST'};
+    const d=await fetch('api/piezas/'+id+'/aprobar',opt).then(r=>r.json());
     toast(d.ok?'Aprobada — publicando':'No se pudo aprobar ('+(d.error||d.status)+')', !d.ok);
   }catch(e){ toast('Error de conexión', true); }
   acting=false; setTimeout(currentLoad, 1500);
 }
+// Aprobar una pieza de IG: primero elegir/editar los colaboradores (Collab).
+let _colId=null, _colList=[];
+function aprobarIG(id, colabs){
+  if(acting) return;
+  _colId=id; _colList=(Array.isArray(colabs)?colabs:[]).slice();
+  renderColab(); document.getElementById('colab-ov').style.display='flex';
+}
+function renderColab(){
+  let ov=document.getElementById('colab-ov');
+  if(!ov){ ov=document.createElement('div'); ov.id='colab-ov'; ov.className='colabov'; document.body.appendChild(ov); ov.addEventListener('click',e=>{ if(e.target===ov) cerrarColab(); }); }
+  const chips=_colList.length ? _colList.map((h,i)=>`<span class="colchip">@${esc(h)}<button title="Quitar" onclick="quitarColab(${i})">×</button></span>`).join('')
+                              : '<span class="colnone">sin colaboradores — se publica sin Collab</span>';
+  ov.innerHTML=`<div class="colabbox">
+    <div class="colabhead"><b>Colaboradores del post</b><button class="colx" onclick="cerrarColab()" title="Cerrar">×</button></div>
+    <p class="colabhint">Se invita a estas cuentas a Collab (aparece también en su feed si aceptan). Sacá o agregá las que quieras.</p>
+    <div class="colchips">${chips}</div>
+    <div class="coladd"><input id="colab-in" placeholder="agregar cuenta (ej. ardora.ar)" onkeydown="if(event.key==='Enter'){event.preventDefault();agregarColab();}"><button onclick="agregarColab()">+</button></div>
+    <div class="colabfoot"><button class="btn ok" onclick="confirmarAprobIG()">Aprobar y publicar</button><button class="btn no" onclick="cerrarColab()">Cancelar</button></div>
+  </div>`;
+}
+function quitarColab(i){ _colList.splice(i,1); renderColab(); }
+function agregarColab(){ const el=document.getElementById('colab-in'); const v=(el.value||'').trim().replace(/^@+/,'').toLowerCase(); if(v && !_colList.includes(v)) _colList.push(v); el.value=''; renderColab(); document.getElementById('colab-in').focus(); }
+function cerrarColab(){ const o=document.getElementById('colab-ov'); if(o) o.style.display='none'; _colId=null; }
+async function confirmarAprobIG(){ const id=_colId, colabs=_colList.slice(); cerrarColab(); await aprobar(id, null, colabs); }
 // Rechazo con material: abre un modal con el motivo + galería opcional de imágenes/videos a aportar.
 // El material se sube a la pieza (mientras está pendiente) y la rutina de corrección lo usa al reprocesar.
 function rechazar(id, btn){ if(acting) return; openRejectModal(id); }
