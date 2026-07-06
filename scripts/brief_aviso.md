@@ -21,7 +21,7 @@ desde el panel; elegí la mejor toma o combiná tomas para el spot), `media` (ad
 - Salida: **mp4 H.264 1080×1620 (2:3), ~10 s, loop, SIN audio**, diseñado bold para LED.
 - Base: la media aportada (reencuadrá a 2:3) o Higgsfield / clips de fuego de `assets/landing/publicaciones/` si no hay.
 - **Texto de marca HORNEADO** con la tipografía y colores de la marca (ver `contexto/CONTEXTO_MARCA.md` y el `CLAUDE.md` del proyecto). Si insertás el **logo**, usá SOLO el archivo oficial de la marca (nunca uno inventado/IA).
-- Guardá el mp4 + un poster (`.webp`/`.jpg`) en **`assets/landing/publicaciones/`** con nombre único `aviso_<slug>_<momento>_<fecha>.mp4`, hacé **git add + commit + push** y **verificá 200** (la landing los sirve público, como las piezas de Instagram).
+- Guardá el mp4 + un poster (`.webp`/`.jpg`) en **`assets/landing/publicaciones/`** con nombre único `aviso_<slug>_<momento>_<fecha>.mp4`, hacé **git add + commit + push** y **verificá 200** (el mp4 DEBE pesar <24MB — tope de Cloudflare, si no falla todo el deploy) (la landing los sirve público, como las piezas de Instagram).
 
 ## Registrá la pieza (un solo curl a cf-crear-pendiente)
 `POST /webhook/cf-crear-pendiente` con:

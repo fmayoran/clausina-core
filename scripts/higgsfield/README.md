@@ -51,6 +51,15 @@ ffmpeg -y -i poster.jpg -c:v libwebp -quality 82 provoleta_fundicion_vN_YYYYMMDD
 Seedance 2.0 1080p ya entrega 1080×1920 / H.264 / 24fps, dentro de specs de Reels. El reencode
 es por compatibilidad/robustez. Nombre de archivo **único por pieza** (anti-cache).
 
+**TOPE DE TAMAÑO (obligatorio):** Cloudflare Workers rechaza cualquier asset **> 25 MiB** y eso hace **fallar TODO el deploy de la landing** (ninguna publicación nueva sale, quedan en 404). El MP4 final **debe pesar menos de ~24 MB**. Verificá siempre con `stat -c%s <mp4>`; si se pasa, reencodá con bitrate acotado hasta que entre:
+```bash
+ffmpeg -y -i raw.mp4 -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 \
+  -map 0:v:0 -map 1:a:0 -shortest -c:v libx264 -pix_fmt yuv420p \
+  -crf 24 -maxrate 9M -bufsize 18M -preset slow -c:a aac -b:a 128k -movflags +faststart salida.mp4
+# si sigue pesado: subí el CRF (24→28) o bajá -maxrate; Reels largos, recortá la duración.
+```
+NUNCA hagas commit/registres un mp4 de más de 24 MB en `assets/landing/publicaciones/`.
+
 ### 4. Iterar
 Cada corrección de Fer se traduce a un ajuste del prompt y se regenera (≈45 créditos por vez).
 Evaluar revisando 3 frames (inicio/medio/final) con `ffmpeg -ss <t> -frames:v 1`.
