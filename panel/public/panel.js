@@ -15,7 +15,7 @@ let currentLoad=function(){};
 let toastT;
 function toast(msg, err){ const t=document.getElementById('toast'); if(!t)return; t.textContent=msg; t.classList.toggle('err',!!err); t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),3800); }
 async function salir(){ try{ await fetch('api/logout',{method:'POST'}); }catch(_){} location.href='login'; }
-function busy(btn, txt){ const a=btn.closest('.acts'); if(a) a.querySelectorAll('button,label').forEach(b=>b.disabled=true); if(txt) btn.textContent=txt; }
+function busy(btn, txt){ if(!btn) return; const a=btn.closest('.acts'); if(a) a.querySelectorAll('button,label').forEach(b=>b.disabled=true); if(txt) btn.textContent=txt; }
 const _lastHtml = {};
 function fill(id, n, html){
   html = html || '<div class="empty">— vacío —</div>';
