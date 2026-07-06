@@ -734,7 +734,7 @@ app.delete('/api/pantallas/:id', async (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public'), {
   extensions: ['html'],
-  setHeaders: (res, p) => { if (p.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache'); }
+  setHeaders: (res, p) => { if (/\.(html|js|css)$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); }
 }));
 
 app.listen(PORT, () => console.log(`cortafuego-panel escuchando en :${PORT}`));
