@@ -38,12 +38,24 @@ Palabras como *oozing, dripping, lava-like, molten, gooey* disparan el filtro y 
 
 ### 3. Acondicionar para Instagram (Reel) + póster
 ```bash
-# Reencode IG-friendly: yuv420p + faststart + pista de audio silenciosa (IG a veces la exige)
-ffmpeg -y -i raw.mp4 -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 \
-  -map 0:v:0 -map 1:a:0 -shortest \
+# Reencode IG-friendly: yuv420p + faststart. CONSERVÁ EL AUDIO DEL ORIGINAL (-map 0:a:0? = opcional).
+ffmpeg -y -i raw.mp4 -map 0:v:0 -map 0:a:0? \
   -c:v libx264 -profile:v high -pix_fmt yuv420p -crf 20 -preset slow \
   -c:a aac -b:a 128k -movflags +faststart provoleta_fundicion_vN_YYYYMMDD.mp4
+# Solo si el original NO tiene audio, agregá una pista silenciosa (IG a veces la exige):
+#   ffmpeg -y -i raw.mp4 -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -map 0:v:0 -map 1:a:0 -shortest ...
+```
 
+**Footage REAL que NO es 9:16 (ej. video horizontal):** NUNCA lo metas con **barras negras** (queda chico y no sirve para Reel). Llená el cuadro 9:16 con **fondo difuminado del propio clip** (el original centrado y nítido, el fondo una versión ampliada+borrosa). Y conservá el audio:
+```bash
+ffmpeg -y -i original.mp4 -filter_complex "\
+  [0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=28[bg];\
+  [0:v]scale=1080:-2,setsar=1[fg];\
+  [bg][fg]overlay=(W-w)/2:(H-h)/2:format=auto,format=yuv420p[v]" \
+  -map "[v]" -map 0:a:0? -c:v libx264 -profile:v high -b:v 4200k -maxrate 5000k -bufsize 10000k \
+  -c:a aac -b:a 128k -movflags +faststart salida.mp4   # verificá que pese <24MB
+```
+```bash
 # Póster: un frame del video → WebP (más liviano y pasa el hook de calidad web)
 ffmpeg -y -ss 4.6 -i provoleta_..._.mp4 -frames:v 1 -q:v 3 poster.jpg
 ffmpeg -y -i poster.jpg -c:v libwebp -quality 82 provoleta_fundicion_vN_YYYYMMDD.webp

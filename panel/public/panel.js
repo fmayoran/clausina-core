@@ -103,7 +103,7 @@ function pendCard(p){
   const thumb = medios.length>1
     ? mediaGallery(medios)
     : (m.tipo==='video' && m.url)
-      ? `<video class="thumb" style="object-fit:contain;background:#000" src="${esc(m.url)}" ${m.poster_url?`poster="${esc(m.poster_url)}"`:''} preload="metadata" playsinline muted loop controls></video>`
+      ? `<video class="thumb" style="aspect-ratio:9/16;height:auto;max-height:70vh;object-fit:contain;background:#000" src="${esc(m.url)}" ${m.poster_url?`poster="${esc(m.poster_url)}"`:''} preload="metadata" playsinline muted loop controls></video>`
       : (t ? `<img class="thumb" loading="lazy" src="${esc(t)}" onerror="this.style.display='none'">` : '<div class="thumb"></div>');
   const copy = p.caption ? `<div class="copy">${esc(p.caption).replace(/\n/g,'<br>')}</div>` : '';
   return `<div class="card">${thumb}<div class="body">
