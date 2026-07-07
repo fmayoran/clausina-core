@@ -582,6 +582,48 @@ async function loadInstagram(){
     setUpd();
   }catch(e){ setUpd(); }
 }
+// --- Pauta (Meta Marketing API, read-only): lee el snapshot de /api/pauta ---
+function money(v, cur){ try{ return new Intl.NumberFormat('es-AR',{style:'currency',currency:cur||'USD',maximumFractionDigits:2}).format(Number(v||0)); }catch(_){ return (cur||'')+' '+nf(v); } }
+const pct = v => Number(v||0).toLocaleString('es-AR',{maximumFractionDigits:2})+'%';
+function stClass(e){ if(e==='ACTIVE') return 'ok'; if(['PAUSED','ADSET_PAUSED','CAMPAIGN_PAUSED'].includes(e)) return 'pause'; if(['WITH_ISSUES','DISABLED','DELETED','ARCHIVED'].includes(e)) return 'warn'; return ''; }
+async function loadPauta(){
+  try{
+    const r=await fetch('api/pauta'); if(r.status===401){ location.href='login'; return; }
+    const d=await r.json();
+    const el=document.getElementById('pauta'); if(!el) return;
+    if(!d || d.configurada===false){ el.innerHTML='<div class="pauta-off">Esta marca todavía no tiene cuenta publicitaria conectada.</div>'; setUpd(); return; }
+    const cur=d.moneda||'USD', c=d.cuenta||{}, t=d.totales||{};
+    const acctSt = c.estado===1 ? 'ok' : (c.estado>=100 ? 'warn' : '');
+    let h=`<div class="pauta-head">
+      <div>
+        <div class="pauta-acct">${esc(c.nombre||'Cuenta publicitaria')}</div>
+        <div class="pauta-sub"><span class="st ${acctSt}">${esc(c.estado_txt||'—')}</span><span>${esc(cur)}</span>${d.capturado_en?`<span>· actualizado ${hace(d.capturado_en)}</span>`:''}</div>
+      </div>
+      <div class="pauta-spend"><div class="pv">${money(c.gastado_total,cur)}</div><div class="pl">Gastado histórico</div></div>
+    </div>
+    <div class="pauta-win">${esc(d.ventana||'Últimos 30 días')}</div>
+    <div class="pauta-kpis">
+      <div class="kpi"><span class="kv">${money(t.gasto,cur)}</span><span class="kl">Gasto</span></div>
+      <div class="kpi"><span class="kv">${nf(t.impresiones)}</span><span class="kl">Impresiones</span></div>
+      <div class="kpi"><span class="kv">${nf(t.alcance)}</span><span class="kl">Alcance</span></div>
+      <div class="kpi"><span class="kv">${nf(t.clics)}</span><span class="kl">Clics</span></div>
+      <div class="kpi"><span class="kv">${pct(t.ctr)}</span><span class="kl">CTR</span></div>
+    </div>`;
+    const camps=d.campanias||[];
+    h+=`<div class="pauta-h3">Campañas <span class="n">${camps.length||''}</span></div>`;
+    if(d.sin_campanias || !camps.length){
+      h+=`<div class="pauta-empty">Todavía no hay campañas en esta cuenta. Cuando lances tu primer anuncio (desde Meta Ads Manager), vas a ver acá el detalle por campaña: gasto, alcance, impresiones y clics. El reporte se sincroniza solo cada pocas horas.</div>`;
+    } else {
+      h+=camps.map(k=>`<div class="camp">
+        <div class="camp-top"><span class="st ${stClass(k.estado)}">${esc(k.estado_txt)}</span><span class="camp-name">${esc(k.nombre)}</span><span class="camp-obj">${esc(k.objetivo)}</span></div>
+        <div class="camp-m"><span>Gasto <b>${money(k.gasto,cur)}</b></span><span>Alcance <b>${nf(k.alcance)}</b></span><span>Impresiones <b>${nf(k.impresiones)}</b></span><span>Clics <b>${nf(k.clics)}</b></span><span>CTR <b>${pct(k.ctr)}</b></span>${k.presupuesto?`<span>Presup. ${esc(k.presupuesto.tipo)} <b>${money(k.presupuesto.monto,cur)}</b></span>`:''}</div>
+      </div>`).join('');
+    }
+    el.innerHTML=h;
+    if(window.lucide) lucide.createIcons();
+    setUpd();
+  }catch(e){ setUpd(); }
+}
 async function loadAvisos(){
   if(acting) return;
   try{

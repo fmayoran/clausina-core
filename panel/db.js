@@ -659,6 +659,14 @@ async function getAuditoria(proyectoId, canal) {
   return r || null;
 }
 
+// --- Pauta (Meta Marketing API, read-only): último snapshot guardado por cf-pauta-sync ---
+async function getPauta(proyectoId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT capturado_en, data FROM contenido.ads_snapshot WHERE proyecto_id=$1`, [proyectoId]);
+  if (!r) return { configurada: false };
+  return { configurada: true, capturado_en: r.capturado_en, ...r.data };
+}
+
 async function health() {
   await pool.query('SELECT 1');
   return true;
@@ -673,5 +681,5 @@ module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, 
   getPantallaActiva, getPantallaPorSlug, getPantallas, crearPantalla, actualizarPantalla, eliminarPantalla, getProgramaActivo,
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
   getLandingCambios, crearLandingCambio, aprobarLanding, rechazarLanding,
-  getAuditoria,
+  getAuditoria, getPauta,
   health };

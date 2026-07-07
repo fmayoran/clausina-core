@@ -234,6 +234,12 @@ app.get('/api/auditoria', async (req, res) => {
   catch (e) { console.error('auditoria', e.message); res.status(500).json({ error: 'db' }); }
 });
 
+// Pauta (Meta Marketing API, read-only): último snapshot sincronizado por cf-pauta-sync.
+app.get('/api/pauta', async (req, res) => {
+  try { res.json(await db.getPauta(req.proyectoId)); }
+  catch (e) { console.error('pauta', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 // Stremea una foto de Telegram (resuelve file_id -> file_path -> bytes, con el token server-side).
 async function proxyTelegramPhoto(res, fileId) {
   if (!fileId) return res.status(404).end();
