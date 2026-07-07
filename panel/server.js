@@ -5,6 +5,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { spawn } = require('child_process');
 const archiver = require('archiver');
 const db = require('./db');
 const vnnox = require('./vnnox');
@@ -436,6 +437,27 @@ app.post('/api/biblioteca/subir', async (req, res) => {
     res.json({ ok: true, id });
   } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
 });
+
+// Subida de VIDEO por streaming crudo + compresión ffmpeg (para archivos grandes que no
+// caben en el límite de base64). El cuerpo es el video tal cual; metadatos en headers.
+app.post('/api/biblioteca/subir-video', async (req, res) => {
+  const tmp = path.join('/tmp', 'up_' + crypto.randomUUID() + '.src');
+  try {
+    const carpeta = String(req.headers['x-carpeta'] || 'En proceso').slice(0, 60);
+    const filename = decodeURIComponent(String(req.headers['x-filename'] || 'video.mp4')).slice(0, 120);
+    const MAX = 600 * 1024 * 1024;  // 600MB de entrada (se comprime a mucho menos)
+    if (Number(req.headers['content-length'] || 0) > MAX) { const e = new Error('El video supera los 600MB'); e.http = 413; throw e; }
+    await recibirStream(req, tmp, MAX);
+    const rel = path.posix.join('biblioteca', req.marca, crypto.randomUUID() + '.mp4');
+    const abs = path.join('/app/media', rel);
+    await fs.promises.mkdir(path.dirname(abs), { recursive: true });
+    await comprimirVideo(tmp, abs);
+    const nombre = filename.replace(/\.[^.]+$/, '');
+    const id = await db.crearItemBiblioteca(req.proyectoId, rel, 'video', nombre, carpeta);
+    res.json({ ok: true, id });
+  } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
+  finally { fs.promises.unlink(tmp).catch(() => {}); }
+});
 // Preservar un asset (p.ej. material aportado, que se depura) copiándolo a la base "Terminado".
 app.post('/api/biblioteca/preservar', async (req, res) => {
   try {
@@ -527,6 +549,34 @@ app.delete('/api/requerimientos/:id/material/:mid', async (req, res) => {
 // Guarda un archivo (dataURL base64) en el media store en disco (/app/media/<subdir>/<uuid>.<ext>)
 // y devuelve {mediaPath, mediaType, filename}. Reemplaza a Telegram: el Bot API descarga hasta 20MB,
 // insuficiente para videos. El volumen es el mismo que lee el creativo (host) — sin límite de tamaño.
+// Comprime un video a calidad apta para Instagram (H.264, máx 1080px de ancho, faststart).
+// Reduce mucho el peso de videos de celular (4K) sin pérdida visible en feed/reels.
+function comprimirVideo(src, dst) {
+  return new Promise((resolve, reject) => {
+    const args = ['-i', src, '-vf', "scale='min(1080,iw)':-2", '-c:v', 'libx264', '-crf', '26',
+      '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k',
+      '-movflags', '+faststart', '-y', dst];
+    const ff = spawn('ffmpeg', args);
+    let err = '';
+    ff.stderr.on('data', d => { err += d; if (err.length > 8000) err = err.slice(-8000); });
+    ff.on('error', e => reject(new Error('ffmpeg no disponible: ' + e.message)));
+    ff.on('close', code => code === 0 ? resolve() : reject(new Error('No se pudo comprimir el video')));
+  });
+}
+
+// Recibe el video crudo por streaming (sin base64) a un archivo temporal. Devuelve la ruta temp.
+function recibirStream(req, tmp, max) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const ws = fs.createWriteStream(tmp);
+    const fail = (e) => { try { ws.destroy(); } catch {} fs.promises.unlink(tmp).catch(() => {}); reject(e); };
+    req.on('data', c => { size += c.length; if (size > max) { try { req.destroy(); } catch {} fail(Object.assign(new Error('El video es demasiado grande'), { http: 413 })); } });
+    ws.on('error', fail); req.on('error', fail);
+    ws.on('finish', () => resolve(size));
+    req.pipe(ws);
+  });
+}
+
 async function guardarMaterialDisco(body, subdir) {
   const dataUrl = String((body && body.dataUrl) || '');
   const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);

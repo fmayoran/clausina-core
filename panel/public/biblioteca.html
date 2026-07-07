@@ -223,18 +223,44 @@ async function subirArchivos(input){
   let ok=0, pes=0, done=0;
   for(const f of files){
     done++;
-    txt.textContent=`Subiendo ${done}/${files.length} — ${f.name}`;
+    const isVideo=(f.type||'').startsWith('video/')||/\.(mp4|mov|webm|m4v|avi)$/i.test(f.name);
     fill.style.width=Math.round((done-1)/files.length*100)+'%';
-    if(f.size>85*1024*1024){ pes++; fill.style.width=Math.round(done/files.length*100)+'%'; continue; }
-    try{ const dataUrl=await new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.onerror=j;rd.readAsDataURL(f);});
-      const d=await fetch('api/biblioteca/subir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,filename:f.name,carpeta:_uploadFolder})}).then(r=>r.json());
-      if(d.ok) ok++;
+    try{
+      if(isVideo){
+        // Video: streaming al server, que lo comprime para Instagram (tope de entrada 600MB).
+        if(f.size>600*1024*1024){ pes++; }
+        else { await subirVideo(f, txt, fill, done, files.length); ok++; }
+      } else {
+        txt.textContent=`Subiendo ${done}/${files.length} — ${f.name}`;
+        if(f.size>85*1024*1024){ pes++; }
+        else {
+          const dataUrl=await new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.onerror=j;rd.readAsDataURL(f);});
+          const d=await fetch('api/biblioteca/subir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,filename:f.name,carpeta:_uploadFolder})}).then(r=>r.json());
+          if(d.ok) ok++;
+        }
+      }
     }catch(e){}
     fill.style.width=Math.round(done/files.length*100)+'%';
   }
   up.classList.add('hidden');
-  toast((ok?ok+' subido(s) a “'+_uploadFolder+'”':'No se pudo subir')+(pes?` · ${pes} muy pesado(s) (máx ~85MB)`:''), !ok);
+  toast((ok?ok+' subido(s) a “'+_uploadFolder+'”':'No se pudo subir')+(pes?` · ${pes} muy pesado(s)`:''), !ok);
   await cargar();
+}
+// Sube un video crudo por streaming (XHR, con barra de progreso); el server lo comprime.
+function subirVideo(f, txt, fill, done, total){
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST','api/biblioteca/subir-video');
+    xhr.setRequestHeader('Content-Type','application/octet-stream');
+    xhr.setRequestHeader('x-filename',encodeURIComponent(f.name));
+    xhr.setRequestHeader('x-carpeta',_uploadFolder);
+    const base=(done-1)/total;
+    xhr.upload.onprogress=e=>{ if(e.lengthComputable){ fill.style.width=Math.round((base+(e.loaded/e.total)/total)*100)+'%'; txt.textContent=`Subiendo ${done}/${total} — ${f.name} (${Math.round(e.loaded/e.total*100)}%)`; } };
+    xhr.upload.onload=()=>{ txt.textContent=`Comprimiendo ${done}/${total} — ${f.name}…`; };
+    xhr.onload=()=>{ try{ const d=JSON.parse(xhr.responseText); d.ok?resolve():reject(new Error(d.error||'')); }catch(_){ reject(new Error('resp')); } };
+    xhr.onerror=()=>reject(new Error('red'));
+    xhr.send(f);
+  });
 }
 async function moverItemA(id, carpeta){
   const d=await fetch('api/biblioteca/item/'+id+'/mover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({carpeta})}).then(r=>r.json()).catch(()=>({ok:false}));
