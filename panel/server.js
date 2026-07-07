@@ -261,6 +261,18 @@ app.post('/api/campanias/:id/descartar', async (req, res) => {
   try { res.json({ ok: await db.descartarCampania(req.proyectoId, req.params.id) }); }
   catch (e) { console.error('campania-descartar', e.message); res.status(500).json({ error: 'db' }); }
 });
+app.post('/api/campanias/:id/activar', async (req, res) => {
+  try { res.json({ ok: await db.activarCampania(req.proyectoId, req.params.id) }); }
+  catch (e) { console.error('campania-activar', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/campanias/:id/pausar', async (req, res) => {
+  try { res.json({ ok: await db.pausarCampania(req.proyectoId, req.params.id) }); }
+  catch (e) { console.error('campania-pausar', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/campanias/:id/reintentar', async (req, res) => {
+  try { res.json({ ok: await db.reintentarCampania(req.proyectoId, req.params.id) }); }
+  catch (e) { console.error('campania-reintentar', e.message); res.status(500).json({ error: 'db' }); }
+});
 
 // Stremea una foto de Telegram (resuelve file_id -> file_path -> bytes, con el token server-side).
 async function proxyTelegramPhoto(res, fileId) {

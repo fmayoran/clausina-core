@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -115,6 +115,25 @@ def det_campania():
     return jobs
 
 
+def det_campania_meta():
+    # Creación en Meta de campañas aprobadas (aún sin crear) + pedidos de activar/pausar.
+    specs = {
+        "crear":   "c.estado='aprobada' AND c.meta_campaign_id IS NULL",
+        "activar": "c.estado='activar'",
+        "pausar":  "c.estado='pausar'",
+    }
+    jobs = []
+    for accion, cond in specs.items():
+        for row in _lines("SELECT c.id||'|'||COALESCE(p.slug,'cortafuego') "
+                          "FROM contenido.campanias c LEFT JOIN contenido.proyectos p ON p.id=c.proyecto_id "
+                          f"WHERE {cond} ORDER BY c.actualizado_en"):
+            cmid, slug = row.split('|', 1)
+            jobs.append({"tipo": "campania_meta", "proyecto_slug": slug,
+                         "payload": {"campania_id": cmid, "accion": accion},
+                         "lock_key": f"campania_meta:{cmid}"})
+    return jobs
+
+
 def det_landing():
     jobs = []
     for estado, accion in (("pendiente", "procesar"), ("aprobada", "aplicar")):
@@ -135,12 +154,13 @@ DETECTORS = {
     "landing": det_landing,
     "bibliotecario": det_bibliotecario,
     "campania": det_campania,
+    "campania_meta": det_campania_meta,
 }
 
 
 def run():
     encolados = 0
-    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania"):
+    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta"):
         if tipo not in MIGRATED:
             continue
         try:

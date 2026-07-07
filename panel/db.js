@@ -716,6 +716,26 @@ async function descartarCampania(proyectoId, id) {
   return rowCount > 0;
 }
 
+// Activar/pausar: el panel deja un pedido ('activar'/'pausar'); el worker lo aplica en Meta.
+async function activarCampania(proyectoId, id) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.campanias SET estado='activar', actualizado_en=now()
+      WHERE id=$1 AND proyecto_id=$2 AND estado='pausada' AND meta_campaign_id IS NOT NULL`, [id, proyectoId]);
+  return rowCount > 0;
+}
+async function pausarCampania(proyectoId, id) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.campanias SET estado='pausar', actualizado_en=now()
+      WHERE id=$1 AND proyecto_id=$2 AND estado='activa'`, [id, proyectoId]);
+  return rowCount > 0;
+}
+async function reintentarCampania(proyectoId, id) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.campanias SET estado='aprobada', resumen=NULL, actualizado_en=now()
+      WHERE id=$1 AND proyecto_id=$2 AND estado='error' AND meta_campaign_id IS NULL`, [id, proyectoId]);
+  return rowCount > 0;
+}
+
 async function health() {
   await pool.query('SELECT 1');
   return true;
@@ -732,4 +752,5 @@ module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, 
   getLandingCambios, crearLandingCambio, aprobarLanding, rechazarLanding,
   getAuditoria, getPauta,
   crearSolicitudCampania, getCampanias, aprobarCampania, rechazarCampania, descartarCampania,
+  activarCampania, pausarCampania, reintentarCampania,
   health };

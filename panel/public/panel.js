@@ -587,7 +587,7 @@ function money(v, cur){ try{ return new Intl.NumberFormat('es-AR',{style:'curren
 const pct = v => Number(v||0).toLocaleString('es-AR',{maximumFractionDigits:2})+'%';
 function stClass(e){ if(e==='ACTIVE') return 'ok'; if(['PAUSED','ADSET_PAUSED','CAMPAIGN_PAUSED'].includes(e)) return 'pause'; if(['WITH_ISSUES','DISABLED','DELETED','ARCHIVED'].includes(e)) return 'warn'; return ''; }
 const OBJ={OUTCOME_AWARENESS:'Reconocimiento',OUTCOME_TRAFFIC:'Tráfico',OUTCOME_ENGAGEMENT:'Interacción'};
-const CAMP_EST={propuesta:['Propuesta','pause'],aprobada:['Aprobada','ok'],pausada:['Pausada en Meta','pause'],activa:['Activa','ok'],rechazada:['Rechazada','warn'],error:['Error','warn']};
+const CAMP_EST={propuesta:['Propuesta','pause'],aprobada:['Creando en Meta…','pause'],activar:['Activando…','pause'],pausar:['Pausando…','pause'],pausada:['Pausada en Meta','pause'],activa:['Activa','ok'],rechazada:['Rechazada','warn'],error:['Error','warn']};
 let _CAMPS=[], _CAMPCUR='USD';
 function audTxt(a){ a=a||{}; const p=[];
   if(a.ubicaciones&&a.ubicaciones.length) p.push(a.ubicaciones.map(u=>esc(u.nombre)+(u.radio_km?` (+${u.radio_km}km)`:'')).join(', '));
@@ -672,7 +672,10 @@ function openCamp(id){
     </div>`;
   const acts=document.getElementById('camp-acts');
   if(c.estado==='propuesta') acts.innerHTML=`<button class="btn del" onclick="descartarCamp('${c.id}')">Descartar</button><button class="btn ok" onclick="aprobarCamp('${c.id}')">Aprobar</button>`;
-  else if(c.estado==='aprobada') acts.innerHTML=`<span class="cm-note">Aprobada. Se creará <b>pausada</b> en Meta al habilitar la publicación; no gasta hasta que la actives.</span>`;
+  else if(['aprobada','activar','pausar'].includes(c.estado)) acts.innerHTML=`<span class="cm-note">El motor está aplicando el cambio en Meta… (se refresca solo)</span>`;
+  else if(c.estado==='pausada') acts.innerHTML=`<span class="cm-note" style="flex:1">Creada <b>pausada</b> en Meta. No gasta hasta que la actives.</span><button class="btn ok" onclick="activarCamp('${c.id}')">Activar</button>`;
+  else if(c.estado==='activa') acts.innerHTML=`<span class="cm-note" style="flex:1">Corriendo en Meta.</span><button class="btn no" onclick="pausarCamp('${c.id}')">Pausar</button>`;
+  else if(c.estado==='error') acts.innerHTML=`<button class="btn del" onclick="descartarCamp('${c.id}')">Descartar</button>${c.meta_campaign_id?'':`<button class="btn ok" onclick="reintentarCamp('${c.id}')">Reintentar</button>`}`;
   else acts.innerHTML='';
   document.getElementById('campmodal').classList.remove('hidden');
 }
@@ -682,8 +685,11 @@ async function campAction(id, accion, body){
     const d=await r.json(); if(d.ok){ closeCamp(); loadPauta(); return true; } toast('No se pudo',true); return false;
   }catch(e){ toast('Error de conexión',true); return false; }
 }
-async function aprobarCamp(id){ if(await campAction(id,'aprobar')) toast('Campaña aprobada'); }
+async function aprobarCamp(id){ if(await campAction(id,'aprobar')) toast('Aprobada — se crea pausada en Meta'); }
 async function descartarCamp(id){ if(await campAction(id,'descartar')) toast('Descartada'); }
+async function activarCamp(id){ if(!confirm('Vas a ACTIVAR la campaña en Meta: empieza a gastar según el presupuesto y las fechas. ¿Confirmás?')) return; if(await campAction(id,'activar')) toast('Activando en Meta…'); }
+async function pausarCamp(id){ if(await campAction(id,'pausar')) toast('Pausando en Meta…'); }
+async function reintentarCamp(id){ if(await campAction(id,'reintentar')) toast('Reintentando la creación…'); }
 function askCampania(){ const m=document.getElementById('campask'); if(m){ const i=document.getElementById('camp-instr'); if(i) i.value=''; m.classList.remove('hidden'); } }
 function closeAsk(){ const m=document.getElementById('campask'); if(m) m.classList.add('hidden'); }
 async function pedirCampania(){
