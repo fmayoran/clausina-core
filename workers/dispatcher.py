@@ -121,6 +121,7 @@ def det_campania_meta():
         "crear":   "c.estado='aprobada' AND c.meta_campaign_id IS NULL",
         "activar": "c.estado='activar'",
         "pausar":  "c.estado='pausar'",
+        "borrar":  "c.estado='descartar'",
     }
     jobs = []
     for accion, cond in specs.items():

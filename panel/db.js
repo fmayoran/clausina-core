@@ -710,9 +710,13 @@ async function rechazarCampania(proyectoId, id, motivo) {
 }
 
 async function descartarCampania(proyectoId, id) {
+  // Si ya existe en Meta, dejamos el pedido 'descartar' (el worker la borra allá y marca descartada).
+  // Si no, se descarta directo.
   const { rowCount } = await pool.query(
-    `UPDATE contenido.campanias SET estado='descartada', actualizado_en=now()
-      WHERE id=$1 AND proyecto_id=$2`, [id, proyectoId]);
+    `UPDATE contenido.campanias
+        SET estado = CASE WHEN meta_campaign_id IS NOT NULL THEN 'descartar' ELSE 'descartada' END,
+            actualizado_en=now()
+      WHERE id=$1 AND proyecto_id=$2 AND estado NOT IN ('descartada','descartar')`, [id, proyectoId]);
   return rowCount > 0;
 }
 

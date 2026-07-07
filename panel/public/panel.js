@@ -587,7 +587,7 @@ function money(v, cur){ try{ return new Intl.NumberFormat('es-AR',{style:'curren
 const pct = v => Number(v||0).toLocaleString('es-AR',{maximumFractionDigits:2})+'%';
 function stClass(e){ if(e==='ACTIVE') return 'ok'; if(['PAUSED','ADSET_PAUSED','CAMPAIGN_PAUSED'].includes(e)) return 'pause'; if(['WITH_ISSUES','DISABLED','DELETED','ARCHIVED'].includes(e)) return 'warn'; return ''; }
 const OBJ={OUTCOME_AWARENESS:'Reconocimiento',OUTCOME_TRAFFIC:'Tráfico',OUTCOME_ENGAGEMENT:'Interacción'};
-const CAMP_EST={propuesta:['Propuesta','pause'],aprobada:['Creando en Meta…','pause'],activar:['Activando…','pause'],pausar:['Pausando…','pause'],pausada:['Pausada en Meta','pause'],activa:['Activa','ok'],rechazada:['Rechazada','warn'],error:['Error','warn']};
+const CAMP_EST={propuesta:['Propuesta','pause'],aprobada:['Creando en Meta…','pause'],activar:['Activando…','pause'],pausar:['Pausando…','pause'],descartar:['Descartando…','warn'],pausada:['Pausada en Meta','pause'],activa:['Activa','ok'],rechazada:['Rechazada','warn'],error:['Error','warn']};
 let _CAMPS=[], _CAMPCUR='USD';
 function audTxt(a){ a=a||{}; const p=[];
   if(a.ubicaciones&&a.ubicaciones.length) p.push(a.ubicaciones.map(u=>esc(u.nombre)+(u.radio_km?` (+${u.radio_km}km)`:'')).join(', '));
@@ -672,7 +672,7 @@ function openCamp(id){
     </div>`;
   const acts=document.getElementById('camp-acts');
   if(c.estado==='propuesta') acts.innerHTML=`<button class="btn del" onclick="descartarCamp('${c.id}')">Descartar</button><button class="btn ok" onclick="aprobarCamp('${c.id}')">Aprobar</button>`;
-  else if(['aprobada','activar','pausar'].includes(c.estado)) acts.innerHTML=`<span class="cm-note">El motor está aplicando el cambio en Meta… (se refresca solo)</span>`;
+  else if(['aprobada','activar','pausar','descartar'].includes(c.estado)) acts.innerHTML=`<span class="cm-note">El motor está aplicando el cambio en Meta… (se refresca solo)</span>`;
   else if(c.estado==='pausada') acts.innerHTML=`<span class="cm-note" style="flex:1">Creada <b>pausada</b> en Meta. No gasta hasta que la actives.</span><button class="btn ok" onclick="activarCamp('${c.id}')">Activar</button>`;
   else if(c.estado==='activa') acts.innerHTML=`<span class="cm-note" style="flex:1">Corriendo en Meta.</span><button class="btn no" onclick="pausarCamp('${c.id}')">Pausar</button>`;
   else if(c.estado==='error') acts.innerHTML=`<button class="btn del" onclick="descartarCamp('${c.id}')">Descartar</button>${c.meta_campaign_id?'':`<button class="btn ok" onclick="reintentarCamp('${c.id}')">Reintentar</button>`}`;

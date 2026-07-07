@@ -251,9 +251,26 @@ def _set_status(cid, status, nuevo_estado):
     return "ok"
 
 
+def borrar(cid):
+    """Descartar una campaña ya creada: la borra en Meta (cascada a conjunto/anuncio) y marca descartada."""
+    env = load_env(ENV_CORTAFUEGO)
+    token = env.get("META_ADS_TOKEN")
+    camp = psql(f"SELECT coalesce(meta_campaign_id,'') FROM contenido.campanias WHERE id='{cid}';")
+    if camp:
+        try:
+            graph("POST", camp, {"status": "DELETED", "access_token": token})
+        except Exception as e:
+            if "does not exist" not in str(e).lower() and "cannot be loaded" not in str(e).lower():
+                set_estado(cid, "error", f"No se pudo borrar en Meta: {e}")
+                raise
+    psql("UPDATE contenido.campanias SET estado='descartada', meta_campaign_id=NULL, "
+         f"meta_adset_id=NULL, meta_ad_id=NULL, actualizado_en=now() WHERE id='{cid}';")
+    return "ok"
+
+
 def main():
     if len(sys.argv) != 3:
-        print("uso: pauta_publish.py crear|activar|pausar <campania_id>", file=sys.stderr)
+        print("uso: pauta_publish.py crear|activar|pausar|borrar <campania_id>", file=sys.stderr)
         return 2
     accion, cid = sys.argv[1], sys.argv[2]
     try:
@@ -263,6 +280,8 @@ def main():
             print(_set_status(cid, "ACTIVE", "activa"))
         elif accion == "pausar":
             print(_set_status(cid, "PAUSED", "pausada"))
+        elif accion == "borrar":
+            print(borrar(cid))
         else:
             print("acción inválida", file=sys.stderr); return 2
         return 0
