@@ -582,17 +582,41 @@ async function loadInstagram(){
     setUpd();
   }catch(e){ setUpd(); }
 }
-// --- Pauta (Meta Marketing API, read-only): lee el snapshot de /api/pauta ---
+// --- Pauta: reporte (Meta, read-only) + propuestas de campaña del creativo ---
 function money(v, cur){ try{ return new Intl.NumberFormat('es-AR',{style:'currency',currency:cur||'USD',maximumFractionDigits:2}).format(Number(v||0)); }catch(_){ return (cur||'')+' '+nf(v); } }
 const pct = v => Number(v||0).toLocaleString('es-AR',{maximumFractionDigits:2})+'%';
 function stClass(e){ if(e==='ACTIVE') return 'ok'; if(['PAUSED','ADSET_PAUSED','CAMPAIGN_PAUSED'].includes(e)) return 'pause'; if(['WITH_ISSUES','DISABLED','DELETED','ARCHIVED'].includes(e)) return 'warn'; return ''; }
+const OBJ={OUTCOME_AWARENESS:'Reconocimiento',OUTCOME_TRAFFIC:'Tráfico',OUTCOME_ENGAGEMENT:'Interacción'};
+const CAMP_EST={propuesta:['Propuesta','pause'],aprobada:['Aprobada','ok'],pausada:['Pausada en Meta','pause'],activa:['Activa','ok'],rechazada:['Rechazada','warn'],error:['Error','warn']};
+let _CAMPS=[], _CAMPCUR='USD';
+function audTxt(a){ a=a||{}; const p=[];
+  if(a.ubicaciones&&a.ubicaciones.length) p.push(a.ubicaciones.map(u=>esc(u.nombre)+(u.radio_km?` (+${u.radio_km}km)`:'')).join(', '));
+  if(a.edad_min||a.edad_max) p.push(`${a.edad_min||18}–${a.edad_max||65} años`);
+  if(a.generos&&a.generos.length&&!a.generos.includes('todos')) p.push(a.generos.join('/'));
+  if(a.intereses&&a.intereses.length) p.push(a.intereses.map(i=>esc(i.nombre||i)).join(', '));
+  return p.join(' · ')||'—'; }
+function presTxt(p,cur){ p=p||{}; if(!p.monto) return '—'; return money(p.monto,p.moneda||cur)+(p.tipo==='diario'?'/día':' total'); }
+function campThumb(c){ const u=(c.pieza_tipo==='video'&&c.pieza_poster)?c.pieza_poster:c.pieza_url; return u?`<img class="camp-thumb" src="${esc(u)}" onerror="this.style.visibility='hidden'">`:'<span class="camp-thumb ph"></span>'; }
+function campCard(c){
+  const [lbl,cls]=CAMP_EST[c.estado]||[c.estado,''];
+  return `<a class="camp cclick" href="#" onclick="openCamp('${c.id}');return false;">
+    <div class="camp-top">${campThumb(c)}<div style="flex:1;min-width:0">
+      <div class="camp-name">${esc(c.nombre)}</div>
+      <div class="camp-m2">${OBJ[c.objetivo]||esc(c.objetivo)} · ${presTxt(c.presupuesto,_CAMPCUR)} · ${c.pieza_numero?'CF-'+pad4(c.pieza_numero):'sin creativo'}</div>
+    </div><span class="st ${cls}">${lbl}</span></div>
+    ${c.resumen?`<div class="camp-res">${esc(c.resumen)}</div>`:''}
+  </a>`;
+}
 async function loadPauta(){
   try{
-    const r=await fetch('api/pauta'); if(r.status===401){ location.href='login'; return; }
-    const d=await r.json();
+    const [rp,rc]=await Promise.all([fetch('api/pauta'),fetch('api/campanias')]);
+    if(rp.status===401){ location.href='login'; return; }
+    const d=await rp.json();
+    const cc=rc.ok?await rc.json():{campanias:[],trabajando:0};
     const el=document.getElementById('pauta'); if(!el) return;
     if(!d || d.configurada===false){ el.innerHTML='<div class="pauta-off">Esta marca todavía no tiene cuenta publicitaria conectada.</div>'; setUpd(); return; }
     const cur=d.moneda||'USD', c=d.cuenta||{}, t=d.totales||{};
+    _CAMPS=cc.campanias||[]; _CAMPCUR=cur;
     const acctSt = c.estado===1 ? 'ok' : (c.estado>=100 ? 'warn' : '');
     let h=`<div class="pauta-head">
       <div>
@@ -609,20 +633,64 @@ async function loadPauta(){
       <div class="kpi"><span class="kv">${nf(t.clics)}</span><span class="kl">Clics</span></div>
       <div class="kpi"><span class="kv">${pct(t.ctr)}</span><span class="kl">CTR</span></div>
     </div>`;
-    const camps=d.campanias||[];
-    h+=`<div class="pauta-h3">Campañas <span class="n">${camps.length||''}</span></div>`;
-    if(d.sin_campanias || !camps.length){
-      h+=`<div class="pauta-empty">Todavía no hay campañas en esta cuenta. Cuando lances tu primer anuncio (desde Meta Ads Manager), vas a ver acá el detalle por campaña: gasto, alcance, impresiones y clics. El reporte se sincroniza solo cada pocas horas.</div>`;
-    } else {
-      h+=camps.map(k=>`<div class="camp">
+    const drafts=_CAMPS, live=d.campanias||[];
+    h+=`<div class="pauta-h3">Campañas <span class="n">${(drafts.length+live.length)||''}</span>
+      <button class="picon" title="Pedir una campaña al creativo" onclick="askCampania()"><i data-lucide="plus" class="w-4 h-4"></i></button></div>`;
+    if(cc.trabajando>0) h+=`<div class="camp-work"><span class="dotp"></span>El creativo está preparando una campaña…</div>`;
+    if(drafts.length) h+=drafts.map(campCard).join('');
+    if(live.length){
+      h+=`<div class="pauta-win">Activas en Meta</div>`+live.map(k=>`<div class="camp">
         <div class="camp-top"><span class="st ${stClass(k.estado)}">${esc(k.estado_txt)}</span><span class="camp-name">${esc(k.nombre)}</span><span class="camp-obj">${esc(k.objetivo)}</span></div>
-        <div class="camp-m"><span>Gasto <b>${money(k.gasto,cur)}</b></span><span>Alcance <b>${nf(k.alcance)}</b></span><span>Impresiones <b>${nf(k.impresiones)}</b></span><span>Clics <b>${nf(k.clics)}</b></span><span>CTR <b>${pct(k.ctr)}</b></span>${k.presupuesto?`<span>Presup. ${esc(k.presupuesto.tipo)} <b>${money(k.presupuesto.monto,cur)}</b></span>`:''}</div>
+        <div class="camp-m"><span>Gasto <b>${money(k.gasto,cur)}</b></span><span>Alcance <b>${nf(k.alcance)}</b></span><span>Impresiones <b>${nf(k.impresiones)}</b></span><span>Clics <b>${nf(k.clics)}</b></span><span>CTR <b>${pct(k.ctr)}</b></span></div>
       </div>`).join('');
+    }
+    if(!drafts.length && !live.length && cc.trabajando===0){
+      h+=`<div class="pauta-empty">Todavía no hay campañas. Pedile una al creativo con el botón <b>+</b>: propone objetivo, creativo, público y presupuesto, y vos la aprobás antes de que gaste un peso.</div>`;
     }
     el.innerHTML=h;
     if(window.lucide) lucide.createIcons();
     setUpd();
   }catch(e){ setUpd(); }
+}
+function openCamp(id){
+  const c=_CAMPS.find(x=>x.id===id); if(!c) return;
+  const cur=_CAMPCUR, [lbl,cls]=CAMP_EST[c.estado]||[c.estado,''];
+  const fechas=(c.fecha_inicio||c.fecha_fin)?`${c.fecha_inicio||'—'} → ${c.fecha_fin||'—'}`:'—';
+  const perm=c.pieza_permalink?` <a href="${esc(c.pieza_permalink)}" target="_blank" rel="noopener">ver post ↗</a>`:'';
+  const media=(c.pieza_tipo==='video'&&c.pieza_poster)?c.pieza_poster:c.pieza_url;
+  document.getElementById('camp-body').innerHTML=`
+    <div class="cm-row"><span class="st ${cls}">${lbl}</span><span class="cm-obj">${OBJ[c.objetivo]||esc(c.objetivo)}</span></div>
+    <h3 class="cm-name">${esc(c.nombre)}</h3>
+    ${c.razon?`<p class="cm-razon">${esc(c.razon)}</p>`:''}
+    ${media?`<img class="cm-media" src="${esc(media)}" onerror="this.style.display='none'">`:''}
+    <div class="cm-grid">
+      <div><span class="cm-k">Creativo</span><span class="cm-v">${c.pieza_numero?'CF-'+pad4(c.pieza_numero):'—'}${perm}</span></div>
+      <div><span class="cm-k">Presupuesto</span><span class="cm-v">${presTxt(c.presupuesto,cur)}</span></div>
+      <div><span class="cm-k">Fechas</span><span class="cm-v">${esc(fechas)}</span></div>
+      <div><span class="cm-k">Audiencia</span><span class="cm-v">${audTxt(c.audiencia)}</span></div>
+      ${c.url_destino?`<div><span class="cm-k">Destino</span><span class="cm-v">${esc(c.url_destino)}${c.cta?' · '+esc(c.cta):''}</span></div>`:''}
+    </div>`;
+  const acts=document.getElementById('camp-acts');
+  if(c.estado==='propuesta') acts.innerHTML=`<button class="btn del" onclick="descartarCamp('${c.id}')">Descartar</button><button class="btn ok" onclick="aprobarCamp('${c.id}')">Aprobar</button>`;
+  else if(c.estado==='aprobada') acts.innerHTML=`<span class="cm-note">Aprobada. Se creará <b>pausada</b> en Meta al habilitar la publicación; no gasta hasta que la actives.</span>`;
+  else acts.innerHTML='';
+  document.getElementById('campmodal').classList.remove('hidden');
+}
+function closeCamp(){ const m=document.getElementById('campmodal'); if(m) m.classList.add('hidden'); }
+async function campAction(id, accion, body){
+  try{ const r=await fetch('api/campanias/'+id+'/'+accion,{method:'POST',headers:body?{'Content-Type':'application/json'}:undefined,body:body?JSON.stringify(body):undefined});
+    const d=await r.json(); if(d.ok){ closeCamp(); loadPauta(); return true; } toast('No se pudo',true); return false;
+  }catch(e){ toast('Error de conexión',true); return false; }
+}
+async function aprobarCamp(id){ if(await campAction(id,'aprobar')) toast('Campaña aprobada'); }
+async function descartarCamp(id){ if(await campAction(id,'descartar')) toast('Descartada'); }
+function askCampania(){ const m=document.getElementById('campask'); if(m){ const i=document.getElementById('camp-instr'); if(i) i.value=''; m.classList.remove('hidden'); } }
+function closeAsk(){ const m=document.getElementById('campask'); if(m) m.classList.add('hidden'); }
+async function pedirCampania(){
+  const instruccion=(document.getElementById('camp-instr')||{}).value||'';
+  try{ const r=await fetch('api/campanias/solicitar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instruccion})});
+    const d=await r.json(); if(d.ok){ toast('Pedido al creativo — va a proponer una campaña'); closeAsk(); loadPauta(); } else toast('No se pudo pedir',true);
+  }catch(e){ toast('Error de conexión',true); }
 }
 async function loadAvisos(){
   if(acting) return;

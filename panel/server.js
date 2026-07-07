@@ -240,6 +240,28 @@ app.get('/api/pauta', async (req, res) => {
   catch (e) { console.error('pauta', e.message); res.status(500).json({ error: 'db' }); }
 });
 
+// Campañas de pauta: propuestas del creativo + su ciclo de aprobación.
+app.get('/api/campanias', async (req, res) => {
+  try { res.json(await db.getCampanias(req.proyectoId)); }
+  catch (e) { console.error('campanias', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/campanias/solicitar', async (req, res) => {
+  try { res.json({ ok: true, id: await db.crearSolicitudCampania(req.proyectoId, (req.body || {}).instruccion) }); }
+  catch (e) { console.error('campania-solicitar', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/campanias/:id/aprobar', async (req, res) => {
+  try { res.json({ ok: await db.aprobarCampania(req.proyectoId, req.params.id) }); }
+  catch (e) { console.error('campania-aprobar', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/campanias/:id/rechazar', async (req, res) => {
+  try { res.json({ ok: await db.rechazarCampania(req.proyectoId, req.params.id, (req.body || {}).motivo) }); }
+  catch (e) { console.error('campania-rechazar', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/campanias/:id/descartar', async (req, res) => {
+  try { res.json({ ok: await db.descartarCampania(req.proyectoId, req.params.id) }); }
+  catch (e) { console.error('campania-descartar', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 // Stremea una foto de Telegram (resuelve file_id -> file_path -> bytes, con el token server-side).
 async function proxyTelegramPhoto(res, fileId) {
   if (!fileId) return res.status(404).end();

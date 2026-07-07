@@ -667,6 +667,55 @@ async function getPauta(proyectoId) {
   return { configurada: true, capturado_en: r.capturado_en, ...r.data };
 }
 
+// --- Campañas de pauta: el creativo propone; Fer aprueba; se crean PAUSADAS en Meta ---
+async function crearSolicitudCampania(proyectoId, instruccion) {
+  const { rows: [r] } = await pool.query(
+    `INSERT INTO contenido.solicitudes_campania (proyecto_id, instruccion) VALUES ($1, $2) RETURNING id`,
+    [proyectoId, (instruccion || '').slice(0, 2000) || null]);
+  return r.id;
+}
+
+async function getCampanias(proyectoId) {
+  const { rows } = await pool.query(
+    `SELECT c.id, c.estado, c.nombre, c.objetivo, c.pieza_id, c.razon, c.audiencia, c.presupuesto,
+            c.fecha_inicio, c.fecha_fin, c.url_destino, c.cta, c.resumen,
+            c.meta_campaign_id, c.creado_en, c.aprobado_en,
+            pz.numero AS pieza_numero, r.ig_permalink AS pieza_permalink, r.caption AS pieza_caption,
+            m.url AS pieza_url, m.poster_url AS pieza_poster, m.tipo AS pieza_tipo
+       FROM contenido.campanias c
+       LEFT JOIN contenido.piezas pz ON pz.id = c.pieza_id
+       LEFT JOIN contenido.revisiones r ON r.pieza_id = c.pieza_id AND r.estado='publicada'
+       LEFT JOIN contenido.media m ON m.pieza_id = c.pieza_id AND m.orden = 1
+      WHERE c.proyecto_id = $1 AND c.estado <> 'descartada'
+      ORDER BY c.creado_en DESC`, [proyectoId]);
+  const { rows: [t] } = await pool.query(
+    `SELECT count(*)::int AS n FROM contenido.solicitudes_campania
+      WHERE proyecto_id=$1 AND estado IN ('pendiente','procesando')`, [proyectoId]);
+  return { campanias: rows, trabajando: t ? t.n : 0 };
+}
+
+async function aprobarCampania(proyectoId, id) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.campanias SET estado='aprobada', aprobado_en=now(), actualizado_en=now()
+      WHERE id=$1 AND proyecto_id=$2 AND estado='propuesta'`, [id, proyectoId]);
+  return rowCount > 0;
+}
+
+async function rechazarCampania(proyectoId, id, motivo) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.campanias SET estado='rechazada', resumen=$3, actualizado_en=now()
+      WHERE id=$1 AND proyecto_id=$2 AND estado IN ('propuesta','aprobada')`,
+    [id, proyectoId, (motivo || 'rechazada').slice(0, 2000)]);
+  return rowCount > 0;
+}
+
+async function descartarCampania(proyectoId, id) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.campanias SET estado='descartada', actualizado_en=now()
+      WHERE id=$1 AND proyecto_id=$2`, [id, proyectoId]);
+  return rowCount > 0;
+}
+
 async function health() {
   await pool.query('SELECT 1');
   return true;
@@ -682,4 +731,5 @@ module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, 
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
   getLandingCambios, crearLandingCambio, aprobarLanding, rechazarLanding,
   getAuditoria, getPauta,
+  crearSolicitudCampania, getCampanias, aprobarCampania, rechazarCampania, descartarCampania,
   health };

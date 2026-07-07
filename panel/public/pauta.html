@@ -24,6 +24,32 @@
 <div class="shell"><main class="min-w-0">
   <div id="toast"></div>
   <div id="pauta" class="pauta"><div class="pauta-load">Cargando pauta…</div></div>
+
+  <!-- Revisión de una propuesta de campaña -->
+  <div id="campmodal" class="modal hidden">
+    <div class="modal-bg" onclick="closeCamp()"></div>
+    <div class="modal-box">
+      <div class="modal-head"><div class="modal-tt">Propuesta de campaña</div><button class="modal-x" onclick="closeCamp()" title="Cerrar">×</button></div>
+      <div class="modal-body" id="camp-body"></div>
+      <div class="modal-foot" id="camp-acts"></div>
+    </div>
+  </div>
+
+  <!-- Pedir una campaña al creativo -->
+  <div id="campask" class="modal hidden">
+    <div class="modal-bg" onclick="closeAsk()"></div>
+    <div class="modal-box">
+      <div class="modal-head"><div class="modal-tt">Pedir campaña al creativo</div><button class="modal-x" onclick="closeAsk()" title="Cerrar">×</button></div>
+      <div class="modal-body">
+        <div class="modal-sec">
+          <div class="modal-lbl">Instrucción (opcional)</div>
+          <textarea id="camp-instr" placeholder="Ej: promocionar la apertura, foco en Ranelagh, presupuesto chico. Dejalo vacío y propone a su criterio."></textarea>
+        </div>
+        <p class="cm-hint">El creativo propone objetivo, creativo, público y presupuesto. No se crea nada en Meta ni gasta hasta tu aprobación.</p>
+      </div>
+      <div class="modal-foot"><button class="btn no" onclick="closeAsk()">Cancelar</button><button class="btn ok" onclick="pedirCampania()">Pedir</button></div>
+    </div>
+  </div>
 </main></div>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="shell.js"></script>

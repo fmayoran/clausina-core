@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -99,6 +99,22 @@ def det_bibliotecario():
     return jobs
 
 
+def det_campania():
+    # Recuperación: solicitudes 'procesando' atascadas (worker caído / job muerto) -> 'error'.
+    psql("UPDATE contenido.solicitudes_campania SET estado='error', procesado_en=now() "
+         "WHERE estado='procesando' AND creado_en < now() - interval '40 minutes'")
+    # Pedidos de propuesta de campaña al creativo: estado='pendiente'.
+    jobs = []
+    for row in _lines("SELECT s.id||'|'||COALESCE(p.slug,'cortafuego') "
+                      "FROM contenido.solicitudes_campania s "
+                      "LEFT JOIN contenido.proyectos p ON p.id=s.proyecto_id "
+                      "WHERE s.estado='pendiente' ORDER BY s.creado_en"):
+        sid, slug = row.split('|', 1)
+        jobs.append({"tipo": "campania", "proyecto_slug": slug,
+                     "payload": {"solicitud_id": sid}, "lock_key": f"campania:{sid}"})
+    return jobs
+
+
 def det_landing():
     jobs = []
     for estado, accion in (("pendiente", "procesar"), ("aprobada", "aplicar")):
@@ -118,12 +134,13 @@ DETECTORS = {
     "brief": det_brief,
     "landing": det_landing,
     "bibliotecario": det_bibliotecario,
+    "campania": det_campania,
 }
 
 
 def run():
     encolados = 0
-    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario"):
+    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania"):
         if tipo not in MIGRATED:
             continue
         try:
