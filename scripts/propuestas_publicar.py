@@ -8,9 +8,11 @@ import json, sys, subprocess, urllib.request, urllib.parse
 CID, CHAT, BOT = sys.argv[1], sys.argv[2], sys.argv[3]
 CANAL = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4] == 'aviso' else 'instagram'
 PROYECTO_ID = sys.argv[5] if len(sys.argv) > 5 and sys.argv[5] else ''
+SOLICITUD_ID = sys.argv[6] if len(sys.argv) > 6 and sys.argv[6] else ''
 
 def psql(q):
-    r = subprocess.run(['docker','exec','-i',CID,'psql','-U','postgres','-d','claude','-t','-A','-c',q],
+    # -q: sin el tag "INSERT 0 1" en INSERT...RETURNING (si no, ensucia el id devuelto).
+    r = subprocess.run(['docker','exec','-i',CID,'psql','-U','postgres','-d','claude','-q','-t','-A','-c',q],
                        capture_output=True, text=True)
     return r.stdout.strip()
 
@@ -36,6 +38,17 @@ except Exception:
 if isinstance(props, dict):
     props = props.get('propuestas', [])
 
+# Material que Fer adjuntó al pedido: se copia a CADA requerimiento generado (brief_material),
+# para que al generar la pieza el creativo tenga ese contenido disponible.
+MATERIAL = []
+if SOLICITUD_ID:
+    try:
+        MATERIAL = json.loads(psql("SELECT COALESCE(json_agg(json_build_object('media_path',media_path,"
+                                    "'media_type',media_type,'filename',filename) ORDER BY orden),'[]') "
+                                    f"FROM contenido.solicitud_propuesta_material WHERE solicitud_id='{SOLICITUD_ID}';") or '[]')
+    except Exception:
+        MATERIAL = []
+
 count = 0
 for p in props:
     titulo = (p.get('titulo') or 'Propuesta').strip()
@@ -54,6 +67,16 @@ for p in props:
                f"VALUES ('{esc(CHAT)}','creativo','propuesta','{CANAL}','{esc(titulo)}','{esc(texto)}','{esc(req)}'" + pid_val + ") RETURNING id;")
     if not bid:
         continue
+    # Adjuntar el material del pedido a este requerimiento (disponible al generar la pieza).
+    for i, m in enumerate(MATERIAL):
+        mp = esc(m.get('media_path') or '')
+        if not mp:
+            continue
+        mt = esc(m.get('media_type') or 'photo')
+        fn = m.get('filename')
+        fn_val = f"'{esc(fn)}'" if fn else "NULL"
+        psql("INSERT INTO contenido.brief_material (brief_id, media_path, media_type, filename, orden) "
+             f"VALUES ('{bid}','{mp}','{mt}',{fn_val},{i});")
     msg = (f"[PROPUESTA] {titulo}\n\n{concepto}\n\nNecesito: {req}\n\n"
            "Respondé este mensaje con la foto/video para activarla — o gestionala en https://panel.clausina.ar")
     mid = tg_send(msg)

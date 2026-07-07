@@ -361,9 +361,34 @@ app.post('/api/proponer', async (req, res) => {
     const enfasis = String((req.body && req.body.enfasis) || '').trim().slice(0, 1000);
     const canal = req.body && req.body.canal === 'aviso' ? 'aviso' : 'instagram';
     const cantidad = Math.min(8, Math.max(1, parseInt(req.body && req.body.cantidad, 10) || 5));
-    await db.pedirPropuestas(enfasis, canal, cantidad, req.proyectoId);
+    const material = Array.isArray(req.body && req.body.material) ? req.body.material : [];
+    await db.pedirPropuestas(enfasis, canal, cantidad, req.proyectoId, material);
     res.json({ ok: true });
   } catch (e) { console.error('proponer', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+
+// Staging de material para un pedido de propuestas (aún sin solicitud): guarda a disco y
+// devuelve el media_path; /api/proponer lo vincula. Imagen por base64; video por streaming+ffmpeg.
+app.post('/api/proponer/material', async (req, res) => {
+  try {
+    const { mediaPath, mediaType, filename } = await guardarMaterialDisco(req.body, path.posix.join('material/prop', req.marca));
+    res.json({ ok: true, media_path: mediaPath, media_type: mediaType, filename });
+  } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
+});
+app.post('/api/proponer/material-video', async (req, res) => {
+  const tmp = path.join('/tmp', 'up_' + crypto.randomUUID() + '.src');
+  try {
+    const filename = decodeURIComponent(String(req.headers['x-filename'] || 'video.mp4')).slice(0, 120);
+    const MAX = 600 * 1024 * 1024;
+    if (Number(req.headers['content-length'] || 0) > MAX) { const e = new Error('El video supera los 600MB'); e.http = 413; throw e; }
+    await recibirStream(req, tmp, MAX);
+    const rel = path.posix.join('material/prop', req.marca, crypto.randomUUID() + '.mp4');
+    const abs = path.join('/app/media', rel);
+    await fs.promises.mkdir(path.dirname(abs), { recursive: true });
+    await comprimirVideo(tmp, abs);
+    res.json({ ok: true, media_path: rel, media_type: 'video', filename: filename.replace(/\.[^.]+$/, '') });
+  } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
+  finally { fs.promises.unlink(tmp).catch(() => {}); }
 });
 
 app.post('/api/requerimientos/:id/activar', async (req, res) => {

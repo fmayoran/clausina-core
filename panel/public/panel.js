@@ -354,14 +354,48 @@ async function descartar(id, btn){
 }
 
 /* ---------- Acciones sobre requerimientos (cola) ---------- */
+// Material opcional adjunto al pedido de propuestas (se sube antes de pedir).
+let _propMaterial=[];
+function propMatReset(){ _propMaterial=[]; const l=document.getElementById('propmat-list'); if(l) l.innerHTML=''; }
+function propMatRender(){
+  const l=document.getElementById('propmat-list'); if(!l) return;
+  l.innerHTML=_propMaterial.map((m,i)=>{
+    const th=m.media_type==='video'?`<span class="pm-vid">▶</span>`:`<img src="media/${esc(m.media_path)}" onerror="this.style.opacity=.2">`;
+    return `<span class="pm-thumb">${th}<button title="Quitar" onclick="propMatDel(${i})">×</button></span>`;
+  }).join('');
+}
+function propMatDel(i){ _propMaterial.splice(i,1); propMatRender(); }
+async function propMatSel(input){
+  const files=[...(input.files||[])]; input.value=''; if(!files.length) return;
+  const prog=document.getElementById('propmat-prog'); if(prog){ prog.classList.remove('hidden'); }
+  for(const f of files){
+    const isVideo=(f.type||'').startsWith('video/')||/\.(mp4|mov|webm|m4v|avi)$/i.test(f.name);
+    try{
+      if(isVideo){
+        if(f.size>600*1024*1024){ toast('Video muy pesado (máx 600MB)',true); continue; }
+        if(prog) prog.textContent=`Subiendo y comprimiendo ${f.name}…`;
+        const d=await new Promise((res,rej)=>{ const x=new XMLHttpRequest(); x.open('POST','api/proponer/material-video'); x.setRequestHeader('Content-Type','application/octet-stream'); x.setRequestHeader('x-filename',encodeURIComponent(f.name)); x.onload=()=>{try{res(JSON.parse(x.responseText));}catch(_){rej();}}; x.onerror=rej; x.send(f); });
+        if(d&&d.ok) _propMaterial.push({media_path:d.media_path,media_type:'video',filename:d.filename});
+      } else {
+        if(f.size>85*1024*1024){ toast('Imagen muy pesada',true); continue; }
+        if(prog) prog.textContent=`Subiendo ${f.name}…`;
+        const dataUrl=await new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.onerror=j;rd.readAsDataURL(f);});
+        const d=await fetch('api/proponer/material',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,filename:f.name})}).then(r=>r.json());
+        if(d&&d.ok) _propMaterial.push({media_path:d.media_path,media_type:d.media_type,filename:d.filename});
+      }
+    }catch(e){ toast('No se pudo subir '+f.name,true); }
+  }
+  if(prog){ prog.classList.add('hidden'); prog.textContent=''; }
+  propMatRender();
+}
 async function pedirPropuestas(){
   const inp=document.getElementById('enfasis'), sel=document.getElementById('canalprop'), cant=document.getElementById('cantprop'), btn=document.getElementById('askbtn'), t=btn.textContent;
   const cantidad=Math.min(8,Math.max(1,parseInt(cant&&cant.value,10)||5));
   btn.disabled=true; btn.textContent='Pidiendo…';
   try{
-    const d=await fetch('api/proponer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enfasis:inp.value, canal: sel?sel.value:'instagram', cantidad})}).then(r=>r.json());
-    toast(d.ok?`Pedido enviado (${cantidad}) — el creativo carga propuestas en unos minutos`:'No se pudo pedir', !d.ok);
-    if(d.ok){ inp.value=''; if(typeof window.afterProponer==='function') window.afterProponer(); }
+    const d=await fetch('api/proponer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enfasis:inp.value, canal: sel?sel.value:'instagram', cantidad, material:_propMaterial})}).then(r=>r.json());
+    toast(d.ok?`Pedido enviado (${cantidad}${_propMaterial.length?' · '+_propMaterial.length+' adjunto(s)':''}) — el creativo carga propuestas en unos minutos`:'No se pudo pedir', !d.ok);
+    if(d.ok){ inp.value=''; propMatReset(); if(typeof window.afterProponer==='function') window.afterProponer(); }
   }catch(e){ toast('Error de conexión', true); }
   btn.disabled=false; btn.textContent=t;
 }

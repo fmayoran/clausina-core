@@ -13,6 +13,7 @@ aporte el material; recién ahí entra al circuito de generación + aprobación 
 - `canal`: **`instagram`** (publicaciones de feed) o **`aviso`** (spots para la **pantalla de calle DOOH**, 2:3 vertical, muda, ~10s). **Proponé para ese canal.**
 - `cantidad`: **cuántas propuestas generar (número exacto)**. Generá exactamente esa cantidad.
 - `recientes`: las últimas publicaciones (título + caption), para **no repetir** y mantener coherencia/variedad.
+- `materiales`: material que Fer adjuntó al pedido (lista de `{path, media_type, filename}`; puede estar vacía). Si viene con contenido, **es la materia prima que Fer quiere publicar**: MIRALO (hacé `Read` de las imágenes) y proponé publicaciones que lo usen. Ese material queda adjuntado a cada requerimiento, así que al generar la pieza va a estar disponible.
 
 ## Según el canal
 - **`instagram`:** posteos de feed (foto/Reel/carrusel/historia). `requiere_material` = qué foto/video necesitás.

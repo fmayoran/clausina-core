@@ -39,12 +39,24 @@ psqlc "UPDATE contenido.solicitudes_propuesta SET estado='procesando' WHERE id='
 # Contexto: últimas publicadas (para no repetir y mantener coherencia)
 recientes=$(psqlc "SELECT COALESCE(json_agg(json_build_object('titulo',titulo_interno,'caption',left(caption,200))),'[]'::json) FROM (SELECT pz.titulo_interno, r.caption FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id=pz.revision_vigente WHERE pz.proyecto_id='$pid' AND r.estado='publicada' ORDER BY r.publicado_en DESC LIMIT 10) s;")
 rm -f /tmp/propuestas.json /tmp/prop_ctx.json
-E="$enfasis" R="$recientes" CN="$canal" QT="$cantidad" python3 -c "import json,os;json.dump({'enfasis':os.environ['E'],'canal':os.environ['CN'],'cantidad':int(os.environ['QT']),'recientes':json.loads(os.environ['R'])},open('/tmp/prop_ctx.json','w'),ensure_ascii=False)"
+# Material opcional adjunto por Fer al pedido: lo listamos con paths absolutos existentes
+# (el creativo corre en el host y puede Read las imágenes directo del media store).
+HOST_MEDIA="/var/lib/docker/volumes/clausina_panel_clausina-media/_data"
+mats=$(psqlc "SELECT COALESCE(json_agg(json_build_object('media_path',media_path,'media_type',media_type,'filename',filename) ORDER BY orden),'[]') FROM contenido.solicitud_propuesta_material WHERE solicitud_id='$sid';")
+matabs=$(HM="$HOST_MEDIA" MATS="$mats" python3 -c "
+import json,os
+hm=os.environ['HM']; out=[]
+for m in json.loads(os.environ['MATS'] or '[]'):
+    mp=(m.get('media_path') or '').lstrip('/'); p=os.path.join(hm, mp)
+    if mp and os.path.isfile(p):
+        out.append({'path':p,'media_type':m.get('media_type') or 'photo','filename':m.get('filename') or ''})
+print(json.dumps(out, ensure_ascii=False))")
+E="$enfasis" R="$recientes" CN="$canal" QT="$cantidad" MA="$matabs" python3 -c "import json,os;json.dump({'enfasis':os.environ['E'],'canal':os.environ['CN'],'cantidad':int(os.environ['QT']),'recientes':json.loads(os.environ['R']),'materiales':json.loads(os.environ['MA'])},open('/tmp/prop_ctx.json','w'),ensure_ascii=False)"
 
 cd "$REPO" || exit 1
 bash "$MOTOR/scripts/perfil_a_md.sh" "$(basename "$REPO")" >/dev/null 2>&1 || true
 PROMPT="Sos el Director Creativo del proyecto. Su identidad, voz y estética están en contexto/CONTEXTO_MARCA.md y en el CLAUDE.md del proyecto (directorio actual): leelos y respetalos; NO uses contexto de otra marca. Generá propuestas para la cola de requerimientos, siguiendo $MOTOR/scripts/propuestas_creativo.md.
-Contexto en /tmp/prop_ctx.json: 'enfasis' (qué destacar; puede estar vacío), 'canal' (instagram=publicaciones de feed, o aviso=spots para la pantalla de calle DOOH 2:3), 'cantidad' (EXACTAMENTE cuántas propuestas generar) y 'recientes' (últimas publicaciones, para no repetir).
+Contexto en /tmp/prop_ctx.json: 'enfasis' (qué destacar; puede estar vacío), 'canal' (instagram=publicaciones de feed, o aviso=spots para la pantalla de calle DOOH 2:3), 'cantidad' (EXACTAMENTE cuántas propuestas generar), 'recientes' (últimas publicaciones, para no repetir) y 'materiales' (material que Fer adjuntó: lista de {path,media_type,filename}). Si 'materiales' NO está vacío, MIRÁ cada archivo (Read en las imágenes) y basá las propuestas en ese contenido — son la materia prima que Fer quiere publicar; proponé publicaciones que lo usen.
 Proponé para el CANAL indicado. Escribí EXCLUSIVAMENTE el archivo /tmp/propuestas.json (array de objetos). NO publiques, NO toques la base, NO mandes mails: solo escribí el archivo."
 timeout 900 claude -p "$PROMPT" --model sonnet --allowedTools "Bash" Read Write Edit Glob Grep >> "$LOG" 2>&1
 
@@ -55,7 +67,7 @@ if [ ! -s /tmp/propuestas.json ]; then
   exit 1
 fi
 
-n=$(python3 "$MOTOR/scripts/propuestas_publicar.py" "$CID" "$CHAT" "$BOT" "$canal" "$pid" 2>>"$LOG")
+n=$(python3 "$MOTOR/scripts/propuestas_publicar.py" "$CID" "$CHAT" "$BOT" "$canal" "$pid" "$sid" 2>>"$LOG")
 echo "$(ts) propuestas cargadas: $n" >> "$LOG"
 psqlc "UPDATE contenido.solicitudes_propuesta SET estado='procesado', procesado_en=now(), resultado='$n propuestas' WHERE id='$sid';" >/dev/null
 curl -s "https://api.telegram.org/bot$BOT/sendMessage" --data-urlencode "chat_id=$CHAT" --data-urlencode "text=El creativo cargó $n propuestas nuevas en la cola. Revisalas en https://panel.clausina.ar" -o /dev/null 2>&1

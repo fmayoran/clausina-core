@@ -171,10 +171,20 @@ async function insertMencion(refId, username, permalink, proyectoId) {
 }
 
 // Pedido de propuestas al creativo (lo levanta el cron propuestas_local.sh). cantidad: 1..8.
-async function pedirPropuestas(enfasis, canal, cantidad, proyectoId) {
+async function pedirPropuestas(enfasis, canal, cantidad, proyectoId, material) {
   const n = Math.min(8, Math.max(1, parseInt(cantidad, 10) || 5));
-  await pool.query(`INSERT INTO contenido.solicitudes_propuesta (enfasis, canal, cantidad, proyecto_id) VALUES ($1,$2,$3,$4)`,
+  const { rows: [s] } = await pool.query(
+    `INSERT INTO contenido.solicitudes_propuesta (enfasis, canal, cantidad, proyecto_id) VALUES ($1,$2,$3,$4) RETURNING id`,
     [enfasis || null, canal === 'aviso' ? 'aviso' : 'instagram', n, proyectoId]);
+  const mats = Array.isArray(material) ? material.slice(0, 10) : [];
+  for (let i = 0; i < mats.length; i++) {
+    const m = mats[i];
+    if (!m || !m.media_path) continue;
+    await pool.query(
+      `INSERT INTO contenido.solicitud_propuesta_material (solicitud_id, media_path, media_type, filename, orden)
+         VALUES ($1,$2,$3,$4,$5)`,
+      [s.id, String(m.media_path).replace(/^\/?(media\/)?/, ''), m.media_type === 'video' ? 'video' : 'photo', (m.filename || '').slice(0, 120) || null, i]);
+  }
   return true;
 }
 

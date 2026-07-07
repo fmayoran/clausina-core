@@ -29,6 +29,15 @@
   #askmodal textarea,#askmodal select,#askmodal input{width:100%;background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);font-family:'Inter',sans-serif;font-size:.98rem;padding:9px 11px;outline:none;}
   #askmodal textarea{min-height:70px;resize:vertical;}
   #askmodal textarea:focus,#askmodal select:focus,#askmodal input:focus{border-color:var(--ember);}
+  .pm-add{width:100%;background:transparent;border:1px dashed var(--line);border-radius:6px;color:var(--ash);font-family:'JetBrains Mono',monospace;font-size:.72rem;letter-spacing:.03em;padding:9px 11px;cursor:pointer;transition:.15s;}
+  .pm-add:hover{border-color:var(--ember);color:var(--white);}
+  .pm-prog{margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--ember);}
+  .pm-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px;}
+  .pm-thumb{position:relative;width:52px;height:52px;border-radius:7px;overflow:hidden;border:1px solid var(--line);background:#0c0c0a;}
+  .pm-thumb img{width:100%;height:100%;object-fit:cover;}
+  .pm-thumb .pm-vid{display:grid;place-items:center;width:100%;height:100%;color:var(--ember);font-size:1rem;}
+  .pm-thumb button{position:absolute;top:0;right:0;width:18px;height:18px;line-height:16px;border:none;background:rgba(0,0,0,.72);color:#fff;cursor:pointer;border-radius:0 0 0 6px;font-size:13px;}
+  .pm-hint{margin-top:8px;font-size:.76rem;color:var(--ash);line-height:1.3;}
 </style>
 </head>
 <body>
@@ -62,6 +71,14 @@
           <select id="canalprop"><option value="instagram">Instagram</option><option value="aviso">Aviso pantalla</option></select>
         </div>
         <div class="modal-sec"><div class="modal-lbl">Cantidad (1 a 8)</div><input id="cantprop" type="number" min="1" max="8" value="5"></div>
+        <div class="modal-sec">
+          <div class="modal-lbl">Material (opcional)</div>
+          <input type="file" id="propfile" accept="image/*,video/*" multiple style="display:none" onchange="propMatSel(this)">
+          <button type="button" class="pm-add" onclick="document.getElementById('propfile').click()">＋ Adjuntar fotos o video</button>
+          <div id="propmat-prog" class="pm-prog hidden"></div>
+          <div id="propmat-list" class="pm-list"></div>
+          <div class="pm-hint">El creativo basa las propuestas en este contenido, y queda disponible al generar la pieza.</div>
+        </div>
       </div>
       <div class="modal-foot">
         <button class="btn ok" id="askbtn" onclick="pedirPropuestas()">Pedir propuestas</button>
@@ -110,7 +127,7 @@
 <script>ClausinaShell({active:'propuestas',darkOnly:true});</script>
 <script src="panel.js"></script>
 <script>
-  function openAsk(){ document.getElementById('askmodal').classList.remove('hidden'); }
+  function openAsk(){ if(typeof propMatReset==='function') propMatReset(); document.getElementById('askmodal').classList.remove('hidden'); }
   function closeAsk(){ document.getElementById('askmodal').classList.add('hidden'); }
   window.afterProponer = closeAsk;
   currentLoad = loadCola; loadCola(); setInterval(loadCola, 6000);
