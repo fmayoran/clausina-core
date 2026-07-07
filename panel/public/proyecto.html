@@ -114,7 +114,7 @@
     <div class="proj-top">
       <div class="proj-title">Panel del proyecto</div>
       <div style="display:flex;gap:8px;flex:0 0 auto">
-        <a href="pauta" class="proj-set" title="Pauta · reporte de anuncios (Meta Ads)"><i data-lucide="badge-dollar-sign" class="w-5 h-5"></i></a>
+        <a href="biblioteca" class="proj-set" title="Biblioteca de medios"><i data-lucide="images" class="w-5 h-5"></i></a>
         <a href="auditoria" class="proj-set" title="Auditoría · KPIs y presencia digital"><i data-lucide="chart-column" class="w-5 h-5"></i></a>
         <a href="perfil" class="proj-set" title="Perfil de la marca"><i data-lucide="settings" class="w-5 h-5"></i></a>
       </div>
@@ -132,9 +132,9 @@
       <h3 class="sech">Canales del proyecto</h3>
       <div class="chan-grid">
         <a class="menucard" href="instagram"><span class="mt">Instagram</span><span class="md">Publicaciones del feed</span><span class="mn" id="mc-ig"></span></a>
+        <a class="menucard" href="pauta"><span class="mt">Avisos Instagram</span><span class="md">Publicidad y pauta (Meta Ads)</span><span class="mn" id="mc-pauta"></span></a>
         <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Avisos para la pantalla de calle</span><span class="mn" id="mc-av"></span></a>
         <a class="menucard" href="landing"><span class="mt">Web / Landing</span><span class="md">Cambios en la landing del proyecto</span><span class="mn" id="mc-web"></span></a>
-        <a class="menucard" href="biblioteca"><span class="mt">Biblioteca de medios</span><span class="md">Creá, subí y organizá el material de la marca</span><span class="mn" id="mc-bib"></span></a>
       </div>
     </aside>
   </div>
@@ -213,12 +213,21 @@
   function closeCola(){ document.getElementById('colamodal').classList.add('hidden'); }
   window.afterProponer = closeAsk;
   currentLoad=loadCola; loadCola(); setInterval(loadCola,6000);
-  // Resumen de la biblioteca de medios (pastilla).
-  fetch('api/biblioteca').then(r=>r.ok?r.json():null).then(d=>{
-    const e=document.getElementById('mc-bib'); if(!e||!d) return;
-    const enProc=(d.items||[]).filter(i=>i.carpeta==='En proceso').length+(d.material||[]).length;
-    const term=(d.items||[]).filter(i=>i.carpeta==='Terminado').length;
-    e.textContent = `${(d.piezas||[]).length} piezas · ${enProc} en proceso · ${term} en base`;
+  // Resumen de pauta (tarjeta "Avisos Instagram").
+  Promise.all([
+    fetch('api/pauta').then(r=>r.ok?r.json():null).catch(()=>null),
+    fetch('api/campanias').then(r=>r.ok?r.json():null).catch(()=>null)
+  ]).then(([pa,ca])=>{
+    const e=document.getElementById('mc-pauta'); if(!e) return;
+    if(pa && pa.configurada===false){ e.textContent='No configurada'; return; }
+    const camps=(ca&&ca.campanias)||[];
+    const prop=camps.filter(c=>c.estado==='propuesta').length;
+    const act=camps.filter(c=>c.estado==='activa').length;
+    const cur=(pa&&pa.moneda)||'USD';
+    const gasto=(pa&&pa.totales&&pa.totales.gasto)||0;
+    if(prop>0){ e.textContent=`${prop} propuesta${prop>1?'s':''} por revisar`; e.classList.add('alert'); }
+    else if(act>0){ e.textContent=`${act} activa${act>1?'s':''} · ${typeof money==='function'?money(gasto,cur):gasto+' '+cur} (30d)`; }
+    else { e.textContent='Sin campañas — pedí una'; }
   }).catch(()=>{});
   lucide.createIcons();
 </script>
