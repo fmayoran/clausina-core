@@ -733,6 +733,29 @@ async function pausarCampania(proyectoId, id) {
       WHERE id=$1 AND proyecto_id=$2 AND estado='activa'`, [id, proyectoId]);
   return rowCount > 0;
 }
+// Posts ya publicados en IG que pueden usarse como creativo de una campaña.
+async function getCreativosDisponibles(proyectoId) {
+  const { rows } = await pool.query(
+    `SELECT pz.id AS pieza_id, pz.numero, r.caption, r.ig_permalink AS permalink,
+            m.url, m.poster_url, m.tipo
+       FROM contenido.piezas pz
+       JOIN contenido.revisiones r ON r.pieza_id = pz.id AND r.estado='publicada'
+       JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1
+      WHERE pz.proyecto_id = $1 AND pz.canal='instagram'
+      ORDER BY pz.numero DESC LIMIT 40`, [proyectoId]);
+  return rows;
+}
+
+// Cambiar el creativo (pieza) de una propuesta — sólo antes de crearse en Meta.
+async function setCreativoCampania(proyectoId, id, piezaId) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.campanias SET pieza_id=$3, actualizado_en=now()
+      WHERE id=$1 AND proyecto_id=$2 AND estado='propuesta'
+        AND EXISTS (SELECT 1 FROM contenido.piezas WHERE id=$3 AND proyecto_id=$2)`,
+    [id, proyectoId, piezaId]);
+  return rowCount > 0;
+}
+
 async function reintentarCampania(proyectoId, id) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.campanias SET estado='aprobada', resumen=NULL, actualizado_en=now()
@@ -756,5 +779,5 @@ module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, 
   getLandingCambios, crearLandingCambio, aprobarLanding, rechazarLanding,
   getAuditoria, getPauta,
   crearSolicitudCampania, getCampanias, aprobarCampania, rechazarCampania, descartarCampania,
-  activarCampania, pausarCampania, reintentarCampania,
+  activarCampania, pausarCampania, reintentarCampania, getCreativosDisponibles, setCreativoCampania,
   health };

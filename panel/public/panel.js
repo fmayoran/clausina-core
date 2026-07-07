@@ -652,8 +652,10 @@ async function loadPauta(){
     setUpd();
   }catch(e){ setUpd(); }
 }
+let _CAMPOPEN=null;
 function openCamp(id){
   const c=_CAMPS.find(x=>x.id===id); if(!c) return;
+  _CAMPOPEN=id;
   const cur=_CAMPCUR, [lbl,cls]=CAMP_EST[c.estado]||[c.estado,''];
   const fechas=(c.fecha_inicio||c.fecha_fin)?`${c.fecha_inicio||'—'} → ${c.fecha_fin||'—'}`:'—';
   const perm=c.pieza_permalink?` <a href="${esc(c.pieza_permalink)}" target="_blank" rel="noopener">ver post ↗</a>`:'';
@@ -671,7 +673,7 @@ function openCamp(id){
       ${c.url_destino?`<div><span class="cm-k">Destino</span><span class="cm-v">${esc(c.url_destino)}${c.cta?' · '+esc(c.cta):''}</span></div>`:''}
     </div>`;
   const acts=document.getElementById('camp-acts');
-  if(c.estado==='propuesta') acts.innerHTML=`<button class="btn del" onclick="descartarCamp('${c.id}')">Descartar</button><button class="btn ok" onclick="aprobarCamp('${c.id}')">Aprobar</button>`;
+  if(c.estado==='propuesta') acts.innerHTML=`<button class="btn no" onclick="abrirCreativos()">Cambiar creativo</button><button class="btn del" onclick="descartarCamp('${c.id}')">Descartar</button><button class="btn ok" onclick="aprobarCamp('${c.id}')">Aprobar</button>`;
   else if(['aprobada','activar','pausar','descartar'].includes(c.estado)) acts.innerHTML=`<span class="cm-note">El motor está aplicando el cambio en Meta… (se refresca solo)</span>`;
   else if(c.estado==='pausada') acts.innerHTML=`<span class="cm-note" style="flex:1">Creada <b>pausada</b> en Meta. No gasta hasta que la actives.</span><button class="btn ok" onclick="activarCamp('${c.id}')">Activar</button>`;
   else if(c.estado==='activa') acts.innerHTML=`<span class="cm-note" style="flex:1">Corriendo en Meta.</span><button class="btn no" onclick="pausarCamp('${c.id}')">Pausar</button>`;
@@ -690,6 +692,28 @@ async function descartarCamp(id){ if(await campAction(id,'descartar')) toast('De
 async function activarCamp(id){ if(!confirm('Vas a ACTIVAR la campaña en Meta: empieza a gastar según el presupuesto y las fechas. ¿Confirmás?')) return; if(await campAction(id,'activar')) toast('Activando en Meta…'); }
 async function pausarCamp(id){ if(await campAction(id,'pausar')) toast('Pausando en Meta…'); }
 async function reintentarCamp(id){ if(await campAction(id,'reintentar')) toast('Reintentando la creación…'); }
+async function abrirCreativos(){
+  const camp=_CAMPS.find(x=>x.id===_CAMPOPEN); const cur=camp?camp.pieza_id:null;
+  try{
+    const r=await fetch('api/campanias/creativos'); const list=await r.json();
+    document.getElementById('creativo-grid').innerHTML = (list||[]).map(c=>{
+      const u=(c.tipo==='video'&&c.poster_url)?c.poster_url:c.url;
+      return `<a class="cpick${c.pieza_id===cur?' on':''}" href="#" onclick="elegirCreativo('${c.pieza_id}');return false;" title="CF-${pad4(c.numero)}">
+        <img src="${esc(u)}" loading="lazy" onerror="this.style.opacity=.15">
+        <span class="cpick-n">CF-${pad4(c.numero)}${c.tipo==='video'?' ▶':''}</span></a>`;
+    }).join('') || '<div class="cm-note">No hay posts publicados disponibles como creativo.</div>';
+    document.getElementById('creativopick').classList.remove('hidden');
+  }catch(e){ toast('No se pudieron cargar los posts',true); }
+}
+function closeCreativos(){ const m=document.getElementById('creativopick'); if(m) m.classList.add('hidden'); }
+async function elegirCreativo(piezaId){
+  const id=_CAMPOPEN; if(!id) return;
+  try{ const r=await fetch('api/campanias/'+id+'/creativo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pieza_id:piezaId})});
+    const d=await r.json();
+    if(d.ok){ toast('Creativo actualizado'); closeCreativos(); await loadPauta(); openCamp(id); }
+    else toast('No se pudo cambiar el creativo',true);
+  }catch(e){ toast('Error de conexión',true); }
+}
 function askCampania(){ const m=document.getElementById('campask'); if(m){ const i=document.getElementById('camp-instr'); if(i) i.value=''; m.classList.remove('hidden'); } }
 function closeAsk(){ const m=document.getElementById('campask'); if(m) m.classList.add('hidden'); }
 async function pedirCampania(){
