@@ -375,6 +375,21 @@ app.post('/api/proponer/material', async (req, res) => {
     res.json({ ok: true, media_path: mediaPath, media_type: mediaType, filename });
   } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
 });
+// Adjuntar material ELIGIÉNDOLO de la biblioteca: copia el archivo al staging del pedido.
+app.post('/api/proponer/material-biblioteca', async (req, res) => {
+  try {
+    const srcRel = String((req.body && req.body.media_path) || '').replace(/^\/+/, '').replace(/^media\//, '');
+    if (!srcRel || srcRel.includes('..')) return res.status(400).json({ ok: false, error: 'ruta' });
+    const src = path.join('/app/media', srcRel);
+    const ext = ((srcRel.match(/\.([a-z0-9]{2,5})$/i) || [, ''])[1] || 'jpg').toLowerCase();
+    const rel = path.posix.join('material/prop', req.marca, crypto.randomUUID() + '.' + ext);
+    const dst = path.join('/app/media', rel);
+    await fs.promises.mkdir(path.dirname(dst), { recursive: true });
+    await fs.promises.copyFile(src, dst);
+    const mediaType = (req.body && req.body.tipo === 'video') ? 'video' : 'photo';
+    res.json({ ok: true, media_path: rel, media_type: mediaType, filename: (req.body && req.body.filename) || null });
+  } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'copy' }); }
+});
 app.post('/api/proponer/material-video', async (req, res) => {
   const tmp = path.join('/tmp', 'up_' + crypto.randomUUID() + '.src');
   try {

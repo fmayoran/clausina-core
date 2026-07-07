@@ -29,7 +29,8 @@
   #askmodal textarea,#askmodal select,#askmodal input{width:100%;background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);font-family:'Inter',sans-serif;font-size:.98rem;padding:9px 11px;outline:none;}
   #askmodal textarea{min-height:70px;resize:vertical;}
   #askmodal textarea:focus,#askmodal select:focus,#askmodal input:focus{border-color:var(--ember);}
-  .pm-add{width:100%;background:transparent;border:1px dashed var(--line);border-radius:6px;color:var(--ash);font-family:'JetBrains Mono',monospace;font-size:.72rem;letter-spacing:.03em;padding:9px 11px;cursor:pointer;transition:.15s;}
+  .pm-btns{display:flex;gap:7px;}
+  .pm-add{flex:1;background:transparent;border:1px dashed var(--line);border-radius:6px;color:var(--ash);font-family:'JetBrains Mono',monospace;font-size:.7rem;letter-spacing:.02em;padding:9px 8px;cursor:pointer;transition:.15s;}
   .pm-add:hover{border-color:var(--ember);color:var(--white);}
   .pm-prog{margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--ember);}
   .pm-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px;}
@@ -74,7 +75,10 @@
         <div class="modal-sec">
           <div class="modal-lbl">Material (opcional)</div>
           <input type="file" id="propfile" accept="image/*,video/*" multiple style="display:none" onchange="propMatSel(this)">
-          <button type="button" class="pm-add" onclick="document.getElementById('propfile').click()">＋ Adjuntar fotos o video</button>
+          <div class="pm-btns">
+            <button type="button" class="pm-add" onclick="document.getElementById('propfile').click()">＋ Subir del disco</button>
+            <button type="button" class="pm-add" onclick="abrirPickerBiblio('prop')">⊞ Desde la biblioteca</button>
+          </div>
           <div id="propmat-prog" class="pm-prog hidden"></div>
           <div id="propmat-list" class="pm-list"></div>
           <div class="pm-hint">El creativo basa las propuestas en este contenido, y queda disponible al generar la pieza.</div>

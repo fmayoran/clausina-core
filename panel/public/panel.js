@@ -485,9 +485,10 @@ async function rmDelMaterial(mid){
   acting=false; loadMateriales();
 }
 // --- Elegir material desde la biblioteca (taller) para una propuesta ---
-let _pickItems=[];
-async function abrirPickerBiblio(){
-  if(!modalId) return;
+let _pickItems=[], _pickMode='req';
+async function abrirPickerBiblio(mode){
+  _pickMode = (mode==='prop') ? 'prop' : 'req';
+  if(_pickMode==='req' && !modalId) return;
   let data; try{ data=await fetch('api/biblioteca').then(r=>r.json()); }catch(e){ toast('No se pudo abrir la biblioteca',true); return; }
   _pickItems=(data.items||[]).filter(i=>i.carpeta==='En proceso'||i.carpeta==='Terminado');
   let ov=document.getElementById('bp-ov');
@@ -501,11 +502,20 @@ async function abrirPickerBiblio(){
   ov.style.display='flex';
 }
 async function attachBiblio(i, el){
-  const m=_pickItems[i]; if(!m||!modalId||el.classList.contains('bpadded')) return;
+  const m=_pickItems[i]; if(!m||el.classList.contains('bpadded')) return;
+  if(_pickMode==='req' && !modalId) return;
   el.classList.add('bpadded');
-  try{ const d=await fetch('api/requerimientos/'+modalId+'/material-biblioteca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({media_path:m.media_path,tipo:m.tipo,filename:m.nombre||m.codigo})}).then(r=>r.json());
-    if(d.ok){ toast('Agregado: '+(m.codigo||'material')); loadMateriales(); }
-    else { toast('No se pudo agregar'+(d.error?' ('+d.error+')':''),true); el.classList.remove('bpadded'); }
+  const body=JSON.stringify({media_path:m.media_path,tipo:m.tipo,filename:m.nombre||m.codigo});
+  try{
+    if(_pickMode==='prop'){
+      const d=await fetch('api/proponer/material-biblioteca',{method:'POST',headers:{'Content-Type':'application/json'},body}).then(r=>r.json());
+      if(d.ok){ _propMaterial.push({media_path:d.media_path,media_type:d.media_type,filename:d.filename}); propMatRender(); toast('Agregado: '+(m.codigo||'material')); }
+      else { toast('No se pudo agregar'+(d.error?' ('+d.error+')':''),true); el.classList.remove('bpadded'); }
+    } else {
+      const d=await fetch('api/requerimientos/'+modalId+'/material-biblioteca',{method:'POST',headers:{'Content-Type':'application/json'},body}).then(r=>r.json());
+      if(d.ok){ toast('Agregado: '+(m.codigo||'material')); loadMateriales(); }
+      else { toast('No se pudo agregar'+(d.error?' ('+d.error+')':''),true); el.classList.remove('bpadded'); }
+    }
   }catch(e){ toast('Error de conexión',true); el.classList.remove('bpadded'); }
 }
 function cerrarPicker(){ const o=document.getElementById('bp-ov'); if(o) o.style.display='none'; }
