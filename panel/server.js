@@ -153,9 +153,21 @@ app.post('/api/marca', async (req, res) => {
 });
 
 // Llama al webhook de n8n y devuelve el status HTTP. Timeout amplio: el publish sube media y poolea.
-async function callWebhook(url) {
-  const r = await fetch(url, { signal: AbortSignal.timeout(90000) });
-  return r.status;
+// Reintenta ante fallo de RED/DNS (el hostname de n8n resuelve intermitentemente desde el
+// contenedor -> EAI_AGAIN / "fetch failed"). No reintenta si n8n responde un status HTTP
+// (eso no lanza): un rechazo real se respeta. Sólo los errores de conexión se reintentan.
+async function callWebhook(url, tries = 5) {
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(90000) });
+      return r.status;
+    } catch (e) {
+      lastErr = e;
+      await new Promise(res => setTimeout(res, 350 * (i + 1)));
+    }
+  }
+  throw lastErr;
 }
 
 app.get('/api/piezas', async (req, res) => {
