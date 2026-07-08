@@ -703,12 +703,17 @@ function openCamp(id){
   const cur=_CAMPCUR, [lbl,cls]=CAMP_EST[c.estado]||[c.estado,''];
   const fechas=(c.fecha_inicio||c.fecha_fin)?`${c.fecha_inicio||'—'} → ${c.fecha_fin||'—'}`:'—';
   const perm=c.pieza_permalink?` <a href="${esc(c.pieza_permalink)}" target="_blank" rel="noopener">ver post ↗</a>`:'';
-  const media=(c.pieza_tipo==='video'&&c.pieza_poster)?c.pieza_poster:c.pieza_url;
+  let mediaHtml='';
+  if(c.pieza_url){
+    mediaHtml = (c.pieza_tipo==='video')
+      ? `<video class="cm-media" src="${esc(c.pieza_url)}" ${c.pieza_poster?`poster="${esc(c.pieza_poster)}"`:''} controls playsinline preload="metadata"></video>`
+      : `<img class="cm-media" src="${esc(c.pieza_url)}" onerror="this.style.display='none'">`;
+  }
   document.getElementById('camp-body').innerHTML=`
     <div class="cm-row"><span class="st ${cls}">${lbl}</span><span class="cm-obj">${OBJ[c.objetivo]||esc(c.objetivo)}</span></div>
     <h3 class="cm-name">${esc(c.nombre)}</h3>
     ${c.razon?`<p class="cm-razon">${esc(c.razon)}</p>`:''}
-    ${media?`<img class="cm-media" src="${esc(media)}" onerror="this.style.display='none'">`:''}
+    ${mediaHtml}
     <div class="cm-grid">
       <div><span class="cm-k">Creativo</span><span class="cm-v">${c.pieza_numero?'CF-'+pad4(c.pieza_numero):'—'}${perm}</span></div>
       <div><span class="cm-k">Presupuesto</span><span class="cm-v">${presTxt(c.presupuesto,cur)}</span></div>
