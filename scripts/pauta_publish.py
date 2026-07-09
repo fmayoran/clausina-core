@@ -247,7 +247,9 @@ def _set_status(cid, status, nuevo_estado):
             except Exception as e:
                 set_estado(cid, "error", f"No se pudo cambiar a {status}: {e}")
                 raise
-    set_estado(cid, nuevo_estado)
+    resumen = ("Corriendo en Meta." if nuevo_estado == "activa"
+               else "Pausada en Meta. Activala para reanudar." if nuevo_estado == "pausada" else None)
+    set_estado(cid, nuevo_estado, resumen=resumen)
     return "ok"
 
 
