@@ -21,7 +21,7 @@ import urllib.request
 
 GRAPH = "https://graph.facebook.com/v21.0"
 PG_NAME_FILTER = "crm_pgvector.1."
-ENV_CORTAFUEGO = "/root/clausina/marcas/cortafuego/cortafuego.env"
+MARCAS_DIR = "/root/clausina/marcas"
 
 OPT_GOAL = {"OUTCOME_TRAFFIC": "LINK_CLICKS", "OUTCOME_ENGAGEMENT": "POST_ENGAGEMENT",
             "OUTCOME_AWARENESS": "REACH"}
@@ -39,6 +39,16 @@ def load_env(path):
     except FileNotFoundError:
         pass
     return d
+
+
+def env_for_campania(cid):
+    """Resuelve la cápsula de la marca dueña de la campaña y devuelve (env, slug).
+    Agnóstico: los secretos de ads viven en marcas/<slug>/<slug>.env."""
+    slug = psql("SELECT p.slug FROM contenido.campanias c "
+                f"JOIN contenido.proyectos p ON p.id=c.proyecto_id WHERE c.id='{cid}'")
+    if not slug:
+        raise RuntimeError("la campaña no tiene proyecto asociado")
+    return load_env(f"{MARCAS_DIR}/{slug}/{slug}.env"), slug
 
 
 def graph(method, path, params):
@@ -145,11 +155,11 @@ def build_targeting(aud, token):
 
 
 def crear(cid):
-    env = load_env(ENV_CORTAFUEGO)
+    env, slug = env_for_campania(cid)
     token = env.get("META_ADS_TOKEN"); act = env.get("META_ADS_ACCOUNT_ID")
     page = env.get("META_ADS_PAGE_ID"); ig = env.get("META_ADS_IG_ID")
     if not all([token, act, page, ig]):
-        raise RuntimeError("Faltan credenciales de ads en cortafuego.env")
+        raise RuntimeError(f"Faltan credenciales de ads en la cápsula de {slug} ({slug}.env)")
     if not act.startswith("act_"):
         act = "act_" + act
 
@@ -236,7 +246,7 @@ def crear(cid):
 
 
 def _set_status(cid, status, nuevo_estado):
-    env = load_env(ENV_CORTAFUEGO)
+    env, _ = env_for_campania(cid)
     token = env.get("META_ADS_TOKEN")
     ids = psql("SELECT coalesce(meta_campaign_id,'')||'|'||coalesce(meta_adset_id,'')||'|'||coalesce(meta_ad_id,'') "
                f"FROM contenido.campanias WHERE id='{cid}';").split("|")
@@ -255,7 +265,7 @@ def _set_status(cid, status, nuevo_estado):
 
 def borrar(cid):
     """Descartar una campaña ya creada: la borra en Meta (cascada a conjunto/anuncio) y marca descartada."""
-    env = load_env(ENV_CORTAFUEGO)
+    env, _ = env_for_campania(cid)
     token = env.get("META_ADS_TOKEN")
     camp = psql(f"SELECT coalesce(meta_campaign_id,'') FROM contenido.campanias WHERE id='{cid}';")
     if camp:

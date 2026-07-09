@@ -14,11 +14,19 @@ import urllib.request
 
 GRAPH = "https://graph.facebook.com/v21.0"
 PG_NAME_FILTER = "crm_pgvector.1."
+MARCAS_DIR = "/root/clausina/marcas"
 
-# Marcas con cuenta publicitaria. slug -> archivo .env de la cápsula.
-BRANDS = {
-    "cortafuego": "/root/clausina/marcas/cortafuego/cortafuego.env",
-}
+
+def discover_brands():
+    """Agnóstico: recorre las marcas (proyectos) y devuelve las que tienen credenciales de ads
+    (META_ADS_ACCOUNT_ID + META_ADS_TOKEN) en su cápsula marcas/<slug>/<slug>.env."""
+    brands = {}
+    for slug in [s for s in psql("SELECT slug FROM contenido.proyectos ORDER BY slug").splitlines() if s.strip()]:
+        path = f"{MARCAS_DIR}/{slug}/{slug}.env"
+        env = load_env(path)
+        if env.get("META_ADS_ACCOUNT_ID") and env.get("META_ADS_TOKEN"):
+            brands[slug] = path
+    return brands
 
 # Códigos de estado de cuenta publicitaria (subset habitual).
 ACCOUNT_STATUS = {
@@ -227,7 +235,8 @@ def heartbeat(msg):
 
 def main():
     ok, errs = 0, []
-    for slug, envpath in BRANDS.items():
+    brands = discover_brands()
+    for slug, envpath in brands.items():
         env = load_env(envpath)
         act = env.get("META_ADS_ACCOUNT_ID")
         token = env.get("META_ADS_TOKEN")
