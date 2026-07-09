@@ -1,6 +1,7 @@
 // Capa de datos del panel — TODA la SQL vive acá (aislada para portar fácil a FastAPI a futuro).
 // Lectura sobre el schema `contenido` (base `claude`). Conexión por variables de entorno PG*.
 const { Pool } = require('pg');
+const cryptoAds = require('./crypto_ads');
 
 const pool = new Pool({
   host: process.env.PGHOST || 'crm_pgvector',
@@ -34,13 +35,21 @@ async function getProyectoId(slug) {
 async function getPerfil(proyectoId) {
   const { rows: [r] } = await pool.query(
     `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email, p.whatsapp,
-            pp.slogan, pp.logo, pp.brief_md, pp.estilo_md, pp.actualizado_en
+            pp.slogan, pp.logo, pp.brief_md, pp.estilo_md, pp.actualizado_en,
+            pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id,
+            (pp.meta_ads_token_enc IS NOT NULL) AS meta_ads_token_set
        FROM contenido.proyectos p LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id
       WHERE p.id=$1`, [proyectoId]);
   return r || {};
 }
 async function guardarPerfil(proyectoId, d) {
   const nn = s => (s != null && String(s).trim() !== '') ? String(s).trim() : null;
+  // Cifrar el token de ads ANTES de escribir nada (si falta la clave, falla limpio sin guardar a medias).
+  let tokEnc = null;
+  if (nn(d.meta_ads_token)) {
+    if (!cryptoAds.hasKey()) { const e = new Error('APP_ENC_KEY no configurada en el panel'); e.code = 'no_enc_key'; throw e; }
+    tokEnc = cryptoAds.encrypt(nn(d.meta_ads_token));
+  }
   if (nn(d.nombre)) await pool.query('UPDATE contenido.proyectos SET nombre=$2 WHERE id=$1', [proyectoId, nn(d.nombre)]);
   await pool.query(
     `UPDATE contenido.proyectos SET ig_handle=$2, dominio_web=$3, ig_user_id=$4, telegram_chat_id=$5, email=$6, whatsapp=$7 WHERE id=$1`,
@@ -50,6 +59,15 @@ async function guardarPerfil(proyectoId, d) {
     VALUES ($1,$2,$3,$4,$5, now())
     ON CONFLICT (proyecto_id) DO UPDATE SET slogan=$2, logo=$3, brief_md=$4, estilo_md=$5, actualizado_en=now()`,
     [proyectoId, nn(d.slogan), nn(d.logo), nn(d.brief_md), nn(d.estilo_md)]);
+  // Pauta: IDs en claro (COALESCE: vacío = no toca); token cifrado, write-only.
+  await pool.query(
+    `UPDATE contenido.proyecto_perfil SET
+       meta_ads_account_id = COALESCE($2, meta_ads_account_id),
+       meta_ads_page_id    = COALESCE($3, meta_ads_page_id),
+       meta_ads_ig_id      = COALESCE($4, meta_ads_ig_id)
+     WHERE proyecto_id=$1`,
+    [proyectoId, nn(d.meta_ads_account_id), nn(d.meta_ads_page_id), nn(d.meta_ads_ig_id)]);
+  if (tokEnc) await pool.query('UPDATE contenido.proyecto_perfil SET meta_ads_token_enc=$2 WHERE proyecto_id=$1', [proyectoId, tokEnc]);
   _marcasAt = 0;   // el nombre pudo cambiar -> refrescar cache de marcas
   return true;
 }

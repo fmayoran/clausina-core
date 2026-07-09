@@ -200,7 +200,7 @@ app.get('/api/perfil', async (req, res) => {
 });
 app.put('/api/perfil', async (req, res) => {
   try { res.json({ ok: await db.guardarPerfil(req.proyectoId, req.body || {}) }); }
-  catch (e) { console.error('guardar perfil', e.message); res.status(500).json({ ok: false }); }
+  catch (e) { console.error('guardar perfil', e.message); res.status(500).json({ ok: false, error: e.code || 'db' }); }
 });
 
 // Subir/actualizar el logo de la marca activa: imagen (dataUrl base64) -> media store -> setea el campo logo.

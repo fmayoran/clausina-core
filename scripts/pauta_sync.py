@@ -7,26 +7,36 @@ systemd cf-pauta-sync. Read-only: sólo GET a Graph API; nunca crea ni edita cam
 """
 import json
 import secrets
+import os
 import subprocess
 import sys
 import urllib.parse
 import urllib.request
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ads_crypto  # noqa: E402
+
 GRAPH = "https://graph.facebook.com/v21.0"
 PG_NAME_FILTER = "crm_pgvector.1."
-MARCAS_DIR = "/root/clausina/marcas"
 
 
 def discover_brands():
-    """Agnóstico: recorre las marcas (proyectos) y devuelve las que tienen credenciales de ads
-    (META_ADS_ACCOUNT_ID + META_ADS_TOKEN) en su cápsula marcas/<slug>/<slug>.env."""
-    brands = {}
-    for slug in [s for s in psql("SELECT slug FROM contenido.proyectos ORDER BY slug").splitlines() if s.strip()]:
-        path = f"{MARCAS_DIR}/{slug}/{slug}.env"
-        env = load_env(path)
-        if env.get("META_ADS_ACCOUNT_ID") and env.get("META_ADS_TOKEN"):
-            brands[slug] = path
-    return brands
+    """Agnóstico: marcas con pauta configurada en el PERFIL (DB) — account_id + token cifrado.
+    Devuelve {slug: {act, token(descifrado)}}."""
+    out = {}
+    rows = psql("SELECT p.slug||'|'||coalesce(pp.meta_ads_account_id,'')||'|'||coalesce(pp.meta_ads_token_enc,'') "
+                "FROM contenido.proyectos p JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id "
+                "WHERE pp.meta_ads_account_id IS NOT NULL AND pp.meta_ads_token_enc IS NOT NULL "
+                "ORDER BY p.slug")
+    for row in rows.splitlines():
+        if not row.strip():
+            continue
+        slug, act, tok_enc = row.split("|", 2)
+        try:
+            out[slug] = {"act": act, "token": ads_crypto.decrypt(tok_enc)}
+        except Exception as e:  # noqa: BLE001
+            sys.stderr.write(f"{slug}: no se pudo descifrar token: {e}\n")
+    return out
 
 # Códigos de estado de cuenta publicitaria (subset habitual).
 ACCOUNT_STATUS = {
@@ -235,11 +245,9 @@ def heartbeat(msg):
 
 def main():
     ok, errs = 0, []
-    brands = discover_brands()
-    for slug, envpath in brands.items():
-        env = load_env(envpath)
-        act = env.get("META_ADS_ACCOUNT_ID")
-        token = env.get("META_ADS_TOKEN")
+    for slug, cfg in discover_brands().items():
+        act = cfg.get("act")
+        token = cfg.get("token")
         if not act or not token:
             continue  # marca sin pauta configurada
         try:

@@ -130,6 +130,11 @@
           <div class="fld"><label>WhatsApp <span class="hint">— +54...</span></label><input type="text" id="whatsapp" placeholder="+54 9 11 ..."></div>
           <div class="fld"><label>IG User ID</label><input type="text" id="ig_user_id"></div>
           <div class="fld"><label>Telegram chat ID</label><input type="text" id="telegram_chat_id"></div>
+          <div class="fld" style="grid-column:1/-1;border-top:1px solid var(--line);padding-top:10px;margin-top:4px"><label style="color:var(--fire)">Pauta — Meta Ads <span class="hint">— publicidad en Instagram (opcional)</span></label></div>
+          <div class="fld"><label>Ad Account ID <span class="hint">— solo el número</span></label><input type="text" id="meta_ads_account_id" placeholder="2233685384046448"></div>
+          <div class="fld"><label>Page ID <span class="hint">— Página de Facebook</span></label><input type="text" id="meta_ads_page_id"></div>
+          <div class="fld"><label>IG account ID (ads)</label><input type="text" id="meta_ads_ig_id"></div>
+          <div class="fld"><label>Token de Meta Ads <span class="hint">— se guarda cifrado; no se muestra</span></label><input type="password" id="meta_ads_token" autocomplete="off" placeholder="pegá el token"></div>
         </div></div>
         <div class="modal-foot"><button class="ibtn" onclick="guardar()">Guardar</button><button class="ibtn ghost" onclick="closeM('redes')">Cerrar</button></div>
       </div>
@@ -164,7 +169,7 @@
 <script>ClausinaShell({active:'perfil',darkOnly:true});</script>
 <script src="panel.js"></script>
 <script>
-const CAMPOS=['nombre','slogan','ig_handle','dominio_web','email','whatsapp','ig_user_id','telegram_chat_id','logo','brief_md','estilo_md'];
+const CAMPOS=['nombre','slogan','ig_handle','dominio_web','email','whatsapp','ig_user_id','telegram_chat_id','logo','brief_md','estilo_md','meta_ads_account_id','meta_ads_page_id','meta_ads_ig_id'];
 function openM(k){ const m=document.getElementById('m-'+k); if(m) m.classList.remove('hidden'); }
 function closeM(k){ const m=document.getElementById('m-'+k); if(m) m.classList.add('hidden'); }
 function closeAllModals(){ document.querySelectorAll('.modal').forEach(m=>m.classList.add('hidden')); }
@@ -185,6 +190,8 @@ async function cargar(){
     const r=await fetch('api/perfil'); if(r.status===401){location.href='login';return;}
     const p=await r.json();
     CAMPOS.forEach(c=>{ const el=document.getElementById(c); if(el) el.value=p[c]||''; });
+    // Token de ads: write-only, nunca se muestra. Placeholder según si está configurado.
+    const tk=document.getElementById('meta_ads_token'); if(tk){ tk.value=''; tk.placeholder = p.meta_ads_token_set ? '•••••••• configurado (vacío = no cambia)' : 'pegá el token'; }
     mostrarLogo(p.logo||'');
     document.getElementById('upd2').textContent = p.actualizado_en ? ('Última edición: '+fecha(p.actualizado_en)) : 'Sin cargar todavía';
     setTiles();
@@ -192,9 +199,10 @@ async function cargar(){
 }
 async function guardar(){
   const body={}; CAMPOS.forEach(c=>{ body[c]=document.getElementById(c).value; });
+  const tk=fval('meta_ads_token'); if(tk) body.meta_ads_token=tk;   // solo si escribió uno nuevo
   try{
     const d=await fetch('api/perfil',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
-    toast(d.ok?'Perfil guardado':'No se pudo guardar',!d.ok);
+    toast(d.ok?'Perfil guardado':(d.error==='no_enc_key'?'Falta configurar APP_ENC_KEY en el panel':'No se pudo guardar'),!d.ok);
     if(d.ok){ cargar(); closeAllModals(); }
   }catch(e){ toast('Error de conexión',true); }
 }

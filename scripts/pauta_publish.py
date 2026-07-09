@@ -19,9 +19,12 @@ import sys
 import urllib.parse
 import urllib.request
 
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ads_crypto  # noqa: E402
+
 GRAPH = "https://graph.facebook.com/v21.0"
 PG_NAME_FILTER = "crm_pgvector.1."
-MARCAS_DIR = "/root/clausina/marcas"
 
 OPT_GOAL = {"OUTCOME_TRAFFIC": "LINK_CLICKS", "OUTCOME_ENGAGEMENT": "POST_ENGAGEMENT",
             "OUTCOME_AWARENESS": "REACH"}
@@ -41,14 +44,20 @@ def load_env(path):
     return d
 
 
-def env_for_campania(cid):
-    """Resuelve la cápsula de la marca dueña de la campaña y devuelve (env, slug).
-    Agnóstico: los secretos de ads viven en marcas/<slug>/<slug>.env."""
-    slug = psql("SELECT p.slug FROM contenido.campanias c "
-                f"JOIN contenido.proyectos p ON p.id=c.proyecto_id WHERE c.id='{cid}'")
-    if not slug:
-        raise RuntimeError("la campaña no tiene proyecto asociado")
-    return load_env(f"{MARCAS_DIR}/{slug}/{slug}.env"), slug
+def config_for_campania(cid):
+    """Config de ads de la marca dueña de la campaña, desde el perfil (DB). Agnóstico.
+    IDs en claro; token descifrado con APP_ENC_KEY. Devuelve dict {act,page,ig,token,slug}."""
+    row = psql(
+        "SELECT coalesce(pp.meta_ads_account_id,'')||'|'||coalesce(pp.meta_ads_page_id,'')||'|'||"
+        "coalesce(pp.meta_ads_ig_id,'')||'|'||coalesce(pp.meta_ads_token_enc,'')||'|'||p.slug "
+        "FROM contenido.campanias c JOIN contenido.proyectos p ON p.id=c.proyecto_id "
+        "JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=c.proyecto_id "
+        f"WHERE c.id='{cid}'")
+    if not row:
+        raise RuntimeError("la campaña no tiene pauta configurada en el perfil de la marca")
+    act, page, ig, tok_enc, slug = row.split("|", 4)
+    return {"act": act, "page": page, "ig": ig,
+            "token": ads_crypto.decrypt(tok_enc) if tok_enc else "", "slug": slug}
 
 
 def graph(method, path, params):
@@ -155,11 +164,10 @@ def build_targeting(aud, token):
 
 
 def crear(cid):
-    env, slug = env_for_campania(cid)
-    token = env.get("META_ADS_TOKEN"); act = env.get("META_ADS_ACCOUNT_ID")
-    page = env.get("META_ADS_PAGE_ID"); ig = env.get("META_ADS_IG_ID")
+    cfg = config_for_campania(cid)
+    token = cfg["token"]; act = cfg["act"]; page = cfg["page"]; ig = cfg["ig"]
     if not all([token, act, page, ig]):
-        raise RuntimeError(f"Faltan credenciales de ads en la cápsula de {slug} ({slug}.env)")
+        raise RuntimeError(f"Faltan credenciales de ads en el perfil de {cfg['slug']}")
     if not act.startswith("act_"):
         act = "act_" + act
 
@@ -246,8 +254,7 @@ def crear(cid):
 
 
 def _set_status(cid, status, nuevo_estado):
-    env, _ = env_for_campania(cid)
-    token = env.get("META_ADS_TOKEN")
+    token = config_for_campania(cid)["token"]
     ids = psql("SELECT coalesce(meta_campaign_id,'')||'|'||coalesce(meta_adset_id,'')||'|'||coalesce(meta_ad_id,'') "
                f"FROM contenido.campanias WHERE id='{cid}';").split("|")
     for oid in ids:
@@ -265,8 +272,7 @@ def _set_status(cid, status, nuevo_estado):
 
 def borrar(cid):
     """Descartar una campaña ya creada: la borra en Meta (cascada a conjunto/anuncio) y marca descartada."""
-    env, _ = env_for_campania(cid)
-    token = env.get("META_ADS_TOKEN")
+    token = config_for_campania(cid)["token"]
     camp = psql(f"SELECT coalesce(meta_campaign_id,'') FROM contenido.campanias WHERE id='{cid}';")
     if camp:
         try:
