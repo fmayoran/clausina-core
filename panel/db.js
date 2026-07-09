@@ -37,18 +37,30 @@ async function getPerfil(proyectoId) {
     `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email, p.whatsapp,
             pp.slogan, pp.logo, pp.brief_md, pp.estilo_md, pp.actualizado_en,
             pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id,
-            (pp.meta_ads_token_enc IS NOT NULL) AS meta_ads_token_set
+            (pp.meta_ads_token_enc IS NOT NULL) AS meta_ads_token_set,
+            (pp.ig_token_enc IS NOT NULL) AS ig_token_set
        FROM contenido.proyectos p LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id
       WHERE p.id=$1`, [proyectoId]);
   return r || {};
 }
+
+// Token de IG de una marca desde el perfil (descifrado), o null. Lo usa el panel (menciones/métricas).
+async function getIgToken(slug) {
+  try {
+    const { rows: [r] } = await pool.query(
+      `SELECT pp.ig_token_enc FROM contenido.proyectos p JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id WHERE p.slug=$1`, [slug]);
+    if (r && r.ig_token_enc) return cryptoAds.decrypt(r.ig_token_enc);
+  } catch (e) { console.error('getIgToken', e.message); }
+  return null;
+}
 async function guardarPerfil(proyectoId, d) {
   const nn = s => (s != null && String(s).trim() !== '') ? String(s).trim() : null;
-  // Cifrar el token de ads ANTES de escribir nada (si falta la clave, falla limpio sin guardar a medias).
-  let tokEnc = null;
-  if (nn(d.meta_ads_token)) {
+  // Cifrar los tokens ANTES de escribir nada (si falta la clave, falla limpio sin guardar a medias).
+  let tokEnc = null, igTokEnc = null;
+  if (nn(d.meta_ads_token) || nn(d.ig_token)) {
     if (!cryptoAds.hasKey()) { const e = new Error('APP_ENC_KEY no configurada en el panel'); e.code = 'no_enc_key'; throw e; }
-    tokEnc = cryptoAds.encrypt(nn(d.meta_ads_token));
+    if (nn(d.meta_ads_token)) tokEnc = cryptoAds.encrypt(nn(d.meta_ads_token));
+    if (nn(d.ig_token)) igTokEnc = cryptoAds.encrypt(nn(d.ig_token));
   }
   if (nn(d.nombre)) await pool.query('UPDATE contenido.proyectos SET nombre=$2 WHERE id=$1', [proyectoId, nn(d.nombre)]);
   await pool.query(
@@ -68,6 +80,7 @@ async function guardarPerfil(proyectoId, d) {
      WHERE proyecto_id=$1`,
     [proyectoId, nn(d.meta_ads_account_id), nn(d.meta_ads_page_id), nn(d.meta_ads_ig_id)]);
   if (tokEnc) await pool.query('UPDATE contenido.proyecto_perfil SET meta_ads_token_enc=$2 WHERE proyecto_id=$1', [proyectoId, tokEnc]);
+  if (igTokEnc) await pool.query('UPDATE contenido.proyecto_perfil SET ig_token_enc=$2 WHERE proyecto_id=$1', [proyectoId, igTokEnc]);
   _marcasAt = 0;   // el nombre pudo cambiar -> refrescar cache de marcas
   return true;
 }
@@ -813,7 +826,7 @@ async function health() {
   return true;
 }
 
-module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, getResumenAgencia,
+module.exports = { getMarcas, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,

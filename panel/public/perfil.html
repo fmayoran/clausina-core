@@ -90,8 +90,8 @@
     </div>
 
     <div class="ptiles">
-      <a class="ptile" id="t-ident" href="#" onclick="openM('ident');return false;"><span class="ptl">Identidad</span><span class="ptd">marca, slogan y logo</span><span class="pts" id="s-ident">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
-      <a class="ptile" id="t-redes" href="#" onclick="openM('redes');return false;"><span class="ptl">Redes y enlaces</span><span class="ptd">IG, web, email y contactos</span><span class="pts" id="s-redes">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+      <a class="ptile" id="t-ident" href="#" onclick="openM('ident');return false;"><span class="ptl">Identidad</span><span class="ptd">marca, slogan, logo y contactos</span><span class="pts" id="s-ident">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+      <a class="ptile" id="t-redes" href="#" onclick="openM('redes');return false;"><span class="ptl">Redes</span><span class="ptd">Instagram y Meta Ads</span><span class="pts" id="s-redes">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
       <a class="ptile" id="t-brief" href="#" onclick="openM('brief');return false;"><span class="ptl">Brief</span><span class="ptd">contexto para el creativo</span><span class="pts" id="s-brief">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
       <a class="ptile" id="t-estilo" href="#" onclick="openM('estilo');return false;"><span class="ptl">Estilo de marca</span><span class="ptd">identidad visual de la marca</span><span class="pts" id="s-estilo">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
     </div>
@@ -113,6 +113,10 @@
               <button type="button" class="ibtn" id="logoBtn" onclick="document.getElementById('logoFile').click()">Subir…</button>
             </div>
           </div>
+          <div class="fld"><label>Web <span class="hint">— dominio</span></label><input type="text" id="dominio_web" placeholder="marca.ar"></div>
+          <div class="fld"><label>Email <span class="hint">— de la marca</span></label><input type="text" id="email" placeholder="hola@marca.ar"></div>
+          <div class="fld"><label>WhatsApp <span class="hint">— +54...</span></label><input type="text" id="whatsapp" placeholder="+54 9 11 ..."></div>
+          <div class="fld"><label>Telegram chat ID</label><input type="text" id="telegram_chat_id"></div>
         </div>
         <div class="modal-foot"><button class="ibtn" onclick="guardar()">Guardar</button><button class="ibtn ghost" onclick="closeM('ident')">Cerrar</button></div>
       </div>
@@ -122,15 +126,13 @@
     <div id="m-redes" class="modal hidden">
       <div class="modal-bg" onclick="closeM('redes')"></div>
       <div class="modal-box">
-        <div class="modal-head"><div class="modal-tt">Redes y enlaces</div><button class="modal-x" onclick="closeM('redes')">×</button></div>
+        <div class="modal-head"><div class="modal-tt">Redes</div><button class="modal-x" onclick="closeM('redes')">×</button></div>
         <div class="modal-body"><div class="grid">
-          <div class="fld"><label>Instagram <span class="hint">— con @</span></label><input type="text" id="ig_handle" placeholder="@cuenta"></div>
-          <div class="fld"><label>Web <span class="hint">— dominio</span></label><input type="text" id="dominio_web" placeholder="marca.ar"></div>
-          <div class="fld"><label>Email <span class="hint">— de la marca</span></label><input type="text" id="email" placeholder="hola@marca.ar"></div>
-          <div class="fld"><label>WhatsApp <span class="hint">— +54...</span></label><input type="text" id="whatsapp" placeholder="+54 9 11 ..."></div>
+          <div class="fld" style="grid-column:1/-1"><label style="color:var(--fire)">Instagram</label></div>
+          <div class="fld"><label>Cuenta <span class="hint">— con @</span></label><input type="text" id="ig_handle" placeholder="@cuenta"></div>
           <div class="fld"><label>IG User ID</label><input type="text" id="ig_user_id"></div>
-          <div class="fld"><label>Telegram chat ID</label><input type="text" id="telegram_chat_id"></div>
-          <div class="fld" style="grid-column:1/-1;border-top:1px solid var(--line);padding-top:10px;margin-top:4px"><label style="color:var(--fire)">Pauta — Meta Ads <span class="hint">— publicidad en Instagram (opcional)</span></label></div>
+          <div class="fld" style="grid-column:1/-1"><label>Token de Instagram <span class="hint">— se guarda cifrado; no se muestra</span></label><input type="password" id="ig_token" autocomplete="off" placeholder="pegá el token"></div>
+          <div class="fld" style="grid-column:1/-1;border-top:1px solid var(--line);padding-top:10px;margin-top:4px"><label style="color:var(--fire)">Meta Ads <span class="hint">— publicidad en Instagram (opcional)</span></label></div>
           <div class="fld"><label>Ad Account ID <span class="hint">— solo el número</span></label><input type="text" id="meta_ads_account_id" placeholder="2233685384046448"></div>
           <div class="fld"><label>Page ID <span class="hint">— Página de Facebook</span></label><input type="text" id="meta_ads_page_id"></div>
           <div class="fld"><label>IG account ID (ads)</label><input type="text" id="meta_ads_ig_id"></div>
@@ -178,8 +180,8 @@ function setTile(id, ok, txt){ const t=document.getElementById('t-'+id); if(t){ 
 function setTiles(){
   const ident = !!fval('nombre') && !!fval('slogan');
   setTile('ident', ident, ident?'completo':'faltan datos');
-  const n=['ig_handle','dominio_web','email','whatsapp','ig_user_id','telegram_chat_id'].filter(f=>fval(f)).length;
-  setTile('redes', n>=2, n+'/6 cargados');
+  const ig = !!fval('ig_handle'), ads = !!fval('meta_ads_account_id');
+  setTile('redes', ig, ig ? (ads?'IG + Meta Ads':'Instagram') : 'sin cargar');
   const brief = fval('brief_md').length>20;
   setTile('brief', brief, brief?'cargado':'sin cargar');
   const est = fval('estilo_md').length>20;
@@ -190,8 +192,9 @@ async function cargar(){
     const r=await fetch('api/perfil'); if(r.status===401){location.href='login';return;}
     const p=await r.json();
     CAMPOS.forEach(c=>{ const el=document.getElementById(c); if(el) el.value=p[c]||''; });
-    // Token de ads: write-only, nunca se muestra. Placeholder según si está configurado.
+    // Tokens: write-only, nunca se muestran. Placeholder según si están configurados.
     const tk=document.getElementById('meta_ads_token'); if(tk){ tk.value=''; tk.placeholder = p.meta_ads_token_set ? '•••••••• configurado (vacío = no cambia)' : 'pegá el token'; }
+    const it=document.getElementById('ig_token'); if(it){ it.value=''; it.placeholder = p.ig_token_set ? '•••••••• configurado (vacío = no cambia)' : 'pegá el token'; }
     mostrarLogo(p.logo||'');
     document.getElementById('upd2').textContent = p.actualizado_en ? ('Última edición: '+fecha(p.actualizado_en)) : 'Sin cargar todavía';
     setTiles();
@@ -200,6 +203,7 @@ async function cargar(){
 async function guardar(){
   const body={}; CAMPOS.forEach(c=>{ body[c]=document.getElementById(c).value; });
   const tk=fval('meta_ads_token'); if(tk) body.meta_ads_token=tk;   // solo si escribió uno nuevo
+  const it=fval('ig_token'); if(it) body.ig_token=it;
   try{
     const d=await fetch('api/perfil',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
     toast(d.ok?'Perfil guardado':(d.error==='no_enc_key'?'Falta configurar APP_ENC_KEY en el panel':'No se pudo guardar'),!d.ok);

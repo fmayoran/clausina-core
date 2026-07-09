@@ -339,7 +339,7 @@
       <tr><td><b>Traefik</b></td><td>Reverse proxy + SSL</td><td>todos los dominios</td><td>—</td></tr>
     </tbody>
   </table>
-  <p class="muted" style="margin-top:12px">Secretos por nivel: plataforma (DB, panel) en <code>core/plataforma.env</code>; marca (IG/Telegram/mail) en <code>marcas/&lt;slug&gt;/&lt;slug&gt;.env</code>; infra/ops (VPS, EasyPanel, GitHub, dominios, Cloudflare, n8n) en <code>.env</code> raíz.</p>
+  <p class="muted" style="margin-top:12px">Secretos por nivel: plataforma (DB, panel) en <code>core/plataforma.env</code>; marca (Telegram/mail y lo no migrado) en <code>marcas/&lt;slug&gt;/&lt;slug&gt;.env</code>; infra/ops (VPS, EasyPanel, GitHub, dominios, Cloudflare, n8n) en <code>.env</code> raíz. <b>Lo que Fer administra desde el panel</b> (credenciales de Meta Ads) va <b>cifrado en la DB</b> (perfil de la marca): IDs en claro, token AES-256-GCM <b>write-only</b>; clave maestra <code>APP_ENC_KEY</code> en infra (host + panel). Objetivo: operar sin acceso al VPS.</p>
 </div></section>
 
 <!-- 8 -->

@@ -23,12 +23,13 @@ const IG_API = 'https://graph.instagram.com/v19.0';
 // Captura menciones entrantes (media donde nos etiquetan, edge /tags) y las deja en la cola
 // como propuesta (origen='mencion') para que Fer decida: generar publicación o descartar. Avisa por Telegram.
 async function refreshMenciones() {
-  if (!IG_TOKEN) return;
   try {
     // El token/cuenta de IG es de Cortafuego: las menciones entrantes se atribuyen a esa marca.
-    // (Cuando cada marca tenga su token, esto se vuelve por-marca.)
+    // Token: del perfil (DB, cifrado) con fallback al env. (Cuando cada marca tenga el suyo, esto se vuelve por-marca.)
     const pid = await db.getProyectoId('cortafuego');
-    const d = await fetch(`${IG_API}/${IG_USER_ID}/tags?fields=id,username,permalink,timestamp&limit=25&access_token=${IG_TOKEN}`, { signal: AbortSignal.timeout(10000) }).then(r => r.json());
+    const tok = (await db.getIgToken('cortafuego')) || IG_TOKEN;
+    if (!tok) return;
+    const d = await fetch(`${IG_API}/${IG_USER_ID}/tags?fields=id,username,permalink,timestamp&limit=25&access_token=${tok}`, { signal: AbortSignal.timeout(10000) }).then(r => r.json());
     if (!d || !d.data) return;
     for (const m of d.data) {
       const nueva = await db.insertMencion(m.id, m.username || 'alguien', m.permalink || '', pid);
@@ -43,12 +44,13 @@ async function refreshMenciones() {
 // Refresca las métricas de IG de las piezas publicadas y las cachea en la base.
 // Insights de NUESTRA propia cuenta (el token de publicación tiene permiso). Stories viejas expiran → se saltean.
 async function refreshMetricas() {
-  if (!IG_TOKEN) return;
+  const tok = (await db.getIgToken('cortafuego')) || IG_TOKEN;
+  if (!tok) return;
   const metric = 'views,reach,likes,comments,saved,shares,total_interactions';
   let ok = 0;
   for (const id of await db.getPostIdsPublicados()) {
     try {
-      const d = await fetch(`${IG_API}/${id}/insights?metric=${metric}&access_token=${IG_TOKEN}`, { signal: AbortSignal.timeout(10000) }).then(r => r.json());
+      const d = await fetch(`${IG_API}/${id}/insights?metric=${metric}&access_token=${tok}`, { signal: AbortSignal.timeout(10000) }).then(r => r.json());
       if (!d || !d.data) continue;               // p.ej. story expirada o métrica no soportada
       const v = {}; d.data.forEach(x => { v[x.name] = x.values && x.values[0] ? x.values[0].value : 0; });
       await db.upsertMetricas(id, v); ok++;
