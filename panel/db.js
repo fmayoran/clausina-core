@@ -144,9 +144,11 @@ async function getRequerimientos(proyectoId) {
     FROM contenido.tg_briefs b
     LEFT JOIN contenido.piezas pz ON pz.id = b.pieza_id
     LEFT JOIN contenido.revisiones r ON r.id = pz.revision_vigente
-    WHERE b.proyecto_id = $1 AND (
-            (b.pieza_id IS NULL AND b.estado IN ('propuesta','pendiente','procesando','error','revisar','revisando'))
-         OR (b.pieza_id IS NOT NULL AND r.estado IN ('pendiente_aprobacion','rechazada','aprobada','borrador')))
+    -- Sólo requerimientos que esperan algo (sin pieza generada aún). Una vez que generaron su
+    -- pieza, ésta vive en el board de Instagram/aprobación, así que salen de la cola.
+    WHERE b.proyecto_id = $1
+      AND b.pieza_id IS NULL
+      AND b.estado IN ('propuesta','pendiente','procesando','error','revisar','revisando')
     ORDER BY (b.estado='propuesta') DESC, b.creado_en DESC
     LIMIT 100;`, [proyectoId]);
   // Pedidos de propuestas en curso (placeholder en la cola mientras el creativo elabora).
