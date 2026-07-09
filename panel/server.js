@@ -252,6 +252,14 @@ app.get('/api/pauta', async (req, res) => {
   try { res.json(await db.getPauta(req.proyectoId)); }
   catch (e) { console.error('pauta', e.message); res.status(500).json({ error: 'db' }); }
 });
+app.get('/api/pauta/evolucion', async (req, res) => {
+  try { res.json(await db.getPautaEvolucion(req.proyectoId)); }
+  catch (e) { console.error('pauta-evol', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/pauta/refrescar', async (req, res) => {
+  try { res.json({ ok: await db.pedirRefrescoPauta() }); }
+  catch (e) { console.error('pauta-refrescar', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
 
 // Campañas de pauta: propuestas del creativo + su ciclo de aprobación.
 app.get('/api/campanias', async (req, res) => {

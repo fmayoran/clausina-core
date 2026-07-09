@@ -632,7 +632,7 @@ const pct = v => Number(v||0).toLocaleString('es-AR',{maximumFractionDigits:2})+
 function stClass(e){ if(e==='ACTIVE') return 'ok'; if(['PAUSED','ADSET_PAUSED','CAMPAIGN_PAUSED'].includes(e)) return 'pause'; if(['WITH_ISSUES','DISABLED','DELETED','ARCHIVED'].includes(e)) return 'warn'; return ''; }
 const OBJ={OUTCOME_AWARENESS:'Reconocimiento',OUTCOME_TRAFFIC:'Tráfico',OUTCOME_ENGAGEMENT:'Interacción'};
 const CAMP_EST={propuesta:['Propuesta','pause'],aprobada:['Creando en Meta…','pause'],activar:['Activando…','pause'],pausar:['Pausando…','pause'],descartar:['Descartando…','warn'],pausada:['Pausada en Meta','pause'],activa:['Activa','ok'],rechazada:['Rechazada','warn'],error:['Error','warn']};
-let _CAMPS=[], _CAMPCUR='USD';
+let _CAMPS=[], _CAMPCUR='USD', _LIVEBYID={}, _EVOL=[], _EVOLMETRIC='gasto', _PAUTABUSY=false, _PAUTAAT='';
 function audTxt(a){ a=a||{}; const p=[];
   if(a.ubicaciones&&a.ubicaciones.length) p.push(a.ubicaciones.map(u=>esc(u.nombre)+(u.radio_km?` (+${u.radio_km}km)`:'')).join(', '));
   if(a.edad_min||a.edad_max) p.push(`${a.edad_min||18}–${a.edad_max||65} años`);
@@ -643,29 +643,84 @@ function presTxt(p,cur){ p=p||{}; if(!p.monto) return '—'; return money(p.mont
 function campThumb(c){ const u=(c.pieza_tipo==='video'&&c.pieza_poster)?c.pieza_poster:c.pieza_url; return u?`<img class="camp-thumb" src="${esc(u)}" onerror="this.style.visibility='hidden'">`:'<span class="camp-thumb ph"></span>'; }
 function campCard(c){
   const [lbl,cls]=CAMP_EST[c.estado]||[c.estado,''];
+  const lv=c.meta_campaign_id?_LIVEBYID[c.meta_campaign_id]:null;   // métricas en vivo de Meta
+  const metr=lv?`<div class="camp-m"><span>Gasto <b>${money(lv.gasto,_CAMPCUR)}</b></span><span>Alcance <b>${nf(lv.alcance)}</b></span><span>Impresiones <b>${nf(lv.impresiones)}</b></span><span>Clics <b>${nf(lv.clics)}</b></span><span>CTR <b>${pct(lv.ctr)}</b></span></div>`:'';
   return `<a class="camp cclick" href="#" onclick="openCamp('${c.id}');return false;">
     <div class="camp-top">${campThumb(c)}<div style="flex:1;min-width:0">
       <div class="camp-name">${esc(c.nombre)}</div>
       <div class="camp-m2">${OBJ[c.objetivo]||esc(c.objetivo)} · ${presTxt(c.presupuesto,_CAMPCUR)} · ${c.pieza_numero?'CF-'+pad4(c.pieza_numero):'sin creativo'}</div>
     </div><span class="st ${cls}">${lbl}</span></div>
-    ${c.resumen?`<div class="camp-res">${esc(c.resumen)}</div>`:''}
+    ${metr}${c.resumen?`<div class="camp-res">${esc(c.resumen)}</div>`:''}
   </a>`;
+}
+// Gráfico de evolución diaria (SVG inline, sin librerías; respeta CSP del panel).
+const EVOL_METRICS={gasto:['Gasto',v=>money(v,_CAMPCUR)],alcance:['Alcance',nf],clics:['Clics',nf],impresiones:['Impresiones',nf]};
+function evolSVG(rows, metric){
+  const vals=rows.map(r=>Number(r[metric]||0));
+  const max=Math.max(1,...vals);
+  const W=680,H=150,pb=22,pl=4,pr=4,gap=2;
+  const n=rows.length, bw=Math.max(3,(W-pl-pr)/n-gap);
+  let bars='';
+  rows.forEach((r,i)=>{
+    const v=Number(r[metric]||0), bh=Math.round((v/max)*(H-pb-6));
+    const x=pl+i*((W-pl-pr)/n), y=H-pb-bh;
+    bars+=`<rect x="${x.toFixed(1)}" y="${y}" width="${bw.toFixed(1)}" height="${Math.max(0,bh)}" rx="1.5" fill="var(--ember)" opacity="${v>0?0.9:0.18}"><title>${r.fecha}: ${EVOL_METRICS[metric][1](v)}</title></rect>`;
+  });
+  const first=rows[0]?.fecha||'', last=rows[rows.length-1]?.fecha||'';
+  const fmt=s=>{ const d=new Date(s+'T00:00:00'); return isNaN(d)?s:d.toLocaleDateString('es-AR',{day:'2-digit',month:'short'}); };
+  return `<svg viewBox="0 0 ${W} ${H}" class="evol-svg" preserveAspectRatio="none">${bars}
+    <text x="${pl}" y="${H-6}" class="evol-x">${fmt(first)}</text>
+    <text x="${W-pr}" y="${H-6}" text-anchor="end" class="evol-x">${fmt(last)}</text></svg>`;
+}
+function renderEvol(){
+  const box=document.getElementById('pauta-evol'); if(!box) return;
+  const rows=_EVOL||[];
+  const hasData=rows.some(r=>(r.gasto||r.impresiones||r.alcance||r.clics));
+  if(!rows.length || !hasData){ box.innerHTML=`<div class="pauta-h3">Evolución</div><div class="pauta-empty">Todavía no hay datos diarios. Cuando la campaña empiece a registrar actividad (Meta puede tardar unas horas), acá vas a ver la evolución día a día.</div>`; return; }
+  const btns=Object.keys(EVOL_METRICS).map(m=>`<button class="evol-b${m===_EVOLMETRIC?' on':''}" onclick="setEvolMetric('${m}')">${EVOL_METRICS[m][0]}</button>`).join('');
+  const total=rows.reduce((a,r)=>a+Number(r[_EVOLMETRIC]||0),0);
+  box.innerHTML=`<div class="pauta-h3">Evolución <span class="n">${EVOL_METRICS[_EVOLMETRIC][0]}: ${EVOL_METRICS[_EVOLMETRIC][1](total)} (${rows.length}d)</span></div>
+    <div class="evol-tabs">${btns}</div>${evolSVG(rows,_EVOLMETRIC)}`;
+}
+function setEvolMetric(m){ if(EVOL_METRICS[m]){ _EVOLMETRIC=m; renderEvol(); } }
+async function refrescarPauta(){
+  if(_PAUTABUSY) return; _PAUTABUSY=true;
+  const b=document.getElementById('pauta-refresh'); if(b){ b.classList.add('spin'); b.disabled=true; }
+  try{
+    await fetch('api/pauta/refrescar',{method:'POST'});
+    toast('Actualizando desde Meta… (puede tardar hasta 1 minuto)');
+    // Espera a que cambie capturado_en (el worker corre el sync) y recarga.
+    const before=(_PAUTAAT||'');
+    for(let i=0;i<24;i++){ await new Promise(r=>setTimeout(r,3000));
+      const d=await fetch('api/pauta').then(r=>r.json()).catch(()=>null);
+      if(d&&d.capturado_en&&d.capturado_en!==before){ break; }
+    }
+    await loadPauta();
+    toast('Reporte actualizado');
+  }catch(e){ toast('No se pudo actualizar',true); }
+  const b2=document.getElementById('pauta-refresh'); if(b2){ b2.classList.remove('spin'); b2.disabled=false; }
+  _PAUTABUSY=false;
 }
 async function loadPauta(){
   try{
-    const [rp,rc]=await Promise.all([fetch('api/pauta'),fetch('api/campanias')]);
+    const [rp,rc,re]=await Promise.all([fetch('api/pauta'),fetch('api/campanias'),fetch('api/pauta/evolucion').then(r=>r.ok?r.json():[]).catch(()=>[])]);
     if(rp.status===401){ location.href='login'; return; }
     const d=await rp.json();
     const cc=rc.ok?await rc.json():{campanias:[],trabajando:0};
     const el=document.getElementById('pauta'); if(!el) return;
     if(!d || d.configurada===false){ el.innerHTML='<div class="pauta-off">Esta marca todavía no tiene cuenta publicitaria conectada.</div>'; setUpd(); return; }
     const cur=d.moneda||'USD', c=d.cuenta||{}, t=d.totales||{};
-    _CAMPS=cc.campanias||[]; _CAMPCUR=cur;
+    _CAMPS=cc.campanias||[]; _CAMPCUR=cur; _EVOL=Array.isArray(re)?re:[]; _PAUTAAT=d.capturado_en||'';
+    // Métricas en vivo de Meta por id de campaña + dedup: lo que ya es borrador no se repite abajo.
+    const live=d.campanias||[]; _LIVEBYID={}; live.forEach(k=>{ if(k.id) _LIVEBYID[k.id]=k; });
+    const draftMetaIds=new Set(_CAMPS.map(x=>x.meta_campaign_id).filter(Boolean));
+    const liveSolo=live.filter(k=>!draftMetaIds.has(k.id));
     const acctSt = c.estado===1 ? 'ok' : (c.estado>=100 ? 'warn' : '');
     let h=`<div class="pauta-head">
       <div>
         <div class="pauta-acct">${esc(c.nombre||'Cuenta publicitaria')}</div>
-        <div class="pauta-sub"><span class="st ${acctSt}">${esc(c.estado_txt||'—')}</span><span>${esc(cur)}</span>${d.capturado_en?`<span>· actualizado ${hace(d.capturado_en)}</span>`:''}</div>
+        <div class="pauta-sub"><span class="st ${acctSt}">${esc(c.estado_txt||'—')}</span><span>${esc(cur)}</span>${d.capturado_en?`<span>· actualizado ${hace(d.capturado_en)}</span>`:''}
+          <button id="pauta-refresh" class="pauta-rf" title="Actualizar desde Meta ahora" onclick="refrescarPauta()"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i></button></div>
       </div>
       <div class="pauta-spend"><div class="pv">${money(c.gastado_total,cur)}</div><div class="pl">Gastado histórico</div></div>
     </div>
@@ -676,22 +731,24 @@ async function loadPauta(){
       <div class="kpi"><span class="kv">${nf(t.alcance)}</span><span class="kl">Alcance</span></div>
       <div class="kpi"><span class="kv">${nf(t.clics)}</span><span class="kl">Clics</span></div>
       <div class="kpi"><span class="kv">${pct(t.ctr)}</span><span class="kl">CTR</span></div>
-    </div>`;
-    const drafts=_CAMPS, live=d.campanias||[];
-    h+=`<div class="pauta-h3">Campañas <span class="n">${(drafts.length+live.length)||''}</span>
+    </div>
+    <div id="pauta-evol"></div>`;
+    const drafts=_CAMPS;
+    h+=`<div class="pauta-h3">Campañas <span class="n">${(drafts.length+liveSolo.length)||''}</span>
       <button class="picon" title="Pedir una campaña al creativo" onclick="askCampania()"><i data-lucide="plus" class="w-4 h-4"></i></button></div>`;
     if(cc.trabajando>0) h+=`<div class="camp-work"><span class="dotp"></span>El creativo está preparando una campaña…</div>`;
     if(drafts.length) h+=drafts.map(campCard).join('');
-    if(live.length){
-      h+=`<div class="pauta-win">Activas en Meta</div>`+live.map(k=>`<div class="camp">
+    if(liveSolo.length){
+      h+=`<div class="pauta-win">Otras campañas en Meta</div>`+liveSolo.map(k=>`<div class="camp">
         <div class="camp-top"><span class="st ${stClass(k.estado)}">${esc(k.estado_txt)}</span><span class="camp-name">${esc(k.nombre)}</span><span class="camp-obj">${esc(k.objetivo)}</span></div>
         <div class="camp-m"><span>Gasto <b>${money(k.gasto,cur)}</b></span><span>Alcance <b>${nf(k.alcance)}</b></span><span>Impresiones <b>${nf(k.impresiones)}</b></span><span>Clics <b>${nf(k.clics)}</b></span><span>CTR <b>${pct(k.ctr)}</b></span></div>
       </div>`).join('');
     }
-    if(!drafts.length && !live.length && cc.trabajando===0){
+    if(!drafts.length && !liveSolo.length && cc.trabajando===0){
       h+=`<div class="pauta-empty">Todavía no hay campañas. Pedile una al creativo con el botón <b>+</b>: propone objetivo, creativo, público y presupuesto, y vos la aprobás antes de que gaste un peso.</div>`;
     }
     el.innerHTML=h;
+    renderEvol();
     if(window.lucide) lucide.createIcons();
     setUpd();
   }catch(e){ setUpd(); }

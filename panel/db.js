@@ -677,6 +677,21 @@ async function getPauta(proyectoId) {
   return { configurada: true, capturado_en: r.capturado_en, ...r.data };
 }
 
+// Serie diaria para el gráfico de evolución.
+async function getPautaEvolucion(proyectoId) {
+  const { rows } = await pool.query(
+    `SELECT to_char(fecha,'YYYY-MM-DD') AS fecha, gasto::float AS gasto,
+            impresiones::int AS impresiones, alcance::int AS alcance, clics::int AS clics
+       FROM contenido.ads_daily WHERE proyecto_id=$1 ORDER BY fecha`, [proyectoId]);
+  return rows;
+}
+
+// Botón "Actualizar ahora": deja un pedido que el dispatcher consume y corre el sync.
+async function pedirRefrescoPauta() {
+  await pool.query(`INSERT INTO contenido.pauta_sync_req DEFAULT VALUES`);
+  return true;
+}
+
 // --- Campañas de pauta: el creativo propone; Fer aprueba; se crean PAUSADAS en Meta ---
 async function crearSolicitudCampania(proyectoId, instruccion) {
   const { rows: [r] } = await pool.query(
@@ -787,7 +802,7 @@ module.exports = { getMarcas, getProyectoId, getPerfil, guardarPerfil, setLogo, 
   getPantallaActiva, getPantallaPorSlug, getPantallas, crearPantalla, actualizarPantalla, eliminarPantalla, getProgramaActivo,
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
   getLandingCambios, crearLandingCambio, aprobarLanding, rechazarLanding,
-  getAuditoria, getPauta,
+  getAuditoria, getPauta, getPautaEvolucion, pedirRefrescoPauta,
   crearSolicitudCampania, getCampanias, aprobarCampania, rechazarCampania, descartarCampania,
   activarCampania, pausarCampania, reintentarCampania, getCreativosDisponibles, setCreativoCampania,
   health };

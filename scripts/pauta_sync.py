@@ -151,6 +151,39 @@ def build_snapshot(act, token):
     }
 
 
+def fetch_daily(act, token):
+    """Serie diaria (últimos 30d) a nivel cuenta: gasto/impresiones/alcance/clics por jornada."""
+    if not act.startswith("act_"):
+        act = "act_" + act
+    out = []
+    try:
+        ins = graph_get(f"{act}/insights", token, {
+            "time_increment": 1, "date_preset": "last_30d",
+            "fields": "spend,impressions,reach,clicks", "limit": 60})
+        for r in ins.get("data", []):
+            out.append({
+                "fecha": r.get("date_start"),
+                "gasto": round(num(r.get("spend")), 2),
+                "impresiones": int(num(r.get("impressions"))),
+                "alcance": int(num(r.get("reach"))),
+                "clics": int(num(r.get("clicks"))),
+            })
+    except Exception as e:  # noqa: BLE001
+        sys.stderr.write(f"daily: {e}\n")
+    return out
+
+
+def upsert_daily(pid, daily):
+    for d in daily:
+        if not d.get("fecha"):
+            continue
+        psql(
+            "INSERT INTO contenido.ads_daily(proyecto_id,fecha,gasto,impresiones,alcance,clics,actualizado_en) "
+            f"VALUES('{pid}','{d['fecha']}',{d['gasto']},{d['impresiones']},{d['alcance']},{d['clics']},now()) "
+            "ON CONFLICT(proyecto_id,fecha) DO UPDATE SET gasto=EXCLUDED.gasto,impresiones=EXCLUDED.impresiones,"
+            "alcance=EXCLUDED.alcance,clics=EXCLUDED.clics,actualizado_en=now();")
+
+
 def pg_container():
     cid = subprocess.run(["docker", "ps", "-q", "-f", f"name={PG_NAME_FILTER}"],
                          capture_output=True, text=True).stdout.strip()
@@ -202,7 +235,11 @@ def main():
             continue  # marca sin pauta configurada
         try:
             snap = build_snapshot(act, token)
-            upsert(slug, snap)
+            pid = upsert(slug, snap)
+            try:
+                upsert_daily(pid, fetch_daily(act, token))
+            except Exception as e:  # noqa: BLE001
+                sys.stderr.write(f"{slug} daily: {e}\n")
             n = len(snap["campanias"])
             print(f"{slug}: OK ({n} campaña(s), gasto 30d {snap['totales']['gasto']} {snap['moneda']})")
             ok += 1

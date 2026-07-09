@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -115,6 +115,17 @@ def det_campania():
     return jobs
 
 
+def det_pauta_sync():
+    # Refresco de pauta on-demand (botón "Actualizar ahora"): si hay pedidos sin procesar,
+    # los marca y encola UN sync (el script sincroniza todas las marcas configuradas).
+    pend = psql("SELECT count(*) FROM contenido.pauta_sync_req WHERE NOT procesado").strip()
+    if not pend or pend == '0':
+        return []
+    psql("UPDATE contenido.pauta_sync_req SET procesado=true WHERE NOT procesado")
+    return [{"tipo": "pauta_sync", "proyecto_slug": "cortafuego",
+             "payload": {}, "lock_key": "pauta_sync"}]
+
+
 def det_campania_meta():
     # Creación en Meta de campañas aprobadas (aún sin crear) + pedidos de activar/pausar.
     specs = {
@@ -156,12 +167,13 @@ DETECTORS = {
     "bibliotecario": det_bibliotecario,
     "campania": det_campania,
     "campania_meta": det_campania_meta,
+    "pauta_sync": det_pauta_sync,
 }
 
 
 def run():
     encolados = 0
-    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta"):
+    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync"):
         if tipo not in MIGRATED:
             continue
         try:
