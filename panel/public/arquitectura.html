@@ -151,7 +151,7 @@
   <p class="sub">La plataforma de contenido y operaciones multi-marca. Un motor agnóstico de marca que prepara, aprueba y publica contenido con generación asistida por IA, y una cápsula aislada por cada marca.</p>
   <div class="meta">
     <span class="pill">Documento vivo</span>
-    <span class="pill">Actualizado: 2026-06-29</span>
+    <span class="pill">Actualizado: 2026-07-09</span>
     <span class="pill">3 marcas activas</span>
     <span class="pill">Monorepo + 4 submodules</span>
   </div>
@@ -209,7 +209,9 @@
     <div class="card"><h4>Generación IA</h4><p><b>Higgsfield</b> (CLI, plan ultra): imágenes y Reels. Tipografía de marca: HTML → JPG con Chromium/Playwright. La inicia Fer (calidad/NSFW en el loop).</p></div>
     <div class="card"><h4>Orquestación — n8n</h4><p>Webhooks <code>cf-*</code> (paths estables) tras el rebrand a "ClaUsina - X". Crea piezas, notifica, decide, publica, sirve el feed. Postgres + Telegram + Graph API.</p></div>
     <div class="card"><h4>Datos — PostgreSQL</h4><p>Motor <code>crm_pgvector</code>, base propia <code>claude</code>, schema <code>contenido</code> (multi-proyecto). Fuente de verdad de todo el ciclo de contenido.</p></div>
-    <div class="card"><h4>Cola Redis + workers</h4><p>Corrección de rechazos migrándose de cron a <b>cola Redis + worker</b> (piloto Cortafuego). Desacopla el disparo del procesamiento.</p></div>
+    <div class="card"><h4>Cola Redis + workers</h4><p><b>dispatcher</b> (timer, lee la DB) + <b>worker</b> (cola Redis) despachan por tipo: corrección, propuesta, revisión, brief, landing, <b>bibliotecario</b> y <b>campaña / pauta</b>. Desacopla el disparo del procesamiento.</p></div>
+    <div class="card"><h4>Pauta — Meta Ads</h4><p>Publicidad de Instagram vía <b>Marketing API</b> (lectura + escritura). El creativo propone campañas; Fer aprueba → se crean <b>pausadas</b> en Meta → activar / pausar / descartar. Reporte + evolución diaria por <code>cf-pauta-sync</code>. Nada gasta sin aprobación.</p></div>
+    <div class="card"><h4>Biblioteca + Bibliotecario</h4><p>DAM por marca (taller: en proceso/terminado · del sistema: piezas/marca). Subida por streaming con <b>compresión de video</b> (ffmpeg). El <b>bibliotecario</b> genera/edita assets con IA (Higgsfield/ffmpeg), sin publicar.</p></div>
     <div class="card"><h4>Presentación — landings</h4><p>Sitios estáticos por marca (Cloudflare). <code>index.html</code> con SEO/JSON-LD; <code>preview.html</code> (aprobación) y feed de novedades vía proxy same-origin a n8n.</p></div>
     <div class="card"><h4>Canales de salida</h4><p>Instagram (Graph API), pantalla DOOH (VNNOX, Paseo Ardora), web (novedades), Telegram (operación/avisos a Fer).</p></div>
     <div class="card"><h4>Media store</h4><p>Dos niveles: store central <code>clausina-media</code> (interno/trabajo, <code>panel.clausina.ar/media</code>) + CDN de marca (público).</p></div>
@@ -270,7 +272,8 @@
   <h2>5 · Canales</h2>
   <p class="lead">Un intake único (la Cola de Requerimientos, agnóstica del canal) separa el <b>qué</b> del <b>dónde</b>. La misma máquina de estados y aprobación vale para todos los canales.</p>
   <div class="grid g2">
-    <div class="card"><h4>Instagram</h4><p>Feed, carrusel, Reels e Historias vía <b>Graph API</b>. Aprobar → <code>cf-pub-publish</code>. Métricas y Collab en el panel. Token IG en credencial cifrada de n8n (no en git ni en la DB).</p></div>
+    <div class="card"><h4>Instagram</h4><p>Feed, carrusel, Reels e Historias vía <b>Graph API</b>. Aprobar → <code>cf-pub-publish</code>. Métricas y <b>colaboradores</b> por publicación en el panel. Token IG en credencial cifrada de n8n (no en git ni en la DB).</p></div>
+    <div class="card"><h4>Pauta Instagram (Meta Ads)</h4><p>Publicidad por <b>Marketing API</b>. El creativo propone campañas (objetivo, creativo = post publicado, público, presupuesto); Fer aprueba → se crean <b>pausadas</b> → activar/pausar. Reporte + gráfico de evolución. Secretos de ads en <code>&lt;slug&gt;.env</code>; <b>nada gasta sin aprobación</b>.</p></div>
     <div class="card"><h4>Pantalla DOOH (Paseo Ardora)</h4><p>Cartel de calle vertical (2×3 m, mudo). El <code>/editor</code> arma spots 2:3 ~10s. Aprobar = "en pantalla". Integración <b>VNNOX</b> (botón "A la pantalla", device T1-4G).</p></div>
     <div class="card"><h4>Web / Novedades</h4><p>Landings estáticas en Cloudflare. El feed de novedades hace fetch a <code>cf-novedades</code> (n8n → DB) y renderiza; al publicar una pieza aparece sola, sin redeploy. Home conserva su SEO estático.</p></div>
     <div class="card"><h4>Telegram</h4><p>Canal operativo: tarjetas de aprobación con botones, ingreso de briefs por voz/foto y avisos a Fer. Workflow <code>cf-telegram</code> + bot.</p></div>
@@ -314,6 +317,8 @@
     <li><b>Trazabilidad del loop:</b> cada corrección es una revisión nueva (<code>nro+1</code>) bajo la misma pieza; el texto queda como historial, la media se reemplaza (no acumula peso).</li>
     <li><b>Estados</b> (<code>estado_pub</code>): borrador → pendiente_aprobacion → aprobada → publicada · más rechazada y descartada. <code>derivado_en</code> marca lo escalado a Fer.</li>
     <li><b>Triggers:</b> <code>sync_pieza</code> mantiene <code>estado</code> y <code>revision_vigente</code> de la pieza. DDL en <code>scripts/db/</code>.</li>
+    <li><b>Pauta:</b> <code>ads_snapshot</code> + <code>ads_daily</code> (reporte y evolución), <code>campanias</code> + <code>solicitudes_campania</code> (propuestas y creación en Meta), <code>pauta_sync_req</code> (refresco on-demand). Secretos de ads en <code>marcas/&lt;slug&gt;/&lt;slug&gt;.env</code>, nunca en la DB.</li>
+    <li><b>Biblioteca:</b> <code>biblioteca_carpeta</code> + <code>biblioteca_item</code> (DAM) y <code>solicitudes_biblioteca</code> (bibliotecario). El material adjunto a un pedido de propuestas vive en <code>solicitud_propuesta_material</code> y se traslada al requerimiento generado.</li>
   </ul>
 </div></section>
 
@@ -373,6 +378,9 @@
   <table class="chg">
     <thead><tr><th>Fecha</th><th>Cambio</th></tr></thead>
     <tbody>
+      <tr><td>2026-07-08</td><td><b>Pauta / Meta Ads.</b> Publicidad de Instagram vía <b>Marketing API</b>: reporte de cuenta + campañas, el creativo <b>propone campañas</b> (objetivo, creativo = post publicado, público, presupuesto), Fer aprueba → se crean <b>pausadas</b> en Meta → activar / pausar / descartar (borra en Meta). <b>Evolución diaria</b> (gráfico) + botón "Actualizar ahora" (pedido → dispatcher → sync). Receta validada v21.0 (creativo desde post existente: <code>object_id</code> + <code>instagram_user_id</code> + <code>source_instagram_media_id</code> + CTA). Tablas <code>ads_snapshot</code>/<code>ads_daily</code>/<code>campanias</code>/<code>solicitudes_campania</code>/<code>pauta_sync_req</code>; nuevos jobs <code>campania</code>/<code>campania_meta</code>/<code>pauta_sync</code>.</td></tr>
+      <tr><td>2026-07-05</td><td><b>Biblioteca de medios (DAM) + Bibliotecario.</b> Biblioteca por marca: taller (en proceso/terminado) + del sistema (piezas/marca), subida por streaming con <b>compresión de video</b> (ffmpeg en <code>core/Dockerfile</code>, el que usa EasyPanel). El <b>bibliotecario</b> crea/edita assets con IA (Higgsfield/ffmpeg) sin publicar. Propuestas del creativo con <b>material adjunto</b> (disco o biblioteca). <b>Colaboradores</b> de IG por publicación (elegidos al aprobar). Bitácora "cómo se generó" por pieza. Loop "pedir nueva versión" en propuestas.</td></tr>
+      <tr><td>2026-07-08</td><td><b>Robustez y UX.</b> <code>callWebhook</code> reintenta ante DNS intermitente a n8n (<code>EAI_AGAIN</code> / "fetch failed"); "En cola" del proyecto ya no cuenta piezas ya generadas (evita doble conteo con "Por aprobar"); pastillas ordenadas por flujo (Propuestas → En cola → Por aprobar → Publicadas); acceso a Biblioteca como ícono + tarjeta "Pauta Instagram".</td></tr>
       <tr><td>2026-06-29</td><td><b>Sistema de marca ClaUsina + rediseño del panel.</b> Identidad nueva (logo "U en órbita" + favicon, lima/coral, Inter Tight/JetBrains Mono, dual dark/light). Panel migrado a un <b>shell reutilizable</b> (<code>shell.js</code>: sidebar + selector de marca funcional) con <b>Tailwind compilado</b> (<code>tw.css</code> commiteado, sin tocar el build). Dashboard, Sala de máquinas y Arquitectura en dark/light; páginas de contenido en dark. Lineamiento en <code>core/planes/SISTEMA_MARCA.md</code> y styleguide vivo en <code>/estilo</code>. Reorganización de <code>/proyecto</code> (pastillas con acción, cola en modal, propuestas en página propia).</td></tr>
       <tr><td>2026-06-23</td><td>Contexto de marca en 3 capas: <b>motor + guardrails</b> en el <code>CLAUDE.md</code> raíz (compartido, código); <b>voz/identidad</b> en <code>contexto/CONTEXTO_MARCA.md</code> (desde la base, editable en el panel); <b>lo propio de la marca</b> en un <code>CLAUDE.md</code> de cápsula fino. Se deduplicó el motor que se repetía en cada marca.</td></tr>
       <tr><td>2026-06-23</td><td>Orden de carpetas: la raíz <code>claudefolder</code> pasó a <code>clausina</code> y el motor <code>plataforma/</code> a <code>core/</code> (coincide con el repo <code>clausina-core</code>). Symlink de compatibilidad mientras la sesión viva corre desde la ruta vieja.</td></tr>
