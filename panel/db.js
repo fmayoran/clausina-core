@@ -80,7 +80,11 @@ async function guardarPerfil(proyectoId, d) {
      WHERE proyecto_id=$1`,
     [proyectoId, nn(d.meta_ads_account_id), nn(d.meta_ads_page_id), nn(d.meta_ads_ig_id)]);
   if (tokEnc) await pool.query('UPDATE contenido.proyecto_perfil SET meta_ads_token_enc=$2 WHERE proyecto_id=$1', [proyectoId, tokEnc]);
-  if (igTokEnc) await pool.query('UPDATE contenido.proyecto_perfil SET ig_token_enc=$2 WHERE proyecto_id=$1', [proyectoId, igTokEnc]);
+  if (igTokEnc) {
+    await pool.query('UPDATE contenido.proyecto_perfil SET ig_token_enc=$2 WHERE proyecto_id=$1', [proyectoId, igTokEnc]);
+    // La DB es la fuente de verdad: pedimos regenerar los secretos derivados (credencial de n8n).
+    await pool.query('INSERT INTO contenido.secrets_sync_req (slug) SELECT slug FROM contenido.proyectos WHERE id=$1', [proyectoId]);
+  }
   _marcasAt = 0;   // el nombre pudo cambiar -> refrescar cache de marcas
   return true;
 }

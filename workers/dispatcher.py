@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -115,6 +115,20 @@ def det_campania():
     return jobs
 
 
+def det_secrets_sync():
+    # La DB es la fuente de verdad: cuando cambia un token en el perfil, regeneramos los
+    # secretos derivados (hoy: credencial de IG en n8n). Un job por marca pedida.
+    jobs = []
+    for row in _lines("SELECT DISTINCT slug FROM contenido.secrets_sync_req WHERE NOT procesado"):
+        slug = row.strip()
+        if slug:
+            jobs.append({"tipo": "secrets_sync", "proyecto_slug": slug,
+                         "payload": {"slug": slug}, "lock_key": f"secrets_sync:{slug}"})
+    if jobs:
+        psql("UPDATE contenido.secrets_sync_req SET procesado=true WHERE NOT procesado")
+    return jobs
+
+
 def det_pauta_sync():
     # Refresco de pauta on-demand (botón "Actualizar ahora"): si hay pedidos sin procesar,
     # los marca y encola UN sync (el script sincroniza todas las marcas configuradas).
@@ -168,12 +182,13 @@ DETECTORS = {
     "campania": det_campania,
     "campania_meta": det_campania_meta,
     "pauta_sync": det_pauta_sync,
+    "secrets_sync": det_secrets_sync,
 }
 
 
 def run():
     encolados = 0
-    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync"):
+    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync"):
         if tipo not in MIGRATED:
             continue
         try:
