@@ -44,6 +44,86 @@ async function getPerfil(proyectoId) {
   return r || {};
 }
 
+// --- Capacidades por marca ---------------------------------------------------------------
+// No toda marca usa toda la plataforma. Estado = flag explícito (habilitada) + configuración
+// VERIFICADA contra la config real (no se guarda, así el flag no puede mentir).
+// Siempre activas (no son capacidades): identidad, brief, biblioteca.
+const CAPS = [
+  { id: 'estilo',    label: 'Estilo de marca',    icon: 'palette',           href: 'estilo',    desc: 'Sistema de diseño e identidad visual' },
+  { id: 'instagram', label: 'Instagram',          icon: 'instagram',         href: 'instagram', desc: 'Publicaciones del feed' },
+  { id: 'pauta',     label: 'Pauta Instagram',    icon: 'badge-dollar-sign', href: 'pauta',     desc: 'Publicidad y pauta (Meta Ads)', depende: ['instagram'] },
+  { id: 'pantalla',  label: 'Avisos en pantalla', icon: 'megaphone',         href: 'avisos',    desc: 'Avisos para la pantalla de calle' },
+  { id: 'web',       label: 'Web / Landing',      icon: 'globe',             href: 'landing',   desc: 'Sitio de la marca' },
+];
+
+function evaluarCap(cap, d, cfg) {
+  const faltan = [];
+  if (cap.id === 'estilo') {
+    if ((d.estilo_md || '').length <= 20) faltan.push('sistema de diseño');
+  } else if (cap.id === 'instagram') {
+    if (!d.ig_handle) faltan.push('cuenta @');
+    if (!d.ig_user_id) faltan.push('IG user id');
+    if (!d.ig_token_enc) faltan.push('token de Instagram');
+  } else if (cap.id === 'pauta') {
+    if (!d.meta_ads_account_id) faltan.push('ad account id');
+    if (!d.meta_ads_page_id) faltan.push('page id');
+    if (!d.meta_ads_ig_id) faltan.push('IG account id (ads)');
+    if (!d.meta_ads_token_enc) faltan.push('token de Meta Ads');
+  } else if (cap.id === 'web') {
+    if (!d.dominio_web) faltan.push('dominio');
+    if (!cfg.modo) faltan.push('modo (administrada o referencia)');
+  }
+  // 'pantalla' no requiere config extra: la pantalla es un recurso del sistema.
+  return { configurada: faltan.length === 0, faltan };
+}
+
+async function getCapacidades(proyectoId) {
+  const { rows: [d] } = await pool.query(
+    `SELECT p.ig_handle, p.ig_user_id, p.dominio_web, pp.estilo_md, pp.ig_token_enc,
+            pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id, pp.meta_ads_token_enc
+       FROM contenido.proyectos p LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id
+      WHERE p.id=$1`, [proyectoId]);
+  const { rows } = await pool.query(
+    'SELECT capacidad, habilitada, config FROM contenido.proyecto_capacidad WHERE proyecto_id=$1', [proyectoId]);
+  const byId = {}; rows.forEach(r => { byId[r.capacidad] = r; });
+  return CAPS.map(c => {
+    const fila = byId[c.id] || { habilitada: false, config: {} };
+    const cfg = fila.config || {};
+    const ev = evaluarCap(c, d || {}, cfg);
+    return { id: c.id, label: c.label, icon: c.icon, href: c.href, desc: c.desc,
+             depende: c.depende || [], habilitada: !!fila.habilitada, config: cfg, ...ev };
+  });
+}
+
+async function setCapacidad(proyectoId, capId, { habilitada, config }) {
+  const cap = CAPS.find(c => c.id === capId);
+  if (!cap) return { ok: false, error: 'capacidad_desconocida' };
+  if (habilitada && (cap.depende || []).length) {
+    const { rows } = await pool.query(
+      'SELECT capacidad FROM contenido.proyecto_capacidad WHERE proyecto_id=$1 AND habilitada', [proyectoId]);
+    const on = new Set(rows.map(r => r.capacidad));
+    const falta = cap.depende.filter(x => !on.has(x));
+    if (falta.length) return { ok: false, error: 'depende', depende: falta };
+  }
+  await pool.query(
+    `INSERT INTO contenido.proyecto_capacidad (proyecto_id, capacidad, habilitada, config, actualizado_en)
+       VALUES ($1,$2,$3,COALESCE($4::jsonb,'{}'::jsonb), now())
+     ON CONFLICT (proyecto_id, capacidad) DO UPDATE SET habilitada=$3,
+       config = CASE WHEN $4 IS NULL THEN contenido.proyecto_capacidad.config ELSE $4::jsonb END,
+       actualizado_en = now()`,
+    [proyectoId, capId, !!habilitada, config ? JSON.stringify(config) : null]);
+  // Cascada: apagar una capacidad apaga las que dependen de ella.
+  if (!habilitada) {
+    const dependientes = CAPS.filter(c => (c.depende || []).includes(capId)).map(c => c.id);
+    if (dependientes.length) {
+      await pool.query(
+        `UPDATE contenido.proyecto_capacidad SET habilitada=false, actualizado_en=now()
+          WHERE proyecto_id=$1 AND capacidad = ANY($2::text[])`, [proyectoId, dependientes]);
+    }
+  }
+  return { ok: true };
+}
+
 // Token de IG de una marca desde el perfil (descifrado), o null. Lo usa el panel (menciones/métricas).
 async function getIgToken(slug) {
   try {
@@ -831,6 +911,7 @@ async function health() {
 }
 
 module.exports = { getMarcas, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
+  getCapacidades, setCapacidad,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,

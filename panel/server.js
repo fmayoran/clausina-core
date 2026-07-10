@@ -196,6 +196,19 @@ app.get('/api/maquinas', async (req, res) => {
 });
 
 // Perfil del proyecto (registro de marca, por marca activa). Lo consume el creativo.
+// Capacidades de la marca activa: qué funcionalidades usa (habilitada) y si están configuradas.
+app.get('/api/capacidades', async (req, res) => {
+  try { res.json(await db.getCapacidades(req.proyectoId)); }
+  catch (e) { console.error('capacidades', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/capacidades/:cap', async (req, res) => {
+  try {
+    const b = req.body || {};
+    const r = await db.setCapacidad(req.proyectoId, req.params.cap, { habilitada: !!b.habilitada, config: b.config });
+    res.status(r.ok ? 200 : 409).json(r);
+  } catch (e) { console.error('capacidad-set', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+
 app.get('/api/perfil', async (req, res) => {
   try { res.json(await db.getPerfil(req.proyectoId)); }
   catch (e) { console.error('perfil', e.message); res.status(500).json({ error: 'db' }); }

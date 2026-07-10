@@ -30,7 +30,7 @@
     var cls = on
       ? 'on flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm transition'
       : 'flex items-center gap-3 px-2.5 py-2 rounded-lg text-sm text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg hover:bg-black/5 dark:hover:bg-white/5 transition';
-    return '<a href="' + it.href + '" class="' + cls + '"><i data-lucide="' + it.icon + '" class="w-4 h-4 shrink-0"></i><span class="nlabel">' + it.label + '</span></a>';
+    return '<a href="' + it.href + '" data-nav="' + it.id + '" class="' + cls + '"><i data-lucide="' + it.icon + '" class="w-4 h-4 shrink-0"></i><span class="nlabel">' + it.label + '</span></a>';
   }
 
   function nav(active) {
@@ -106,7 +106,18 @@
     opts = opts || {};
     var shell = document.querySelector('.shell');
     if (!shell) return;
+    if (!document.getElementById('cap-style')) {
+      var st = document.createElement('style'); st.id = 'cap-style';
+      st.textContent = '.nav-off{opacity:.42;} .nav-off:hover{opacity:.62;}' +
+        '.capguard{margin:40px 28px;padding:28px 26px;border:1px dashed #20242B;border-radius:12px;max-width:620px;}' +
+        '.capguard h2{font-size:1.4rem;font-weight:800;color:#F5F2EC;margin:0 0 8px;}' +
+        '.capguard p{color:#8A8F98;line-height:1.45;margin:0 0 16px;}' +
+        '.capguard a{display:inline-block;background:#CCF24D;color:#0c0c0a;font-weight:700;padding:9px 16px;border-radius:8px;text-decoration:none;}';
+      document.head.appendChild(st);
+    }
     shell.insertAdjacentHTML('afterbegin', html(opts.active || ''));
+    marcarCapacidades();
+    if (opts.cap) guardarCapacidad(opts.cap);
     // Páginas de contenido (panel.css) son dark-only: forzar dark y ocultar el toggle.
     if (opts.darkOnly) {
       document.documentElement.classList.add('dark');
@@ -145,6 +156,37 @@
       }
     }).catch(function () {});
   };
+
+  // Grisa en el menú las capacidades que la marca activa tiene deshabilitadas (siguen visibles:
+  // se habilitan desde el panel del proyecto). nav id -> capacidad.
+  var NAV_CAP = { instagram: 'instagram', pauta: 'pauta', avisos: 'pantalla', landing: 'web' };
+  function marcarCapacidades() {
+    fetch('api/capacidades').then(function (r) { return r.ok ? r.json() : null; }).then(function (caps) {
+      if (!caps) return;
+      var off = {};
+      caps.forEach(function (c) { if (!c.habilitada) off[c.id] = true; });
+      Object.keys(NAV_CAP).forEach(function (navId) {
+        if (!off[NAV_CAP[navId]]) return;
+        var a = document.querySelector('[data-nav="' + navId + '"]');
+        if (a) { a.classList.add('nav-off'); a.title = 'Deshabilitada — habilitala en el panel del proyecto'; }
+      });
+    }).catch(function () {});
+  }
+
+  // Guarda: si la capacidad de esta página está deshabilitada para la marca activa, mostramos
+  // el aviso para habilitarla en vez del contenido (evita páginas vacías o rotas).
+  function guardarCapacidad(capId) {
+    fetch('api/capacidades').then(function (r) { return r.ok ? r.json() : null; }).then(function (caps) {
+      if (!caps) return;
+      var c = caps.find(function (x) { return x.id === capId; });
+      if (!c || c.habilitada) return;
+      var main = document.querySelector('.shell main');
+      if (!main) return;
+      main.innerHTML = '<div class="capguard"><h2>' + esc(c.label) + ' está deshabilitada</h2>' +
+        '<p>Esta marca no tiene activada esta capacidad. Podés habilitarla desde el panel del proyecto ' +
+        'y completar su configuración.</p><a href="proyecto">Ir al panel del proyecto</a></div>';
+    }).catch(function () {});
+  }
 
   function esc(s) { return (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
   window.ClausinaSetMarca = function (slug) {

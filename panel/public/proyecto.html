@@ -62,6 +62,17 @@
   .proj-right .md{line-height:1.35;}
   .proj-right .mn{font-size:.8rem;margin-top:auto;padding-top:8px;}
   .menucard .mn.alert{color:var(--alarm);font-weight:700;}
+  /* Capacidades: pastilla grisada cuando está deshabilitada, con ícono para habilitarla */
+  .menucard.cap{position:relative;}
+  .capbtn{position:absolute;top:12px;right:12px;display:grid;place-items:center;width:28px;height:28px;border-radius:8px;
+    border:1px solid var(--line);background:transparent;color:var(--ash);cursor:pointer;transition:.15s;z-index:2;opacity:0;}
+  .menucard.cap:hover .capbtn{opacity:1;}
+  .menucard.capoff .capbtn{opacity:1;border-color:var(--ember);color:var(--ember);}
+  .capbtn:hover{border-color:var(--fire);color:var(--fire);}
+  .menucard.capoff{opacity:.45;border-style:dashed;cursor:default;}
+  .menucard.capoff:hover{border-color:var(--line);}
+  .menucard.capoff::before{background:transparent!important;}
+  .menucard.capoff .mn{color:var(--ash);}
 
   /* Caja "pedir propuestas" dentro de la sección Propuestas */
   .askbox{margin:12px;padding:13px 14px 14px;background:#0c0c0a;border:1px dashed #1d3a44;border-radius:8px;display:flex;flex-direction:column;gap:9px;}
@@ -129,13 +140,8 @@
     </div>
 
     <aside class="proj-right" id="sec-canales">
-      <h3 class="sech">Canales del proyecto</h3>
-      <div class="chan-grid">
-        <a class="menucard" href="instagram"><span class="mt">Instagram</span><span class="md">Publicaciones del feed</span><span class="mn" id="mc-ig"></span></a>
-        <a class="menucard" href="pauta"><span class="mt">Pauta Instagram</span><span class="md">Publicidad y pauta (Meta Ads)</span><span class="mn" id="mc-pauta"></span></a>
-        <a class="menucard" href="avisos"><span class="mt">Avisos pantalla</span><span class="md">Avisos para la pantalla de calle</span><span class="mn" id="mc-av"></span></a>
-        <a class="menucard" href="landing"><span class="mt">Web / Landing</span><span class="md">Cambios en la landing del proyecto</span><span class="mn" id="mc-web"></span></a>
-      </div>
+      <h3 class="sech">Capacidades de la marca</h3>
+      <div class="chan-grid" id="caps-grid"></div>
     </aside>
   </div>
 
@@ -213,22 +219,66 @@
   function closeCola(){ document.getElementById('colamodal').classList.add('hidden'); }
   window.afterProponer = closeAsk;
   currentLoad=loadCola; loadCola(); setInterval(loadCola,6000);
-  // Resumen de pauta (tarjeta "Avisos Instagram").
-  Promise.all([
-    fetch('api/pauta').then(r=>r.ok?r.json():null).catch(()=>null),
-    fetch('api/campanias').then(r=>r.ok?r.json():null).catch(()=>null)
-  ]).then(([pa,ca])=>{
+  // ---- Capacidades de la marca: pastillas con estado (activa / falta configurar / deshabilitada) ----
+  // Cada capacidad que está habilitada Y configurada conserva su id de indicador (mc-*), para que
+  // los contadores existentes la sigan llenando. Las demás muestran su propio estado.
+  const MC={instagram:'mc-ig', pauta:'mc-pauta', pantalla:'mc-av', web:'mc-web'};
+  const HREF_CFG={instagram:'perfil', pauta:'perfil', web:'perfil', estilo:'perfil', pantalla:'avisos'};
+  let _CAPS=[];
+  function capCard(c){
+    const off=!c.habilitada;
+    const href = off ? '#' : (c.configurada ? c.href : (HREF_CFG[c.id]||c.href));
+    const mnId = (!off && c.configurada && MC[c.id]) ? ` id="${MC[c.id]}"` : '';
+    const mn = off ? 'Deshabilitada'
+      : (c.configurada ? '' : 'Falta configurar: '+c.faltan.join(', '));
+    const icon = off
+      ? `<button class="capbtn" title="Habilitar ${c.label}" onclick="event.preventDefault();event.stopPropagation();toggleCap('${c.id}',true)"><i data-lucide="power" class="w-4 h-4"></i></button>`
+      : `<button class="capbtn on" title="Deshabilitar ${c.label}" onclick="event.preventDefault();event.stopPropagation();toggleCap('${c.id}',false)"><i data-lucide="power-off" class="w-4 h-4"></i></button>`;
+    return `<a class="menucard cap${off?' capoff':''}" href="${href}"${off?' onclick="return false;"':''}>
+      ${icon}
+      <span class="mt">${c.label}</span><span class="md">${c.desc}</span>
+      <span class="mn${(!off&&!c.configurada)?' alert':''}"${mnId}>${mn}</span></a>`;
+  }
+  async function cargarCaps(){
+    try{
+      const r=await fetch('api/capacidades'); if(!r.ok) return;
+      _CAPS=await r.json();
+      document.getElementById('caps-grid').innerHTML=_CAPS.map(capCard).join('');
+      lucide.createIcons();
+      pintarPauta();
+      if(typeof updateMenuCounts==='function') updateMenuCounts();
+    }catch(e){}
+  }
+  async function toggleCap(id, on){
+    const c=_CAPS.find(x=>x.id===id);
+    if(!on && !confirm(`Deshabilitar "${c?c.label:id}" para esta marca. ¿Confirmás?`)) return;
+    try{
+      const r=await fetch('api/capacidades/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({habilitada:on})});
+      const d=await r.json();
+      if(d.ok){ toast(on?'Capacidad habilitada':'Capacidad deshabilitada'); cargarCaps(); }
+      else if(d.error==='depende'){ toast('Primero habilitá: '+d.depende.join(', '), true); }
+      else toast('No se pudo cambiar', true);
+    }catch(e){ toast('Error de conexión', true); }
+  }
+  // Resumen de pauta en su pastilla (solo si está habilitada y configurada).
+  function pintarPauta(){
     const e=document.getElementById('mc-pauta'); if(!e) return;
-    if(pa && pa.configurada===false){ e.textContent='No configurada'; return; }
-    const camps=(ca&&ca.campanias)||[];
-    const prop=camps.filter(c=>c.estado==='propuesta').length;
-    const act=camps.filter(c=>c.estado==='activa').length;
-    const cur=(pa&&pa.moneda)||'USD';
-    const gasto=(pa&&pa.totales&&pa.totales.gasto)||0;
-    if(prop>0){ e.textContent=`${prop} propuesta${prop>1?'s':''} por revisar`; e.classList.add('alert'); }
-    else if(act>0){ e.textContent=`${act} activa${act>1?'s':''} · ${typeof money==='function'?money(gasto,cur):gasto+' '+cur} (30d)`; }
-    else { e.textContent='Sin campañas — pedí una'; }
-  }).catch(()=>{});
+    Promise.all([
+      fetch('api/pauta').then(r=>r.ok?r.json():null).catch(()=>null),
+      fetch('api/campanias').then(r=>r.ok?r.json():null).catch(()=>null)
+    ]).then(([pa,ca])=>{
+      if(!pa || pa.configurada===false){ e.textContent='No configurada'; return; }
+      const camps=(ca&&ca.campanias)||[];
+      const prop=camps.filter(c=>c.estado==='propuesta').length;
+      const act=camps.filter(c=>c.estado==='activa').length;
+      const cur=(pa&&pa.moneda)||'USD';
+      const gasto=(pa&&pa.totales&&pa.totales.gasto)||0;
+      if(prop>0){ e.textContent=`${prop} propuesta${prop>1?'s':''} por revisar`; e.classList.add('alert'); }
+      else if(act>0){ e.textContent=`${act} activa${act>1?'s':''} · ${typeof money==='function'?money(gasto,cur):gasto+' '+cur} (30d)`; }
+      else { e.textContent='Sin campañas — pedí una'; }
+    }).catch(()=>{});
+  }
+  cargarCaps();
   lucide.createIcons();
 </script>
 </body>
