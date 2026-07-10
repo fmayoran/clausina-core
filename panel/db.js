@@ -95,6 +95,38 @@ async function getCapacidades(proyectoId) {
   });
 }
 
+// Alta de marca desde el panel (wizard). Crea proyecto + perfil + capacidades y ENCOLA el
+// scaffold de la cápsula (artefacto derivado de la DB). No toca el disco directamente.
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
+async function crearMarca(d) {
+  const nombre = (d.nombre || '').trim();
+  const slug = (d.slug || '').trim().toLowerCase();
+  if (!nombre) return { ok: false, error: 'nombre_requerido' };
+  if (!SLUG_RE.test(slug)) return { ok: false, error: 'slug_invalido' };
+  const dup = await pool.query('SELECT 1 FROM contenido.proyectos WHERE slug=$1', [slug]);
+  if (dup.rowCount) return { ok: false, error: 'slug_duplicado' };
+  // Capacidades elegidas + sus dependencias (pauta arrastra instagram).
+  const set = new Set(Array.isArray(d.capacidades) ? d.capacidades : []);
+  CAPS.forEach(c => { if (set.has(c.id)) (c.depende || []).forEach(x => set.add(x)); });
+
+  const { rows: [p] } = await pool.query(
+    'INSERT INTO contenido.proyectos (slug, nombre) VALUES ($1,$2) RETURNING id', [slug, nombre]);
+  await pool.query(
+    'INSERT INTO contenido.proyecto_perfil (proyecto_id, slogan, brief_md, actualizado_en) VALUES ($1,$2,$3, now())',
+    [p.id, (d.slogan || '').trim() || null, (d.brief_md || '').trim() || null]);
+  for (const cap of CAPS) {
+    const on = set.has(cap.id);
+    const config = (cap.id === 'web' && on) ? { modo: (d.web_modo === 'administrada' ? 'administrada' : 'referencia') } : {};
+    await pool.query(
+      `INSERT INTO contenido.proyecto_capacidad (proyecto_id, capacidad, habilitada, config)
+         VALUES ($1,$2,$3,$4::jsonb) ON CONFLICT DO NOTHING`,
+      [p.id, cap.id, on, JSON.stringify(config)]);
+  }
+  await pool.query("INSERT INTO contenido.marca_capsula_req (slug, accion) VALUES ($1,'scaffold')", [slug]);
+  _marcasAt = 0;
+  return { ok: true, slug };
+}
+
 // Vista de agencia: todas las marcas con el estado de cada capacidad (grilla marca × capacidad).
 async function getCapacidadesTodas() {
   const marcas = await getMarcas();
@@ -922,7 +954,7 @@ async function health() {
 }
 
 module.exports = { getMarcas, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
-  getCapacidades, getCapacidadesTodas, setCapacidad,
+  getCapacidades, getCapacidadesTodas, setCapacidad, crearMarca,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,

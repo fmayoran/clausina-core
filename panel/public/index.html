@@ -51,12 +51,153 @@
   </main>
 </div>
 
+<!-- Wizard: sumá una marca -->
+<div id="wiz" class="wiz-ov" style="display:none">
+  <div class="wiz-bg" onclick="cerrarWizard()"></div>
+  <div class="wiz-box">
+    <div class="wiz-head">
+      <div><div class="wiz-tt">Sumá una marca</div><div class="wiz-step mono" id="wiz-stepn">Paso 1 de 4</div></div>
+      <button class="wiz-x" onclick="cerrarWizard()" title="Cerrar">×</button>
+    </div>
+    <div class="wiz-body" id="wiz-body"></div>
+    <div class="wiz-foot">
+      <button class="wbtn ghost" id="wiz-back" onclick="wizPrev()">Atrás</button>
+      <button class="wbtn ok" id="wiz-next" onclick="wizNext()">Siguiente</button>
+    </div>
+  </div>
+</div>
+<style>
+  .wiz-ov{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .wiz-bg{position:absolute;inset:0;background:rgba(4,5,7,.72);}
+  .wiz-box{position:relative;z-index:1;width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;
+    background:var(--surf,#111317);border:1px solid var(--line,#20242B);border-radius:14px;box-shadow:0 20px 70px rgba(0,0,0,.6);}
+  .wiz-head{display:flex;align-items:center;gap:10px;padding:18px 20px;border-bottom:1px solid var(--line,#20242B);}
+  .wiz-tt{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:1.25rem;color:var(--fg,#F5F2EC);}
+  .wiz-step{font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mut,#8A8F98);margin-top:3px;}
+  .wiz-x{margin-left:auto;background:transparent;border:0;color:var(--mut,#8A8F98);font-size:1.5rem;cursor:pointer;line-height:1;}
+  .wiz-body{padding:20px;overflow-y:auto;}
+  .wiz-foot{display:flex;gap:10px;padding:15px 20px;border-top:1px solid var(--line,#20242B);}
+  .wiz-foot .wbtn{flex:1;}
+  .wbtn{border-radius:8px;padding:10px 14px;font-family:'Inter Tight',sans-serif;font-weight:700;font-size:.95rem;cursor:pointer;border:1px solid var(--line,#20242B);background:transparent;color:var(--fg,#F5F2EC);transition:.15s;}
+  .wbtn.ok{background:#CCF24D;color:#0c0c0a;border-color:#CCF24D;} .wbtn.ok:hover{filter:brightness(.95);}
+  .wbtn.ghost{color:var(--mut,#8A8F98);} .wbtn:disabled{opacity:.5;cursor:default;}
+  .wfld{margin-bottom:16px;} .wfld label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--mut,#8A8F98);margin-bottom:6px;}
+  .wfld input,.wfld textarea{width:100%;background:#0c0c0a;border:1px solid var(--line,#20242B);border-radius:7px;color:var(--fg,#F5F2EC);font-family:'Inter',sans-serif;font-size:.98rem;padding:10px 12px;outline:none;}
+  .wfld textarea{min-height:110px;resize:vertical;line-height:1.4;} .wfld input:focus,.wfld textarea:focus{border-color:#CCF24D;}
+  .wfld .hint{font-family:'Inter',sans-serif;text-transform:none;letter-spacing:0;color:#6f6f68;}
+  .werr{color:#FF6A45;font-family:'JetBrains Mono',monospace;font-size:.66rem;margin-top:6px;min-height:14px;}
+  .wcap{display:flex;align-items:flex-start;gap:12px;padding:13px 14px;border:1px solid var(--line,#20242B);border-radius:10px;margin-bottom:9px;cursor:pointer;transition:.15s;}
+  .wcap:hover{border-color:#8A8F98;} .wcap.on{border-color:#CCF24D;background:rgba(204,242,77,.06);}
+  .wcap .wc-ic{display:grid;place-items:center;width:34px;height:34px;border-radius:8px;border:1px solid var(--line,#20242B);color:var(--mut,#8A8F98);flex:0 0 auto;}
+  .wcap.on .wc-ic{border-color:#CCF24D;color:#CCF24D;}
+  .wc-t{font-weight:700;color:var(--fg,#F5F2EC);} .wc-d{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--mut,#8A8F98);margin-top:2px;}
+  .wc-chk{margin-left:auto;width:20px;height:20px;border-radius:6px;border:1px solid var(--line,#20242B);display:grid;place-items:center;color:#0c0c0a;flex:0 0 auto;}
+  .wcap.on .wc-chk{background:#CCF24D;border-color:#CCF24D;} .wcap:not(.on) .wc-chk i{display:none;}
+  .wc-dep{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#8A8F98;margin-top:4px;}
+  .wsub{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--mut,#8A8F98);line-height:1.5;margin-bottom:14px;}
+  .wdone{text-align:center;padding:14px 0;}
+  .wdone .wd-ic{width:56px;height:56px;border-radius:50%;background:rgba(204,242,77,.12);color:#CCF24D;display:grid;place-items:center;margin:0 auto 14px;}
+</style>
+
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="shell.js"></script>
 <script>ClausinaShell({active:'inicio'});</script>
 <script>
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 async function entrar(slug){ try{ await fetch('api/marca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})}); }catch(_){} location.href='proyecto'; }
+
+// ---- Wizard "Sumá una marca" (Identidad -> Brief -> Capacidades -> crear) ----
+const WIZ_CAPS = [
+  {id:'estilo', label:'Estilo de marca', icon:'palette', desc:'Sistema de diseño e identidad visual'},
+  {id:'instagram', label:'Instagram', icon:'instagram', desc:'Publicaciones del feed'},
+  {id:'pauta', label:'Pauta Instagram', icon:'badge-dollar-sign', desc:'Publicidad (Meta Ads)', depende:['instagram']},
+  {id:'pantalla', label:'Avisos en pantalla', icon:'megaphone', desc:'Pantalla de calle (DOOH)'},
+  {id:'web', label:'Web / Landing', icon:'globe', desc:'Sitio de la marca'},
+];
+let _wz=null;
+function slugify(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40); }
+function abrirWizard(){ _wz={step:1,nombre:'',slug:'',slugTouched:false,slogan:'',brief_md:'',caps:new Set(),web_modo:'referencia',creando:false,creada:null}; document.getElementById('wiz').style.display='flex'; wizRender(); }
+function cerrarWizard(){ document.getElementById('wiz').style.display='none'; _wz=null; }
+function wizErr(m){ const e=document.getElementById('wz-err'); if(e) e.textContent=m||''; }
+function wizNombre(v){ _wz.nombre=v; if(!_wz.slugTouched){ _wz.slug=slugify(v); const s=document.getElementById('wz-slug'); if(s) s.value=_wz.slug; } }
+function wizToggleCap(id){ const w=_wz,c=WIZ_CAPS.find(x=>x.id===id);
+  if(w.caps.has(id)){ w.caps.delete(id); WIZ_CAPS.forEach(x=>{ if((x.depende||[]).includes(id)) w.caps.delete(x.id); }); }
+  else { w.caps.add(id); (c.depende||[]).forEach(d=>w.caps.add(d)); }
+  wizRender(); }
+function wizPrev(){ if(_wz.step>1){ _wz.step--; wizRender(); } }
+function wizCapCard(c){ const on=_wz.caps.has(c.id);
+  return `<div class="wcap${on?' on':''}" onclick="wizToggleCap('${c.id}')">
+    <span class="wc-ic"><i data-lucide="${c.icon}" class="w-4 h-4"></i></span>
+    <div style="flex:1;min-width:0"><div class="wc-t">${c.label}</div><div class="wc-d">${c.desc}</div>${c.depende?`<div class="wc-dep">requiere: ${c.depende.join(', ')}</div>`:''}</div>
+    <span class="wc-chk"><i data-lucide="check" class="w-3 h-3"></i></span></div>`; }
+function wizRender(){
+  const w=_wz; if(!w) return;
+  const body=document.getElementById('wiz-body'), back=document.getElementById('wiz-back'), next=document.getElementById('wiz-next');
+  document.getElementById('wiz-stepn').textContent = w.creada ? '' : `Paso ${w.step} de 4`;
+  back.style.visibility = (w.step>1 && !w.creada) ? 'visible':'hidden'; next.disabled=false;
+  if(w.step===1){
+    body.innerHTML=`
+      <div class="wfld"><label>Nombre de la marca</label><input id="wz-nombre" value="${esc(w.nombre)}" placeholder="Ej: Distrito Ardora" oninput="wizNombre(this.value)"></div>
+      <div class="wfld"><label>Identificador (slug) <span class="hint">— minúsculas y guiones; se usa en URLs y en la cápsula</span></label>
+        <input id="wz-slug" value="${esc(w.slug)}" placeholder="distrito-ardora" oninput="_wz.slug=this.value.toLowerCase();_wz.slugTouched=true;wizErr('')">
+        <div class="werr" id="wz-err"></div></div>
+      <div class="wfld"><label>Slogan <span class="hint">— opcional</span></label><input value="${esc(w.slogan)}" oninput="_wz.slogan=this.value"></div>`;
+    next.textContent='Siguiente';
+  } else if(w.step===2){
+    body.innerHTML=`
+      <div class="wsub">El <b>brief</b> es el contexto que usa el creativo: propuesta de valor, tono, público, qué hacer y evitar, productos, datos clave. Aplica a todas las marcas.</div>
+      <div class="wfld"><label>Brief <span class="hint">— opcional, recomendado</span></label><textarea placeholder="Contá de qué va la marca…" oninput="_wz.brief_md=this.value">${esc(w.brief_md)}</textarea></div>`;
+    next.textContent='Siguiente';
+  } else if(w.step===3){
+    body.innerHTML=`
+      <div class="wsub"><b>Identidad</b>, <b>Brief</b> y <b>Biblioteca</b> vienen por defecto. Elegí qué otras capacidades querés (las configurás ahora o después).</div>
+      ${WIZ_CAPS.map(wizCapCard).join('')}
+      <div id="wz-webmodo" style="display:${w.caps.has('web')?'block':'none'};margin-top:6px">
+        <div class="wsub" style="margin-bottom:8px">La web, ¿la administra ClaUsina o solo la referenciamos?</div>
+        <div class="wcap${w.web_modo==='administrada'?' on':''}" onclick="_wz.web_modo='administrada';wizRender()"><div style="flex:1"><div class="wc-t">Administrada por ClaUsina</div><div class="wc-d">Publicamos y deployamos la landing</div></div><span class="wc-chk"><i data-lucide="check" class="w-3 h-3"></i></span></div>
+        <div class="wcap${w.web_modo==='referencia'?' on':''}" onclick="_wz.web_modo='referencia';wizRender()"><div style="flex:1"><div class="wc-t">Solo referencia</div><div class="wc-d">La web existe pero no la administramos</div></div><span class="wc-chk"><i data-lucide="check" class="w-3 h-3"></i></span></div>
+      </div>`;
+    next.textContent='Siguiente';
+  } else if(w.step===4){
+    if(w.creada){
+      body.innerHTML=`<div class="wdone"><div class="wd-ic"><i data-lucide="check" class="w-7 h-7"></i></div>
+        <div class="wiz-tt">Marca creada</div>
+        <div class="wsub" style="margin-top:8px">Estamos preparando la cápsula de <b>${esc(w.nombre)}</b> (unos segundos). Entrá y completá la configuración de cada capacidad.</div></div>`;
+      back.style.visibility='hidden'; next.textContent='Entrar a la marca';
+    } else {
+      const caps=WIZ_CAPS.filter(c=>w.caps.has(c.id)).map(c=>c.label);
+      body.innerHTML=`
+        <div class="wsub">Repasá y creá la marca.</div>
+        <div class="wfld"><label>Marca</label><div style="color:var(--fg,#F5F2EC)">${esc(w.nombre)} <span class="mono" style="color:#8A8F98">(${esc(w.slug)})</span></div></div>
+        ${w.slogan?`<div class="wfld"><label>Slogan</label><div style="color:var(--fg,#F5F2EC)">${esc(w.slogan)}</div></div>`:''}
+        <div class="wfld"><label>Capacidades</label><div style="color:var(--fg,#F5F2EC)">Identidad · Brief · Biblioteca${caps.length?' · '+caps.map(esc).join(' · '):''}</div></div>
+        <div class="werr" id="wz-err"></div>`;
+      next.textContent = w.creando ? 'Creando…' : 'Crear marca'; next.disabled=w.creando;
+    }
+  }
+  if(window.lucide) lucide.createIcons();
+}
+async function wizNext(){
+  const w=_wz; if(!w) return;
+  if(w.creada){ entrar(w.creada); return; }
+  if(w.step===1){
+    if(!w.nombre.trim()){ wizErr('Poné un nombre'); return; }
+    if(!/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(w.slug)){ wizErr('Slug inválido: minúsculas, números y guiones (3+ caracteres)'); return; }
+    w.step=2;
+  } else if(w.step===2){ w.step=3; }
+  else if(w.step===3){ w.step=4; }
+  else if(w.step===4){
+    w.creando=true; wizRender();
+    try{
+      const d=await fetch('api/marcas/crear',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({nombre:w.nombre.trim(),slug:w.slug,slogan:w.slogan,brief_md:w.brief_md,capacidades:[...w.caps],web_modo:w.web_modo})}).then(r=>r.json());
+      if(d.ok){ w.creada=d.slug; }
+      else { wizErr({slug_duplicado:'Ya existe una marca con ese identificador',slug_invalido:'Slug inválido',nombre_requerido:'Falta el nombre'}[d.error]||'No se pudo crear'); }
+    }catch(e){ wizErr('Error de conexión'); }
+    w.creando=false;
+  }
+  wizRender();
+}
 
 function cell(n,label,cls){ return `<div class="px-5 py-3"><div class="display font-bold text-2xl leading-none ${cls||''}">${n}</div><div class="mono text-[10px] uppercase tracking-wide text-pmut dark:text-mut mt-1.5">${label}</div></div>`; }
 function salud(p){ if(p.hace_s==null) return 'caido'; const r=p.hace_s/(p.intervalo_s||300); return r<=1.5?'ok':(r<=3?'warn':'caido'); }
@@ -131,9 +272,9 @@ function capChips(caps){
     return `<span title="${esc(c.label+' — '+est)}" class="grid place-items-center w-6 h-6 rounded-md border ${cls}"><i data-lucide="${esc(c.icon)}" class="w-3 h-3"></i></span>`;
   }).join('') + `</div>`;
 }
-function vacio(){ return `<div class="rounded-2xl border border-dashed border-pline dark:border-line p-5 grid place-items-center text-center min-h-[120px]">
-  <div><div class="w-10 h-10 rounded-xl grid place-items-center border border-pline dark:border-line mx-auto mb-2.5"><i data-lucide="plus" class="w-5 h-5 text-pmut dark:text-mut"></i></div>
-  <div class="display font-medium">Sumá una marca</div><p class="mono text-[11px] text-pmut dark:text-mut mt-1">Onboarding de la próxima cápsula.</p></div></div>`; }
+function vacio(){ return `<a href="#" onclick="abrirWizard();return false;" class="group rounded-2xl border border-dashed border-pline dark:border-line p-5 grid place-items-center text-center min-h-[120px] hover:border-acc transition">
+  <div><div class="w-10 h-10 rounded-xl grid place-items-center border border-pline dark:border-line mx-auto mb-2.5 group-hover:border-acc transition"><i data-lucide="plus" class="w-5 h-5 text-pmut dark:text-mut group-hover:acc-text"></i></div>
+  <div class="display font-medium">Sumá una marca</div><p class="mono text-[11px] text-pmut dark:text-mut mt-1">Configurá la próxima cápsula.</p></div></a>`; }
 function skel(){ return `<div class="rounded-2xl border border-pline dark:border-line bg-psurf dark:bg-surf card p-5">
   <div class="flex gap-3"><div class="w-10 h-10 rounded-xl bg-pline dark:bg-line"></div><div class="flex-1"><div class="h-4 w-1/2 rounded bg-pline dark:bg-line"></div><div class="h-3 w-3/4 rounded bg-pline dark:bg-line mt-2"></div></div></div>
   <div class="h-10 w-2/3 rounded bg-pline dark:bg-line mt-6"></div></div>`; }

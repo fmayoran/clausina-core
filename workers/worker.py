@@ -9,7 +9,7 @@ import traceback
 
 import jobqueue
 from db import heartbeat
-from handlers import correccion, propuesta, revision, brief, landing, bibliotecario, campania, campania_meta, pauta_sync, secrets_sync
+from handlers import correccion, propuesta, revision, brief, landing, bibliotecario, campania, campania_meta, pauta_sync, secrets_sync, marca_capsula
 
 # Registry de handlers por tipo de job.
 HANDLERS = {
@@ -23,6 +23,7 @@ HANDLERS = {
     "campania_meta": campania_meta.handle,
     "pauta_sync": pauta_sync.handle,
     "secrets_sync": secrets_sync.handle,
+    "marca_capsula": marca_capsula.handle,
 }
 
 

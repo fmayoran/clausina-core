@@ -201,6 +201,14 @@ app.get('/api/capacidades', async (req, res) => {
   try { res.json(await db.getCapacidades(req.proyectoId)); }
   catch (e) { console.error('capacidades', e.message); res.status(500).json({ error: 'db' }); }
 });
+// Alta de marca (wizard "Sumá una marca").
+app.post('/api/marcas/crear', async (req, res) => {
+  try {
+    const r = await db.crearMarca(req.body || {});
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { console.error('crear-marca', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+
 // Grilla de agencia: todas las marcas y qué tiene configurada cada una (cross-marca).
 app.get('/api/capacidades/todas', async (req, res) => {
   try { res.json(await db.getCapacidadesTodas()); }

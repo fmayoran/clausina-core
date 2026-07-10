@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -115,6 +115,19 @@ def det_campania():
     return jobs
 
 
+def det_marca_capsula():
+    # La cápsula deriva de la DB: aplicar pedidos de scaffold/archivar (un job por pedido).
+    jobs = []
+    for row in _lines("SELECT slug||'|'||accion FROM contenido.marca_capsula_req WHERE NOT procesado ORDER BY pedido_en"):
+        slug, accion = row.split('|', 1)
+        if slug:
+            jobs.append({"tipo": "marca_capsula", "proyecto_slug": slug,
+                         "payload": {"slug": slug, "accion": accion}, "lock_key": f"marca_capsula:{slug}"})
+    if jobs:
+        psql("UPDATE contenido.marca_capsula_req SET procesado=true WHERE NOT procesado")
+    return jobs
+
+
 def det_secrets_sync():
     # La DB es la fuente de verdad: cuando cambia un token en el perfil, regeneramos los
     # secretos derivados (hoy: credencial de IG en n8n). Un job por marca pedida.
@@ -183,12 +196,13 @@ DETECTORS = {
     "campania_meta": det_campania_meta,
     "pauta_sync": det_pauta_sync,
     "secrets_sync": det_secrets_sync,
+    "marca_capsula": det_marca_capsula,
 }
 
 
 def run():
     encolados = 0
-    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync"):
+    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula"):
         if tipo not in MIGRATED:
             continue
         try:
