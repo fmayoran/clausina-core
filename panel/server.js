@@ -201,6 +201,11 @@ app.get('/api/capacidades', async (req, res) => {
   try { res.json(await db.getCapacidades(req.proyectoId)); }
   catch (e) { console.error('capacidades', e.message); res.status(500).json({ error: 'db' }); }
 });
+// Grilla de agencia: todas las marcas y qué tiene configurada cada una (cross-marca).
+app.get('/api/capacidades/todas', async (req, res) => {
+  try { res.json(await db.getCapacidadesTodas()); }
+  catch (e) { console.error('capacidades-todas', e.message); res.status(500).json({ error: 'db' }); }
+});
 app.post('/api/capacidades/:cap', async (req, res) => {
   try {
     const b = req.body || {};

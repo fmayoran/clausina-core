@@ -95,6 +95,17 @@ async function getCapacidades(proyectoId) {
   });
 }
 
+// Vista de agencia: todas las marcas con el estado de cada capacidad (grilla marca × capacidad).
+async function getCapacidadesTodas() {
+  const marcas = await getMarcas();
+  const out = [];
+  for (const m of marcas) {
+    out.push({ slug: m.slug, nombre: m.nombre, logo: m.logo, activo: m.activo,
+               capacidades: await getCapacidades(m.id) });
+  }
+  return out;
+}
+
 async function setCapacidad(proyectoId, capId, { habilitada, config }) {
   const cap = CAPS.find(c => c.id === capId);
   if (!cap) return { ok: false, error: 'capacidad_desconocida' };
@@ -911,7 +922,7 @@ async function health() {
 }
 
 module.exports = { getMarcas, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
-  getCapacidades, setCapacidad,
+  getCapacidades, getCapacidadesTodas, setCapacidad,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,

@@ -8,7 +8,7 @@
     Agencia: [
       { id: 'inicio',       label: 'Inicio',            icon: 'layout-dashboard', href: '.' },
       { id: 'maquinas',     label: 'Sala de máquinas',  icon: 'gauge',            href: 'maquinas' },
-      { id: 'marcas',       label: 'Marcas',            icon: 'boxes',            href: '.' },
+      { id: 'marcas',       label: 'Marcas',            icon: 'boxes',            href: 'marcas' },
       { id: 'pantallas',    label: 'Pantallas',         icon: 'monitor',          href: 'audiovisual' },
       { id: 'estilo',       label: 'Estilo',            icon: 'palette',          href: 'estilo' },
       { id: 'arquitectura', label: 'Arquitectura',      icon: 'git-fork',         href: 'arquitectura' },
