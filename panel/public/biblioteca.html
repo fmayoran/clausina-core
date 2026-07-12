@@ -25,7 +25,8 @@
   #uprog.hidden{display:none;}
   #uprog .uptxt{font-family:'Inter',sans-serif;font-size:12.5px;color:#ECEEF0;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   #uprog .upbar{height:5px;background:#0c0f12;border-radius:3px;overflow:hidden;}
-  #uprog .upfill{height:100%;background:#CCF24D;width:0;transition:width .2s;}
+  #uprog .upfill{height:100%;background:#FF6A45;width:0;transition:width .2s,background .2s;}
+  #uprog .upfill.hecho{background:#CCF24D;}
   .mcell.gwork{cursor:default;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px;text-align:center;}
   .mcell.gwork .gwlbl{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:#E0A458;}
   .mcell.gwork .gwtx,.mcell.gerr .gwtx{font-family:'Inter',sans-serif;font-size:10.5px;color:#8A8F98;line-height:1.3;}
@@ -242,7 +243,9 @@ async function subirArchivos(input){
     }catch(e){}
     fill.style.width=Math.round(done/files.length*100)+'%';
   }
-  up.classList.add('hidden');
+  if(ok) fill.classList.add('hecho');           // verde: terminó
+  await new Promise(r=>setTimeout(r,500));      // que se vea el verde antes de esconder la barra
+  up.classList.add('hidden'); fill.classList.remove('hecho');
   toast((ok?ok+' subido(s) a “'+_uploadFolder+'”':'No se pudo subir')+(pes?` · ${pes} muy pesado(s)`:''), !ok);
   await cargar();
 }

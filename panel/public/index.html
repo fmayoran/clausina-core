@@ -80,7 +80,8 @@
   .wiz-foot{display:flex;gap:10px;padding:15px 20px;border-top:1px solid var(--line,#20242B);}
   .wiz-foot .wbtn{flex:1;}
   .wbtn{border-radius:8px;padding:10px 14px;font-family:'Inter Tight',sans-serif;font-weight:700;font-size:.95rem;cursor:pointer;border:1px solid var(--line,#20242B);background:transparent;color:var(--fg,#F5F2EC);transition:.15s;}
-  .wbtn.ok{background:#CCF24D;color:#0c0c0a;border-color:#CCF24D;} .wbtn.ok:hover{filter:brightness(.95);}
+  .wbtn.ok{background:#FF6A45;color:#0c0c0a;border-color:#FF6A45;} .wbtn.ok:hover{filter:brightness(.95);}
+  .wbtn.done{background:#CCF24D;color:#0c0c0a;border-color:#CCF24D;}  /* tarea terminada */
   .wbtn.ghost{color:var(--mut,#8A8F98);} .wbtn:disabled{opacity:.5;cursor:default;}
   .wfld{margin-bottom:16px;} .wfld label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--mut,#8A8F98);margin-bottom:6px;}
   .wfld input,.wfld textarea{width:100%;background:#0c0c0a;border:1px solid var(--line,#20242B);border-radius:7px;color:var(--fg,#F5F2EC);font-family:'Inter',sans-serif;font-size:.98rem;padding:10px 12px;outline:none;}
@@ -99,7 +100,7 @@
   .wdone{text-align:center;padding:14px 0;}
   .wdone .wd-ic{width:56px;height:56px;border-radius:50%;background:rgba(204,242,77,.12);color:#CCF24D;display:grid;place-items:center;margin:0 auto 14px;}
   /* Paso de descubrimiento: análisis de la presencia digital pública. */
-  .wspin{width:40px;height:40px;border-radius:50%;border:3px solid var(--line,#20242B);border-top-color:#CCF24D;margin:0 auto 16px;animation:wsp 1s linear infinite;}
+  .wspin{width:40px;height:40px;border-radius:50%;border:3px solid var(--line,#20242B);border-top-color:#FF6A45;margin:0 auto 16px;animation:wsp 1s linear infinite;}
   @keyframes wsp{to{transform:rotate(360deg);}}
   .wlink{background:transparent;border:0;color:var(--mut,#8A8F98);font-family:'JetBrains Mono',monospace;font-size:.66rem;text-decoration:underline;cursor:pointer;padding:0;}
   .wlink:hover{color:#CCF24D;}
@@ -203,6 +204,7 @@ function wizRender(){
   document.getElementById('wiz-stepn').textContent = w.creada ? '' : `Paso ${w.step} de ${WIZ_PASOS}`;
   back.style.visibility = (w.step>1 && !w.creada) ? 'visible':'hidden'; next.disabled=false;
   next.style.display='';
+  next.classList.toggle('done', !!w.creada);  // coral mientras falte algo; verde recién al terminar
   if(w.step===1){
     // Presencia digital: lo público de la marca. De acá sale la base de identidad.
     if(w.an==='analizando'){

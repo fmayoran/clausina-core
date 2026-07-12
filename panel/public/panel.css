@@ -1,5 +1,11 @@
 /* Fuentes de marca (Inter Tight / JetBrains Mono) vienen de Google Fonts en el <head> de cada página. */
-:root{--bg:#0A0B0D;--panel:#111317;--line:#20242B;--chalk:#ECEEF0;--white:#F5F2EC;--ash:#8A8F98;--fire:#CCF24D;--ember:#CCF24D;--alarm:#FF6A45;}
+:root{--bg:#0A0B0D;--panel:#111317;--line:#20242B;--chalk:#ECEEF0;--white:#F5F2EC;--ash:#8A8F98;--fire:#CCF24D;--ember:#CCF24D;--alarm:#FF6A45;
+  /* Semántica del ciclo de vida de una tarea (regla de la casa):
+     CORAL = pendiente, en curso, o "te toca a vos" (próximo paso).
+     VERDE = terminado, aprobado, publicado.
+     No aplica a la SALUD de los procesos (sala de máquinas): ahí verde = sano, y eso no cambia. */
+  --pend:#FF6A45; --pend-line:rgba(255,106,69,.35); --pend-soft:rgba(255,106,69,.10);
+  --done:#CCF24D; --done-line:#244a31;}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--chalk);font-family:'Inter',system-ui,sans-serif;min-height:100vh;}
 header{display:flex;align-items:baseline;gap:18px;padding:22px 28px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5;}
@@ -29,7 +35,7 @@ header .marcasel:hover{border-color:var(--fire);}
 .col{background:var(--panel);border:1px solid var(--line);border-radius:8px;min-height:120px;align-self:start;}
 .col h2{font-size:.98rem;letter-spacing:.04em;text-transform:uppercase;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;line-height:1.15;}
 .col h2 .dot{width:9px;height:9px;border-radius:50%;background:var(--ash);flex:0 0 auto;}
-.col.brief h2 .dot{background:#5b9bd5;} .col.pend h2 .dot{background:var(--ember);} .col.pub h2 .dot{background:#5ec27a;}
+.col.brief h2 .dot{background:#5b9bd5;} .col.pend h2 .dot{background:var(--pend);} .col.pub h2 .dot{background:#5ec27a;}
 .col h2 .n{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:var(--ash);flex:0 0 auto;}
 .cards{padding:12px;display:flex;flex-direction:column;gap:12px;}
 .card{background:#0c0c0a;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
@@ -114,13 +120,15 @@ header .marcasel:hover{border-color:var(--fire);}
 .reqtext{margin-top:7px;font-size:.93rem;line-height:1.26;color:#cfcbc2;}
 .meta2{margin-top:5px;font-family:'JetBrains Mono',monospace;font-size:.63rem;color:var(--ash);display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
 .rst{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:10px;}
-.rst.cola{color:#8a8a82;border:1px solid var(--line);}
-.rst.proc{color:#5b9bd5;border:1px solid #2c4258;}
-.rst.pend{color:var(--ember);border:1px solid #1d3a44;}
+/* Coral = pendiente/en curso · Verde = listo. "En cola" es lo más frío del coral (todavía
+   no arrancó); "Procesando" late; "Pendiente de aprobación" te está esperando a vos. */
+.rst.cola{color:var(--pend);border:1px solid var(--pend-line);opacity:.75;}
+.rst.proc{color:var(--pend);border:1px solid var(--pend-line);background:var(--pend-soft);animation:pulse 1.6s ease-in-out infinite;}
+.rst.pend{color:var(--pend);border:1px solid var(--pend-line);}
 .rst.rech{color:var(--alarm);border:1px solid rgba(255,106,69,.35);}
 .rst.ok{color:#5ec27a;border:1px solid #244a31;}
 .rst.err{color:var(--alarm);border:1px solid rgba(255,106,69,.35);background:#1c0f0a;}
-.rst.prop{color:#0c0c0a;background:var(--ember);}
+.rst.prop{color:#0c0c0a;background:var(--pend);}
 .rst.men{color:#0c0c0a;background:#5b9bd5;}
 .acts{display:flex;flex-direction:column;gap:8px;padding:0 12px 12px;}
 .acts-row{display:flex;gap:8px;}
@@ -187,12 +195,14 @@ header .marcasel:hover{border-color:var(--fire);}
 .pauta-spend .pv{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:1.6rem;color:var(--white);line-height:1;}
 .pauta-spend .pl{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-top:5px;}
 .st{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);border-radius:10px;padding:2px 8px;color:var(--ash);}
-.st.ok{color:#5ec27a;border-color:#2b5237;} .st.warn{color:var(--alarm);border-color:rgba(255,106,69,.35);} .st.pause{color:var(--ember);border-color:#1d3a44;}
+.st.ok{color:#5ec27a;border-color:#2b5237;} .st.warn{color:var(--alarm);border-color:rgba(255,106,69,.35);} .st.pause{color:var(--pend);border-color:var(--pend-line);}
 .pauta-win{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin:22px 2px 10px;}
 .pauta-rf{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--ash);cursor:pointer;vertical-align:middle;transition:.15s;}
 .pauta-rf:hover{border-color:var(--fire);color:var(--fire);}
 .pauta-rf:disabled{opacity:.6;cursor:default;}
+.pauta-rf.spin{color:var(--pend);border-color:var(--pend-line);}
 .pauta-rf.spin i{animation:spin 1s linear infinite;}
+.pauta-rf.hecho{color:var(--done);border-color:var(--done);}  /* flash al terminar */
 @keyframes spin{to{transform:rotate(360deg);}}
 /* Gráfico de evolución */
 .evol-tabs{display:flex;gap:6px;margin:2px 0 10px;flex-wrap:wrap;}
@@ -225,7 +235,7 @@ header .marcasel:hover{border-color:var(--fire);}
 .camp-m2{margin-top:3px;font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--ash);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .camp-res{margin-top:9px;font-size:.9rem;color:#cfcbc2;line-height:1.35;}
 .camp-work{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:12px 15px;color:var(--ash);font-size:.9rem;margin-bottom:10px;}
-.camp-work .dotp{width:9px;height:9px;border-radius:50%;background:var(--ember);flex:0 0 auto;animation:pulse 1.4s ease-in-out infinite;}
+.camp-work .dotp{width:9px;height:9px;border-radius:50%;background:var(--pend);flex:0 0 auto;animation:pulse 1.4s ease-in-out infinite;}
 @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
 /* Modal de propuesta */
 .cm-row{display:flex;align-items:center;gap:10px;}

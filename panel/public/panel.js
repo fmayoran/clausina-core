@@ -697,6 +697,10 @@ async function refrescarPauta(){
     }
     await loadPauta();
     toast('Reporte actualizado');
+    // Coral mientras trabaja -> verde al terminar (la regla de la casa, ver :root en panel.css).
+    const bok=document.getElementById('pauta-refresh');
+    if(bok){ bok.classList.remove('spin'); bok.classList.add('hecho');
+             setTimeout(()=>bok.classList.remove('hecho'), 2200); }
   }catch(e){ toast('No se pudo actualizar',true); }
   const b2=document.getElementById('pauta-refresh'); if(b2){ b2.classList.remove('spin'); b2.disabled=false; }
   _PAUTABUSY=false;
