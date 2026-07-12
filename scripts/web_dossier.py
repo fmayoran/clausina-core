@@ -14,10 +14,47 @@ Uso: web_dossier.py --web https://… --ig @handle --out /tmp/dossier.md
 import argparse
 import html
 import json
+import os
 import re
+import subprocess
 import urllib.error
 import urllib.parse
 import urllib.request
+
+MOTOR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Debajo de esto, el HTML estático es un cascarón: el sitio se arma con JS -> hay que renderizar.
+MIN_TEXTO = 900
+
+
+def render(url, out_html, out_png):
+    """Chromium (Playwright) para sitios JS y para VER la marca. Devuelve (html, png, error)."""
+    try:
+        r = subprocess.run(["node", f"{MOTOR}/scripts/web_render.js", url, out_html, out_png],
+                           capture_output=True, text=True, timeout=90)
+        d = json.loads((r.stdout or "{}").strip().splitlines()[-1])
+    except Exception as e:
+        return None, None, str(e)[:120]
+    if not d.get("ok"):
+        return None, None, d.get("error", "render falló")
+    h = open(out_html, encoding="utf-8", errors="replace").read() if os.path.exists(out_html) else None
+    png = out_png if (out_png and os.path.exists(out_png)) else None
+    return h, png, None
+
+
+def paleta_real(png, n=6):
+    """Colores dominantes de la captura. El CSS miente (variables, gradientes); el píxel no."""
+    try:
+        from PIL import Image
+        im = Image.open(png).convert("RGB").resize((320, 200))
+        q = im.quantize(colors=12, method=Image.MEDIANCUT).convert("RGB")
+        cuenta = sorted(q.getcolors(80_000) or [], key=lambda kv: -kv[0])
+        total = sum(c for c, _ in cuenta) or 1
+        out = []
+        for c, (r, g, b) in cuenta[:n]:
+            out.append(("#%02X%02X%02X" % (r, g, b), round(100 * c / total)))
+        return out
+    except Exception:
+        return []
 
 UA = "ClaUsina/1.0 (+https://clausina.ar; lectura puntual del sitio de la marca, a pedido del usuario)"
 TIMEOUT = 20
@@ -138,6 +175,7 @@ def main():
     ap.add_argument("--web", default="")
     ap.add_argument("--ig", default="")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--shot", default="", help="ruta del screenshot de la home (habilita el render)")
     a = ap.parse_args()
 
     f = open(a.out, "w", encoding="utf-8")
@@ -148,6 +186,17 @@ def main():
         web = a.web if a.web.startswith("http") else "https://" + a.web
         h, err = bajar(web)
         sec(f, f"Sitio: {web}")
+
+        # Si el HTML estático viene vacío o flaco, el sitio se arma con JS: renderizamos.
+        render_err = None
+        if a.shot and (not h or len(texto(h)) < MIN_TEXTO):
+            hr, png, render_err = render(web, a.shot.replace(".png", ".html"), a.shot)
+            if hr:
+                h = hr
+                f.write("_(el sitio se arma con JS: leído con navegador)_\n")
+        elif a.shot:
+            _, _, render_err = render(web, a.shot.replace(".png", ".html"), a.shot)
+
         if not h:
             f.write(f"NO SE PUDO LEER ({err}). El sitio existe pero nos rechaza o no responde.\n")
         else:
@@ -168,6 +217,16 @@ def main():
             col = colores(h)
             if col:
                 f.write(f"- Colores más usados en el CSS: {', '.join(col)}\n")
+            # Paleta desde la captura: el CSS miente (variables, gradientes, imágenes); el píxel no.
+            if a.shot and os.path.exists(a.shot):
+                pal = paleta_real(a.shot)
+                if pal:
+                    f.write("- Paleta REAL de la home (colores dominantes de la captura, con % de superficie): "
+                            + ", ".join(f"{c} ({p}%)" for c, p in pal) + "\n")
+                f.write(f"- Captura de la home: {a.shot} — **abrila con Read**: es la única forma de ver "
+                        "de verdad la identidad visual (tipografía, imaginario, uso del color).\n")
+            elif render_err:
+                f.write(f"- (No se pudo capturar la home: {render_err})\n")
             lg = logos(h, web)
             if lg:
                 f.write(f"- Posibles logos/íconos: {', '.join(lg)}\n")

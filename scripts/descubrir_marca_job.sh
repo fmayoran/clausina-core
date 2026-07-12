@@ -42,12 +42,13 @@ PY
 # Dossier: bajamos nosotros el sitio (WebFetch respeta robots.txt y casi toda web de marca
 # bloquea crawlers de IA -> el análisis volvía vacío). Ver web_dossier.py.
 DOS="/tmp/desc_web_$did.md"
+SHOT="/tmp/desc_shot_$did.png"
 WEB=$(python3 -c "import json;print(json.load(open('/tmp/desc_ctx_$did.json')).get('web',''))")
 IG=$(python3 -c "import json;print(json.load(open('/tmp/desc_ctx_$did.json')).get('instagram',''))")
-python3 "$MOTOR/scripts/web_dossier.py" --web "$WEB" --ig "$IG" --out "$DOS" >> "$LOG" 2>&1 || echo "" > "$DOS"
+python3 "$MOTOR/scripts/web_dossier.py" --web "$WEB" --ig "$IG" --out "$DOS" --shot "$SHOT" >> "$LOG" 2>&1 || echo "" > "$DOS"
 
 rm -f "/tmp/desc_res_$did.json"
-PROMPT="Sos el ANALISTA DE MARCA de ClaUsina. Segui EXACTAMENTE $MOTOR/scripts/descubrir_marca.md. El pedido (nombre, web, instagram, notas) esta en /tmp/desc_ctx_$did.json y el DOSSIER ya bajado del sitio esta en $DOS: leelo PRIMERO, es tu fuente principal. Usa WebSearch para completar lo que falte. Escribi el resultado en /tmp/desc_res_$did.json con el formato que indica la skill. Solo LEES fuentes publicas: no toques la base, ni git, ni publiques nada, ni crees la marca."
+PROMPT="Sos el ANALISTA DE MARCA de ClaUsina. Segui EXACTAMENTE $MOTOR/scripts/descubrir_marca.md. El pedido (nombre, web, instagram, notas) esta en /tmp/desc_ctx_$did.json y el DOSSIER ya bajado del sitio esta en $DOS: leelo PRIMERO, es tu fuente principal. Si existe la captura de la home $SHOT, ABRILA CON Read: es la unica forma de ver la identidad visual real (tipografia, imaginario, uso del color). Usa WebSearch para completar lo que falte. Escribi el resultado en /tmp/desc_res_$did.json con el formato que indica la skill. Solo LEES fuentes publicas: no toques la base, ni git, ni publiques nada, ni crees la marca."
 timeout 600 claude -p "$PROMPT" --model sonnet --allowedTools WebFetch WebSearch Read Write >> "$LOG" 2>&1
 
 PG="$PG" DID="$did" python3 - <<'PY'
@@ -91,5 +92,5 @@ if r.returncode!=0:
 print("ok:"+(d.get("nombre") or "marca"))
 PY
 
-rm -f "/tmp/desc_ctx_$did.json" "/tmp/desc_res_$did.json" "/tmp/desc_web_$did.md"
+rm -f "/tmp/desc_ctx_$did.json" "/tmp/desc_res_$did.json" "/tmp/desc_web_$did.md" "$SHOT" "/tmp/desc_shot_$did.html"
 echo "$(ts) fin descubrimiento $did" >> "$LOG"

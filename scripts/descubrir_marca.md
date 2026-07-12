@@ -10,15 +10,21 @@ El contexto del pedido está en `/tmp/desc_ctx_<ID>.json`. Escribí el resultado
 
 ## Qué mirar
 
-1. **La web** (si hay): home y las páginas que importen (nosotros/sobre, servicios/productos,
-   contacto, menú/catálogo). Usá `WebFetch`. Sacá de ahí: qué hace la marca, propuesta de valor,
-   tono de voz, público, productos/servicios, datos de contacto, ubicación, colores y logo.
-2. **Instagram** (si hay): probá `WebFetch` sobre `https://www.instagram.com/<handle>/`. Muchas
-   veces Instagram devuelve un muro de login: **si no podés leerlo, decilo** en `hallazgos` y
-   seguí. No inventes seguidores, cantidad de posts ni contenido que no viste.
-3. **Búsqueda** (`WebSearch`): buscá el nombre de la marca + ubicación para completar lo que
+1. **El dossier del sitio** (`web_dossier.py` ya lo bajó por vos): es tu fuente principal. Trae el
+   texto de la home y de las páginas internas, los datos estructurados (JSON-LD), los metadatos,
+   contactos, redes enlazadas y la paleta. Ahí está casi todo: qué hace la marca, propuesta de
+   valor, tono de voz, público, productos/servicios, ubicación.
+2. **La captura de la home** (si el dossier la menciona): **abrila con `Read`**. Es la única forma
+   de ver la identidad visual de verdad —tipografía, imaginario, cómo usa el color, qué tan denso o
+   despojado es—. Del CSS no se deduce: el dossier te da la paleta real medida sobre los píxeles de
+   la captura, usala para `paleta` y `estilo_md`. Describí lo que VES, no lo que el nombre sugiere.
+3. **Instagram**: Instagram **bloquea las lecturas desde servidores** (HTTP 429), así que lo más
+   probable es que no puedas ver el feed. **No pasa nada: decilo en `hallazgos` y seguí.** Nunca
+   inventes seguidores, cantidad de posts, ni de qué va el contenido. Si necesitás datos del perfil,
+   `WebSearch` puede traerte cifras de terceros: si las usás, **aclarás que son de segunda mano**.
+4. **Búsqueda** (`WebSearch`): buscá el nombre de la marca + ubicación para completar lo que
    falte (reseñas, notas de prensa, directorios, otras redes). Sirve sobre todo cuando no hay web.
-4. Las **notas** que dejó el usuario: pueden traer enlaces o datos que no están en ningún lado.
+5. Las **notas** que dejó el usuario: pueden traer enlaces o datos que no están en ningún lado.
 
 ## Reglas
 
