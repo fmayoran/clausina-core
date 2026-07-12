@@ -95,6 +95,26 @@ async function getCapacidades(proyectoId) {
   });
 }
 
+// Descubrimiento: el analista lee la presencia digital pública (web + IG) y devuelve una base de
+// identidad para pre-cargar el wizard. Corre antes de que la marca exista -> cuelga de su propia
+// tabla, no de proyecto_id (se enlaza después, si el alta se concreta).
+async function crearDescubrimiento(d) {
+  const web = (d.web || '').trim();
+  const ig = (d.instagram || '').trim();
+  if (!web && !ig) return { ok: false, error: 'sin_fuentes' };
+  const { rows: [r] } = await pool.query(
+    `INSERT INTO contenido.marca_descubrimiento (nombre, web, instagram, notas)
+       VALUES ($1,$2,$3,$4) RETURNING id`,
+    [(d.nombre || '').trim() || null, web || null, ig || null, (d.notas || '').trim() || null]);
+  return { ok: true, id: r.id };
+}
+
+async function getDescubrimiento(id) {
+  const { rows } = await pool.query(
+    'SELECT id, estado, resultado, error FROM contenido.marca_descubrimiento WHERE id=$1', [id]);
+  return rows[0] || null;
+}
+
 // Alta de marca desde el panel (wizard). Crea proyecto + perfil + capacidades y ENCOLA el
 // scaffold de la cápsula (artefacto derivado de la DB). No toca el disco directamente.
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
@@ -108,12 +128,21 @@ async function crearMarca(d) {
   // Capacidades elegidas + sus dependencias (pauta arrastra instagram).
   const set = new Set(Array.isArray(d.capacidades) ? d.capacidades : []);
   CAPS.forEach(c => { if (set.has(c.id)) (c.depende || []).forEach(x => set.add(x)); });
+  const txt = v => ((v || '').trim() || null);
 
   const { rows: [p] } = await pool.query(
-    'INSERT INTO contenido.proyectos (slug, nombre) VALUES ($1,$2) RETURNING id', [slug, nombre]);
+    `INSERT INTO contenido.proyectos (slug, nombre, dominio_web, ig_handle, email, whatsapp)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+    [slug, nombre, txt(d.dominio_web), txt(d.ig_handle), txt(d.email), txt(d.whatsapp)]);
   await pool.query(
-    'INSERT INTO contenido.proyecto_perfil (proyecto_id, slogan, brief_md, actualizado_en) VALUES ($1,$2,$3, now())',
-    [p.id, (d.slogan || '').trim() || null, (d.brief_md || '').trim() || null]);
+    `INSERT INTO contenido.proyecto_perfil (proyecto_id, slogan, brief_md, estilo_md, logo, actualizado_en)
+       VALUES ($1,$2,$3,$4,$5, now())`,
+    [p.id, txt(d.slogan), txt(d.brief_md), txt(d.estilo_md), txt(d.logo)]);
+  // Trazabilidad: de qué análisis salió esta marca.
+  if (d.descubrimiento_id) {
+    await pool.query('UPDATE contenido.marca_descubrimiento SET proyecto_id=$1 WHERE id=$2',
+      [p.id, d.descubrimiento_id]).catch(() => {});
+  }
   for (const cap of CAPS) {
     const on = set.has(cap.id);
     const config = (cap.id === 'web' && on) ? { modo: (d.web_modo === 'administrada' ? 'administrada' : 'referencia') } : {};
@@ -955,6 +984,7 @@ async function health() {
 
 module.exports = { getMarcas, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearMarca,
+  crearDescubrimiento, getDescubrimiento,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,

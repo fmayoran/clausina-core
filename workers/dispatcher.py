@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula", "descubrimiento"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -128,6 +128,20 @@ def det_marca_capsula():
     return jobs
 
 
+def det_descubrimiento():
+    # Análisis de presencia digital para el wizard de alta. Corre antes de que la marca exista:
+    # la marca todavía no tiene slug propio en proyectos -> el job es agnóstico (no usa cápsula).
+    psql("UPDATE contenido.marca_descubrimiento SET estado='error', "
+         "error='El análisis se quedó colgado. Probá de nuevo o cargá los datos a mano.', procesado_en=now() "
+         "WHERE estado='procesando' AND creado_en < now() - interval '20 minutes'")
+    jobs = []
+    for did in _lines("SELECT id FROM contenido.marca_descubrimiento WHERE estado='pendiente' ORDER BY creado_en"):
+        did = did.strip()
+        jobs.append({"tipo": "descubrimiento", "proyecto_slug": "clausina",
+                     "payload": {"descubrimiento_id": did}, "lock_key": f"descubrimiento:{did}"})
+    return jobs
+
+
 def det_secrets_sync():
     # La DB es la fuente de verdad: cuando cambia un token en el perfil, regeneramos los
     # secretos derivados (hoy: credencial de IG en n8n). Un job por marca pedida.
@@ -197,12 +211,13 @@ DETECTORS = {
     "pauta_sync": det_pauta_sync,
     "secrets_sync": det_secrets_sync,
     "marca_capsula": det_marca_capsula,
+    "descubrimiento": det_descubrimiento,
 }
 
 
 def run():
     encolados = 0
-    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula"):
+    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula", "descubrimiento"):
         if tipo not in MIGRATED:
             continue
         try:

@@ -201,6 +201,22 @@ app.get('/api/capacidades', async (req, res) => {
   try { res.json(await db.getCapacidades(req.proyectoId)); }
   catch (e) { console.error('capacidades', e.message); res.status(500).json({ error: 'db' }); }
 });
+// Descubrimiento: analizar la presencia digital pública de una marca que todavía no existe,
+// para pre-cargar el wizard. El análisis lo hace un job (worker); acá solo encolamos y consultamos.
+app.post('/api/marcas/descubrir', async (req, res) => {
+  try {
+    const r = await db.crearDescubrimiento(req.body || {});
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { console.error('descubrir', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+app.get('/api/marcas/descubrir/:id', async (req, res) => {
+  try {
+    const d = await db.getDescubrimiento(req.params.id);
+    if (!d) return res.status(404).json({ error: 'no_existe' });
+    res.json(d);
+  } catch (e) { console.error('descubrir-get', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 // Alta de marca (wizard "Sumá una marca").
 app.post('/api/marcas/crear', async (req, res) => {
   try {

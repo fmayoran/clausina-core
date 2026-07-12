@@ -98,6 +98,19 @@
   .wsub{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--mut,#8A8F98);line-height:1.5;margin-bottom:14px;}
   .wdone{text-align:center;padding:14px 0;}
   .wdone .wd-ic{width:56px;height:56px;border-radius:50%;background:rgba(204,242,77,.12);color:#CCF24D;display:grid;place-items:center;margin:0 auto 14px;}
+  /* Paso de descubrimiento: análisis de la presencia digital pública. */
+  .wspin{width:40px;height:40px;border-radius:50%;border:3px solid var(--line,#20242B);border-top-color:#CCF24D;margin:0 auto 16px;animation:wsp 1s linear infinite;}
+  @keyframes wsp{to{transform:rotate(360deg);}}
+  .wlink{background:transparent;border:0;color:var(--mut,#8A8F98);font-family:'JetBrains Mono',monospace;font-size:.66rem;text-decoration:underline;cursor:pointer;padding:0;}
+  .wlink:hover{color:#CCF24D;}
+  .wfind{border:1px solid var(--line,#20242B);border-radius:10px;padding:13px 14px;margin-bottom:14px;}
+  .wfind h4{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mut,#8A8F98);margin-bottom:8px;}
+  .wfind ul{margin:0;padding-left:16px;} .wfind li{font-size:.86rem;line-height:1.5;color:var(--fg,#F5F2EC);margin-bottom:6px;}
+  .wconf{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;}
+  .wconf i{width:7px;height:7px;border-radius:50%;display:block;}
+  .wconf.alta{color:#CCF24D;} .wconf.alta i{background:#CCF24D;}
+  .wconf.media{color:#FF6A45;} .wconf.media i{background:#FF6A45;}
+  .wconf.baja{color:#8A8F98;} .wconf.baja i{background:#8A8F98;}
 </style>
 
 <script src="https://unpkg.com/lucide@latest"></script>
@@ -115,10 +128,63 @@ const WIZ_CAPS = [
   {id:'pantalla', label:'Avisos en pantalla', icon:'megaphone', desc:'Pantalla de calle (DOOH)'},
   {id:'web', label:'Web / Landing', icon:'globe', desc:'Sitio de la marca'},
 ];
-let _wz=null;
+const WIZ_PASOS=5;
+let _wz=null, _wzPoll=null;
 function slugify(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40); }
-function abrirWizard(){ _wz={step:1,nombre:'',slug:'',slugTouched:false,slogan:'',brief_md:'',caps:new Set(),web_modo:'referencia',creando:false,creada:null}; document.getElementById('wiz').style.display='flex'; wizRender(); }
-function cerrarWizard(){ document.getElementById('wiz').style.display='none'; _wz=null; }
+function abrirWizard(){
+  _wz={step:1,nombre:'',slug:'',slugTouched:false,slogan:'',brief_md:'',estilo_md:'',
+       web:'',instagram:'',notas:'',email:'',whatsapp:'',logo:'',
+       an:'form',  // form | analizando | listo | error  (estado del descubrimiento)
+       desc_id:null,hallazgos:[],resumen:'',confianza:'',anErr:'',
+       caps:new Set(),web_modo:'referencia',creando:false,creada:null};
+  document.getElementById('wiz').style.display='flex'; wizRender();
+}
+function cerrarWizard(){ if(_wzPoll){clearInterval(_wzPoll);_wzPoll=null;} document.getElementById('wiz').style.display='none'; _wz=null; }
+
+// --- Paso 1: descubrimiento de la presencia digital pública ---
+async function wizAnalizar(){
+  const w=_wz;
+  if(!w.web.trim() && !w.instagram.trim()){ wizErr('Poné al menos la web o el Instagram'); return; }
+  w.an='analizando'; w.anErr=''; wizRender();
+  try{
+    const d=await fetch('api/marcas/descubrir',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({nombre:w.nombre,web:w.web,instagram:w.instagram,notas:w.notas})}).then(r=>r.json());
+    if(!d.ok){ w.an='error'; w.anErr='No se pudo lanzar el análisis'; wizRender(); return; }
+    w.desc_id=d.id;
+    let intentos=0;
+    _wzPoll=setInterval(async ()=>{
+      if(!_wz){ clearInterval(_wzPoll); _wzPoll=null; return; }
+      if(++intentos>150){ clearInterval(_wzPoll); _wzPoll=null; w.an='error'; w.anErr='El análisis tardó demasiado. Cargá los datos a mano.'; wizRender(); return; }
+      try{
+        const r=await fetch('api/marcas/descubrir/'+d.id).then(x=>x.json());
+        if(r.estado==='listo'){ clearInterval(_wzPoll); _wzPoll=null; wizAplicar(r.resultado||{}); }
+        else if(r.estado==='error'){ clearInterval(_wzPoll); _wzPoll=null; w.an='error'; w.anErr=r.error||'El análisis falló'; wizRender(); }
+      }catch(_){}
+    },4000);
+  }catch(e){ w.an='error'; w.anErr='Error de conexión'; wizRender(); }
+}
+// Vuelca el análisis en el estado del wizard. Es una BASE editable: Fer revisa todo después.
+function wizAplicar(r){
+  const w=_wz, id=r.identidad||{};
+  if(r.nombre && !w.nombre.trim()) w.nombre=r.nombre;
+  w.slug = w.slugTouched ? w.slug : (r.slug || slugify(w.nombre));
+  w.slogan = r.slogan || w.slogan;
+  w.brief_md = r.brief_md || w.brief_md;
+  w.estilo_md = r.estilo_md || '';
+  w.logo = id.logo || '';
+  w.email = id.email || '';
+  w.whatsapp = id.whatsapp || '';
+  w.web = id.dominio_web || w.web;
+  w.instagram = id.ig_handle || w.instagram;
+  w.caps = new Set(r.capacidades_sugeridas || []);
+  WIZ_CAPS.forEach(c => { if(w.caps.has(c.id)) (c.depende||[]).forEach(x=>w.caps.add(x)); });
+  if(r.web_modo) w.web_modo = r.web_modo;
+  w.hallazgos = r.hallazgos || [];
+  w.resumen = r.resumen || '';
+  w.confianza = r.confianza || '';
+  w.an='listo';
+  wizRender();
+}
 function wizErr(m){ const e=document.getElementById('wz-err'); if(e) e.textContent=m||''; }
 function wizNombre(v){ _wz.nombre=v; if(!_wz.slugTouched){ _wz.slug=slugify(v); const s=document.getElementById('wz-slug'); if(s) s.value=_wz.slug; } }
 function wizToggleCap(id){ const w=_wz,c=WIZ_CAPS.find(x=>x.id===id);
@@ -134,22 +200,57 @@ function wizCapCard(c){ const on=_wz.caps.has(c.id);
 function wizRender(){
   const w=_wz; if(!w) return;
   const body=document.getElementById('wiz-body'), back=document.getElementById('wiz-back'), next=document.getElementById('wiz-next');
-  document.getElementById('wiz-stepn').textContent = w.creada ? '' : `Paso ${w.step} de 4`;
+  document.getElementById('wiz-stepn').textContent = w.creada ? '' : `Paso ${w.step} de ${WIZ_PASOS}`;
   back.style.visibility = (w.step>1 && !w.creada) ? 'visible':'hidden'; next.disabled=false;
+  next.style.display='';
   if(w.step===1){
+    // Presencia digital: lo público de la marca. De acá sale la base de identidad.
+    if(w.an==='analizando'){
+      body.innerHTML=`<div class="wdone"><div class="wspin"></div>
+        <div class="wiz-tt">Analizando la presencia digital</div>
+        <div class="wsub" style="margin-top:8px">Estamos leyendo la web, buscando la marca y armando una base de identidad. Tarda unos minutos: podés dejar esta ventana abierta.</div></div>`;
+      back.style.visibility='hidden'; next.style.display='none';
+    } else if(w.an==='listo'){
+      body.innerHTML=`
+        <div class="wsub">Esto es lo que encontramos. Es una <b>base editable</b>: revisá y corregí todo en los pasos que siguen.</div>
+        ${w.resumen?`<div class="wfld"><label>La marca</label><div style="color:var(--fg,#F5F2EC)">${esc(w.resumen)}</div></div>`:''}
+        ${w.confianza?`<div class="wfld"><label>Confianza del análisis</label><span class="wconf ${esc(w.confianza)}"><i></i>${esc(w.confianza)}</span></div>`:''}
+        ${w.hallazgos.length?`<div class="wfind"><h4>Hallazgos</h4><ul>${w.hallazgos.map(h=>`<li>${esc(h)}</li>`).join('')}</ul></div>`:''}
+        <button class="wlink" onclick="_wz.an='form';wizRender()">Volver a los datos y analizar de nuevo</button>`;
+      next.textContent='Siguiente';
+    } else {
+      body.innerHTML=`
+        <div class="wsub">Empecemos por lo <b>público</b> de la marca. Con esto analizamos su presencia digital y pre-cargamos identidad, brief y capacidades. Podés saltearlo y cargar todo a mano.</div>
+        <div class="wfld"><label>Nombre de la marca</label><input value="${esc(w.nombre)}" placeholder="Ej: Distrito Ardora" oninput="wizNombre(this.value)"></div>
+        <div class="wfld"><label>Web <span class="hint">— opcional</span></label><input value="${esc(w.web)}" placeholder="https://marca.com.ar" oninput="_wz.web=this.value;wizErr('')"></div>
+        <div class="wfld"><label>Instagram <span class="hint">— opcional</span></label><input value="${esc(w.instagram)}" placeholder="@marca" oninput="_wz.instagram=this.value;wizErr('')"></div>
+        <div class="wfld"><label>Otros datos públicos <span class="hint">— opcional: otras redes, dirección, a qué se dedica</span></label>
+          <textarea placeholder="Lo que sepas: rubro, ubicación, enlaces…" oninput="_wz.notas=this.value">${esc(w.notas)}</textarea></div>
+        ${w.an==='error'?`<div class="werr" style="min-height:auto;margin-bottom:12px">${esc(w.anErr)}</div>`:''}
+        <div class="werr" id="wz-err"></div>
+        <button class="wlink" onclick="_wz.step=2;wizRender()">Saltar el análisis y cargar a mano</button>`;
+      next.textContent='Analizar presencia';
+    }
+  } else if(w.step===2){
     body.innerHTML=`
-      <div class="wfld"><label>Nombre de la marca</label><input id="wz-nombre" value="${esc(w.nombre)}" placeholder="Ej: Distrito Ardora" oninput="wizNombre(this.value)"></div>
+      <div class="wsub">La <b>identidad</b> de la marca. ${w.desc_id?'Pre-cargada con el análisis — revisala.':''}</div>
+      <div class="wfld"><label>Nombre de la marca</label><input value="${esc(w.nombre)}" oninput="wizNombre(this.value)"></div>
       <div class="wfld"><label>Identificador (slug) <span class="hint">— minúsculas y guiones; se usa en URLs y en la cápsula</span></label>
         <input id="wz-slug" value="${esc(w.slug)}" placeholder="distrito-ardora" oninput="_wz.slug=this.value.toLowerCase();_wz.slugTouched=true;wizErr('')">
         <div class="werr" id="wz-err"></div></div>
-      <div class="wfld"><label>Slogan <span class="hint">— opcional</span></label><input value="${esc(w.slogan)}" oninput="_wz.slogan=this.value"></div>`;
-    next.textContent='Siguiente';
-  } else if(w.step===2){
-    body.innerHTML=`
-      <div class="wsub">El <b>brief</b> es el contexto que usa el creativo: propuesta de valor, tono, público, qué hacer y evitar, productos, datos clave. Aplica a todas las marcas.</div>
-      <div class="wfld"><label>Brief <span class="hint">— opcional, recomendado</span></label><textarea placeholder="Contá de qué va la marca…" oninput="_wz.brief_md=this.value">${esc(w.brief_md)}</textarea></div>`;
+      <div class="wfld"><label>Slogan <span class="hint">— opcional</span></label><input value="${esc(w.slogan)}" oninput="_wz.slogan=this.value"></div>
+      <div class="wfld"><label>Web</label><input value="${esc(w.web)}" placeholder="https://marca.com.ar" oninput="_wz.web=this.value"></div>
+      <div class="wfld"><label>Instagram</label><input value="${esc(w.instagram)}" placeholder="@marca" oninput="_wz.instagram=this.value"></div>
+      <div class="wfld"><label>Mail <span class="hint">— opcional</span></label><input value="${esc(w.email)}" oninput="_wz.email=this.value"></div>
+      <div class="wfld"><label>WhatsApp <span class="hint">— opcional</span></label><input value="${esc(w.whatsapp)}" oninput="_wz.whatsapp=this.value"></div>`;
     next.textContent='Siguiente';
   } else if(w.step===3){
+    body.innerHTML=`
+      <div class="wsub">El <b>brief</b> es el contexto que usa el creativo: propuesta de valor, tono, público, qué hacer y evitar, productos, datos clave. Aplica a todas las marcas.</div>
+      <div class="wfld"><label>Brief <span class="hint">— opcional, recomendado</span></label><textarea style="min-height:220px" placeholder="Contá de qué va la marca…" oninput="_wz.brief_md=this.value">${esc(w.brief_md)}</textarea></div>
+      ${w.estilo_md?`<div class="wfld"><label>Estilo visual <span class="hint">— detectado en el análisis; se guarda en el perfil</span></label><textarea oninput="_wz.estilo_md=this.value">${esc(w.estilo_md)}</textarea></div>`:''}`;
+    next.textContent='Siguiente';
+  } else if(w.step===4){
     body.innerHTML=`
       <div class="wsub"><b>Identidad</b>, <b>Brief</b> y <b>Biblioteca</b> vienen por defecto. Elegí qué otras capacidades querés (las configurás ahora o después).</div>
       ${WIZ_CAPS.map(wizCapCard).join('')}
@@ -159,7 +260,7 @@ function wizRender(){
         <div class="wcap${w.web_modo==='referencia'?' on':''}" onclick="_wz.web_modo='referencia';wizRender()"><div style="flex:1"><div class="wc-t">Solo referencia</div><div class="wc-d">La web existe pero no la administramos</div></div><span class="wc-chk"><i data-lucide="check" class="w-3 h-3"></i></span></div>
       </div>`;
     next.textContent='Siguiente';
-  } else if(w.step===4){
+  } else if(w.step===5){
     if(w.creada){
       body.innerHTML=`<div class="wdone"><div class="wd-ic"><i data-lucide="check" class="w-7 h-7"></i></div>
         <div class="wiz-tt">Marca creada</div>
@@ -171,6 +272,8 @@ function wizRender(){
         <div class="wsub">Repasá y creá la marca.</div>
         <div class="wfld"><label>Marca</label><div style="color:var(--fg,#F5F2EC)">${esc(w.nombre)} <span class="mono" style="color:#8A8F98">(${esc(w.slug)})</span></div></div>
         ${w.slogan?`<div class="wfld"><label>Slogan</label><div style="color:var(--fg,#F5F2EC)">${esc(w.slogan)}</div></div>`:''}
+        ${(w.web||w.instagram)?`<div class="wfld"><label>Presencia</label><div style="color:var(--fg,#F5F2EC)">${[w.web,w.instagram].filter(Boolean).map(esc).join(' · ')}</div></div>`:''}
+        <div class="wfld"><label>Brief</label><div style="color:var(--fg,#F5F2EC)">${w.brief_md.trim()?esc(w.brief_md.trim().slice(0,140))+'…':'<span class="mono" style="color:#8A8F98">sin brief (lo cargás después)</span>'}</div></div>
         <div class="wfld"><label>Capacidades</label><div style="color:var(--fg,#F5F2EC)">Identidad · Brief · Biblioteca${caps.length?' · '+caps.map(esc).join(' · '):''}</div></div>
         <div class="werr" id="wz-err"></div>`;
       next.textContent = w.creando ? 'Creando…' : 'Crear marca'; next.disabled=w.creando;
@@ -183,16 +286,22 @@ async function wizNext(){
   const w=_wz; if(!w) return;
   if(w.creada){ entrar(w.creada); return; }
   if(w.step===1){
+    if(w.an==='listo'){ w.step=2; }        // ya analizamos: seguimos con la base pre-cargada
+    else { await wizAnalizar(); return; }  // botón "Analizar presencia"
+  } else if(w.step===2){
     if(!w.nombre.trim()){ wizErr('Poné un nombre'); return; }
     if(!/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(w.slug)){ wizErr('Slug inválido: minúsculas, números y guiones (3+ caracteres)'); return; }
-    w.step=2;
-  } else if(w.step===2){ w.step=3; }
+    w.step=3;
+  }
   else if(w.step===3){ w.step=4; }
-  else if(w.step===4){
+  else if(w.step===4){ w.step=5; }
+  else if(w.step===5){
     w.creando=true; wizRender();
     try{
       const d=await fetch('api/marcas/crear',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({nombre:w.nombre.trim(),slug:w.slug,slogan:w.slogan,brief_md:w.brief_md,capacidades:[...w.caps],web_modo:w.web_modo})}).then(r=>r.json());
+        body:JSON.stringify({nombre:w.nombre.trim(),slug:w.slug,slogan:w.slogan,brief_md:w.brief_md,
+          estilo_md:w.estilo_md,dominio_web:w.web,ig_handle:w.instagram,email:w.email,whatsapp:w.whatsapp,
+          logo:w.logo,descubrimiento_id:w.desc_id,capacidades:[...w.caps],web_modo:w.web_modo})}).then(r=>r.json());
       if(d.ok){ w.creada=d.slug; }
       else { wizErr({slug_duplicado:'Ya existe una marca con ese identificador',slug_invalido:'Slug inválido',nombre_requerido:'Falta el nombre'}[d.error]||'No se pudo crear'); }
     }catch(e){ wizErr('Error de conexión'); }
