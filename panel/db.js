@@ -95,6 +95,44 @@ async function getCapacidades(proyectoId) {
   });
 }
 
+// Config de plataforma: lo transversal a todas las marcas (hoy, la lente de Instagram).
+// Mismo criterio que los tokens de marca: cifrado en la DB, write-only hacia el navegador.
+async function getLente() {
+  const { rows } = await pool.query(
+    "SELECT clave, valor, (valor_enc IS NOT NULL) AS seteado FROM contenido.plataforma_config " +
+    "WHERE clave IN ('ig_lente_id','ig_lente_token')");
+  const id = rows.find(r => r.clave === 'ig_lente_id');
+  const tk = rows.find(r => r.clave === 'ig_lente_token');
+  return { ig_lente_id: (id && id.valor) || '', token_set: !!(tk && tk.seteado) };
+}
+
+async function getLenteToken() {
+  const { rows } = await pool.query(
+    "SELECT valor_enc FROM contenido.plataforma_config WHERE clave='ig_lente_token'");
+  if (!rows[0] || !rows[0].valor_enc) return null;
+  return cryptoAds.decrypt(rows[0].valor_enc);
+}
+
+async function guardarLente(d) {
+  const id = (d.ig_lente_id || '').trim();
+  const tok = (d.token || '').trim();
+  // Ciframos ANTES de escribir nada: si falta la clave, no dejamos la config a medias.
+  let enc = null;
+  if (tok) {
+    if (!cryptoAds.hasKey()) return { ok: false, error: 'no_enc_key' };
+    enc = cryptoAds.encrypt(tok);
+  }
+  await pool.query(
+    "UPDATE contenido.plataforma_config SET valor=$1, actualizado_en=now() WHERE clave='ig_lente_id'",
+    [id || null]);
+  if (enc) {
+    await pool.query(
+      "UPDATE contenido.plataforma_config SET valor_enc=$1, actualizado_en=now() WHERE clave='ig_lente_token'",
+      [enc]);
+  }
+  return { ok: true, ...(await getLente()) };
+}
+
 // Descubrimiento: el analista lee la presencia digital pública (web + IG) y devuelve una base de
 // identidad para pre-cargar el wizard. Corre antes de que la marca exista -> cuelga de su propia
 // tabla, no de proyecto_id (se enlaza después, si el alta se concreta).
@@ -985,6 +1023,7 @@ async function health() {
 module.exports = { getMarcas, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearMarca,
   crearDescubrimiento, getDescubrimiento,
+  getLente, getLenteToken, guardarLente,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,

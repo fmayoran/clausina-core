@@ -130,6 +130,45 @@
     <p class="mono text-[11px] text-pmut dark:text-mut mb-3">cola, espera y publicado · una lectura por cápsula</p>
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3" id="brands"></div>
 
+    <!-- PLATAFORMA: lo que es de la agencia y no de una marca -->
+    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1 mt-8">Plataforma</div>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">la lente con la que ClaUsina mira Instagram · transversal a todas las marcas</p>
+    <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card p-5">
+      <div class="flex items-start gap-3 mb-4">
+        <span class="grid place-items-center w-9 h-9 rounded-lg border border-pline dark:border-line shrink-0" id="lente-ic"></span>
+        <div class="min-w-0">
+          <div class="display font-bold text-base tracking-tight">Lente de Instagram</div>
+          <div class="mono text-[11px] text-pmut dark:text-mut mt-1" id="lente-est">leyendo…</div>
+        </div>
+        <span class="ml-auto mono text-[10px] px-2 py-1 rounded-full border" id="lente-pill">·····</span>
+      </div>
+      <p class="text-sm leading-relaxed text-pmut dark:text-mut mb-4">
+        Cuenta de Instagram Business que usamos para leer el perfil <b>público</b> de cualquier otra marca
+        (bio, seguidores, cadencia, posts con engagement e imágenes del feed). Es la vía oficial de Meta
+        (<span class="mono text-[11px]">business_discovery</span>): alimenta el análisis del alta de marcas.
+        Solo ve cuentas <b>Business o Creator</b> públicas — una cuenta personal no se puede leer.
+      </p>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <label class="block">
+          <span class="mono text-[10px] uppercase tracking-wide text-pmut dark:text-mut">Cuenta lente (IG Business ID)</span>
+          <input id="lente-id" class="w-full mt-1 rounded-lg bg-paper dark:bg-ink border border-pline dark:border-line px-3 py-2 text-sm outline-none focus:border-acc" placeholder="17841…">
+        </label>
+        <label class="block">
+          <span class="mono text-[10px] uppercase tracking-wide text-pmut dark:text-mut">Token <span id="lente-tokset"></span></span>
+          <input id="lente-token" type="password" class="w-full mt-1 rounded-lg bg-paper dark:bg-ink border border-pline dark:border-line px-3 py-2 text-sm outline-none focus:border-acc" placeholder="pegá el token para reemplazarlo">
+        </label>
+      </div>
+      <p class="mono text-[10px] text-pmut dark:text-mut mt-2">
+        El token se guarda cifrado (AES-256-GCM) y nunca vuelve al navegador. Necesita los permisos:
+        instagram_basic · instagram_manage_insights · pages_read_engagement · pages_show_list.
+      </p>
+      <div class="flex gap-2 mt-4">
+        <button id="lente-probar" class="mono text-[11px] px-3 py-2 rounded-lg border border-pline dark:border-line hover:border-acc transition">Probar la lente</button>
+        <button id="lente-guardar" class="mono text-[11px] px-3 py-2 rounded-lg bg-pend text-ink font-bold" style="background:#FF6A45;color:#0c0c0a">Guardar</button>
+        <span class="mono text-[11px] self-center" id="lente-msg"></span>
+      </div>
+    </div>
+
     <p class="mono text-[10px] text-pmut dark:text-mut mt-7 pt-4 border-t border-pline dark:border-line">cola → tg_briefs · espera → revisión pendiente · publicado → piezas publicadas <span id="foot-upd"></span></p>
   </main>
 </div>
@@ -263,6 +302,50 @@ async function cargar(){
 }
 cargar();
 setInterval(cargar,20000);
+</script>
+
+<script>
+// --- Lente de Instagram (config de PLATAFORMA, no de marca) ---
+(async function lente(){
+  const $=id=>document.getElementById(id);
+  const pill=$('lente-pill'), est=$('lente-est'), ic=$('lente-ic');
+  function pintar(d){
+    $('lente-id').value = d.ig_lente_id || '';
+    $('lente-tokset').innerHTML = d.token_set
+      ? '<span style="color:#CCF24D">— cargado</span>'
+      : '<span style="color:#FF6A45">— falta</span>';
+    const ok = d.ig_lente_id && d.token_set;
+    pill.textContent = ok ? 'configurada' : 'sin configurar';
+    pill.style.color = ok ? '#CCF24D' : '#FF6A45';
+    pill.style.borderColor = ok ? '#CCF24D' : 'rgba(255,106,69,.35)';
+    est.textContent = ok ? 'lista para leer perfiles públicos' : 'cargá la cuenta y el token';
+    ic.style.color = ok ? '#CCF24D' : '#FF6A45';
+    ic.innerHTML = (window.igIcon ? window.igIcon('w-4 h-4') : '');
+  }
+  try{ pintar(await fetch('api/plataforma/lente').then(r=>r.json())); }
+  catch(e){ est.textContent='no se pudo leer'; }
+
+  $('lente-guardar').onclick = async () => {
+    const msg=$('lente-msg'); msg.style.color='#FF6A45'; msg.textContent='guardando…';
+    const body={ ig_lente_id: $('lente-id').value.trim() };
+    const t=$('lente-token').value.trim(); if(t) body.token=t;   // vacío = no lo toca
+    try{
+      const d=await fetch('api/plataforma/lente',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+      if(d.ok){ $('lente-token').value=''; pintar(d); msg.style.color='#CCF24D'; msg.textContent='guardado'; }
+      else { msg.textContent = d.error==='no_enc_key' ? 'falta APP_ENC_KEY en el panel' : 'no se pudo guardar'; }
+    }catch(e){ msg.textContent='error de conexión'; }
+    setTimeout(()=>{msg.textContent='';}, 3000);
+  };
+  $('lente-probar').onclick = async () => {
+    const msg=$('lente-msg'); msg.style.color='#FF6A45'; msg.textContent='consultando a Instagram…';
+    try{
+      const d=await fetch('api/plataforma/lente/probar',{method:'POST'}).then(r=>r.json());
+      if(d.ok){ msg.style.color='#CCF24D'; msg.textContent=`OK — la lente es @${d.username} (${d.followers} seguidores)`; }
+      else { msg.style.color='#FF6A45'; msg.textContent=d.error||'la lente no responde'; }
+    }catch(e){ msg.textContent='error de conexión'; }
+    setTimeout(()=>{msg.textContent='';}, 6000);
+  };
+})();
 </script>
 </body>
 </html>

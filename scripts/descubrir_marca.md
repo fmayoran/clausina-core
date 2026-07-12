@@ -18,10 +18,15 @@ El contexto del pedido está en `/tmp/desc_ctx_<ID>.json`. Escribí el resultado
    de ver la identidad visual de verdad —tipografía, imaginario, cómo usa el color, qué tan denso o
    despojado es—. Del CSS no se deduce: el dossier te da la paleta real medida sobre los píxeles de
    la captura, usala para `paleta` y `estilo_md`. Describí lo que VES, no lo que el nombre sugiere.
-3. **Instagram**: Instagram **bloquea las lecturas desde servidores** (HTTP 429), así que lo más
-   probable es que no puedas ver el feed. **No pasa nada: decilo en `hallazgos` y seguí.** Nunca
-   inventes seguidores, cantidad de posts, ni de qué va el contenido. Si necesitás datos del perfil,
-   `WebSearch` puede traerte cifras de terceros: si las usás, **aclarás que son de segunda mano**.
+3. **Instagram**: el dossier trae el perfil por la **API oficial de Meta** (`business_discovery`) —
+   no es scraping: son datos reales de Instagram. Tenés bio, seguidores, cadencia de publicación y
+   los últimos posts con caption, likes y comentarios, además de **las imágenes del feed** (abrilas
+   con `Read`: ahí ves el tratamiento visual, si usan foto propia o stock, si hay texto sobre la
+   imagen). Usalos: el **tono de voz** sale de los captions reales, no de tu intuición.
+   Si el dossier dice que no se pudo leer (cuenta personal o privada — la API solo ve cuentas
+   Business/Creator públicas), **decilo en `hallazgos` y seguí**. Nunca inventes seguidores,
+   cantidad de posts ni de qué va el contenido. Si sacás cifras de `WebSearch`, **aclarás que son
+   de segunda mano**.
 4. **Búsqueda** (`WebSearch`): buscá el nombre de la marca + ubicación para completar lo que
    falte (reseñas, notas de prensa, directorios, otras redes). Sirve sobre todo cuando no hay web.
 5. Las **notas** que dejó el usuario: pueden traer enlaces o datos que no están en ningún lado.

@@ -201,6 +201,31 @@ app.get('/api/capacidades', async (req, res) => {
   try { res.json(await db.getCapacidades(req.proyectoId)); }
   catch (e) { console.error('capacidades', e.message); res.status(500).json({ error: 'db' }); }
 });
+// Lente de Instagram: config de PLATAFORMA (la agencia, no una marca). El token se guarda
+// cifrado y es write-only: nunca vuelve al navegador (solo decimos si está cargado).
+app.get('/api/plataforma/lente', async (req, res) => {
+  try { res.json(await db.getLente()); }
+  catch (e) { console.error('lente', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/plataforma/lente', async (req, res) => {
+  try {
+    const r = await db.guardarLente(req.body || {});
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { console.error('lente-set', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+// Probar la lente contra Instagram: confirma que el token anda ANTES de que falle un alta.
+app.post('/api/plataforma/lente/probar', async (req, res) => {
+  try {
+    const { ig_lente_id } = await db.getLente();
+    const tok = await db.getLenteToken();
+    if (!ig_lente_id || !tok) return res.json({ ok: false, error: 'Falta la cuenta o el token' });
+    const r = await fetch(`https://graph.facebook.com/v21.0/${ig_lente_id}` +
+      `?fields=username,followers_count&access_token=${encodeURIComponent(tok)}`).then(x => x.json());
+    if (r.error) return res.json({ ok: false, error: String(r.error.message).slice(0, 140) });
+    res.json({ ok: true, username: r.username, followers: r.followers_count });
+  } catch (e) { res.json({ ok: false, error: 'No se pudo consultar a Instagram' }); }
+});
+
 // Descubrimiento: analizar la presencia digital pública de una marca que todavía no existe,
 // para pre-cargar el wizard. El análisis lo hace un job (worker); acá solo encolamos y consultamos.
 app.post('/api/marcas/descubrir', async (req, res) => {

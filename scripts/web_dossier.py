@@ -248,20 +248,45 @@ def main():
 
     if a.ig:
         handle = a.ig.strip().lstrip("@")
-        url = f"https://www.instagram.com/{handle}/"
-        h, err = bajar(url)
         sec(f, f"Instagram: @{handle}")
-        if not h:
-            f.write(f"NO SE PUDO LEER ({err}). Instagram bloquea las lecturas desde servidores; "
-                    "es lo esperable. NO asumas nada del feed: ni seguidores, ni cantidad de posts, "
-                    "ni temática. Si hace falta, decilo en `hallazgos`.\n")
+        # Vía OFICIAL (business_discovery), no scraping: instagram.com da 429 a los servidores.
+        try:
+            import ig_publico
+            d, err = ig_publico.perfil(handle, n_media=12)
+        except Exception as e:
+            d, err = None, str(e)[:200]
+
+        if err or not d:
+            f.write(f"NO SE PUDO LEER: {err}\n"
+                    "NO asumas nada del feed: ni seguidores, ni cantidad de posts, ni temática. "
+                    "Decilo en `hallazgos`.\n")
         else:
-            m = metas(h)
-            for k in ("og:title", "og:description", "description"):
-                if m.get(k):
-                    f.write(f"- {k}: {m[k]}\n")
-            if not any(m.get(k) for k in ("og:title", "og:description", "description")):
-                f.write("Respondió, pero sin datos del perfil (muro de login). No asumas nada del feed.\n")
+            medias = (d.get("media") or {}).get("data") or []
+            cad = ig_publico.cadencia(medias)
+            f.write(f"- Nombre: {d.get('name') or ''}\n")
+            f.write(f"- Seguidores: {d.get('followers_count'):,} · Publicaciones: {d.get('media_count'):,}\n")
+            if d.get("website"):
+                f.write(f"- Web que declara en la bio: {d['website']}\n")
+            if cad is not None:
+                f.write(f"- Cadencia: publica cada ~{cad} día(s) (mediana de los últimos posts)\n")
+            f.write(f"- Bio:\n```\n{d.get('biography') or ''}\n```\n")
+            if medias:
+                ls = [m.get("like_count") or 0 for m in medias]
+                f.write(f"\n### Últimos {len(medias)} posts (engagement real: promedio {sum(ls)//len(ls)} likes)\n")
+                for m in medias:
+                    cap = " ".join((m.get("caption") or "").split())[:220]
+                    f.write(f"- **{m.get('timestamp','')[:10]}** · {m.get('media_type')} · "
+                            f"{m.get('like_count')} likes · {m.get('comments_count')} comentarios\n"
+                            f"  > {cap}\n")
+                # Las imágenes del feed: el estilo visual se VE, no se deduce de los captions.
+                if a.shot:
+                    dirf = os.path.join(os.path.dirname(a.shot), "igfeed")
+                    fotos = ig_publico.bajar_fotos(medias, dirf, n=6)
+                    if fotos:
+                        f.write(f"\n### Imágenes del feed ({len(fotos)}) — **abrilas con Read**\n"
+                                "Es la grilla real de la marca: mirá el tratamiento visual, la paleta, "
+                                "si usan fotos propias o stock, si hay texto sobre la imagen.\n"
+                                + "\n".join(f"- {p}" for p in fotos) + "\n")
 
     f.close()
     print(f"dossier -> {a.out}")
