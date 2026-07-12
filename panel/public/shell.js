@@ -116,6 +116,7 @@
       document.head.appendChild(st);
     }
     shell.insertAdjacentHTML('afterbegin', html(opts.active || ''));
+    if (window.fixIgIcons) window.fixIgIcons(shell);
     marcarCapacidades();
     if (opts.cap) guardarCapacidad(opts.cap);
     // Páginas de contenido (panel.css) son dark-only: forzar dark y ocultar el toggle.
@@ -187,6 +188,24 @@
         'y completar su configuración.</p><a href="proyecto">Ir al panel del proyecto</a></div>';
     }).catch(function () {});
   }
+
+  // Lucide sacó los logos de marca: no tiene ícono 'instagram'. Usamos un SVG monocromático
+  // propio (hereda currentColor, mismo peso de trazo que Lucide). window.igIcon(cls) -> markup.
+  window.igIcon = function (cls) {
+    return '<svg xmlns="http://www.w3.org/2000/svg" class="' + (cls || 'w-4 h-4') + '" viewBox="0 0 24 24" ' +
+      'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<rect x="2" y="2" width="20" height="20" rx="5"/>' +
+      '<circle cx="12" cy="12" r="4"/>' +
+      '<circle cx="17.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/>' +
+      '</svg>';
+  };
+  // Reemplaza los <i data-lucide="instagram"> por el SVG propio (Lucide los deja vacíos).
+  window.fixIgIcons = function (root) {
+    (root || document).querySelectorAll('[data-lucide="instagram"]').forEach(function (el) {
+      var cls = el.getAttribute('class') || 'w-4 h-4';
+      el.outerHTML = window.igIcon(cls);
+    });
+  };
 
   function esc(s) { return (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
   window.ClausinaSetMarca = function (slug) {

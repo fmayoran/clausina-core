@@ -29,6 +29,10 @@
     <div class="flex items-baseline gap-3 mb-4">
       <h1 class="display font-bold text-xl tracking-tight hl"><span>Inicio</span></h1>
       <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
+      <a href="marcas" title="Ver qué tiene configurada cada marca" aria-label="Ver qué tiene configurada cada marca"
+         class="ml-auto self-center grid place-items-center w-9 h-9 rounded-lg border border-pline dark:border-line text-pmut dark:text-mut hover:border-acc hover:acc-text transition shrink-0">
+        <i data-lucide="table-properties" class="w-4 h-4"></i>
+      </a>
     </div>
 
     <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-3">Sala de máquinas</div>
@@ -43,10 +47,7 @@
       </div>
     </a>
 
-    <div class="flex items-center gap-3 mb-3">
-      <span class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut">Las marcas</span>
-      <a href="marcas" class="mono text-[11px] acc-text hover:underline ml-auto inline-flex items-center gap-1">ver qué tiene cada una <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i></a>
-    </div>
+    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-3">Las marcas</div>
     <section id="grid" class="grid md:grid-cols-2 gap-4"></section>
   </main>
 </div>
@@ -127,7 +128,7 @@ function wizToggleCap(id){ const w=_wz,c=WIZ_CAPS.find(x=>x.id===id);
 function wizPrev(){ if(_wz.step>1){ _wz.step--; wizRender(); } }
 function wizCapCard(c){ const on=_wz.caps.has(c.id);
   return `<div class="wcap${on?' on':''}" onclick="wizToggleCap('${c.id}')">
-    <span class="wc-ic"><i data-lucide="${c.icon}" class="w-4 h-4"></i></span>
+    <span class="wc-ic">${(c.id==='instagram'&&window.igIcon)?window.igIcon('w-4 h-4'):`<i data-lucide="${c.icon}" class="w-4 h-4"></i>`}</span>
     <div style="flex:1;min-width:0"><div class="wc-t">${c.label}</div><div class="wc-d">${c.desc}</div>${c.depende?`<div class="wc-dep">requiere: ${c.depende.join(', ')}</div>`:''}</div>
     <span class="wc-chk"><i data-lucide="check" class="w-3 h-3"></i></span></div>`; }
 function wizRender(){
@@ -176,6 +177,7 @@ function wizRender(){
     }
   }
   if(window.lucide) lucide.createIcons();
+  if(window.fixIgIcons) window.fixIgIcons(document.getElementById('wiz-body'));
 }
 async function wizNext(){
   const w=_wz; if(!w) return;
@@ -269,7 +271,8 @@ function capChips(caps){
     const cls = st==='ok' ? 'border-acc/50 acc-text'
       : (st==='cfg' ? 'border-cor/50 cor-text' : 'border-pline dark:border-line text-pmut dark:text-mut opacity-40');
     const est = st==='ok' ? 'activa' : (st==='cfg' ? 'falta configurar: '+c.faltan.join(', ') : 'deshabilitada');
-    return `<span title="${esc(c.label+' — '+est)}" class="grid place-items-center w-6 h-6 rounded-md border ${cls}"><i data-lucide="${esc(c.icon)}" class="w-3 h-3"></i></span>`;
+    const ico = (c.id==='instagram' && window.igIcon) ? window.igIcon('w-3 h-3') : `<i data-lucide="${esc(c.icon)}" class="w-3 h-3"></i>`;
+    return `<span title="${esc(c.label+' — '+est)}" class="grid place-items-center w-6 h-6 rounded-md border ${cls}">${ico}</span>`;
   }).join('') + `</div>`;
 }
 function vacio(){ return `<a href="#" onclick="abrirWizard();return false;" class="group rounded-2xl border border-dashed border-pline dark:border-line p-5 grid place-items-center text-center min-h-[120px] hover:border-acc transition">
@@ -295,6 +298,7 @@ async function cargar(){
       ? marcas.map((m,i)=>card(m, i===0)).join('') + vacio()
       : vacio();
     lucide.createIcons();
+    if(window.fixIgIcons) window.fixIgIcons(document.getElementById('grid'));
   }catch(e){
     document.getElementById('sub').textContent = 'sin conexión';
   }

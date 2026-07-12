@@ -6,12 +6,15 @@
 <title>ClaUsina — Marcas</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="apple-touch-icon" href="fonts/clausina-icono-180.png">
+<script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tw.css">
 <style>
   .mtx{width:100%;border-collapse:separate;border-spacing:0;min-width:720px;}
-  .mtx th,.mtx td{padding:14px 12px;text-align:left;border-bottom:1px solid rgb(var(--line-rgb,32 36 43)/1);}
+  .mtx th,.mtx td{padding:14px 12px;text-align:left;border-bottom:1px solid #E6E3DD;}
+  .dark .mtx th,.dark .mtx td{border-bottom-color:#20242B;}
+  .mtx tbody tr:last-child th,.mtx tbody tr:last-child td{border-bottom:0;}
   .mtx thead th{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;font-weight:400;white-space:nowrap;}
   .mtx tbody tr:hover{background:rgba(127,127,127,.06);}
   .mtx td.marca{white-space:nowrap;}
@@ -23,7 +26,7 @@
   .scrollx{overflow-x:auto;}
 </style>
 </head>
-<body>
+<body class="bg-paper text-pfg dark:bg-ink dark:text-fg transition-colors">
 <div class="shell">
   <main class="px-6 md:px-9 py-8 min-w-0">
     <div class="flex items-baseline gap-3 mb-1">
@@ -39,7 +42,7 @@
       </table>
     </div>
 
-    <div class="mono text-[10px] text-pmut dark:text-mut mt-5 flex flex-wrap gap-x-6 gap-y-2">
+    <div class="mono text-[10px] text-pmut dark:text-mut" style="display:flex;flex-wrap:wrap;gap:10px 26px;margin-top:20px;">
       <span class="cst ok"><span class="cdot"></span>activa</span>
       <span class="cst cfg"><span class="cdot"></span>falta configurar</span>
       <span class="cst off text-pmut dark:text-mut"><span class="cdot"></span>deshabilitada</span>
@@ -88,6 +91,7 @@ function filaMarca(m){
     document.getElementById('mtx-head').innerHTML =
       `<th class="text-pmut dark:text-mut">Marca</th>` +
       caps.map(c=>`<th class="text-pmut dark:text-mut">${esc(c.label)}</th>`).join('');
+    if(window.fixIgIcons) window.fixIgIcons();
     document.getElementById('mtx-body').innerHTML = marcas.map(filaMarca).join('');
     document.getElementById('sub').textContent = `${marcas.length} marca(s)`;
     if(window.lucide) lucide.createIcons();

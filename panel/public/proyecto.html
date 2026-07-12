@@ -245,6 +245,7 @@
       _CAPS=await r.json();
       document.getElementById('caps-grid').innerHTML=_CAPS.map(capCard).join('');
       lucide.createIcons();
+      if(window.fixIgIcons) window.fixIgIcons(document.getElementById('caps-grid'));
       pintarPauta();
       if(typeof updateMenuCounts==='function') updateMenuCounts();
     }catch(e){}
