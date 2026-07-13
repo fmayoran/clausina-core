@@ -5,8 +5,19 @@ NO existe en la plataforma (nombre, web, Instagram, notas sueltas). Tu trabajo e
 presencia digital pública** y devolver una **base de identidad** lo más completa y honesta
 posible, para pre-cargar el alta de la marca.
 
-El contexto del pedido está en `/tmp/desc_ctx_<ID>.json`. Escribí el resultado en
-`/tmp/desc_res_<ID>.json`. No hagas nada más: no toques la base, ni git, ni publiques nada.
+El contexto del pedido está en `/tmp/desc_ctx_<ID>.json`. No hagas nada más: no toques la base,
+ni git, ni publiques nada.
+
+## Dónde escribís el resultado (TRES archivos)
+
+El brief y el estilo son textos largos: **NO van dentro del JSON**. Metidos ahí, las comillas y
+los saltos de línea rompen el escapado y se pierde todo el análisis. Van en archivos aparte:
+
+1. `/tmp/desc_brief_<ID>.md` → el **brief**, markdown plano (ver estructura abajo).
+2. `/tmp/desc_estilo_<ID>.md` → el **estilo visual**, markdown plano.
+3. `/tmp/desc_res_<ID>.json` → **solo datos cortos** (ver formato abajo). Sin brief ni estilo.
+
+Escribí primero los dos `.md` y al final el JSON.
 
 ## Qué mirar
 
@@ -41,7 +52,32 @@ El contexto del pedido está en `/tmp/desc_ctx_<ID>.json`. Escribí el resultado
 - El `brief_md` es el que va a usar el creativo para escribir. Escribilo en **markdown**, en español,
   con la voz de la marca observada, no con la tuya.
 
-## Formato de salida (JSON, exactamente estas claves)
+## `/tmp/desc_brief_<ID>.md` — el brief
+
+Markdown plano, con estas secciones (escribilas aunque alguna quede corta):
+
+```markdown
+## Qué es
+## Propuesta de valor
+## Público
+## Tono de voz
+## Productos / servicios
+## Qué evitar
+## Datos clave
+```
+
+## `/tmp/desc_estilo_<ID>.md` — el estilo visual
+
+```markdown
+## Paleta
+- #RRGGBB — para qué se usa
+## Tipografía
+## Imaginario visual
+```
+
+## `/tmp/desc_res_<ID>.json` — los datos cortos
+
+Exactamente estas claves. **Nada de textos largos acá.**
 
 ```json
 {
@@ -49,8 +85,6 @@ El contexto del pedido está en `/tmp/desc_ctx_<ID>.json`. Escribí el resultado
   "slug": "sugerencia-en-minusculas",
   "slogan": "el que use la marca, si tiene",
   "resumen": "una línea: qué es esta marca (para mostrar en el wizard)",
-  "brief_md": "## Qué es\n…\n\n## Propuesta de valor\n…\n\n## Público\n…\n\n## Tono de voz\n…\n\n## Productos / servicios\n…\n\n## Qué evitar\n…\n\n## Datos clave\n…",
-  "estilo_md": "## Paleta\n- #RRGGBB — uso\n\n## Tipografía\n…\n\n## Imaginario visual\n…",
   "identidad": {
     "dominio_web": "https://…",
     "ig_handle": "@handle",

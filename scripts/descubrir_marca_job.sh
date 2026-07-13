@@ -47,11 +47,11 @@ WEB=$(python3 -c "import json;print(json.load(open('/tmp/desc_ctx_$did.json')).g
 IG=$(python3 -c "import json;print(json.load(open('/tmp/desc_ctx_$did.json')).get('instagram',''))")
 python3 "$MOTOR/scripts/web_dossier.py" --web "$WEB" --ig "$IG" --out "$DOS" --shot "$SHOT" >> "$LOG" 2>&1 || echo "" > "$DOS"
 
-rm -f "/tmp/desc_res_$did.json"
-PROMPT="Sos el ANALISTA DE MARCA de ClaUsina. Segui EXACTAMENTE $MOTOR/scripts/descubrir_marca.md. El pedido (nombre, web, instagram, notas) esta en /tmp/desc_ctx_$did.json y el DOSSIER ya bajado del sitio esta en $DOS: leelo PRIMERO, es tu fuente principal. Si existe la captura de la home $SHOT, ABRILA CON Read: es la unica forma de ver la identidad visual real (tipografia, imaginario, uso del color). Usa WebSearch para completar lo que falte. Escribi el resultado en /tmp/desc_res_$did.json con el formato que indica la skill. Solo LEES fuentes publicas: no toques la base, ni git, ni publiques nada, ni crees la marca."
+rm -f "/tmp/desc_res_$did.json" "/tmp/desc_brief_$did.md" "/tmp/desc_estilo_$did.md"
+PROMPT="Sos el ANALISTA DE MARCA de ClaUsina. Segui EXACTAMENTE $MOTOR/scripts/descubrir_marca.md. El pedido (nombre, web, instagram, notas) esta en /tmp/desc_ctx_$did.json y el DOSSIER ya bajado del sitio esta en $DOS: leelo PRIMERO, es tu fuente principal. Si existe la captura de la home $SHOT, ABRILA CON Read: es la unica forma de ver la identidad visual real (tipografia, imaginario, uso del color). Usa WebSearch para completar lo que falte. Escribi TRES archivos como indica la skill: el brief en /tmp/desc_brief_$did.md, el estilo en /tmp/desc_estilo_$did.md y los datos cortos en /tmp/desc_res_$did.json (SIN textos largos adentro del JSON). Solo LEES fuentes publicas: no toques la base, ni git, ni publiques nada, ni crees la marca."
 timeout 600 claude -p "$PROMPT" --model sonnet --allowedTools WebFetch WebSearch Read Write >> "$LOG" 2>&1
 
-PG="$PG" DID="$did" python3 - <<'PY'
+res=$(PG="$PG" DID="$did" python3 - <<'PY'
 import json, os, secrets, subprocess
 pg=os.environ["PG"]; did=os.environ["DID"]
 def psql(sql):
@@ -65,12 +65,26 @@ def fallar(msg):
 
 try:
     d=json.load(open(f"/tmp/desc_res_{did}.json"))
+except FileNotFoundError:
+    fallar("El analista no dejó resultado. Probá de nuevo o cargá los datos a mano."); raise SystemExit
 except Exception as e:
-    fallar(f"El analista no dejó un resultado legible ({e}). Probá de nuevo o cargá los datos a mano."); raise SystemExit
+    fallar(f"El resultado del analista salió mal formado ({e}). Probá de nuevo."); raise SystemExit
 
 err=(d.get("error") or "").strip()
 if err:
     fallar(err); raise SystemExit
+
+# Los textos largos van en archivos aparte, NO dentro del JSON: metidos ahí, las comillas y los
+# saltos de línea rompen el escapado y se pierde todo el análisis (pasó con IBITAT el 12/07).
+def leer(p):
+    try:
+        return open(p, encoding="utf-8").read().strip()
+    except Exception:
+        return ""
+d["brief_md"]  = leer(f"/tmp/desc_brief_{did}.md")  or (d.get("brief_md")  or "")
+d["estilo_md"] = leer(f"/tmp/desc_estilo_{did}.md") or (d.get("estilo_md") or "")
+if not d["brief_md"]:
+    fallar("El analista no escribió el brief. Probá de nuevo."); raise SystemExit
 
 # Normalización defensiva: el wizard confía en la forma, no en el criterio del modelo.
 CAPS_OK={"estilo","instagram","pauta","pantalla","web"}
@@ -91,6 +105,15 @@ if r.returncode!=0:
     fallar("No se pudo guardar el análisis: "+(r.stderr or "").strip()[:300]); raise SystemExit
 print("ok:"+(d.get("nombre") or "marca"))
 PY
+)
 
-rm -f "/tmp/desc_ctx_$did.json" "/tmp/desc_res_$did.json" "/tmp/desc_web_$did.md" "$SHOT" "/tmp/desc_shot_$did.html"
+# Limpiamos SOLO si salió bien. Si falló, los temporales quedan: son la única evidencia de qué
+# escribió el analista (la primera vez que esto se rompió, el cleanup me dejó a ciegas).
+if [[ "$res" == ok:* ]]; then
+  rm -f "/tmp/desc_ctx_$did.json" "/tmp/desc_res_$did.json" "/tmp/desc_brief_$did.md" \
+        "/tmp/desc_estilo_$did.md" "/tmp/desc_web_$did.md" "$SHOT" "/tmp/desc_shot_$did.html"
+  rm -rf "/tmp/desc_shot_${did}_igfeed" "/tmp/desc_${did}.lock"
+else
+  echo "$(ts) (temporales de $did conservados para diagnóstico)" >> "$LOG"
+fi
 echo "$(ts) fin descubrimiento $did" >> "$LOG"

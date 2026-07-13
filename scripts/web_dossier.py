@@ -280,7 +280,7 @@ def main():
                             f"  > {cap}\n")
                 # Las imágenes del feed: el estilo visual se VE, no se deduce de los captions.
                 if a.shot:
-                    dirf = os.path.join(os.path.dirname(a.shot), "igfeed")
+                    dirf = a.shot.rsplit(".", 1)[0] + "_igfeed"
                     fotos = ig_publico.bajar_fotos(medias, dirf, n=6)
                     if fotos:
                         f.write(f"\n### Imágenes del feed ({len(fotos)}) — **abrilas con Read**\n"
