@@ -47,8 +47,15 @@
       </div>
     </a>
 
-    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-3">Las marcas</div>
+    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1">Gestión integral</div>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">las manejamos completas</p>
     <section id="grid" class="grid md:grid-cols-2 gap-4"></section>
+
+    <div id="sec-parcial" style="display:none">
+      <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1 mt-8">Gestión parcial</div>
+      <p class="mono text-[11px] text-pmut dark:text-mut mb-3">rol secundario · les damos una parte del servicio</p>
+      <section id="grid-parcial" class="grid md:grid-cols-2 gap-4"></section>
+    </div>
   </main>
 </div>
 
@@ -135,6 +142,7 @@ function slugify(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-
 function abrirWizard(){
   _wz={step:1,nombre:'',slug:'',slugTouched:false,slogan:'',brief_md:'',estilo_md:'',
        web:'',instagram:'',notas:'',email:'',whatsapp:'',logo:'',
+       gestion:'integral',
        an:'form',  // form | analizando | listo | error  (estado del descubrimiento)
        desc_id:null,hallazgos:[],resumen:'',confianza:'',anErr:'',
        caps:new Set(),web_modo:'referencia',creando:false,creada:null};
@@ -254,6 +262,9 @@ function wizRender(){
     next.textContent='Siguiente';
   } else if(w.step===4){
     body.innerHTML=`
+      <div class="wsub">¿Cuál es nuestro <b>rol</b> sobre esta marca? Agrupa la marca en el inicio.</div>
+      <div class="wcap${w.gestion==='integral'?' on':''}" onclick="_wz.gestion='integral';wizRender()"><div style="flex:1"><div class="wc-t">Gestión integral</div><div class="wc-d">La manejamos completa</div></div><span class="wc-chk"><i data-lucide="check" class="w-3 h-3"></i></span></div>
+      <div class="wcap${w.gestion==='parcial'?' on':''}" onclick="_wz.gestion='parcial';wizRender()" style="margin-bottom:16px"><div style="flex:1"><div class="wc-t">Gestión parcial</div><div class="wc-d">Rol secundario: le damos una parte del servicio</div></div><span class="wc-chk"><i data-lucide="check" class="w-3 h-3"></i></span></div>
       <div class="wsub"><b>Identidad</b>, <b>Brief</b> y <b>Biblioteca</b> vienen por defecto. Elegí qué otras capacidades querés (las configurás ahora o después).</div>
       ${WIZ_CAPS.map(wizCapCard).join('')}
       <div id="wz-webmodo" style="display:${w.caps.has('web')?'block':'none'};margin-top:6px">
@@ -276,6 +287,7 @@ function wizRender(){
         ${w.slogan?`<div class="wfld"><label>Slogan</label><div style="color:var(--fg,#F5F2EC)">${esc(w.slogan)}</div></div>`:''}
         ${(w.web||w.instagram)?`<div class="wfld"><label>Presencia</label><div style="color:var(--fg,#F5F2EC)">${[w.web,w.instagram].filter(Boolean).map(esc).join(' · ')}</div></div>`:''}
         <div class="wfld"><label>Brief</label><div style="color:var(--fg,#F5F2EC)">${w.brief_md.trim()?esc(w.brief_md.trim().slice(0,140))+'…':'<span class="mono" style="color:#8A8F98">sin brief (lo cargás después)</span>'}</div></div>
+        <div class="wfld"><label>Rol de ClaUsina</label><div style="color:var(--fg,#F5F2EC)">${w.gestion==='parcial'?'Gestión parcial (rol secundario)':'Gestión integral'}</div></div>
         <div class="wfld"><label>Capacidades</label><div style="color:var(--fg,#F5F2EC)">Identidad · Brief · Biblioteca${caps.length?' · '+caps.map(esc).join(' · '):''}</div></div>
         <div class="werr" id="wz-err"></div>`;
       next.textContent = w.creando ? 'Creando…' : 'Crear marca'; next.disabled=w.creando;
@@ -303,7 +315,8 @@ async function wizNext(){
       const d=await fetch('api/marcas/crear',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({nombre:w.nombre.trim(),slug:w.slug,slogan:w.slogan,brief_md:w.brief_md,
           estilo_md:w.estilo_md,dominio_web:w.web,ig_handle:w.instagram,email:w.email,whatsapp:w.whatsapp,
-          logo:w.logo,descubrimiento_id:w.desc_id,capacidades:[...w.caps],web_modo:w.web_modo})}).then(r=>r.json());
+          logo:w.logo,descubrimiento_id:w.desc_id,capacidades:[...w.caps],web_modo:w.web_modo,
+          gestion:w.gestion})}).then(r=>r.json());
       if(d.ok){ w.creada=d.slug; }
       else { wizErr({slug_duplicado:'Ya existe una marca con ese identificador',slug_invalido:'Slug inválido',nombre_requerido:'Falta el nombre'}[d.error]||'No se pudo crear'); }
     }catch(e){ wizErr('Error de conexión'); }
@@ -405,11 +418,19 @@ async function cargar(){
     const activas = marcas.filter(m=>m.activo).length;
     document.getElementById('sub').textContent = `agencia · ${activas} marca${activas===1?'':'s'} activa${activas===1?'':'s'}`;
     renderConsola(marcas, maq);
-    document.getElementById('grid').innerHTML = marcas.length
-      ? marcas.map((m,i)=>card(m, i===0)).join('') + vacio()
+    // El rol sobre la marca es un dato de negocio (columna proyectos.gestion), no algo derivado
+    // de qué capacidades estén prendidas: una marca puede tener IG y aun así ser rol secundario.
+    const integrales = marcas.filter(m => m.gestion !== 'parcial');
+    const parciales  = marcas.filter(m => m.gestion === 'parcial');
+    document.getElementById('grid').innerHTML = integrales.length
+      ? integrales.map((m,i)=>card(m, i===0)).join('') + vacio()
       : vacio();
+    const secP = document.getElementById('sec-parcial');
+    secP.style.display = parciales.length ? 'block' : 'none';
+    if(parciales.length) document.getElementById('grid-parcial').innerHTML = parciales.map(m=>card(m,false)).join('');
     lucide.createIcons();
     if(window.fixIgIcons) window.fixIgIcons(document.getElementById('grid'));
+    if(window.fixIgIcons && parciales.length) window.fixIgIcons(document.getElementById('grid-parcial'));
   }catch(e){
     document.getElementById('sub').textContent = 'sin conexión';
   }

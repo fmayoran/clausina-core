@@ -19,7 +19,7 @@ let _marcas = null, _marcasAt = 0;
 async function getMarcas() {
   if (!_marcas || Date.now() - _marcasAt > 60000) {
     const { rows } = await pool.query(
-      `SELECT p.id, p.slug, p.nombre, p.activo, pp.logo
+      `SELECT p.id, p.slug, p.nombre, p.activo, p.gestion, pp.logo
          FROM contenido.proyectos p LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id
         ORDER BY p.activo DESC, p.creado_en`);
     _marcas = rows; _marcasAt = Date.now();
@@ -34,7 +34,7 @@ async function getProyectoId(slug) {
 // --- Perfil del proyecto (registro que consume el creativo): marca + slogan + logo + brief ---
 async function getPerfil(proyectoId) {
   const { rows: [r] } = await pool.query(
-    `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email, p.whatsapp,
+    `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email, p.whatsapp, p.gestion,
             pp.slogan, pp.logo, pp.brief_md, pp.estilo_md, pp.actualizado_en,
             pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id,
             (pp.meta_ads_token_enc IS NOT NULL) AS meta_ads_token_set,
@@ -244,10 +244,11 @@ async function crearMarca(d) {
   CAPS.forEach(c => { if (set.has(c.id)) (c.depende || []).forEach(x => set.add(x)); });
   const txt = v => ((v || '').trim() || null);
 
+  const gestion = d.gestion === 'parcial' ? 'parcial' : 'integral';
   const { rows: [p] } = await pool.query(
-    `INSERT INTO contenido.proyectos (slug, nombre, dominio_web, ig_handle, email, whatsapp)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-    [slug, nombre, txt(d.dominio_web), txt(d.ig_handle), txt(d.email), txt(d.whatsapp)]);
+    `INSERT INTO contenido.proyectos (slug, nombre, dominio_web, ig_handle, email, whatsapp, gestion)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+    [slug, nombre, txt(d.dominio_web), txt(d.ig_handle), txt(d.email), txt(d.whatsapp), gestion]);
   await pool.query(
     `INSERT INTO contenido.proyecto_perfil (proyecto_id, slogan, brief_md, estilo_md, logo, actualizado_en)
        VALUES ($1,$2,$3,$4,$5, now())`,
@@ -332,6 +333,10 @@ async function guardarPerfil(proyectoId, d) {
   await pool.query(
     `UPDATE contenido.proyectos SET ig_handle=$2, dominio_web=$3, ig_user_id=$4, telegram_chat_id=$5, email=$6, whatsapp=$7 WHERE id=$1`,
     [proyectoId, nn(d.ig_handle), nn(d.dominio_web), nn(d.ig_user_id), nn(d.telegram_chat_id), nn(d.email), nn(d.whatsapp)]);
+  if (d.gestion === 'integral' || d.gestion === 'parcial') {
+    await pool.query('UPDATE contenido.proyectos SET gestion=$2 WHERE id=$1', [proyectoId, d.gestion]);
+    _marcasAt = 0;   // el inicio agrupa por esto: invalidar el cache
+  }
   await pool.query(`
     INSERT INTO contenido.proyecto_perfil (proyecto_id, slogan, logo, brief_md, estilo_md, actualizado_en)
     VALUES ($1,$2,$3,$4,$5, now())
@@ -766,7 +771,7 @@ const _avisoMedia = `(SELECT json_build_object('url',m.url,'poster_url',m.poster
 // Resumen de la agencia: un renglón por proyecto con descripción + indicadores (para el dashboard).
 async function getResumenAgencia() {
   const { rows } = await pool.query(`
-    SELECT p.id, p.slug, p.nombre, p.activo, p.ig_handle, p.dominio_web, pp.logo,
+    SELECT p.id, p.slug, p.nombre, p.activo, p.gestion, p.ig_handle, p.dominio_web, pp.logo,
       coalesce(nullif(pp.slogan,''), left(coalesce(pp.brief_md,''), 160)) AS descripcion,
       (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='instagram' AND pz.estado='pendiente_aprobacion') AS ig_pend,
       (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='instagram' AND pz.estado='publicada') AS ig_pub,

@@ -123,6 +123,12 @@
           <div class="fld"><label>Email <span class="hint">— de la marca</span></label><input type="text" id="email" placeholder="hola@marca.ar"></div>
           <div class="fld"><label>WhatsApp <span class="hint">— +54...</span></label><input type="text" id="whatsapp" placeholder="+54 9 11 ..."></div>
           <div class="fld"><label>Telegram chat ID</label><input type="text" id="telegram_chat_id"></div>
+          <div class="fld"><label>Rol de ClaUsina <span class="hint">— agrupa la marca en el inicio</span></label>
+            <select id="gestion" style="background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:1.02rem;padding:10px 11px;outline:none;">
+              <option value="integral">Gestión integral — la manejamos completa</option>
+              <option value="parcial">Gestión parcial — rol secundario</option>
+            </select>
+          </div>
 
           <div class="fld" style="border-top:1px solid var(--line);padding-top:14px;margin-top:4px;">
             <label>Contactos <span class="hint">— quién es quién del lado del cliente</span></label>
@@ -208,6 +214,7 @@ async function cargar(){
     const tk=document.getElementById('meta_ads_token'); if(tk){ tk.value=''; tk.placeholder = p.meta_ads_token_set ? '•••••••• configurado (vacío = no cambia)' : 'pegá el token'; }
     const it=document.getElementById('ig_token'); if(it){ it.value=''; it.placeholder = p.ig_token_set ? '•••••••• configurado (vacío = no cambia)' : 'pegá el token'; }
     mostrarLogo(p.logo||'');
+    const g=document.getElementById('gestion'); if(g) g.value = p.gestion || 'integral';
     try{ renderContactos(await fetch('api/contactos').then(r=>r.json())); }catch(_){ renderContactos([]); }
     document.getElementById('upd2').textContent = p.actualizado_en ? ('Última edición: '+fecha(p.actualizado_en)) : 'Sin cargar todavía';
     setTiles();
@@ -215,6 +222,7 @@ async function cargar(){
 }
 async function guardar(){
   const body={}; CAMPOS.forEach(c=>{ body[c]=document.getElementById(c).value; });
+  const g=document.getElementById('gestion'); if(g) body.gestion=g.value;
   const tk=fval('meta_ads_token'); if(tk) body.meta_ads_token=tk;   // solo si escribió uno nuevo
   const it=fval('ig_token'); if(it) body.ig_token=it;
   try{
