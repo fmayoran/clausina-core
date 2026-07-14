@@ -23,15 +23,11 @@
   </header>
 <div class="shell"><main class="min-w-0">
   <div id="toast"></div>
-  <!-- OJO: shell.js oculta el <header> legado, así que las acciones de página van acá adentro. -->
-  <div class="avtop">
-    <span class="avtt">Avisos · pantalla de calle</span>
-    <button class="avsub" onclick="abrirSubirAviso()" title="Subir un aviso ya listo (de la biblioteca o de disco)" aria-label="Subir un aviso ya listo">
-      <i data-lucide="upload" class="w-4 h-4"></i>
-    </button>
-  </div>
   <div class="board b2">
-    <div class="col pend"><h2><span class="dot"></span>Pendiente de aprobación <span class="n" id="n-pend"></span></h2><div class="cards" id="c-pend"></div></div>
+    <div class="col pend"><h2><span class="dot"></span>Pendiente de aprobación <span class="n" id="n-pend"></span>
+      <button class="avsub" onclick="abrirSubirAviso()" title="Subir un aviso ya listo (de la biblioteca o de disco)" aria-label="Subir un aviso ya listo">
+        <i data-lucide="upload" class="w-4 h-4"></i>
+      </button></h2><div class="cards" id="c-pend"></div></div>
     <div class="col pub"><h2><span class="dot"></span>En pantalla <span class="n" id="n-pub"></span></h2><div class="cards" id="c-pub"></div></div>
   </div>
 </main></div>
@@ -69,9 +65,8 @@
   </div>
 </div>
 <style>
-  .avtop{display:flex;align-items:center;gap:12px;padding:20px 28px 0;}
-  .avtt{font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ash);}
-  .avsub{margin-left:auto;background:transparent;border:1px solid var(--line);color:var(--ash);width:36px;height:36px;border-radius:9px;cursor:pointer;display:grid;place-items:center;transition:.15s;}
+  .col.pend h2 .n{margin-left:auto;}   /* el contador queda pegado al botón */
+  .avsub{margin-left:10px;background:transparent;border:1px solid var(--line);color:var(--ash);width:28px;height:28px;border-radius:7px;cursor:pointer;display:grid;place-items:center;transition:.15s;flex:0 0 auto;}
   .avsub:hover{color:var(--pend);border-color:var(--pend);}
   .avov{position:fixed;inset:0;z-index:140;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(0,0,0,.7);}
   .avbox{background:#111317;border:1px solid #20242B;border-radius:14px;max-width:520px;width:100%;max-height:88vh;display:flex;flex-direction:column;}
@@ -138,6 +133,9 @@ async function avDeBiblioteca(){
   const items = (data.items||[]);
   let ov = document.getElementById('avbp');
   if(!ov){ ov = document.createElement('div'); ov.id='avbp'; ov.className='bpov'; document.body.appendChild(ov);
+           // .bpov trae z-index 120 y el modal del aviso está en 140: sin esto el selector
+           // queda POR DETRÁS y los clicks no le llegan (no se podía elegir nada).
+           ov.style.zIndex = '160';
            ov.addEventListener('click', e => { if(e.target===ov) ov.style.display='none'; }); }
   window._avItems = items;
   const cells = items.length ? items.map((m,i)=>{
