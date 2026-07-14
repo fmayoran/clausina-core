@@ -95,6 +95,82 @@ async function getCapacidades(proyectoId) {
   });
 }
 
+// Contactos de la marca (dueño, community manager, pauta…). A quién escribirle, y a futuro
+// a quién notificarle cuando su aviso sale en pantalla.
+async function getContactos(proyectoId) {
+  const { rows } = await pool.query(
+    'SELECT id, nombre, rol, whatsapp, email, notas FROM contenido.proyecto_contacto ' +
+    'WHERE proyecto_id=$1 ORDER BY orden, creado_en', [proyectoId]);
+  return rows;
+}
+
+// Guardado por reemplazo: la UI manda la lista completa (es corta y se edita como un bloque).
+async function guardarContactos(proyectoId, lista) {
+  const items = (Array.isArray(lista) ? lista : [])
+    .map(c => ({
+      nombre: String(c.nombre || '').trim().slice(0, 120),
+      rol: String(c.rol || '').trim().slice(0, 60) || null,
+      whatsapp: String(c.whatsapp || '').trim().slice(0, 40) || null,
+      email: String(c.email || '').trim().slice(0, 160) || null,
+      notas: String(c.notas || '').trim().slice(0, 300) || null,
+    }))
+    .filter(c => c.nombre);   // sin nombre no es un contacto
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    await cli.query('DELETE FROM contenido.proyecto_contacto WHERE proyecto_id=$1', [proyectoId]);
+    for (let i = 0; i < items.length; i++) {
+      const c = items[i];
+      await cli.query(
+        `INSERT INTO contenido.proyecto_contacto (proyecto_id, nombre, rol, whatsapp, email, notas, orden)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [proyectoId, c.nombre, c.rol, c.whatsapp, c.email, c.notas, i]);
+    }
+    await cli.query('COMMIT');
+  } catch (e) {
+    await cli.query('ROLLBACK'); throw e;
+  } finally {
+    cli.release();
+  }
+  return { ok: true, contactos: await getContactos(proyectoId) };
+}
+
+// Aviso cargado A MANO (no lo hizo el creativo): material ya listo, de la biblioteca o de disco.
+// Entra por la MISMA puerta que los del creativo: nace 'pendiente_aprobacion'. Nada va a la
+// pantalla sin el visto de Fer.
+async function crearAvisoManual(proyectoId, d) {
+  const titulo = String(d.titulo || '').trim().slice(0, 160);
+  const url = String(d.url || '').trim();
+  if (!titulo) return { ok: false, error: 'titulo_requerido' };
+  if (!url) return { ok: false, error: 'media_requerida' };
+  const tipo = d.tipo === 'video' ? 'video' : 'image';
+  const dur = Math.max(1, Math.min(120, parseInt(d.duracion_s, 10) || 10));
+  const momento = String(d.momento || '').trim().slice(0, 80) || null;
+
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    const { rows: [pz] } = await cli.query(
+      `INSERT INTO contenido.piezas (proyecto_id, titulo_interno, canal, estado, notas)
+         VALUES ($1,$2,'aviso','pendiente_aprobacion',$3) RETURNING id, numero`,
+      [proyectoId, titulo, 'Cargado a mano (material ya listo).']);
+    const { rows: [rv] } = await cli.query(
+      `INSERT INTO contenido.revisiones (pieza_id, nro, estado, canal, duracion_s, momento)
+         VALUES ($1, 1, 'pendiente_aprobacion', 'instagram', $2, $3) RETURNING id`,
+      [pz.id, dur, momento]);
+    await cli.query(
+      `INSERT INTO contenido.media (pieza_id, orden, tipo, url, poster_url) VALUES ($1,1,$2,$3,$4)`,
+      [pz.id, tipo, url, d.poster_url || null]);
+    await cli.query('UPDATE contenido.piezas SET revision_vigente=$1 WHERE id=$2', [rv.id, pz.id]);
+    await cli.query('COMMIT');
+    return { ok: true, id: pz.id, numero: pz.numero };
+  } catch (e) {
+    await cli.query('ROLLBACK'); throw e;
+  } finally {
+    cli.release();
+  }
+}
+
 // Config de plataforma: lo transversal a todas las marcas (hoy, la lente de Instagram).
 // Mismo criterio que los tokens de marca: cifrado en la DB, write-only hacia el navegador.
 async function getLente() {
@@ -1024,6 +1100,7 @@ module.exports = { getMarcas, getProyectoId, getPerfil, getIgToken, guardarPerfi
   getCapacidades, getCapacidadesTodas, setCapacidad, crearMarca,
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente,
+  getContactos, guardarContactos, crearAvisoManual,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,

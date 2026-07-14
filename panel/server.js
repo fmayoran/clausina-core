@@ -693,6 +693,27 @@ function comprimirVideo(src, dst) {
   });
 }
 
+// Duración real del video (ffprobe): así el aviso no depende de que el usuario la adivine.
+function duracionVideo(src) {
+  return new Promise(resolve => {
+    const ff = spawn('ffprobe', ['-v', 'error', '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1', src]);
+    let out = '';
+    ff.stdout.on('data', d => { out += d; });
+    ff.on('error', () => resolve(null));
+    ff.on('close', () => { const s = Math.round(parseFloat(out)); resolve(Number.isFinite(s) && s > 0 ? s : null); });
+  });
+}
+
+// Cuadro de portada del video: sin esto la tarjeta del aviso se ve como un rectángulo negro.
+function posterVideo(src, dst) {
+  return new Promise(resolve => {
+    const ff = spawn('ffmpeg', ['-ss', '1', '-i', src, '-vframes', '1', '-q:v', '3', '-y', dst]);
+    ff.on('error', () => resolve(false));
+    ff.on('close', code => resolve(code === 0 && fs.existsSync(dst)));
+  });
+}
+
 // Recibe el video crudo por streaming (sin base64) a un archivo temporal. Devuelve la ruta temp.
 function recibirStream(req, tmp, max) {
   return new Promise((resolve, reject) => {
@@ -795,6 +816,67 @@ app.delete('/api/piezas/:id/material/:mid', async (req, res) => {
 async function resolvePantalla(req) {
   return req.query.pantalla ? db.getPantallaPorSlug(String(req.query.pantalla)) : db.getPantallaActiva();
 }
+// --- Avisos cargados A MANO (material ya listo: no lo hizo el creativo) ---
+// Entran por la misma puerta que los del creativo: nacen 'pendiente_aprobacion'.
+const urlMedia = (req, rel) => `https://${req.get('host')}/media/` +
+  rel.split('/').map(encodeURIComponent).join('/');
+
+// 1) Desde la BIBLIOTECA: el archivo ya está en el media store, solo lo apuntamos.
+app.post('/api/avisos/manual', async (req, res) => {
+  try {
+    const b = req.body || {};
+    const rel = String(b.media_path || '').replace(/^\/+/, '').replace(/^media\//, '');
+    if (!rel || rel.includes('..')) return res.status(400).json({ ok: false, error: 'media_requerida' });
+    const r = await db.crearAvisoManual(req.proyectoId, {
+      titulo: b.titulo, duracion_s: b.duracion_s, momento: b.momento,
+      tipo: b.tipo, url: urlMedia(req, rel), poster_url: b.poster_url,
+    });
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { console.error('aviso-manual', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+
+// 2) Desde DISCO (imagen, dataURL). Guarda en el media store bajo avisos/<marca>/.
+app.post('/api/avisos/subir', async (req, res) => {
+  try {
+    const { mediaPath, mediaType } = await guardarMaterialDisco(req.body, path.posix.join('avisos', req.marca));
+    res.json({ ok: true, media_path: mediaPath, tipo: mediaType });
+  } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
+});
+
+// 3) Desde DISCO (video, streaming + compresión). Devuelve además la duración real y el póster,
+//    para que el usuario no tenga que adivinar ni vea una tarjeta negra.
+app.post('/api/avisos/subir-video', async (req, res) => {
+  const tmp = path.join('/tmp', 'av_' + crypto.randomUUID() + '.src');
+  try {
+    const MAX = 600 * 1024 * 1024;
+    if (Number(req.headers['content-length'] || 0) > MAX) { const e = new Error('El video supera los 600MB'); e.http = 413; throw e; }
+    await recibirStream(req, tmp, MAX);
+    const base = crypto.randomUUID();
+    const rel = path.posix.join('avisos', req.marca, base + '.mp4');
+    const abs = path.join('/app/media', rel);
+    await fs.promises.mkdir(path.dirname(abs), { recursive: true });
+    await comprimirVideo(tmp, abs);
+    const relPost = path.posix.join('avisos', req.marca, base + '.jpg');
+    const okPost = await posterVideo(abs, path.join('/app/media', relPost));
+    res.json({
+      ok: true, media_path: rel, tipo: 'video',
+      duracion_s: await duracionVideo(abs),
+      poster_url: okPost ? urlMedia(req, relPost) : null,
+    });
+  } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
+  finally { fs.promises.unlink(tmp).catch(() => {}); }
+});
+
+// --- Contactos de la marca (dueño, community manager, pauta…) ---
+app.get('/api/contactos', async (req, res) => {
+  try { res.json(await db.getContactos(req.proyectoId)); }
+  catch (e) { console.error('contactos', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/contactos', async (req, res) => {
+  try { res.json(await db.guardarContactos(req.proyectoId, (req.body || {}).contactos)); }
+  catch (e) { console.error('contactos-set', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+
 app.get('/api/avisos-aprobados', async (req, res) => {
   try { res.json(await db.getAvisosAprobados()); }   // de TODOS los proyectos (mix)
   catch (e) { console.error('avisos-aprob', e.message); res.status(500).json({ error: 'db' }); }

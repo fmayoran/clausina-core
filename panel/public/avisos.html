@@ -17,6 +17,9 @@
     <span class="sub">Avisos · pantalla de calle</span>
     <span class="upd" id="upd"></span>
     <nav>
+      <button class="avsub" onclick="abrirSubirAviso()" title="Subir un aviso ya listo (biblioteca o archivo)" aria-label="Subir un aviso ya listo">
+        <i data-lucide="upload" class="w-4 h-4"></i>
+      </button>
       <a href="proyecto">← Proyecto</a>
       <button class="logout" onclick="salir()">Salir</button>
     </nav>
@@ -28,10 +31,180 @@
     <div class="col pub"><h2><span class="dot"></span>En pantalla <span class="n" id="n-pub"></span></h2><div class="cards" id="c-pub"></div></div>
   </div>
 </main></div>
+
+<!-- Subir un aviso ya listo (no lo hizo el creativo). Entra igual: pendiente de aprobación. -->
+<div id="av-ov" class="avov">
+  <div class="avbox">
+    <div class="avhead">
+      <b>Subir un aviso</b>
+      <span>material ya listo · queda pendiente de aprobación</span>
+      <button onclick="cerrarSubirAviso()" title="Cerrar">×</button>
+    </div>
+    <div class="avbody">
+      <div class="avfld">
+        <label>Material</label>
+        <div id="av-prev" class="avprev avvacio">— elegí de la biblioteca o subí un archivo —</div>
+        <div class="avrow" style="margin-top:8px">
+          <button class="avbtn" onclick="avDeBiblioteca()"><i data-lucide="folder-open" class="w-4 h-4"></i> Biblioteca</button>
+          <button class="avbtn" onclick="document.getElementById('av-file').click()"><i data-lucide="hard-drive-upload" class="w-4 h-4"></i> Desde disco</button>
+          <input type="file" id="av-file" accept="image/*,video/*" style="display:none" onchange="avSubirArchivo(this)">
+        </div>
+        <div id="av-prog" class="avprog" style="display:none"><div class="avfill"></div></div>
+      </div>
+      <div class="avfld"><label>Título</label><input id="av-titulo" placeholder="Cómo lo vas a reconocer en el tablero"></div>
+      <div class="avrow">
+        <div class="avfld" style="flex:1"><label>Duración (segundos)</label><input id="av-dur" type="number" min="1" max="120" value="10"></div>
+        <div class="avfld" style="flex:1"><label>Momento <span class="avhint">— opcional</span></label><input id="av-mom" placeholder="pre-apertura, mediodía…"></div>
+      </div>
+      <div class="averr" id="av-err"></div>
+    </div>
+    <div class="avfoot">
+      <button class="avbtn" onclick="cerrarSubirAviso()">Cancelar</button>
+      <button class="avbtn prim" id="av-crear" onclick="avCrear()">Mandar a aprobación</button>
+    </div>
+  </div>
+</div>
+<style>
+  .avsub{background:transparent;border:1px solid var(--line);color:var(--ash);width:30px;height:26px;border-radius:5px;cursor:pointer;display:grid;place-items:center;transition:.15s;}
+  .avsub:hover{color:var(--pend);border-color:var(--pend);}
+  .avov{position:fixed;inset:0;z-index:140;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(0,0,0,.7);}
+  .avbox{background:#111317;border:1px solid #20242B;border-radius:14px;max-width:520px;width:100%;max-height:88vh;display:flex;flex-direction:column;}
+  .avhead{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid #20242B;}
+  .avhead b{font-family:'Inter Tight',sans-serif;font-size:16px;color:#ECEEF0;}
+  .avhead span{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ash);}
+  .avhead button{margin-left:auto;background:none;border:0;color:var(--ash);font-size:22px;cursor:pointer;line-height:1;}
+  .avbody{padding:18px;overflow-y:auto;}
+  .avfoot{display:flex;gap:9px;padding:14px 18px;border-top:1px solid #20242B;}
+  .avfoot .avbtn{flex:1;justify-content:center;}
+  .avfld{margin-bottom:15px;}
+  .avfld label{display:block;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;}
+  .avhint{text-transform:none;letter-spacing:0;color:#6f6f68;}
+  .avfld input{width:100%;background:#0c0c0a;border:1px solid var(--line);border-radius:7px;color:var(--white);font-family:'Inter',sans-serif;font-size:.95rem;padding:9px 11px;outline:none;}
+  .avfld input:focus{border-color:var(--pend);}
+  .avrow{display:flex;gap:9px;}
+  .avbtn{display:inline-flex;align-items:center;gap:7px;background:transparent;border:1px solid var(--line);color:var(--white);font-family:'Inter Tight',sans-serif;font-weight:700;font-size:.86rem;padding:9px 13px;border-radius:8px;cursor:pointer;transition:.15s;}
+  .avbtn:hover{border-color:var(--ash);} .avbtn:disabled{opacity:.5;cursor:default;}
+  .avbtn.prim{background:var(--pend);border-color:var(--pend);color:#0c0c0a;}   /* pendiente: coral */
+  .avprev{border:1px dashed var(--line);border-radius:10px;min-height:120px;display:grid;place-items:center;overflow:hidden;background:#0c0c0a;}
+  .avprev.avvacio{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:#55554f;}
+  .avprev img,.avprev video{max-height:220px;max-width:100%;display:block;}
+  .avprog{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:8px;}
+  .avprog .avfill{height:100%;width:0;background:var(--pend);transition:width .2s,background .2s;}
+  .avprog .avfill.hecho{background:var(--done);}
+  .averr{color:var(--alarm);font-family:'JetBrains Mono',monospace;font-size:.66rem;min-height:14px;}
+</style>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="shell.js"></script>
 <script>ClausinaShell({active:'avisos',cap:'pantalla',darkOnly:true});</script>
 <script src="panel.js"></script>
 <script>currentLoad=loadAvisos; loadAvisos(); setInterval(loadAvisos,6000);</script>
+<script>
+// --- Subir un aviso ya listo (biblioteca o disco). Nace pendiente_aprobacion: nada llega a la
+//     pantalla sin el visto de Fer, igual que los del creativo. ---
+let _av = null;   // {media_path, tipo, poster_url}
+const avErr = m => { document.getElementById('av-err').textContent = m || ''; };
+
+function abrirSubirAviso(){
+  _av = null;
+  document.getElementById('av-titulo').value = '';
+  document.getElementById('av-mom').value = '';
+  document.getElementById('av-dur').value = 10;
+  const p = document.getElementById('av-prev');
+  p.className = 'avprev avvacio'; p.textContent = '— elegí de la biblioteca o subí un archivo —';
+  avErr(''); document.getElementById('av-ov').style.display = 'flex';
+  if(window.lucide) lucide.createIcons();
+}
+function cerrarSubirAviso(){ document.getElementById('av-ov').style.display = 'none'; }
+
+function avPreview(url, tipo){
+  const p = document.getElementById('av-prev');
+  p.className = 'avprev';
+  p.innerHTML = tipo === 'video'
+    ? `<video src="${esc(url)}#t=0.5" muted playsinline controls></video>`
+    : `<img src="${esc(url)}">`;
+}
+
+// Vía 1: la biblioteca (el archivo ya vive en el media store).
+async function avDeBiblioteca(){
+  let data; try{ data = await fetch('api/biblioteca').then(r=>r.json()); }
+  catch(e){ avErr('No se pudo abrir la biblioteca'); return; }
+  const items = (data.items||[]);
+  let ov = document.getElementById('avbp');
+  if(!ov){ ov = document.createElement('div'); ov.id='avbp'; ov.className='bpov'; document.body.appendChild(ov);
+           ov.addEventListener('click', e => { if(e.target===ov) ov.style.display='none'; }); }
+  window._avItems = items;
+  const cells = items.length ? items.map((m,i)=>{
+    const u = 'media/'+m.media_path;
+    const th = m.tipo==='video' ? `<video src="${esc(u)}#t=0.1" muted></video>` : `<img src="${esc(u)}" onerror="this.style.opacity=.15">`;
+    return `<div class="bpcell" onclick="avElegir(${i})" title="${esc(m.nombre||'')}">${th}<span class="bpcode">${esc(m.codigo||'')}</span></div>`;
+  }).join('') : '<div class="bpempty">— la biblioteca está vacía —</div>';
+  ov.innerHTML = `<div class="bpbox"><div class="bphead"><b>Elegí el material</b><span>de la biblioteca de la marca</span>`
+    + `<button onclick="document.getElementById('avbp').style.display='none'" title="Cerrar">×</button></div>`
+    + `<div class="bpgrid">${cells}</div></div>`;
+  ov.style.display = 'flex';
+}
+function avElegir(i){
+  const m = window._avItems[i]; if(!m) return;
+  _av = { media_path: m.media_path, tipo: m.tipo, poster_url: null };
+  avPreview('media/'+m.media_path, m.tipo);
+  if(!document.getElementById('av-titulo').value) document.getElementById('av-titulo').value = m.nombre || '';
+  document.getElementById('avbp').style.display = 'none';
+  avErr('');
+}
+
+// Vía 2: un archivo del disco. El video se comprime y el server nos devuelve duración y póster.
+async function avSubirArchivo(input){
+  const f = (input.files||[])[0]; input.value=''; if(!f) return;
+  const esVideo = (f.type||'').startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(f.name);
+  const prog = document.getElementById('av-prog'), fill = prog.querySelector('.avfill');
+  prog.style.display='block'; fill.classList.remove('hecho'); fill.style.width='0';
+  avErr('');
+  try{
+    let d;
+    if(esVideo){
+      if(f.size > 600*1024*1024){ avErr('El video supera los 600MB'); prog.style.display='none'; return; }
+      d = await new Promise((resolve,reject)=>{
+        const x = new XMLHttpRequest();
+        x.open('POST','api/avisos/subir-video');
+        x.setRequestHeader('Content-Type','application/octet-stream');
+        x.upload.onprogress = e => { if(e.lengthComputable) fill.style.width = Math.round(e.loaded/e.total*92)+'%'; };
+        x.onload = () => { try{ resolve(JSON.parse(x.responseText)); }catch(_){ reject(new Error('respuesta inválida')); } };
+        x.onerror = () => reject(new Error('falló la subida'));
+        x.send(f);
+      });
+    } else {
+      if(f.size > 85*1024*1024){ avErr('La imagen supera los 85MB'); prog.style.display='none'; return; }
+      const dataUrl = await new Promise((r,j)=>{ const rd=new FileReader(); rd.onload=()=>r(rd.result); rd.onerror=j; rd.readAsDataURL(f); });
+      fill.style.width='70%';
+      d = await fetch('api/avisos/subir',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({dataUrl, filename:f.name})}).then(r=>r.json());
+    }
+    if(!d.ok){ avErr(d.error||'No se pudo subir'); prog.style.display='none'; return; }
+    _av = { media_path: d.media_path, tipo: d.tipo, poster_url: d.poster_url||null };
+    fill.style.width='100%'; fill.classList.add('hecho');   // verde: terminó
+    avPreview('media/'+d.media_path, d.tipo);
+    if(d.duracion_s) document.getElementById('av-dur').value = d.duracion_s;   // la real, no la adivinada
+    if(!document.getElementById('av-titulo').value) document.getElementById('av-titulo').value = f.name.replace(/\.[^.]+$/,'');
+    setTimeout(()=>{ prog.style.display='none'; }, 700);
+  }catch(e){ avErr('No se pudo subir el archivo'); prog.style.display='none'; }
+}
+
+async function avCrear(){
+  if(!_av){ avErr('Falta el material'); return; }
+  const titulo = document.getElementById('av-titulo').value.trim();
+  if(!titulo){ avErr('Poné un título'); return; }
+  const btn = document.getElementById('av-crear');
+  btn.disabled = true; btn.textContent = 'Mandando…';
+  try{
+    const d = await fetch('api/avisos/manual',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ media_path:_av.media_path, tipo:_av.tipo, poster_url:_av.poster_url,
+        titulo, duracion_s: document.getElementById('av-dur').value,
+        momento: document.getElementById('av-mom').value })}).then(r=>r.json());
+    if(d.ok){ cerrarSubirAviso(); toast('Aviso #'+d.numero+' — pendiente de aprobación'); loadAvisos(); }
+    else avErr({titulo_requerido:'Falta el título', media_requerida:'Falta el material'}[d.error] || 'No se pudo crear');
+  }catch(e){ avErr('Error de conexión'); }
+  btn.disabled = false; btn.textContent = 'Mandar a aprobación';
+}
+</script>
 </body>
 </html>
