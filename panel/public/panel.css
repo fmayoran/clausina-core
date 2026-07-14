@@ -63,7 +63,7 @@ header .marcasel:hover{border-color:var(--fire);}
 .bpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;padding:16px 18px;overflow:auto;}
 .bpcell{position:relative;aspect-ratio:1;border-radius:9px;overflow:hidden;border:1px solid #1c2128;cursor:pointer;background:#0c0f12;}
 .bpcell:hover{border-color:var(--fire);}
-.bpcell img,.bpcell video{width:100%;height:100%;object-fit:cover;}
+.bpcell img,.bpcell video{width:100%;height:100%;object-fit:cover;pointer-events:none;}  /* el click es de la celda, no de la miniatura */
 .bpcell .bpcode{position:absolute;bottom:4px;left:4px;font-family:'JetBrains Mono',monospace;font-size:8px;background:rgba(0,0,0,.6);color:var(--fire);padding:1px 5px;border-radius:5px;}
 .bpcell.bpadded{border-color:var(--alarm);box-shadow:0 0 0 3px var(--alarm) inset;}
 .bpcell.bpadded::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.42);z-index:1;}
