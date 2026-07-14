@@ -63,7 +63,8 @@
     <label class="pasel-l">Pantalla: <select id="pasel" onchange="cambiarPantalla()"></select></label>
     <a class="palink" href="audiovisual">← Audiovisual</a>
     <span style="flex:1"></span>
-    Reproductor: <b id="playurl">cortafuego.ar/panel/play</b> (kiosco, se actualiza solo)
+    Reproductor: <a id="playurl" class="palink" href="play" target="_blank" rel="noopener">panel.clausina.ar/play</a>
+    <button class="ibtn" style="margin-left:8px" onclick="copiarPlay()" title="Copiar la URL del kiosco">Copiar</button>
   </div>
   <div id="toast"></div>
   <div class="pgrid">
@@ -78,6 +79,7 @@
         <div class="prow">
           <button class="ibtn" onclick="nuevoPrograma()">Nuevo</button>
           <button class="ibtn" onclick="guardarPrograma()">Guardar</button>
+          <button class="ibtn" onclick="previewEditor()" title="Ver cómo queda en la pantalla, sin activarlo">Preview</button>
           <button class="ibtn fire" onclick="activarPrograma()">Guardar y activar</button>
         </div>
         <div class="plist" id="items"></div>
@@ -111,7 +113,9 @@ async function setContexto(){
     if(sel) sel.innerHTML = ps.length ? ps.map(p=>`<option value="${esc(p.slug)}" ${p.slug===cur?'selected':''}>${esc(p.nombre)}${p.activo?'':' (inactiva)'}</option>`).join('') : '<option>(sin pantallas)</option>';
     const pa = ps.find(p=>p.slug===cur);
     if(pa){ document.getElementById('sub').textContent='Audiovisual · '+pa.nombre;
-      document.getElementById('playurl').textContent='cortafuego.ar/panel/play'+(cur?('?pantalla='+cur):''); }
+      const q = cur?('?pantalla='+cur):'';
+      const a = document.getElementById('playurl');
+      a.textContent = 'panel.clausina.ar/play'+q; a.href = 'play'+q; }
   }catch(_){}
 }
 function cambiarPantalla(){
@@ -144,6 +148,22 @@ function miniAviso(a, cls, style){
 }
 function avCard(a){
   return `<div class="avitem">${miniAviso(a)}<div class="sp"><div class="tt">${esc(a.titulo_interno)}</div><div class="mm">${mBadge(a)}#${String(a.numero).padStart(4,'0')} · ${a.duracion_s||10}s · ${esc(a.momento||'')}</div></div><button class="ibtn fire" onclick="agregar('${a.id}')">Agregar ▸</button></div>`;
+}
+// Preview desde el editor: guarda primero. Sin esto previsualizarías la versión guardada, no lo
+// que acabás de armar en pantalla — el error más fácil de cometer acá.
+async function previewEditor(){
+  if(!prog.items.length){ toast('Agregá avisos antes de previsualizar', true); return; }
+  await guardarPrograma();
+  if(prog.id) previewPrograma(prog.id);
+}
+// Preview: abre el player en modo programa. NO activa nada ni toca lo que se está emitiendo.
+function previewPrograma(id){
+  window.open('play?programa='+encodeURIComponent(id), 'preview_pantalla',
+              'width=430,height=700,menubar=no,toolbar=no');
+}
+function copiarPlay(){
+  const u = location.origin + location.pathname.replace(/[^/]*$/,'') + document.getElementById('playurl').getAttribute('href');
+  navigator.clipboard.writeText(u).then(()=>toast('URL del reproductor copiada')).catch(()=>toast('No se pudo copiar',true));
 }
 function agregar(id){ prog.items.push(id); renderItems(); }
 function quitar(i){ prog.items.splice(i,1); renderItems(); }
@@ -184,6 +204,7 @@ async function cargarProgramas(){
   const c=document.getElementById('programas');
   c.innerHTML = ps.length ? ps.map(p=>`<div class="pgline ${p.activo?'act':''}"><div class="sp"><div class="tt">${esc(p.nombre)} ${p.activo?'<span class="actbadge">activo</span>':''}</div><div class="mm">${p.n_items} avisos</div></div>
     <button class="ibtn" onclick="editar('${p.id}')">Editar</button>
+    ${p.n_items>0?`<button class="ibtn" onclick="previewPrograma('${p.id}')" title="Ver cómo queda en la pantalla, sin activarlo">Preview</button>`:''}
     ${p.activo?'':`<button class="ibtn fire" onclick="activarId('${p.id}')">Activar</button>`}
     ${p.n_items>0?`<button class="ibtn" onclick="descargarPrograma('${p.id}','${esc(p.nombre)}',this)" title="Bajar los videos del programa en un .zip">Descargar</button>`:''}
     ${p.n_items>0?`<button class="ibtn fire" onclick="enviarPantalla('${p.id}','${esc(p.nombre)}',this)" title="Publicar el programa en la pantalla LED vía VNNOX">A la pantalla</button>`:''}

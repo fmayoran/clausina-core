@@ -92,8 +92,11 @@ app.get('/play', (req, res) => { res.set('Cache-Control', 'no-cache'); res.sendF
 // Player público: la pantalla viene por query param (?pantalla=<slug>); default = la pantalla activa.
 app.get('/api/pantalla/activo', async (req, res) => {
   try {
-    const pa = req.query.pantalla ? await db.getPantallaPorSlug(String(req.query.pantalla)) : await db.getPantallaActiva();
     res.set('Cache-Control', 'no-store');
+    // Preview: el player puede pedir UN programa concreto (?programa=<id>), esté activo o no.
+    // Sirve para ver cómo queda la pantalla antes de activar. No cambia nada de lo que se emite.
+    if (req.query.programa) return res.json(await db.getProgramaPlaylist(String(req.query.programa)));
+    const pa = req.query.pantalla ? await db.getPantallaPorSlug(String(req.query.pantalla)) : await db.getPantallaActiva();
     res.json(pa ? await db.getActivoPlaylist(pa.id) : { version: 'none', nombre: null, items: [] });
   } catch (e) { console.error('activo', e.message); res.status(500).json({ error: 'db', items: [] }); }
 });

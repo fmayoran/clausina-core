@@ -905,6 +905,22 @@ async function eliminarPrograma(id, pantallaId) {
 }
 
 // Playlist del programa ACTIVO de una pantalla (la consume el player). Mezcla avisos de varios proyectos.
+// Playlist de UN programa concreto, esté activo o no: es lo que consume el preview, para ver
+// cómo queda la pantalla ANTES de activarla. Misma forma que la del activo -> el player no cambia.
+async function getProgramaPlaylist(programaId) {
+  const { rows: [p] } = await pool.query(
+    'SELECT id, nombre, actualizado_en FROM contenido.programas WHERE id=$1', [programaId]);
+  if (!p) return { version: 'none', nombre: null, items: [] };
+  const { rows: items } = await pool.query(`
+    SELECT (SELECT m.url FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1) AS url,
+           (SELECT m.poster_url FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1) AS poster,
+           r.duracion_s AS dur
+    FROM contenido.programa_items i JOIN contenido.piezas pz ON pz.id=i.pieza_id JOIN contenido.revisiones r ON r.id=pz.revision_vigente
+    WHERE i.programa_id=$1 ORDER BY i.orden`, [p.id]);
+  return { version: p.id + ':' + new Date(p.actualizado_en).getTime(), nombre: p.nombre,
+           preview: true, items: items.filter(x => x.url) };
+}
+
 async function getActivoPlaylist(pantallaId) {
   const { rows: [p] } = await pool.query(`SELECT id, nombre, actualizado_en FROM contenido.programas WHERE activo AND pantalla_id=$1 LIMIT 1`, [pantallaId]);
   if (!p) return { version: 'none', nombre: null, items: [] };
@@ -1100,7 +1116,7 @@ module.exports = { getMarcas, getProyectoId, getPerfil, getIgToken, guardarPerfi
   getCapacidades, getCapacidadesTodas, setCapacidad, crearMarca,
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente,
-  getContactos, guardarContactos, crearAvisoManual,
+  getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,
