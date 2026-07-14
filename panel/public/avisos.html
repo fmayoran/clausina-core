@@ -36,26 +36,22 @@
 <div id="av-ov" class="avov">
   <div class="avbox">
     <div class="avhead">
-      <b>Subir un aviso</b>
+      <b>Subir avisos</b>
       <span>material ya listo · queda pendiente de aprobación</span>
       <button onclick="cerrarSubirAviso()" title="Cerrar">×</button>
     </div>
     <div class="avbody">
       <div class="avfld">
-        <label>Material</label>
-        <div id="av-prev" class="avprev avvacio">— elegí de la biblioteca o subí un archivo —</div>
-        <div class="avrow" style="margin-top:8px">
+        <label>Material <span class="avhint">— podés cargar varios; cada uno es un aviso</span></label>
+        <div id="av-lista" class="avlista"><div class="avvacio">— elegí de la biblioteca o subí archivos —</div></div>
+        <div class="avrow" style="margin-top:9px">
           <button class="avbtn" onclick="avDeBiblioteca()"><i data-lucide="folder-open" class="w-4 h-4"></i> Biblioteca</button>
           <button class="avbtn" onclick="document.getElementById('av-file').click()"><i data-lucide="hard-drive-upload" class="w-4 h-4"></i> Desde disco</button>
-          <input type="file" id="av-file" accept="image/*,video/*" style="display:none" onchange="avSubirArchivo(this)">
+          <input type="file" id="av-file" accept="image/*,video/*" multiple style="display:none" onchange="avSubirArchivos(this)">
         </div>
         <div id="av-prog" class="avprog" style="display:none"><div class="avfill"></div></div>
       </div>
-      <div class="avfld"><label>Título</label><input id="av-titulo" placeholder="Cómo lo vas a reconocer en el tablero"></div>
-      <div class="avrow">
-        <div class="avfld" style="flex:1"><label>Duración (segundos)</label><input id="av-dur" type="number" min="1" max="120" value="10"></div>
-        <div class="avfld" style="flex:1"><label>Momento <span class="avhint">— opcional</span></label><input id="av-mom" placeholder="pre-apertura, mediodía…"></div>
-      </div>
+      <div class="avfld"><label>Momento <span class="avhint">— opcional, se aplica a todos</span></label><input id="av-mom" placeholder="pre-apertura, mediodía…"></div>
       <div class="averr" id="av-err"></div>
     </div>
     <div class="avfoot">
@@ -86,9 +82,16 @@
   .avbtn{display:inline-flex;align-items:center;gap:7px;background:transparent;border:1px solid var(--line);color:var(--white);font-family:'Inter Tight',sans-serif;font-weight:700;font-size:.86rem;padding:9px 13px;border-radius:8px;cursor:pointer;transition:.15s;}
   .avbtn:hover{border-color:var(--ash);} .avbtn:disabled{opacity:.5;cursor:default;}
   .avbtn.prim{background:var(--pend);border-color:var(--pend);color:#0c0c0a;}   /* pendiente: coral */
-  .avprev{border:1px dashed var(--line);border-radius:10px;min-height:120px;display:grid;place-items:center;overflow:hidden;background:#0c0c0a;}
-  .avprev.avvacio{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:#55554f;}
-  .avprev img,.avprev video{max-height:220px;max-width:100%;display:block;}
+  .avlista{border:1px dashed var(--line);border-radius:10px;background:#0c0c0a;padding:8px;max-height:260px;overflow-y:auto;}
+  .avvacio{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:#55554f;text-align:center;padding:26px 0;}
+  .avit{display:grid;grid-template-columns:52px 1fr 74px 24px;gap:9px;align-items:center;padding:7px;border-radius:8px;}
+  .avit + .avit{border-top:1px solid var(--line);}
+  .avit .th{width:52px;height:52px;border-radius:6px;overflow:hidden;background:#16171a;display:grid;place-items:center;}
+  .avit .th img,.avit .th video{width:100%;height:100%;object-fit:cover;}
+  .avit input{width:100%;background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);font-family:'Inter',sans-serif;font-size:.86rem;padding:6px 8px;outline:none;}
+  .avit input:focus{border-color:var(--pend);}
+  .avit .x{background:transparent;border:0;color:var(--ash);font-size:17px;cursor:pointer;line-height:1;}
+  .avit .x:hover{color:var(--alarm);}
   .avprog{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:8px;}
   .avprog .avfill{height:100%;width:0;background:var(--pend);transition:width .2s,background .2s;}
   .avprog .avfill.hecho{background:var(--done);}
@@ -101,114 +104,155 @@
 <script>currentLoad=loadAvisos; loadAvisos(); setInterval(loadAvisos,6000);
 if(window.lucide) lucide.createIcons();</script>
 <script>
-// --- Subir un aviso ya listo (biblioteca o disco). Nace pendiente_aprobacion: nada llega a la
-//     pantalla sin el visto de Fer, igual que los del creativo. ---
-let _av = null;   // {media_path, tipo, poster_url}
+// --- Subir avisos ya listos (biblioteca o disco). Nacen pendiente_aprobacion: nada llega a la
+//     pantalla sin el visto de Fer, igual que los del creativo.
+//     Se cargan VARIOS de una: cada archivo es un aviso, con su título y su duración. ---
+let _avs = [];   // [{media_path, tipo, poster_url, titulo, duracion_s}]
 const avErr = m => { document.getElementById('av-err').textContent = m || ''; };
 
 function abrirSubirAviso(){
-  _av = null;
-  document.getElementById('av-titulo').value = '';
+  _avs = [];
   document.getElementById('av-mom').value = '';
-  document.getElementById('av-dur').value = 10;
-  const p = document.getElementById('av-prev');
-  p.className = 'avprev avvacio'; p.textContent = '— elegí de la biblioteca o subí un archivo —';
-  avErr(''); document.getElementById('av-ov').style.display = 'flex';
+  avErr(''); avRender();
+  document.getElementById('av-ov').style.display = 'flex';
   if(window.lucide) lucide.createIcons();
 }
 function cerrarSubirAviso(){ document.getElementById('av-ov').style.display = 'none'; }
 
-function avPreview(url, tipo){
-  const p = document.getElementById('av-prev');
-  p.className = 'avprev';
-  p.innerHTML = tipo === 'video'
-    ? `<video src="${esc(url)}#t=0.5" muted playsinline controls></video>`
-    : `<img src="${esc(url)}">`;
+function avRender(){
+  const cont = document.getElementById('av-lista');
+  if(!_avs.length){ cont.innerHTML = '<div class="avvacio">— elegí de la biblioteca o subí archivos —</div>'; avBoton(); return; }
+  cont.innerHTML = _avs.map((a,i)=>{
+    const u = 'media/'+a.media_path;
+    const th = a.tipo==='video' ? `<video src="${esc(u)}#t=0.5" muted></video>` : `<img src="${esc(u)}">`;
+    return `<div class="avit">
+      <span class="th">${th}</span>
+      <input value="${esc(a.titulo||'')}" placeholder="Título" oninput="_avs[${i}].titulo=this.value">
+      <input type="number" min="1" max="120" value="${a.duracion_s||10}" title="Duración en segundos" oninput="_avs[${i}].duracion_s=this.value">
+      <button class="x" title="Quitar" onclick="_avs.splice(${i},1);avRender()">×</button>
+    </div>`;
+  }).join('');
+  avBoton();
 }
+function avBoton(){
+  const b = document.getElementById('av-crear');
+  b.textContent = _avs.length > 1 ? `Mandar ${_avs.length} a aprobación` : 'Mandar a aprobación';
+  b.disabled = !_avs.length;
+}
+const yaEsta = mp => _avs.some(a => a.media_path === mp);
 
-// Vía 1: la biblioteca (el archivo ya vive en el media store).
+// --- Vía 1: la biblioteca. Multi-selección: se van sumando a la lista. ---
 async function avDeBiblioteca(){
   let data; try{ data = await fetch('api/biblioteca').then(r=>r.json()); }
   catch(e){ avErr('No se pudo abrir la biblioteca'); return; }
-  const items = (data.items||[]);
+  window._avItems = (data.items||[]);
   let ov = document.getElementById('avbp');
   if(!ov){ ov = document.createElement('div'); ov.id='avbp'; ov.className='bpov'; document.body.appendChild(ov);
-           // .bpov trae z-index 120 y el modal del aviso está en 140: sin esto el selector
-           // queda POR DETRÁS y los clicks no le llegan (no se podía elegir nada).
+           // .bpov trae z-index 120 y el modal del aviso está en 140: sin esto el selector queda
+           // POR DETRÁS y los clicks no le llegan (no se podía elegir nada).
            ov.style.zIndex = '160';
            ov.addEventListener('click', e => { if(e.target===ov) ov.style.display='none'; }); }
-  window._avItems = items;
-  const cells = items.length ? items.map((m,i)=>{
+  const cells = window._avItems.length ? window._avItems.map((m,i)=>{
     const u = 'media/'+m.media_path;
     const th = m.tipo==='video' ? `<video src="${esc(u)}#t=0.1" muted></video>` : `<img src="${esc(u)}" onerror="this.style.opacity=.15">`;
-    return `<div class="bpcell" onclick="avElegir(${i})" title="${esc(m.nombre||'')}">${th}<span class="bpcode">${esc(m.codigo||'')}</span></div>`;
+    const sel = yaEsta(m.media_path) ? ' bpadded' : '';
+    return `<div class="bpcell${sel}" data-i="${i}" onclick="avToggle(${i},this)" title="${esc(m.nombre||'')}">${th}<span class="bpcode">${esc(m.codigo||'')}</span></div>`;
   }).join('') : '<div class="bpempty">— la biblioteca está vacía —</div>';
-  ov.innerHTML = `<div class="bpbox"><div class="bphead"><b>Elegí el material</b><span>de la biblioteca de la marca</span>`
-    + `<button onclick="document.getElementById('avbp').style.display='none'" title="Cerrar">×</button></div>`
-    + `<div class="bpgrid">${cells}</div></div>`;
+  ov.innerHTML = `<div class="bpbox">
+      <div class="bphead"><b>Elegí el material</b><span>tocá los que quieras · cada uno es un aviso</span>
+        <button onclick="document.getElementById('avbp').style.display='none'" title="Cerrar">×</button></div>
+      <div class="bpgrid">${cells}</div>
+      <div class="bphead" style="border-top:1px solid #20242B;border-bottom:0">
+        <span id="avbp-n">${_avs.length} elegido(s)</span>
+        <button class="avbtn prim" style="margin-left:auto" onclick="document.getElementById('avbp').style.display='none'">Listo</button></div>
+    </div>`;
   ov.style.display = 'flex';
 }
-function avElegir(i){
+// Toca de nuevo = lo saca. Es un toggle: así se corrige sin cerrar y volver a abrir.
+function avToggle(i, el){
   const m = window._avItems[i]; if(!m) return;
-  _av = { media_path: m.media_path, tipo: m.tipo, poster_url: null };
-  avPreview('media/'+m.media_path, m.tipo);
-  if(!document.getElementById('av-titulo').value) document.getElementById('av-titulo').value = m.nombre || '';
-  document.getElementById('avbp').style.display = 'none';
-  avErr('');
+  const idx = _avs.findIndex(a => a.media_path === m.media_path);
+  if(idx >= 0){ _avs.splice(idx,1); el.classList.remove('bpadded'); }
+  else {
+    _avs.push({ media_path:m.media_path, tipo:m.tipo, poster_url:null,
+                titulo:(m.nombre||m.codigo||''), duracion_s:10 });
+    el.classList.add('bpadded');
+  }
+  const n = document.getElementById('avbp-n');
+  if(n) n.textContent = `${_avs.length} elegido(s)`;
+  avErr(''); avRender();
 }
 
-// Vía 2: un archivo del disco. El video se comprime y el server nos devuelve duración y póster.
-async function avSubirArchivo(input){
-  const f = (input.files||[])[0]; input.value=''; if(!f) return;
-  const esVideo = (f.type||'').startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(f.name);
+// --- Vía 2: archivos del disco (varios a la vez). El video se comprime y el server devuelve
+//     la duración REAL y el póster: no hay que adivinar segundos. ---
+async function avSubirArchivos(input){
+  const files = [...(input.files||[])]; input.value=''; if(!files.length) return;
   const prog = document.getElementById('av-prog'), fill = prog.querySelector('.avfill');
   prog.style.display='block'; fill.classList.remove('hecho'); fill.style.width='0';
   avErr('');
-  try{
-    let d;
-    if(esVideo){
-      if(f.size > 600*1024*1024){ avErr('El video supera los 600MB'); prog.style.display='none'; return; }
-      d = await new Promise((resolve,reject)=>{
-        const x = new XMLHttpRequest();
-        x.open('POST','api/avisos/subir-video');
-        x.setRequestHeader('Content-Type','application/octet-stream');
-        x.upload.onprogress = e => { if(e.lengthComputable) fill.style.width = Math.round(e.loaded/e.total*92)+'%'; };
-        x.onload = () => { try{ resolve(JSON.parse(x.responseText)); }catch(_){ reject(new Error('respuesta inválida')); } };
-        x.onerror = () => reject(new Error('falló la subida'));
-        x.send(f);
-      });
-    } else {
-      if(f.size > 85*1024*1024){ avErr('La imagen supera los 85MB'); prog.style.display='none'; return; }
-      const dataUrl = await new Promise((r,j)=>{ const rd=new FileReader(); rd.onload=()=>r(rd.result); rd.onerror=j; rd.readAsDataURL(f); });
-      fill.style.width='70%';
-      d = await fetch('api/avisos/subir',{method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({dataUrl, filename:f.name})}).then(r=>r.json());
-    }
-    if(!d.ok){ avErr(d.error||'No se pudo subir'); prog.style.display='none'; return; }
-    _av = { media_path: d.media_path, tipo: d.tipo, poster_url: d.poster_url||null };
-    fill.style.width='100%'; fill.classList.add('hecho');   // verde: terminó
-    avPreview('media/'+d.media_path, d.tipo);
-    if(d.duracion_s) document.getElementById('av-dur').value = d.duracion_s;   // la real, no la adivinada
-    if(!document.getElementById('av-titulo').value) document.getElementById('av-titulo').value = f.name.replace(/\.[^.]+$/,'');
-    setTimeout(()=>{ prog.style.display='none'; }, 700);
-  }catch(e){ avErr('No se pudo subir el archivo'); prog.style.display='none'; }
+  let hechos = 0, fallados = 0;
+  for(const f of files){
+    const base = hechos / files.length;
+    try{
+      const d = await avSubirUno(f, (p)=>{ fill.style.width = Math.round((base + p/files.length)*100)+'%'; });
+      if(d && d.ok){
+        _avs.push({ media_path:d.media_path, tipo:d.tipo, poster_url:d.poster_url||null,
+                    titulo:f.name.replace(/\.[^.]+$/,''), duracion_s:d.duracion_s || 10 });
+        avRender();
+      } else { fallados++; if(d && d.error) avErr(d.error); }
+    }catch(e){ fallados++; }
+    hechos++;
+    fill.style.width = Math.round(hechos/files.length*100)+'%';
+  }
+  if(hechos && !fallados) fill.classList.add('hecho');   // verde: terminó
+  if(fallados) avErr(`${fallados} archivo(s) no se pudieron subir`);
+  setTimeout(()=>{ prog.style.display='none'; }, 800);
+}
+function avSubirUno(f, onProg){
+  const esVideo = (f.type||'').startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(f.name);
+  if(esVideo){
+    if(f.size > 600*1024*1024) return Promise.resolve({ok:false, error:'Hay un video de más de 600MB'});
+    return new Promise((resolve,reject)=>{
+      const x = new XMLHttpRequest();
+      x.open('POST','api/avisos/subir-video');
+      x.setRequestHeader('Content-Type','application/octet-stream');
+      x.upload.onprogress = e => { if(e.lengthComputable) onProg(e.loaded/e.total*0.92); };
+      x.onload = () => { try{ resolve(JSON.parse(x.responseText)); }catch(_){ reject(new Error('respuesta inválida')); } };
+      x.onerror = () => reject(new Error('falló la subida'));
+      x.send(f);
+    });
+  }
+  if(f.size > 85*1024*1024) return Promise.resolve({ok:false, error:'Hay una imagen de más de 85MB'});
+  return new Promise((r,j)=>{ const rd=new FileReader(); rd.onload=()=>r(rd.result); rd.onerror=j; rd.readAsDataURL(f); })
+    .then(dataUrl => { onProg(0.7);
+      return fetch('api/avisos/subir',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({dataUrl, filename:f.name})}).then(r=>r.json()); });
 }
 
+// Un aviso por archivo. Si alguno falla, se informa: los que entraron quedan.
 async function avCrear(){
-  if(!_av){ avErr('Falta el material'); return; }
-  const titulo = document.getElementById('av-titulo').value.trim();
-  if(!titulo){ avErr('Poné un título'); return; }
+  if(!_avs.length){ avErr('Falta el material'); return; }
+  const sinTitulo = _avs.findIndex(a => !String(a.titulo||'').trim());
+  if(sinTitulo >= 0){ avErr(`Falta el título del ${sinTitulo+1}º`); return; }
+  const momento = document.getElementById('av-mom').value;
   const btn = document.getElementById('av-crear');
   btn.disabled = true; btn.textContent = 'Mandando…';
-  try{
-    const d = await fetch('api/avisos/manual',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ media_path:_av.media_path, tipo:_av.tipo, poster_url:_av.poster_url,
-        titulo, duracion_s: document.getElementById('av-dur').value,
-        momento: document.getElementById('av-mom').value })}).then(r=>r.json());
-    if(d.ok){ cerrarSubirAviso(); toast('Aviso #'+d.numero+' — pendiente de aprobación'); loadAvisos(); }
-    else avErr({titulo_requerido:'Falta el título', media_requerida:'Falta el material'}[d.error] || 'No se pudo crear');
-  }catch(e){ avErr('Error de conexión'); }
-  btn.disabled = false; btn.textContent = 'Mandar a aprobación';
+  let ok = 0, mal = 0;
+  for(const a of _avs){
+    try{
+      const d = await fetch('api/avisos/manual',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ media_path:a.media_path, tipo:a.tipo, poster_url:a.poster_url,
+          titulo:a.titulo, duracion_s:a.duracion_s, momento })}).then(r=>r.json());
+      d.ok ? ok++ : mal++;
+    }catch(e){ mal++; }
+  }
+  if(ok){
+    cerrarSubirAviso();
+    toast(ok===1 ? 'Aviso pendiente de aprobación' : `${ok} avisos pendientes de aprobación`);
+    loadAvisos();
+  }
+  if(mal){ avErr(`${mal} no se pudieron crear`); }
+  btn.disabled = false; avBoton();
 }
 </script>
 </body>
