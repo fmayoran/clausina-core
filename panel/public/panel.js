@@ -78,7 +78,7 @@ function modCard(p, canal){
   const t = thumbSrc(p.media);
   const medios = Array.isArray(p.medios) ? p.medios : [];
   const thumb = canal==='aviso'
-    ? (p.media&&p.media.url ? `<video class="avvid" src="${esc(p.media.url)}" ${p.media.poster_url?`poster="${esc(p.media.poster_url)}"`:''} preload="none" muted loop playsinline controls></video>` : '<div class="thumb"></div>')
+    ? (p.media&&p.media.url ? `<video class="avvid" src="${esc(p.media.url)}${p.media.poster_url?'':'#t=0.5'}" ${p.media.poster_url?`poster="${esc(p.media.poster_url)}"`:''} preload="metadata" muted loop playsinline controls></video>` : '<div class="thumb"></div>')
     : (medios.length>1 ? mediaGallery(medios) : (t ? `<img class="thumb" loading="lazy" src="${esc(t)}" onerror="this.style.display='none'">` : '<div class="thumb"></div>'));
   const motivo = p.motivo_rechazo ? `<div class="copy"><b>Pediste:</b> ${esc(p.motivo_rechazo)}</div>` : '';
   const banner = enProceso

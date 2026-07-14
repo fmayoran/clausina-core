@@ -133,17 +133,25 @@ async function cargar(){
 }
 const _mn = s => (s||'').split('—')[0].split('|')[0].trim();           // "ARDORA | Paseo…" -> "ARDORA"
 const mBadge = a => a.marca_slug ? `<span class="mbadge ${esc(a.marca_slug)}">${esc(_mn(a.marca_nombre)||a.marca_slug)}</span>` : '';
+// Miniatura del aviso. Si el video no tiene póster hay que usar <video>: un .mp4 dentro de un
+// <img> no renderiza nunca — era el motivo por el que acá no se veía nada.
+function miniAviso(a, cls, style){
+  const m = a.media||{}, c = cls?` class="${cls}"`:'', st = style?` style="${style}"`:'';
+  if(m.poster_url) return `<img loading="lazy"${c}${st} src="${esc(m.poster_url)}">`;
+  if(m.url && /\.(mp4|webm|mov|m4v)$/i.test(m.url))
+    return `<video${c}${st} src="${esc(m.url)}#t=0.5" preload="metadata" muted playsinline></video>`;
+  return m.url ? `<img loading="lazy"${c}${st} src="${esc(m.url)}">` : `<div${c}${st}></div>`;
+}
 function avCard(a){
-  const p=(a.media||{}).poster_url||(a.media||{}).url||'';
-  return `<div class="avitem"><img loading="lazy" src="${esc(p)}"><div class="sp"><div class="tt">${esc(a.titulo_interno)}</div><div class="mm">${mBadge(a)}#${String(a.numero).padStart(4,'0')} · ${a.duracion_s||10}s · ${esc(a.momento||'')}</div></div><button class="ibtn fire" onclick="agregar('${a.id}')">Agregar ▸</button></div>`;
+  return `<div class="avitem">${miniAviso(a)}<div class="sp"><div class="tt">${esc(a.titulo_interno)}</div><div class="mm">${mBadge(a)}#${String(a.numero).padStart(4,'0')} · ${a.duracion_s||10}s · ${esc(a.momento||'')}</div></div><button class="ibtn fire" onclick="agregar('${a.id}')">Agregar ▸</button></div>`;
 }
 function agregar(id){ prog.items.push(id); renderItems(); }
 function quitar(i){ prog.items.splice(i,1); renderItems(); }
 function mover(i,d){ const j=i+d; if(j<0||j>=prog.items.length)return; const t=prog.items[i];prog.items[i]=prog.items[j];prog.items[j]=t; renderItems(); }
 function renderItems(){
   const c=document.getElementById('items');
-  c.innerHTML = prog.items.length ? prog.items.map((id,i)=>{const a=byId(id)||{};const p=(a.media||{}).poster_url||'';
-    return `<div class="pgline"><div class="ord"><button onclick="mover(${i},-1)">▲</button><button onclick="mover(${i},1)">▼</button></div><img class="avitem" style="width:36px;height:54px;object-fit:cover;border:0;border-radius:4px" src="${esc(p)}"><div class="sp"><div class="tt" style="font-size:.92rem">${esc(a.titulo_interno||'?')}</div><div class="mm">${mBadge(a)}#${a.numero?String(a.numero).padStart(4,'0'):'?'} · ${a.duracion_s||10}s</div></div><button class="ibtn" onclick="quitar(${i})">✕</button></div>`;
+  c.innerHTML = prog.items.length ? prog.items.map((id,i)=>{const a=byId(id)||{};
+    return `<div class="pgline"><div class="ord"><button onclick="mover(${i},-1)">▲</button><button onclick="mover(${i},1)">▼</button></div>${miniAviso(a,'avitem','width:36px;height:54px;object-fit:cover;border:0;border-radius:4px')}<div class="sp"><div class="tt" style="font-size:.92rem">${esc(a.titulo_interno||'?')}</div><div class="mm">${mBadge(a)}#${a.numero?String(a.numero).padStart(4,'0'):'?'} · ${a.duracion_s||10}s</div></div><button class="ibtn" onclick="quitar(${i})">✕</button></div>`;
   }).join('') : '<div class="empty">— agregá avisos de la izquierda —</div>';
   document.getElementById('n-it').textContent=prog.items.length||'';
   const tot=prog.items.reduce((s,id)=>s+((byId(id)||{}).duracion_s||10),0);

@@ -827,13 +827,32 @@ app.post('/api/avisos/manual', async (req, res) => {
     const b = req.body || {};
     const rel = String(b.media_path || '').replace(/^\/+/, '').replace(/^media\//, '');
     if (!rel || rel.includes('..')) return res.status(400).json({ ok: false, error: 'media_requerida' });
+
+    // Un video SIEMPRE necesita póster: sin él la tarjeta se ve negra y la vista de programación
+    // intenta meter un .mp4 dentro de un <img> (no se ve nada). Si vino de la biblioteca no lo
+    // trae, así que lo sacamos acá del archivo que ya está en disco.
+    let poster = b.poster_url || null;
+    if (b.tipo === 'video' && !poster) poster = await asegurarPoster(req, rel);
+
     const r = await db.crearAvisoManual(req.proyectoId, {
       titulo: b.titulo, duracion_s: b.duracion_s, momento: b.momento,
-      tipo: b.tipo, url: urlMedia(req, rel), poster_url: b.poster_url,
+      tipo: b.tipo, url: urlMedia(req, rel), poster_url: poster,
     });
     res.status(r.ok ? 200 : 400).json(r);
   } catch (e) { console.error('aviso-manual', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
+
+// Póster de un video que ya vive en el media store. Reusa el .jpg si ya lo generamos antes.
+async function asegurarPoster(req, rel) {
+  try {
+    const abs = path.join('/app/media', rel);
+    if (!fs.existsSync(abs)) return null;
+    const relPost = rel.replace(/\.[^.]+$/, '') + '.jpg';
+    const absPost = path.join('/app/media', relPost);
+    if (!fs.existsSync(absPost) && !(await posterVideo(abs, absPost))) return null;
+    return urlMedia(req, relPost);
+  } catch (_) { return null; }
+}
 
 // 2) Desde DISCO (imagen, dataURL). Guarda en el media store bajo avisos/<marca>/.
 app.post('/api/avisos/subir', async (req, res) => {
