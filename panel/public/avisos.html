@@ -17,15 +17,19 @@
     <span class="sub">Avisos · pantalla de calle</span>
     <span class="upd" id="upd"></span>
     <nav>
-      <button class="avsub" onclick="abrirSubirAviso()" title="Subir un aviso ya listo (biblioteca o archivo)" aria-label="Subir un aviso ya listo">
-        <i data-lucide="upload" class="w-4 h-4"></i>
-      </button>
       <a href="proyecto">← Proyecto</a>
       <button class="logout" onclick="salir()">Salir</button>
     </nav>
   </header>
 <div class="shell"><main class="min-w-0">
   <div id="toast"></div>
+  <!-- OJO: shell.js oculta el <header> legado, así que las acciones de página van acá adentro. -->
+  <div class="avtop">
+    <span class="avtt">Avisos · pantalla de calle</span>
+    <button class="avsub" onclick="abrirSubirAviso()" title="Subir un aviso ya listo (de la biblioteca o de disco)" aria-label="Subir un aviso ya listo">
+      <i data-lucide="upload" class="w-4 h-4"></i>
+    </button>
+  </div>
   <div class="board b2">
     <div class="col pend"><h2><span class="dot"></span>Pendiente de aprobación <span class="n" id="n-pend"></span></h2><div class="cards" id="c-pend"></div></div>
     <div class="col pub"><h2><span class="dot"></span>En pantalla <span class="n" id="n-pub"></span></h2><div class="cards" id="c-pub"></div></div>
@@ -65,7 +69,9 @@
   </div>
 </div>
 <style>
-  .avsub{background:transparent;border:1px solid var(--line);color:var(--ash);width:30px;height:26px;border-radius:5px;cursor:pointer;display:grid;place-items:center;transition:.15s;}
+  .avtop{display:flex;align-items:center;gap:12px;padding:20px 28px 0;}
+  .avtt{font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ash);}
+  .avsub{margin-left:auto;background:transparent;border:1px solid var(--line);color:var(--ash);width:36px;height:36px;border-radius:9px;cursor:pointer;display:grid;place-items:center;transition:.15s;}
   .avsub:hover{color:var(--pend);border-color:var(--pend);}
   .avov{position:fixed;inset:0;z-index:140;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(0,0,0,.7);}
   .avbox{background:#111317;border:1px solid #20242B;border-radius:14px;max-width:520px;width:100%;max-height:88vh;display:flex;flex-direction:column;}
@@ -97,7 +103,8 @@
 <script src="shell.js"></script>
 <script>ClausinaShell({active:'avisos',cap:'pantalla',darkOnly:true});</script>
 <script src="panel.js"></script>
-<script>currentLoad=loadAvisos; loadAvisos(); setInterval(loadAvisos,6000);</script>
+<script>currentLoad=loadAvisos; loadAvisos(); setInterval(loadAvisos,6000);
+if(window.lucide) lucide.createIcons();</script>
 <script>
 // --- Subir un aviso ya listo (biblioteca o disco). Nace pendiente_aprobacion: nada llega a la
 //     pantalla sin el visto de Fer, igual que los del creativo. ---
