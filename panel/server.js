@@ -204,6 +204,24 @@ app.get('/api/capacidades', async (req, res) => {
   try { res.json(await db.getCapacidades(req.proyectoId)); }
   catch (e) { console.error('capacidades', e.message); res.status(500).json({ error: 'db' }); }
 });
+// Generar/regenerar el estilo, y el manual de marca (jobs del creativo).
+app.post('/api/estilo/generar', async (req, res) => {
+  try {
+    const r = await db.pedirGeneracion(req.proyectoId, 'estilo');
+    res.status(r.ok ? 200 : 409).json(r);
+  } catch (e) { console.error('estilo-gen', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+app.post('/api/manual/generar', async (req, res) => {
+  try {
+    const r = await db.pedirGeneracion(req.proyectoId, 'manual');
+    res.status(r.ok ? 200 : 409).json(r);
+  } catch (e) { console.error('manual-gen', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+app.get('/api/generacion', async (req, res) => {
+  try { res.json(await db.getGeneracion(req.proyectoId)); }
+  catch (e) { console.error('generacion', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 // Lente de Instagram: config de PLATAFORMA (la agencia, no una marca). El token se guarda
 // cifrado y es write-only: nunca vuelve al navegador (solo decimos si está cargado).
 app.get('/api/plataforma/lente', async (req, res) => {

@@ -171,6 +171,50 @@ async function crearAvisoManual(proyectoId, d) {
   }
 }
 
+// Generación de estilo y manual de marca por el creativo (jobs). El manual necesita el estilo hecho.
+async function pedirGeneracion(proyectoId, tipo) {
+  if (tipo !== 'estilo' && tipo !== 'manual') return { ok: false, error: 'tipo_invalido' };
+  if (tipo === 'manual') {
+    const { rows } = await pool.query(
+      "SELECT length(coalesce(estilo_md,'')) AS n FROM contenido.proyecto_perfil WHERE proyecto_id=$1", [proyectoId]);
+    if (!rows[0] || rows[0].n <= 20) return { ok: false, error: 'falta_estilo' };
+  }
+  try {
+    const { rows: [g] } = await pool.query(
+      `INSERT INTO contenido.marca_gen (proyecto_id, tipo) VALUES ($1,$2) RETURNING id`,
+      [proyectoId, tipo]);
+    return { ok: true, id: g.id };
+  } catch (e) {
+    if (e.code === '23505') return { ok: false, error: 'ya_en_curso' };  // índice único en curso
+    throw e;
+  }
+}
+
+// Estado de la generación para el panel: qué hay en curso y cómo quedó el manual.
+async function getGeneracion(proyectoId) {
+  const { rows } = await pool.query(
+    `SELECT tipo, estado, error FROM contenido.marca_gen
+       WHERE proyecto_id=$1 AND estado IN ('pendiente','procesando')`, [proyectoId]);
+  const { rows: [p] } = await pool.query(
+    `SELECT length(coalesce(estilo_md,'')) AS estilo_len,
+            manual_html_url, manual_pdf_url, manual_generado_en
+       FROM contenido.proyecto_perfil WHERE proyecto_id=$1`, [proyectoId]);
+  // Último error por tipo (para avisar si la última corrida falló y ya no está en curso).
+  const { rows: err } = await pool.query(
+    `SELECT DISTINCT ON (tipo) tipo, estado, error FROM contenido.marca_gen
+       WHERE proyecto_id=$1 ORDER BY tipo, creado_en DESC`, [proyectoId]);
+  const ult = {}; err.forEach(r => { ult[r.tipo] = r; });
+  const enCurso = t => rows.some(r => r.tipo === t);
+  return {
+    estilo:  { enCurso: enCurso('estilo'), hecho: (p && p.estilo_len > 20),
+               error: (!enCurso('estilo') && ult.estilo && ult.estilo.estado === 'error') ? ult.estilo.error : null },
+    manual:  { enCurso: enCurso('manual'),
+               html_url: p && p.manual_html_url, pdf_url: p && p.manual_pdf_url,
+               generado_en: p && p.manual_generado_en,
+               error: (!enCurso('manual') && ult.manual && ult.manual.estado === 'error') ? ult.manual.error : null },
+  };
+}
+
 // Config de plataforma: lo transversal a todas las marcas (hoy, la lente de Instagram).
 // Mismo criterio que los tokens de marca: cifrado en la DB, write-only hacia el navegador.
 async function getLente() {
@@ -1122,6 +1166,7 @@ module.exports = { getMarcas, getProyectoId, getPerfil, getIgToken, guardarPerfi
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist,
+  pedirGeneracion, getGeneracion,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,

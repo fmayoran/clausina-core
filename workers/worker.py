@@ -9,7 +9,7 @@ import traceback
 
 import jobqueue
 from db import heartbeat
-from handlers import correccion, propuesta, revision, brief, landing, bibliotecario, campania, campania_meta, pauta_sync, secrets_sync, marca_capsula, descubrimiento
+from handlers import correccion, propuesta, revision, brief, landing, bibliotecario, campania, campania_meta, pauta_sync, secrets_sync, marca_capsula, descubrimiento, estilo_gen, manual_gen
 
 # Registry de handlers por tipo de job.
 HANDLERS = {
@@ -25,6 +25,8 @@ HANDLERS = {
     "secrets_sync": secrets_sync.handle,
     "marca_capsula": marca_capsula.handle,
     "descubrimiento": descubrimiento.handle,
+    "estilo_gen": estilo_gen.handle,
+    "manual_gen": manual_gen.handle,
 }
 
 

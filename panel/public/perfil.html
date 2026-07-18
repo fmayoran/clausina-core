@@ -75,6 +75,17 @@
   .cdel{background:transparent;border:0;color:var(--ash);font-size:17px;cursor:pointer;line-height:1;}
   .cdel:hover{color:var(--alarm);}
   @media(max-width:640px){.cfila{grid-template-columns:1fr 1fr 26px;}}
+  .genbox{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:16px;background:#0c0c0a;}
+  .genrow{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;}
+  .geninfo{min-width:0;flex:1;}
+  .gentt{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1rem;color:var(--white);}
+  .gensub{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--ash);line-height:1.5;margin-top:3px;}
+  .ibtn.fire{border-color:var(--pend);color:var(--pend);}
+  .ibtn.fire:hover{background:var(--pend);border-color:var(--pend);color:#0c0c0a;}
+  .ibtn.busy{color:var(--pend);border-color:var(--pend);pointer-events:none;}
+  .ibtn.busy::before{content:"";display:inline-block;width:9px;height:9px;margin-right:6px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:sp 1s linear infinite;vertical-align:baseline;}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .generr{color:var(--alarm);font-family:'JetBrains Mono',monospace;font-size:.6rem;margin-top:6px;}
 </style>
 </head>
 <body>
@@ -176,6 +187,27 @@
       <div class="modal-box">
         <div class="modal-head"><div class="modal-tt">Estilo de marca</div><button class="modal-x" onclick="closeM('estilo')">×</button></div>
         <div class="modal-body">
+          <!-- Generación por el creativo: documenta el estilo desde el brief + lo publicado + IG -->
+          <div class="genbox" id="gen-estilo">
+            <div class="genrow">
+              <div class="geninfo">
+                <div class="gentt">Generar con el creativo</div>
+                <div class="gensub" id="gen-estilo-sub">Documenta el sistema de diseño a partir del brief, lo publicado y el Instagram de la marca.</div>
+              </div>
+              <button class="ibtn fire" id="gen-estilo-btn" onclick="generarEstilo()">Generar estilo</button>
+            </div>
+            <div class="genrow" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
+              <div class="geninfo">
+                <div class="gentt">Manual de marca</div>
+                <div class="gensub" id="gen-manual-sub">Necesita el estilo completo. Genera un manual en HTML (online) y PDF.</div>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+                <a class="ibtn ghost" id="gen-manual-html" style="display:none" target="_blank" rel="noopener">Ver online</a>
+                <a class="ibtn ghost" id="gen-manual-pdf" style="display:none" target="_blank" rel="noopener">PDF</a>
+                <button class="ibtn" id="gen-manual-btn" onclick="generarManual()" disabled>Generar manual</button>
+              </div>
+            </div>
+          </div>
           <div class="fld"><label>Sistema de diseño <span class="hint">— markdown: tokens, tipografía, logo, layout, voz. Es la fuente de verdad; el creativo lo lee y baja a la cápsula como ESTILO.md.</span></label><textarea id="estilo_md"></textarea></div>
           <div class="est-block"><div class="est-h" style="margin-top:6px">Vista previa</div><div id="estilo-marca"><div class="est-empty">cargando…</div></div></div>
         </div>
@@ -327,6 +359,52 @@ function leerContactos(){
     email:    f.querySelector('.c-mail').value,
   })).filter(c => c.nombre.trim());   // sin nombre no es contacto
 }
+
+// --- Generación de estilo y manual por el creativo (jobs asíncronos, con polling) ---
+let _genPoll=null;
+async function cargarGeneracion(){
+  let g; try{ g=await fetch('api/generacion').then(r=>r.json()); }catch(_){ return; }
+  // Estilo
+  const eb=document.getElementById('gen-estilo-btn'), es=document.getElementById('gen-estilo-sub');
+  if(g.estilo.enCurso){ eb.className='ibtn busy'; eb.textContent='Generando…'; eb.disabled=true;
+    es.textContent='El creativo está documentando el estilo… (unos minutos)'; }
+  else { eb.className='ibtn fire'; eb.disabled=false;
+    eb.textContent = g.estilo.hecho ? 'Regenerar estilo' : 'Generar estilo';
+    es.textContent = g.estilo.error ? g.estilo.error
+      : 'Documenta el sistema de diseño a partir del brief, lo publicado y el Instagram de la marca.'; }
+  // Manual
+  const mb=document.getElementById('gen-manual-btn'), ms=document.getElementById('gen-manual-sub');
+  const mh=document.getElementById('gen-manual-html'), mp=document.getElementById('gen-manual-pdf');
+  mh.style.display = g.manual.html_url ? '' : 'none'; if(g.manual.html_url) mh.href=g.manual.html_url;
+  mp.style.display = g.manual.pdf_url ? '' : 'none';  if(g.manual.pdf_url)  mp.href=g.manual.pdf_url;
+  if(g.manual.enCurso){ mb.className='ibtn busy'; mb.textContent='Generando…'; mb.disabled=true;
+    ms.textContent='Armando el manual (HTML + PDF)…'; }
+  else if(!g.estilo.hecho){ mb.className='ibtn'; mb.disabled=true; mb.textContent='Generar manual';
+    ms.textContent='Necesita el estilo completo primero.'; }
+  else { mb.className='ibtn'; mb.disabled=false;
+    mb.textContent = g.manual.html_url ? 'Regenerar manual' : 'Generar manual';
+    ms.textContent = g.manual.error ? g.manual.error
+      : (g.manual.generado_en ? ('Última versión: '+fecha(g.manual.generado_en)) : 'Genera un manual en HTML (online) y PDF.'); }
+  // Si algo está en curso, seguimos consultando; si no, refrescamos el perfil (estilo_md nuevo).
+  const activo = g.estilo.enCurso || g.manual.enCurso;
+  if(activo && !_genPoll){ _genPoll=setInterval(cargarGeneracion, 5000); }
+  if(!activo && _genPoll){ clearInterval(_genPoll); _genPoll=null; cargar(); }
+}
+async function generarEstilo(){
+  const b=document.getElementById('gen-estilo-btn'); b.className='ibtn busy'; b.disabled=true; b.textContent='Generando…';
+  try{ const d=await fetch('api/estilo/generar',{method:'POST'}).then(r=>r.json());
+    if(!d.ok) toast(d.error==='ya_en_curso'?'Ya hay una generación en curso':'No se pudo iniciar', true);
+  }catch(e){ toast('Error de conexión', true); }
+  cargarGeneracion();
+}
+async function generarManual(){
+  const b=document.getElementById('gen-manual-btn'); b.className='ibtn busy'; b.disabled=true; b.textContent='Generando…';
+  try{ const d=await fetch('api/manual/generar',{method:'POST'}).then(r=>r.json());
+    if(!d.ok) toast(d.error==='falta_estilo'?'Completá el estilo primero':(d.error==='ya_en_curso'?'Ya hay una generación en curso':'No se pudo iniciar'), true);
+  }catch(e){ toast('Error de conexión', true); }
+  cargarGeneracion();
+}
+cargarGeneracion();
 </script>
 </body>
 </html>
