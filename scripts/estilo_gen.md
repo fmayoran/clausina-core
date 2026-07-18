@@ -61,6 +61,15 @@ Una o dos frases: qué transmite la marca visual y verbalmente.
 - `#RRGGBB` — Nombre — para qué se usa (fondo / acento / texto…)
 (todos los colores centrales, con jerarquía)
 
+### Texto (jerarquía legible sobre el fondo)
+SIEMPRE definí los niveles de texto, incluso si la marca no los declara explícitamente — es lo que
+suele faltar y provoca texto ilegible. Sobre el fondo dominante:
+- **Principal** — el de máximo contraste (blanco puro sobre negro, o casi-negro sobre claro).
+- **Secundario** — cuerpo apagado, descripciones. Debe seguir siendo **cómodamente legible**.
+- **Apoyo** — rótulos, pies, lo más tenue. **Definí un piso**: sobre fondo oscuro, ningún texto por
+  debajo de ~`#8A8A8A` (relación de contraste ≈ 4.5:1). Nada de grises `#3xx`–`#6xx` sobre negro:
+  se vuelven invisibles. Si la marca es cálida, usá grises con la misma temperatura (no grises fríos).
+
 ## Tipografía
 - **Display** — Familia — para títulos
 - **Cuerpo** — Familia — para texto

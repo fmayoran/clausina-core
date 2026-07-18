@@ -43,6 +43,11 @@ no se pueda confundir con la de otra marca. El manual es, él mismo, una demostr
   clara, pesos y espaciados decididos. Que el tratamiento tipográfico sea memorable, no un vehículo
   neutro. Usá las familias del `estilo_md`; si no cargan, elegí unas de Google Fonts fieles al
   espíritu de la marca, no las de siempre.
+- **Legibilidad NO negociable.** Todo texto tiene que leerse cómodo sobre su fondo. Si el estilo
+  define una jerarquía de texto (principal/secundario/apoyo), usá esos valores. Si no, elegilos vos
+  con un **piso de contraste ≈ 4.5:1**: sobre fondo oscuro, el texto más tenue no baja de `~#8A8A8A`
+  (rótulos y pies incluidos). **Prohibido** el gris `#333`–`#666` sobre negro: se vuelve invisible.
+  Ante la duda, subí el contraste. Un rótulo que no se lee no cumple ninguna función.
 - **La estructura codifica, no decora.** Numerar las secciones (01 / 02 / 03) SOLO si son una
   secuencia real; un manual de marca casi nunca lo es —son áreas, no pasos—. Los rótulos, franjas y
   divisores tienen que decir algo verdadero del contenido.
