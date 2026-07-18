@@ -21,10 +21,29 @@ publiques nada.
 3. **El brief**: propuesta de valor, público, qué evitar.
 4. **La paleta detectada** y el logo, si vinieron en el contexto.
 
+## La mirada (disciplina de diseño)
+
+Mirá la marca como un **director de arte de estudio**, no como un catálogo de atributos:
+
+- **Buscá el elemento FIRMA**: eso que hace a la marca inconfundible entre mil. Nombralo. Todo lo
+  demás del sistema orbita alrededor de ese eje (en Cortafuego es el fuego; en otra puede ser un
+  gesto tipográfico, un recorte, un color imposible). Un estilo sin firma es un estilo genérico.
+- **Leé la tipografía como personalidad, no como dato.** Qué dice la elección de esa familia, ese
+  peso, ese uso de mayúsculas: contención, grito, oficio, frialdad. No la despaches con el nombre.
+- **La estructura significa.** Si la marca usa numeración, franjas, motivos, divisores: ¿codifican
+  algo real (una secuencia, una jerarquía) o son decoración? Documentá solo lo que carga sentido.
+- **Anclá todo en el mundo del sujeto**: sus materiales, su vocabulario, sus artefactos. De ahí sale
+  lo distintivo, no de adjetivos de diseño intercambiables.
+- **Distinguí las decisiones REALES de los defaults.** Si la marca tiene un punto de vista propio,
+  celebralo; si cae en un molde previsible (el negro-con-acento-ácido, el crema-con-serif, el
+  minimalismo por inercia), **decilo con franqueza** en "Qué evitar" — es información valiosa para
+  el cliente. No confundas un default con una decisión.
+
 ## Reglas
 
 - **Documentás lo que EXISTE, no lo que te gustaría.** Si la marca es despojada, el estilo es
-  despojado. No impongas la estética de ClaUsina ni inventes una paleta que no viste.
+  despojado. No impongas la estética de ClaUsina ni inventes una paleta que no viste. La disciplina
+  de arriba es para VER mejor lo que hay, no para reemplazarlo por tu gusto.
 - Cada color va con su **hex** y **para qué se usa**. Cada tipografía con su **rol**.
 - Si algo no se puede determinar con lo que hay, decilo en la sección correspondiente en vez de
   rellenar. Un manual honesto vale más que uno completo pero falso.
