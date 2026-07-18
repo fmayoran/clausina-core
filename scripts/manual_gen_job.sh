@@ -28,8 +28,12 @@ echo "$(ts) manual $gid ($slug)" >> "$LOG"
 psql "UPDATE contenido.marca_gen SET estado='procesando' WHERE id='$gid';" >/dev/null
 rm -f "/tmp/manual_res_$gid.html"
 
+# Versión y fecha para control: cada manual generado incrementa la versión de la marca.
+ver=$(( $(psql "SELECT coalesce(manual_version,0) FROM contenido.proyecto_perfil WHERE proyecto_id='$pid';") + 1 ))
+fecha=$(date +%d/%m/%Y)
+
 # Contexto: nombre, slogan, brief, estilo_md, logo, paleta.
-PG="$PG" PID="$pid" GID="$gid" python3 - <<'PY'
+PG="$PG" PID="$pid" GID="$gid" VER="v$ver" FECHA="$fecha" python3 - <<'PY'
 import json, os, subprocess
 pg=os.environ["PG"]; pid=os.environ["PID"]; gid=os.environ["GID"]
 def q(sql):
@@ -43,13 +47,31 @@ slogan, _, r2 = r1.partition('\n---L---\n')
 logo,   _, r3 = r2.partition('\n---B---\n')
 brief,  _, estilo = r3.partition('\n---E---\n')
 json.dump({"nombre":nombre.strip(),"slogan":slogan.strip(),"logo":logo.strip(),
-           "brief":brief.strip(),"estilo_md":estilo.strip()},
+           "brief":brief.strip(),"estilo_md":estilo.strip(),
+           "version":os.environ.get("VER",""),"fecha":os.environ.get("FECHA","")},
           open(f"/tmp/manual_ctx_{gid}.json","w"), ensure_ascii=False)
 print("estilo_len="+str(len(estilo.strip())))
 PY
 
 PROMPT="Sos el DISEÑADOR EDITORIAL de ClaUsina. Segui EXACTAMENTE $MOTOR/scripts/manual_gen.md. El contexto (nombre, slogan, brief, estilo_md, logo, paleta) esta en /tmp/manual_ctx_$gid.json. Escribi UNA sola pagina HTML autocontenida en /tmp/manual_res_$gid.html, aplicando la identidad de la marca al propio manual. No toques la base, ni git, ni publiques nada."
 timeout 900 claude -p "$PROMPT" --model sonnet --allowedTools Read Write >> "$LOG" 2>&1
+
+# Versión y fecha: los reemplazamos nosotros (control). Placeholders si el modelo cooperó; si no,
+# un sello fijo antes de </body> garantiza que la info de control SIEMPRE esté.
+if [ -s "/tmp/manual_res_$gid.html" ]; then
+  VER="v$ver" FECHA="$fecha" python3 - "$gid" <<'PY'
+import os, re, sys
+gid=sys.argv[1]; ver=os.environ["VER"]; fecha=os.environ["FECHA"]
+p=f"/tmp/manual_res_{gid}.html"; h=open(p, encoding="utf-8").read()
+tuvo = "{{VERSION}}" in h or "{{FECHA}}" in h
+h = h.replace("{{VERSION}}", ver).replace("{{FECHA}}", fecha)
+if not tuvo:  # el modelo no puso los placeholders: sello fijo, discreto, visible también en PDF
+    sello=(f'<div style="position:fixed;bottom:8mm;right:10mm;font:600 9px/1 monospace;'
+           f'letter-spacing:.08em;color:#888;opacity:.85;z-index:9999">{ver} · {fecha}</div>')
+    h = re.sub(r"</body>", sello + "</body>", h, count=1, flags=re.I) if "</body>" in h.lower() else h+sello
+open(p,"w",encoding="utf-8").write(h)
+PY
+fi
 
 if [ ! -s "/tmp/manual_res_$gid.html" ] || grep -q "^SIN_ESTILO" "/tmp/manual_res_$gid.html" 2>/dev/null; then
   psql "UPDATE contenido.marca_gen SET estado='error', error='No se pudo generar el manual (¿está completo el estilo?).', procesado_en=now() WHERE id='$gid';" >/dev/null
@@ -70,7 +92,7 @@ fi
 
 HTML_URL="$BASE_URL/$rel/manual-$stamp.html"
 PDF_URL="$BASE_URL/$rel/manual-$stamp.pdf"
-PG="$PG" PID="$pid" GID="$gid" HTMLU="$HTML_URL" PDFU="$PDF_URL" POK="$pdf_ok" python3 - <<'PY'
+PG="$PG" PID="$pid" GID="$gid" HTMLU="$HTML_URL" PDFU="$PDF_URL" POK="$pdf_ok" VER="$ver" python3 - <<'PY'
 import os, secrets, subprocess
 pg=os.environ["PG"]; pid=os.environ["PID"]; gid=os.environ["GID"]
 htmlu=os.environ["HTMLU"]; pdfu=os.environ["PDFU"] if os.environ["POK"]=="1" else None
@@ -78,7 +100,7 @@ def psql(sql):
     return subprocess.run(["docker","exec","-i",pg,"psql","-U","postgres","-d","claude","-t","-A","-q","-c",sql],capture_output=True,text=True)
 def dq(v):
     t="x"+secrets.token_hex(8); return "NULL" if v is None else f"${t}${v}${t}$"
-psql(f"UPDATE contenido.proyecto_perfil SET manual_html_url={dq(htmlu)}, manual_pdf_url={dq(pdfu)}, manual_generado_en=now() WHERE proyecto_id='{pid}';")
+psql(f"UPDATE contenido.proyecto_perfil SET manual_html_url={dq(htmlu)}, manual_pdf_url={dq(pdfu)}, manual_version={int(os.environ['VER'])}, manual_generado_en=now() WHERE proyecto_id='{pid}';")
 psql(f"UPDATE contenido.marca_gen SET estado='listo', error=NULL, procesado_en=now() WHERE id='{gid}';")
 print("ok")
 PY

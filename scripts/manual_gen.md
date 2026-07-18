@@ -14,6 +14,10 @@ Un documento de marca que traduzca el `estilo_md` a una pieza **visual**, no un 
 Secciones típicas (usá las que apliquen según el estilo):
 
 1. **Portada**: nombre de la marca, logo (si hay URL, usalo con `<img>`), slogan, y "Manual de marca".
+   Incluí en la portada, de forma discreta (encabezado o pie de la portada), una línea de control
+   con la **versión** y la **fecha** usando EXACTAMENTE los placeholders `{{VERSION}}` y `{{FECHA}}`
+   (ej.: `Manual de marca · {{VERSION}} · {{FECHA}}`). No inventes el número ni la fecha: los
+   reemplazamos nosotros. En el contexto vienen los valores para que sepas cómo se van a ver.
 2. **Esencia / propósito**: qué es la marca, en pocas palabras.
 3. **Logo**: el logo en sus fondos, aire mínimo, usos correctos e incorrectos.
 4. **Paleta**: cada color como un **swatch real** (un bloque pintado con su `background`), con nombre,
