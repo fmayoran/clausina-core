@@ -13,7 +13,8 @@ const [inHtml, outPdf] = process.argv.slice(2);
     // file:// para que resuelva rutas relativas; networkidle deja cargar Google Fonts y el logo.
     await p.goto('file://' + path.resolve(inHtml), { waitUntil: 'networkidle', timeout: 45000 });
     await p.emulateMedia({ media: 'print' });
-    await p.pdf({ path: outPdf, format: 'A4', printBackground: true,
+    // preferCSSPageSize: el @page {size:A4;margin:0} del HTML manda -> full-bleed, sin marco blanco.
+    await p.pdf({ path: outPdf, printBackground: true, preferCSSPageSize: true,
       margin: { top: '0', bottom: '0', left: '0', right: '0' } });
     await b.close();
     console.log(JSON.stringify({ ok: true }));

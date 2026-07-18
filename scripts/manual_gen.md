@@ -55,18 +55,42 @@ no se pueda confundir con la de otra marca. El manual es, él mismo, una demostr
   cortes feos, respetá `prefers-reduced-motion` si usás algo de movimiento (el manual no lo necesita;
   el exceso de animación lo hace sentir generado por IA).
 
-## Reglas técnicas (importantes para que el PDF salga bien)
+## Reglas técnicas — MAQUETACIÓN A4 (crítico: el PDF es el entregable)
 
-- **UNA sola página HTML autocontenida.** Todo el CSS embebido en un `<style>`. Nada de frameworks
-  ni JS. Fuentes: solo Google Fonts por `<link>` (permitido); ninguna otra dependencia externa salvo
-  el logo y, si aplica, las imágenes que vengan en el contexto.
-- **Aplicá la identidad de la marca al manual**: los colores y las tipografías del `estilo_md` son
-  los del documento. Un manual de una parrilla no se ve como uno de una fintech.
-- Pensado para imprimir: agregá `@page { margin: 18mm; }` y un `@media print` que evite cortes feos
-  (`section { break-inside: avoid; }`). Ancho de contenido tipo A4 (~820px máx), buena tipografía,
-  aire generoso.
-- Español. Serio pero con carácter; es material que el cliente va a mostrar.
-- Si el logo del contexto no carga, no lo fuerces: usá el nombre en la tipografía de marca.
+El manual se exporta a **PDF A4 vertical**. Maquetalo como un documento paginado de verdad, no como
+una web larga que después se corta sola. Esto es lo que hace que se vea profesional:
+
+- **UNA sola página HTML autocontenida.** Todo el CSS embebido en un `<style>`. Nada de frameworks ni
+  JS. Fuentes: solo Google Fonts por `<link>`; ninguna otra dependencia externa salvo el logo y las
+  imágenes que vengan en el contexto.
+- **Sin margen de hoja: fondo a sangre.** Usá exactamente:
+  ```css
+  @page { size: A4; margin: 0; }
+  ```
+  Nada de `@page { margin: 18mm }` — eso deja un marco blanco feo alrededor de cada hoja. El color de
+  fondo de la marca tiene que llegar **hasta el borde del papel** (full-bleed). El "margen" es aire
+  INTERNO (padding), parte de la página coloreada, no un borde blanco.
+- **Una hoja por sección.** Estructurá el documento en bloques `.page`, uno por cada página A4:
+  ```css
+  .page { width: 210mm; min-height: 297mm; box-sizing: border-box; padding: 20mm 22mm;
+          break-after: page; break-inside: avoid; overflow: hidden; position: relative; }
+  .page:last-child { break-after: auto; }
+  ```
+  Cada `.page` lleva su propio fondo (el de la marca). Portada = una `.page`; cada sección grande =
+  su(s) propia(s) `.page`. Si una sección no entra en 297mm, **partila en dos `.page`**, no la dejes
+  desbordar. Los bloques internos (swatches, cards, muestras): `break-inside: avoid`.
+- **Dimensioná en escala de impresión.** Pensá los tamaños para que cada hoja respire y quede
+  balanceada (ni un titular perdido en una hoja vacía, ni contenido apretado que se corta). Usá `mm`
+  o `pt` para lo estructural; la tipografía puede ir en `px`/`rem` con criterio.
+- **Aplicá la identidad de la marca al documento**: colores y tipografías del `estilo_md`. Un manual
+  de una parrilla no se ve como uno de una fintech.
+- `print-color-adjust: exact` (y `-webkit-print-color-adjust: exact`) en `html, body` para que los
+  fondos oscuros salgan en el PDF y no en blanco.
+- Español. Serio pero con carácter; es material que el cliente muestra. Si el logo no carga, no lo
+  fuerces: usá el nombre en la tipografía de marca.
+
+El mismo HTML se ve online (scroll de páginas) y se exporta a PDF (una hoja por `.page`): la
+maquetación paginada sirve para los dos.
 
 Devolvé SOLO el archivo HTML. Si el `estilo_md` viene vacío, escribí en su lugar el texto
 `SIN_ESTILO` (el manual necesita el estilo hecho primero).

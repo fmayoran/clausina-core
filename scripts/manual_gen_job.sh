@@ -74,7 +74,10 @@ PY
 fi
 
 if [ ! -s "/tmp/manual_res_$gid.html" ] || grep -q "^SIN_ESTILO" "/tmp/manual_res_$gid.html" 2>/dev/null; then
-  psql "UPDATE contenido.marca_gen SET estado='error', error='No se pudo generar el manual (¿está completo el estilo?).', procesado_en=now() WHERE id='$gid';" >/dev/null
+  # Causa más común de "sin resultado": límite temporal de uso de la suscripción (claude -p).
+  msg="El creativo no pudo generar el manual. Suele ser un límite temporal de uso; probá de nuevo en unos minutos."
+  grep -qi "session limit\|usage limit\|rate limit" "$LOG" 2>/dev/null && msg="Se alcanzó el límite de uso de la suscripción. Reintentá cuando se reinicie."
+  psql "UPDATE contenido.marca_gen SET estado='error', error='$msg', procesado_en=now() WHERE id='$gid';" >/dev/null
   echo "$(ts) manual $gid sin resultado" >> "$LOG"
   rm -f "/tmp/manual_ctx_$gid.json" "/tmp/manual_res_$gid.html"; exit 1
 fi
