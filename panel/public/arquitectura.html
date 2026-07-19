@@ -142,13 +142,13 @@
     <a href="#canales">5 · Canales</a>
     <a href="#datos">6 · Datos</a>
     <a href="#infra">7 · Infra</a>
-    <a href="#marcas">8 · Marcas</a>
+    <a href="#negocios">8 · Negocios</a>
     <a href="#roadmap">9 · Roadmap</a>
     <a href="#changelog">10 · Changelog</a>
   </div></div>
 <header class="hero"><div class="wrap">
   <h1>ClaUsina — Arquitectura técnica y funcional</h1>
-  <p class="sub">La plataforma de contenido y operaciones multi-marca. Un motor agnóstico de marca que prepara, aprueba y publica contenido con generación asistida por IA, y una cápsula aislada por cada negocio.</p>
+  <p class="sub">La plataforma de contenido y operaciones multi-negocio. Un motor agnóstico de negocio que prepara, aprueba y publica contenido con generación asistida por IA, y una cápsula aislada por cada negocio.</p>
   <div class="meta">
     <span class="pill">Documento vivo</span>
     <span class="pill">Actualizado: 2026-07-09</span>
@@ -160,20 +160,20 @@
 <!-- 1 -->
 <section id="vision"><div class="wrap">
   <h2>1 · Visión y principio</h2>
-  <p class="lead">Una plataforma para que una o varias marcas <b>planifiquen, aprueben y publiquen</b> contenido sin fricción. La automatización prepara y publica; <b>no decide</b>.</p>
+  <p class="lead">Una plataforma para que uno o varios negocios <b>planifiquen, aprueben y publiquen</b> contenido sin fricción. La automatización prepara y publica; <b>no decide</b>.</p>
   <div class="grid g2">
     <div class="card">
       <h4>Principio rector</h4>
       <p><b>Nada sale sin aprobación humana.</b> El contenido se prepara (texto + imagen/video, generado o real), se registra como pieza pendiente, pasa por una aprobación humana con preview, y recién entonces se publica. Si se rechaza, entra en un loop de iteración hasta aprobarse.</p>
     </div>
     <div class="card">
-      <h4>Motor agnóstico + cápsula por marca</h4>
-      <p>El <b>motor</b> no sabe de ninguna marca en particular: sabe operar <i>una marca cualquiera</i>, ruteando por <code>proyecto_id</code>. Cada <b>marca</b> es una cápsula independiente (contexto + assets + secretos), aislada de las demás.</p>
+      <h4>Motor agnóstico + cápsula por negocio</h4>
+      <p>El <b>motor</b> no sabe de ningún negocio en particular: sabe operar <i>un negocio cualquiera</i>, ruteando por <code>negocio_id</code>. Cada <b>negocio</b> es una cápsula independiente (contexto + assets + secretos), aislada de las demás.</p>
     </div>
   </div>
   <div class="loop">
     <span class="ico" style="color:var(--cel)">◆</span>
-    <div><b>Dualidad de ClaUsina.</b> ClaUsina es a la vez el contenedor/motor/agencia que abarca todo, <i>y</i> una marca más (simétrica con Cortafuego y Ardora): la agencia se hace su propio marketing en <a href="https://clausina.ar">clausina.ar</a>.</div>
+    <div><b>Dualidad de ClaUsina.</b> ClaUsina es a la vez el contenedor/motor/agencia que abarca todo, <i>y</i> un negocio más (simétrico con Cortafuego y Ardora): la agencia se hace su propio marketing en <a href="https://clausina.ar">clausina.ar</a>.</div>
   </div>
 </div></section>
 
@@ -205,14 +205,14 @@
   <p class="lead">Cinco capas: control/agentes, generación IA, orquestación, datos y presentación, sobre la infraestructura del VPS.</p>
   <div class="grid g3">
     <div class="card"><h4>Control / Agentes</h4><p>Claude Code como operador. Skills globales: <code>/creativo</code> (contenido), <code>/editor</code> (pantalla DOOH), <code>/it</code> (infra). Headless por cron/cola para la auto-corrección.</p></div>
-    <div class="card"><h4>Panel</h4><p><code>clausina_panel</code> (EasyPanel) en <a href="https://panel.clausina.ar">panel.clausina.ar</a>. Board: Cola de Requerimientos · Pendientes · Publicadas, login por marca. Sirve el media store en <code>/media</code>.</p></div>
+    <div class="card"><h4>Panel</h4><p><code>clausina_panel</code> (EasyPanel) en <a href="https://panel.clausina.ar">panel.clausina.ar</a>. Board: Cola de Requerimientos · Pendientes · Publicadas, login por negocio. Sirve el media store en <code>/media</code>.</p></div>
     <div class="card"><h4>Generación IA</h4><p><b>Higgsfield</b> (CLI, plan ultra): imágenes y Reels. Tipografía de marca: HTML → JPG con Chromium/Playwright. La inicia Fer (calidad/NSFW en el loop).</p></div>
     <div class="card"><h4>Orquestación — n8n</h4><p>Webhooks <code>cf-*</code> (paths estables) tras el rebrand a "ClaUsina - X". Crea piezas, notifica, decide, publica, sirve el feed. Postgres + Telegram + Graph API.</p></div>
     <div class="card"><h4>Datos — PostgreSQL</h4><p>Motor <code>crm_pgvector</code>, base propia <code>claude</code>, schema <code>contenido</code> (multi-proyecto). Fuente de verdad de todo el ciclo de contenido.</p></div>
     <div class="card"><h4>Cola Redis + workers</h4><p><b>dispatcher</b> (timer, lee la DB) + <b>worker</b> (cola Redis) despachan por tipo: corrección, propuesta, revisión, brief, landing, <b>bibliotecario</b> y <b>campaña / pauta</b>. Desacopla el disparo del procesamiento.</p></div>
     <div class="card"><h4>Pauta — Meta Ads</h4><p>Publicidad de Instagram vía <b>Marketing API</b> (lectura + escritura). El creativo propone campañas; Fer aprueba → se crean <b>pausadas</b> en Meta → activar / pausar / descartar. Reporte + evolución diaria por <code>cf-pauta-sync</code>. Nada gasta sin aprobación.</p></div>
-    <div class="card"><h4>Biblioteca + Bibliotecario</h4><p>DAM por marca (taller: en proceso/terminado · del sistema: piezas/marca). Subida por streaming con <b>compresión de video</b> (ffmpeg). El <b>bibliotecario</b> genera/edita assets con IA (Higgsfield/ffmpeg), sin publicar.</p></div>
-    <div class="card"><h4>Presentación — landings</h4><p>Sitios estáticos por marca (Cloudflare). <code>index.html</code> con SEO/JSON-LD; <code>preview.html</code> (aprobación) y feed de novedades vía proxy same-origin a n8n.</p></div>
+    <div class="card"><h4>Biblioteca + Bibliotecario</h4><p>DAM por negocio (taller: en proceso/terminado · del sistema: piezas/negocio). Subida por streaming con <b>compresión de video</b> (ffmpeg). El <b>bibliotecario</b> genera/edita assets con IA (Higgsfield/ffmpeg), sin publicar.</p></div>
+    <div class="card"><h4>Presentación — landings</h4><p>Sitios estáticos por negocio (Cloudflare). <code>index.html</code> con SEO/JSON-LD; <code>preview.html</code> (aprobación) y feed de novedades vía proxy same-origin a n8n.</p></div>
     <div class="card"><h4>Canales de salida</h4><p>Instagram (Graph API), pantalla DOOH (VNNOX, Paseo Ardora), web (novedades), Telegram (operación/avisos a Fer).</p></div>
     <div class="card"><h4>Media store</h4><p>Dos niveles: store central <code>clausina-media</code> (interno/trabajo, <code>panel.clausina.ar/media</code>) + CDN de marca (público).</p></div>
   </div>
@@ -227,7 +227,7 @@
     <div class="step"><div class="num">1</div><div class="body">
       <h4>Entra el requerimiento (intake)</h4>
       <p class="func">Fer dicta un brief por voz/foto+texto en Telegram, o sube un pedido en el panel; el creativo también puede proponer qué publicar y qué material hace falta.</p>
-      <div class="tech"><b>Técnico:</b> el brief queda en <code>contenido.tg_briefs</code> con <code>proyecto_id</code> y <code>canal_destino</code> (instagram|aviso). Handlers en el VPS: <code>brief_local.sh</code> (voz → Whisper.cpp local) y <code>propuestas_local.sh</code>. Ruteo por marca: cada corrida = una sola cápsula <code>marcas/&lt;slug&gt;/</code>.</div>
+      <div class="tech"><b>Técnico:</b> el brief queda en <code>contenido.tg_briefs</code> con <code>negocio_id</code> y <code>canal_destino</code> (instagram|aviso). Handlers en el VPS: <code>brief_local.sh</code> (voz → Whisper.cpp local) y <code>propuestas_local.sh</code>. Ruteo por negocio: cada corrida = una sola cápsula <code>marcas/&lt;slug&gt;/</code>.</div>
     </div></div>
 
     <div class="step"><div class="num">2</div><div class="body">
@@ -283,7 +283,7 @@
 <!-- 6 -->
 <section id="datos"><div class="wrap">
   <h2>6 · Modelo de datos</h2>
-  <p class="lead">Base <code>claude</code> (independiente de las apps ajenas en <code>crm</code>), schema <code>contenido</code>. Multi-proyecto: una marca = una fila en <code>proyectos</code>; el resto cuelga de ahí.</p>
+  <p class="lead">Base <code>claude</code> (independiente de las apps ajenas en <code>crm</code>), schema <code>contenido</code>. Multi-negocio: un negocio = una fila en <code>negocectos</code>; el resto cuelga de ahí.</p>
   <div class="erd">
     <div class="row">
       <div class="ent">
@@ -339,16 +339,16 @@
       <tr><td><b>Traefik</b></td><td>Reverse proxy + SSL</td><td>todos los dominios</td><td>—</td></tr>
     </tbody>
   </table>
-  <p class="muted" style="margin-top:12px">Secretos por nivel: plataforma (DB, panel) en <code>core/plataforma.env</code>; marca (Telegram/mail y lo no migrado) en <code>marcas/&lt;slug&gt;/&lt;slug&gt;.env</code>; infra/ops (VPS, EasyPanel, GitHub, dominios, Cloudflare, n8n) en <code>.env</code> raíz. <b>Lo que Fer administra desde el panel</b> (credenciales de Meta Ads) va <b>cifrado en la DB</b> (perfil de la marca): IDs en claro, token AES-256-GCM <b>write-only</b>; clave maestra <code>APP_ENC_KEY</code> en infra (host + panel). Objetivo: operar sin acceso al VPS.</p>
+  <p class="muted" style="margin-top:12px">Secretos por nivel: plataforma (DB, panel) en <code>core/plataforma.env</code>; negocio (Telegram/mail y lo no migrado) en <code>marcas/&lt;slug&gt;/&lt;slug&gt;.env</code>; infra/ops (VPS, EasyPanel, GitHub, dominios, Cloudflare, n8n) en <code>.env</code> raíz. <b>Lo que Fer administra desde el panel</b> (credenciales de Meta Ads) va <b>cifrado en la DB</b> (perfil del negocio): IDs en claro, token AES-256-GCM <b>write-only</b>; clave maestra <code>APP_ENC_KEY</code> en infra (host + panel). Objetivo: operar sin acceso al VPS.</p>
 </div></section>
 
 <!-- 8 -->
-<section id="marcas"><div class="wrap">
-  <h2>8 · Marcas activas</h2>
-  <p class="lead">Hoy ClaUsina maneja 3 cápsulas. Antes de cualquier tarea de una marca se lee su contexto.</p>
+<section id="negocios"><div class="wrap">
+  <h2>8 · Negocios activos</h2>
+  <p class="lead">Hoy ClaUsina maneja 3 cápsulas. Antes de cualquier tarea de un negocio se lee su contexto.</p>
   <div class="grid g3">
-    <div class="card"><h4>Cortafuego</h4><p>Asador urbano (Ranelagh). Marca piloto, donde se valida todo el circuito. <span class="tag">@cortafuego.ar</span> <span class="tag">Worker</span></p></div>
-    <div class="card"><h4>Distrito Ardora</h4><p>Marca paraguas con sub-marcas (Paseo de Compras, Complejo Deportivo). Token IG permanente (System User). <span class="tag">@ardora.ar</span> <span class="tag">Pages</span> <span class="tag">DOOH</span></p></div>
+    <div class="card"><h4>Cortafuego</h4><p>Asador urbano (Ranelagh). Negocio piloto, donde se valida todo el circuito. <span class="tag">@cortafuego.ar</span> <span class="tag">Worker</span></p></div>
+    <div class="card"><h4>Distrito Ardora</h4><p>Negocio paraguas con sub-marcas (Paseo de Compras, Complejo Deportivo). Token IG permanente (System User). <span class="tag">@ardora.ar</span> <span class="tag">Pages</span> <span class="tag">DOOH</span></p></div>
     <div class="card"><h4>ClaUsina</h4><p>La agencia como marca (dualidad): se hace su propio marketing. <span class="tag">@clausina.ar</span> <span class="tag">Worker</span></p></div>
   </div>
 </div></section>
@@ -363,7 +363,7 @@
       <tr><td>Cola Redis a toda la plataforma</td><td>Extender la corrección por cola+worker (hoy piloto Cortafuego) a todas los negocios.</td><td><span class="st warn">en curso</span></td></tr>
       <tr><td>Media store con CDN</td><td>Store único fronteado con Cloudflare (<code>media.clausina.ar</code>); sacar el material de publicaciones del repo de la landing.</td><td><span class="st pend">pendiente</span></td></tr>
       <tr><td>API REST de Higgsfield en n8n</td><td>Generación automática dentro del pipeline (async con webhook), manteniendo a Fer por calidad/NSFW.</td><td><span class="st pend">pendiente</span></td></tr>
-      <tr><td>Preview por marca (cf-pub-notify)</td><td>El botón "Ver completo" apunta a <code>cortafuego.ar/preview.html</code>; falta servir preview + proxy por cada negocio.</td><td><span class="st pend">pendiente</span></td></tr>
+      <tr><td>Preview por negocio (cf-pub-notify)</td><td>El botón "Ver completo" apunta a <code>cortafuego.ar/preview.html</code>; falta servir preview + proxy por cada negocio.</td><td><span class="st pend">pendiente</span></td></tr>
       <tr><td>Fallback SQL en cf-crear-pendiente</td><td><code>COALESCE(j-&gt;&gt;'proyecto','cortafuego')</code>: el último resabio de marca en n8n; depende del esquema y del contrato de payload.</td><td><span class="st pend">pendiente</span></td></tr>
       <tr><td>Skills agnósticos</td><td><code>/creativo</code> y <code>/editor</code> aún teñidos de Cortafuego; el contenido específico debería leerse del contexto de la negocio activo.</td><td><span class="st pend">pendiente</span></td></tr>
       <tr><td>Ardora: @ardora.sport + paraguas</td><td>Conectar la sub-marca deportiva y modelar el paraguas Distrito Ardora.</td><td><span class="st pend">pendiente</span></td></tr>
@@ -378,11 +378,14 @@
   <table class="chg">
     <thead><tr><th>Fecha</th><th>Cambio</th></tr></thead>
     <tbody>
+      <tr><td>2026-07-19</td><td><b>Renombre: proyecto/marca → NEGOCIO.</b> La entidad que gestiona ClaUsina pasa a llamarse <b>negocio</b> (a futuro un negocio podrá tener &gt;1 marca). "Marca" se conserva SOLO como <b>branding</b> (voz/estilo/manual de marca, sub-marcas). DB: <code>proyectos</code>→<code>negocios</code>, <code>proyecto_*</code>→<code>negocio_*</code>, columna <code>proyecto_id</code>→<code>negocio_id</code> (20 tablas). Backend/UI/endpoints (<code>/api/negocios</code>). NO se tocaron: la carpeta de logos <code>/media/marca/</code> ni las rutas de cápsula en disco <code>marcas/&lt;slug&gt;/</code> (storage / submodules).</td></tr>
+      <tr><td>2026-07-18</td><td><b>Estilo + Manual de marca (generados por el creativo).</b> Desde Perfil: <b>generar/regenerar estilo</b> (el director de arte documenta el sistema de diseño desde brief + publicaciones + IG) y <b>manual de marca</b> (HTML online + PDF A4 paginado a sangre, con versión + fecha). Disciplina de diseño (frontend-design) destilada en los prompts. Jerarquía de texto con piso de contraste. Tabla <code>negocio_gen</code>; jobs <code>estilo_gen</code>/<code>manual_gen</code>.</td></tr>
+      <tr><td>2026-07-12</td><td><b>Lente de Instagram (business_discovery).</b> Cuenta IG Business de la plataforma que lee el perfil <b>público</b> de cualquier cuenta Business/Creator (bio, seguidores, cadencia, posts, imágenes del feed). Alimenta el <b>alta de negocios</b> (wizard con análisis de presencia digital) y el estilo. Config cifrada en <code>plataforma_config</code>. Faltaba el permiso <code>instagram_manage_insights</code>.</td></tr>
       <tr><td>2026-07-08</td><td><b>Pauta / Meta Ads.</b> Publicidad de Instagram vía <b>Marketing API</b>: reporte de cuenta + campañas, el creativo <b>propone campañas</b> (objetivo, creativo = post publicado, público, presupuesto), Fer aprueba → se crean <b>pausadas</b> en Meta → activar / pausar / descartar (borra en Meta). <b>Evolución diaria</b> (gráfico) + botón "Actualizar ahora" (pedido → dispatcher → sync). Receta validada v21.0 (creativo desde post existente: <code>object_id</code> + <code>instagram_user_id</code> + <code>source_instagram_media_id</code> + CTA). Tablas <code>ads_snapshot</code>/<code>ads_daily</code>/<code>campanias</code>/<code>solicitudes_campania</code>/<code>pauta_sync_req</code>; nuevos jobs <code>campania</code>/<code>campania_meta</code>/<code>pauta_sync</code>.</td></tr>
-      <tr><td>2026-07-05</td><td><b>Biblioteca de medios (DAM) + Bibliotecario.</b> Biblioteca por marca: taller (en proceso/terminado) + del sistema (piezas/marca), subida por streaming con <b>compresión de video</b> (ffmpeg en <code>core/Dockerfile</code>, el que usa EasyPanel). El <b>bibliotecario</b> crea/edita assets con IA (Higgsfield/ffmpeg) sin publicar. Propuestas del creativo con <b>material adjunto</b> (disco o biblioteca). <b>Colaboradores</b> de IG por publicación (elegidos al aprobar). Bitácora "cómo se generó" por pieza. Loop "pedir nueva versión" en propuestas.</td></tr>
+      <tr><td>2026-07-05</td><td><b>Biblioteca de medios (DAM) + Bibliotecario.</b> Biblioteca por negocio: taller (en proceso/terminado) + del sistema (piezas/negocio), subida por streaming con <b>compresión de video</b> (ffmpeg en <code>core/Dockerfile</code>, el que usa EasyPanel). El <b>bibliotecario</b> crea/edita assets con IA (Higgsfield/ffmpeg) sin publicar. Propuestas del creativo con <b>material adjunto</b> (disco o biblioteca). <b>Colaboradores</b> de IG por publicación (elegidos al aprobar). Bitácora "cómo se generó" por pieza. Loop "pedir nueva versión" en propuestas.</td></tr>
       <tr><td>2026-07-08</td><td><b>Robustez y UX.</b> <code>callWebhook</code> reintenta ante DNS intermitente a n8n (<code>EAI_AGAIN</code> / "fetch failed"); "En cola" del proyecto ya no cuenta piezas ya generadas (evita doble conteo con "Por aprobar"); pastillas ordenadas por flujo (Propuestas → En cola → Por aprobar → Publicadas); acceso a Biblioteca como ícono + tarjeta "Pauta Instagram".</td></tr>
-      <tr><td>2026-06-29</td><td><b>Sistema de marca ClaUsina + rediseño del panel.</b> Identidad nueva (logo "U en órbita" + favicon, lima/coral, Inter Tight/JetBrains Mono, dual dark/light). Panel migrado a un <b>shell reutilizable</b> (<code>shell.js</code>: sidebar + selector de marca funcional) con <b>Tailwind compilado</b> (<code>tw.css</code> commiteado, sin tocar el build). Dashboard, Sala de máquinas y Arquitectura en dark/light; páginas de contenido en dark. Lineamiento en <code>core/planes/SISTEMA_MARCA.md</code> y styleguide vivo en <code>/estilo</code>. Reorganización de <code>/proyecto</code> (pastillas con acción, cola en modal, propuestas en página propia).</td></tr>
-      <tr><td>2026-06-23</td><td>Contexto de marca en 3 capas: <b>motor + guardrails</b> en el <code>CLAUDE.md</code> raíz (compartido, código); <b>voz/identidad</b> en <code>contexto/CONTEXTO_MARCA.md</code> (desde la base, editable en el panel); <b>lo propio de la marca</b> en un <code>CLAUDE.md</code> de cápsula fino. Se deduplicó el motor que se repetía en cada negocio.</td></tr>
+      <tr><td>2026-06-29</td><td><b>Sistema de marca ClaUsina + rediseño del panel.</b> Identidad nueva (logo "U en órbita" + favicon, lima/coral, Inter Tight/JetBrains Mono, dual dark/light). Panel migrado a un <b>shell reutilizable</b> (<code>shell.js</code>: sidebar + selector de negocio funcional) con <b>Tailwind compilado</b> (<code>tw.css</code> commiteado, sin tocar el build). Dashboard, Sala de máquinas y Arquitectura en dark/light; páginas de contenido en dark. Lineamiento en <code>core/planes/SISTEMA_MARCA.md</code> y styleguide vivo en <code>/estilo</code>. Reorganización de <code>/proyecto</code> (pastillas con acción, cola en modal, propuestas en página propia).</td></tr>
+      <tr><td>2026-06-23</td><td>Contexto de marca en 3 capas: <b>motor + guardrails</b> en el <code>CLAUDE.md</code> raíz (compartido, código); <b>voz/identidad</b> en <code>contexto/CONTEXTO_MARCA.md</code> (desde la base, editable en el panel); <b>lo propio del negocio</b> en un <code>CLAUDE.md</code> de cápsula fino. Se deduplicó el motor que se repetía en cada negocio.</td></tr>
       <tr><td>2026-06-23</td><td>Orden de carpetas: la raíz <code>claudefolder</code> pasó a <code>clausina</code> y el motor <code>plataforma/</code> a <code>core/</code> (coincide con el repo <code>clausina-core</code>). Symlink de compatibilidad mientras la sesión viva corre desde la ruta vieja.</td></tr>
       <tr><td>2026-06-23</td><td>Primera versión de este documento de arquitectura (HTML vivo).</td></tr>
       <tr><td>2026-06-22</td><td>Monorepo contenedor <code>clausina</code> + 4 submodules; <code>clausina.ar</code> live (Worker + auto-deploy GitHub Actions); crons des-horneados (agnósticos); rebrand de n8n a "ClaUsina - X"; hook de calidad web reactivado y agnóstico.</td></tr>
