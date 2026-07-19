@@ -19,21 +19,21 @@ hb(){ psqlc "INSERT INTO contenido.batch_runs(proceso,last_run,last_msg) VALUES(
 
 exec 9>/tmp/cf_propuestas.lock; flock -n 9 || exit 0
 
-row=$(psqlc "SELECT row_to_json(t) FROM (SELECT id,enfasis,canal,cantidad,proyecto_id FROM contenido.solicitudes_propuesta WHERE estado='pendiente' ORDER BY creado_en LIMIT 1) t;")
+row=$(psqlc "SELECT row_to_json(t) FROM (SELECT id,enfasis,canal,cantidad,negocio_id FROM contenido.solicitudes_propuesta WHERE estado='pendiente' ORDER BY creado_en LIMIT 1) t;")
 [ -z "$row" ] && { echo "$(ts) sin pedidos" >> "$LOG"; hb "sin pedidos"; exit 0; }
 
 sid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
 enfasis=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('enfasis') or '')")
 canal=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('canal') or 'instagram')")
 cantidad=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('cantidad') or 5)")
-pid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('proyecto_id') or '')")
+pid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('negocio_id') or '')")
 
 # --- resolver el proyecto del pedido: cápsula y secretos de ESA marca (aislamiento multiproyecto) ---
-slug=$(psqlc "SELECT slug FROM contenido.proyectos WHERE id='$pid';")
+slug=$(psqlc "SELECT slug FROM contenido.negocios WHERE id='$pid';")
 # Sin proyecto resoluble no se asume ninguna marca: se marca error (multi-marca, agnóstico).
 [ -z "$slug" ] && { echo "$(ts) ERROR: pedido $sid sin proyecto resoluble (pid='$pid')" >> "$LOG"; psqlc "UPDATE contenido.solicitudes_propuesta SET estado='error', procesado_en=now() WHERE id='$sid';" >/dev/null; exit 1; }
-pid=$(psqlc "SELECT id FROM contenido.proyectos WHERE slug='$slug';")   # normaliza si vino vacío
-CHAT=$(psqlc "SELECT coalesce(telegram_chat_id,'') FROM contenido.proyectos WHERE slug='$slug';")
+pid=$(psqlc "SELECT id FROM contenido.negocios WHERE slug='$slug';")   # normaliza si vino vacío
+CHAT=$(psqlc "SELECT coalesce(telegram_chat_id,'') FROM contenido.negocios WHERE slug='$slug';")
 REPO="$MARCAS/$slug"
 [ -d "$REPO" ] || { echo "$(ts) ERROR: cápsula inexistente $REPO" >> "$LOG"; psqlc "UPDATE contenido.solicitudes_propuesta SET estado='error', procesado_en=now() WHERE id='$sid';" >/dev/null; exit 1; }
 BOT=$(grep '^TELEGRAM_BOT_TOKEN=' "$REPO/$slug.env" 2>/dev/null | cut -d= -f2-)
@@ -42,7 +42,7 @@ hb "elaborando propuestas"
 psqlc "UPDATE contenido.solicitudes_propuesta SET estado='procesando' WHERE id='$sid';" >/dev/null
 
 # Contexto: últimas publicadas (para no repetir y mantener coherencia)
-recientes=$(psqlc "SELECT COALESCE(json_agg(json_build_object('titulo',titulo_interno,'caption',left(caption,200))),'[]'::json) FROM (SELECT pz.titulo_interno, r.caption FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id=pz.revision_vigente WHERE pz.proyecto_id='$pid' AND r.estado='publicada' ORDER BY r.publicado_en DESC LIMIT 10) s;")
+recientes=$(psqlc "SELECT COALESCE(json_agg(json_build_object('titulo',titulo_interno,'caption',left(caption,200))),'[]'::json) FROM (SELECT pz.titulo_interno, r.caption FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id=pz.revision_vigente WHERE pz.negocio_id='$pid' AND r.estado='publicada' ORDER BY r.publicado_en DESC LIMIT 10) s;")
 rm -f /tmp/propuestas.json /tmp/prop_ctx.json
 E="$enfasis" R="$recientes" CN="$canal" QT="$cantidad" python3 -c "import json,os;json.dump({'enfasis':os.environ['E'],'canal':os.environ['CN'],'cantidad':int(os.environ['QT']),'recientes':json.loads(os.environ['R'])},open('/tmp/prop_ctx.json','w'),ensure_ascii=False)"
 

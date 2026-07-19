@@ -29,7 +29,7 @@ psql(){ docker exec -i "$CID" psql -U postgres -d claude -t -A -c "$1"; }
 hb(){ docker exec -i "$CID" psql -U postgres -d claude -q -c "INSERT INTO contenido.batch_runs(proceso,last_run,last_msg) VALUES('correccion',now(),\$m\$$1\$m\$) ON CONFLICT(proceso) DO UPDATE SET last_run=now(), last_msg=EXCLUDED.last_msg;" >/dev/null 2>&1; }
 
 # Cola = revisión rechazada, vigente de su pieza, no derivada a Fer.
-COLA="contenido.revisiones r JOIN contenido.piezas pz ON pz.id=r.pieza_id AND pz.revision_vigente=r.id JOIN contenido.proyectos p ON p.id=pz.proyecto_id WHERE r.estado='rechazada' AND r.derivado_en IS NULL"
+COLA="contenido.revisiones r JOIN contenido.piezas pz ON pz.id=r.pieza_id AND pz.revision_vigente=r.id JOIN contenido.negocios p ON p.id=pz.negocio_id WHERE r.estado='rechazada' AND r.derivado_en IS NULL"
 
 REPO="$MARCAS/$slug"
 [ -d "$REPO" ] || { echo "$(ts) sin cápsula para $slug, salteo" >> "$LOG"; exit 0; }
@@ -38,7 +38,7 @@ REVIDS="${2:-}"
 [ -z "$REVIDS" ] && REVIDS=$(psql "SELECT string_agg(r.id::text, ', ') FROM $COLA AND p.slug='$slug'")
 [ -z "$REVIDS" ] && { echo "$(ts) $slug sin rechazos en base, nada que hacer" >> "$LOG"; exit 0; }
 
-NOMBRE=$(psql "SELECT nombre FROM contenido.proyectos WHERE slug='$slug';"); [ -z "$NOMBRE" ] && NOMBRE="$slug"
+NOMBRE=$(psql "SELECT nombre FROM contenido.negocios WHERE slug='$slug';"); [ -z "$NOMBRE" ] && NOMBRE="$slug"
 cd "$REPO" || exit 1
 bash "$MOTOR/scripts/perfil_a_md.sh" "$slug" >/dev/null 2>&1 || true
 
@@ -63,7 +63,7 @@ done < <(psql "SELECT b.pieza_id::text || chr(31) || COALESCE(bm.file_id,'') || 
                JOIN contenido.tg_briefs b ON b.id=bm.brief_id
                JOIN contenido.piezas pz ON pz.id=b.pieza_id
                JOIN contenido.revisiones r ON r.id=pz.revision_vigente
-               JOIN contenido.proyectos p ON p.id=pz.proyecto_id
+               JOIN contenido.negocios p ON p.id=pz.negocio_id
                WHERE r.estado='rechazada' AND r.derivado_en IS NULL AND p.slug='$slug'
                ORDER BY bm.orden, bm.creado_en")
 [ -n "$MATCTX" ] && echo "$(ts)    material aportado al rechazo ($mi archivo/s)" >> "$LOG"

@@ -23,12 +23,12 @@ hb(){ psqlc "INSERT INTO contenido.batch_runs(proceso,last_run,last_msg) VALUES(
 exec 9>"/tmp/cf_revision_${bid}.lock"; flock -n 9 || exit 0
 
 # Brief en estado procesable (revisar). Lo tomamos y marcamos 'revisando' (transitorio).
-row=$(psqlc "SELECT row_to_json(t) FROM (SELECT id,titulo,texto,comentarios,canal_destino,proyecto_id FROM contenido.tg_briefs WHERE id='$bid' AND estado='revisar' LIMIT 1) t;")
+row=$(psqlc "SELECT row_to_json(t) FROM (SELECT id,titulo,texto,comentarios,canal_destino,negocio_id FROM contenido.tg_briefs WHERE id='$bid' AND estado='revisar' LIMIT 1) t;")
 [ -z "$row" ] && { echo "$(ts) revisión $bid sin estado procesable" >> "$LOG"; exit 0; }
 
-pid=$(psqlc "SELECT id FROM contenido.proyectos WHERE slug='$slug';")
-CHAT=$(psqlc "SELECT coalesce(telegram_chat_id,'') FROM contenido.proyectos WHERE slug='$slug';")
-NOMBRE=$(psqlc "SELECT nombre FROM contenido.proyectos WHERE slug='$slug';"); [ -z "$NOMBRE" ] && NOMBRE="$slug"
+pid=$(psqlc "SELECT id FROM contenido.negocios WHERE slug='$slug';")
+CHAT=$(psqlc "SELECT coalesce(telegram_chat_id,'') FROM contenido.negocios WHERE slug='$slug';")
+NOMBRE=$(psqlc "SELECT nombre FROM contenido.negocios WHERE slug='$slug';"); [ -z "$NOMBRE" ] && NOMBRE="$slug"
 REPO="$MARCAS/$slug"
 [ -d "$REPO" ] || { echo "$(ts) ERROR: cápsula inexistente $REPO" >> "$LOG"; psqlc "UPDATE contenido.tg_briefs SET estado='propuesta' WHERE id='$bid';" >/dev/null; exit 1; }
 BOT=$(grep '^TELEGRAM_BOT_TOKEN=' "$REPO/$slug.env" 2>/dev/null | cut -d= -f2-)

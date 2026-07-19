@@ -51,10 +51,10 @@
 </div>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="shell.js"></script>
-<script>ClausinaShell({active:'marcas'});</script>
+<script>ClausinaShell({active:'negocios'});</script>
 <script>
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-async function entrar(slug){ try{ await fetch('api/marca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})}); }catch(_){} location.href='proyecto'; }
+async function entrar(slug){ try{ await fetch('api/negocio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})}); }catch(_){} location.href='proyecto'; }
 
 function celda(c){
   if(!c.habilitada) return `<span class="cst off text-pmut dark:text-mut"><span class="cdot"></span>—</span>`;

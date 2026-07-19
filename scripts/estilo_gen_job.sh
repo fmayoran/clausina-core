@@ -17,13 +17,13 @@ psql(){ docker exec -i "$PG" psql -U postgres -d claude -t -A -q -c "$1"; }
 
 exec 9>"/tmp/estilo_${gid}.lock"; flock -n 9 || exit 0
 
-estado=$(psql "SELECT estado FROM contenido.marca_gen WHERE id='$gid' AND tipo='estilo';")
+estado=$(psql "SELECT estado FROM contenido.negocio_gen WHERE id='$gid' AND tipo='estilo';")
 case "$estado" in pendiente|procesando) ;; *) echo "$(ts) $gid sin estado procesable ($estado)" >> "$LOG"; exit 0;; esac
-pid=$(psql "SELECT proyecto_id FROM contenido.marca_gen WHERE id='$gid';")
+pid=$(psql "SELECT negocio_id FROM contenido.negocio_gen WHERE id='$gid';")
 [ -z "$pid" ] && exit 0
 
 echo "$(ts) estilo $gid ($slug)" >> "$LOG"
-psql "UPDATE contenido.marca_gen SET estado='procesando' WHERE id='$gid';" >/dev/null
+psql "UPDATE contenido.negocio_gen SET estado='procesando' WHERE id='$gid';" >/dev/null
 
 SHOTS="/tmp/estilo_feed_$gid"
 rm -rf "$SHOTS" "/tmp/estilo_res_$gid.md"; mkdir -p "$SHOTS"
@@ -36,15 +36,15 @@ def q(sql):
     return subprocess.run(["docker","exec","-i",pg,"psql","-U","postgres","-d","claude","-t","-A","-q","-c",sql],
                           capture_output=True, text=True).stdout.strip()
 perfil = q(f"SELECT coalesce(pp.brief_md,'')||E'\\n---SLOGAN---\\n'||coalesce(pp.slogan,'')||E'\\n---ESTILO---\\n'||coalesce(pp.estilo_md,'') "
-           f"FROM contenido.proyecto_perfil pp WHERE pp.proyecto_id='{pid}'")
+           f"FROM contenido.negocio_perfil pp WHERE pp.negocio_id='{pid}'")
 brief, _, rest = perfil.partition('\n---SLOGAN---\n')
 slogan, _, estilo = rest.partition('\n---ESTILO---\n')
-ig = q(f"SELECT coalesce(ig_handle,'') FROM contenido.proyectos WHERE id='{pid}'")
+ig = q(f"SELECT coalesce(ig_handle,'') FROM contenido.negocios WHERE id='{pid}'")
 pubs = q("SELECT coalesce(json_agg(t),'[]') FROM ("
          "SELECT pz.numero, r.caption, "
          "(SELECT tipo FROM contenido.media WHERE pieza_id=pz.id AND orden=1) AS tipo "
          f"FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id=pz.revision_vigente "
-         f"WHERE pz.proyecto_id='{pid}' AND pz.canal='instagram' AND r.estado='publicada' "
+         f"WHERE pz.negocio_id='{pid}' AND pz.canal='instagram' AND r.estado='publicada' "
          "ORDER BY pz.numero DESC LIMIT 30) t")
 try: publicaciones=json.loads(pubs)
 except Exception: publicaciones=[]
@@ -73,7 +73,7 @@ def psql(sql):
 def dq(v):
     t="x"+secrets.token_hex(8); return f"${t}${v or ''}${t}$"
 def fallar(msg):
-    psql(f"UPDATE contenido.marca_gen SET estado='error', error={dq(msg[:800])}, procesado_en=now() WHERE id='{gid}';")
+    psql(f"UPDATE contenido.negocio_gen SET estado='error', error={dq(msg[:800])}, procesado_en=now() WHERE id='{gid}';")
     print("err:"+msg[:150])
 try:
     txt=open(f"/tmp/estilo_res_{gid}.md", encoding="utf-8").read().strip()
@@ -84,10 +84,10 @@ if not txt or txt.startswith("SIN_DATOS"):
     fallar("No se pudo generar el estilo: "+motivo); raise SystemExit
 if len(txt) < 120:
     fallar("El estilo salió demasiado corto. Probá de nuevo."); raise SystemExit
-r=psql(f"UPDATE contenido.proyecto_perfil SET estilo_md={dq(txt)}, actualizado_en=now() WHERE proyecto_id='{pid}';")
+r=psql(f"UPDATE contenido.negocio_perfil SET estilo_md={dq(txt)}, actualizado_en=now() WHERE negocio_id='{pid}';")
 if r.returncode!=0:
     fallar("No se pudo guardar el estilo: "+(r.stderr or '').strip()[:300]); raise SystemExit
-psql(f"UPDATE contenido.marca_gen SET estado='listo', error=NULL, procesado_en=now() WHERE id='{gid}';")
+psql(f"UPDATE contenido.negocio_gen SET estado='listo', error=NULL, procesado_en=now() WHERE id='{gid}';")
 print("ok")
 PY
 )

@@ -19,12 +19,12 @@ psql(){ docker exec -i "$CID" psql -U postgres -d claude -t -A -c "$1"; }
 
 exec 9>"/tmp/camp_${sid}.lock"; flock -n 9 || exit 0
 
-pid=$(psql "SELECT proyecto_id FROM contenido.solicitudes_campania WHERE id='$sid' AND estado IN ('pendiente','procesando') LIMIT 1;")
+pid=$(psql "SELECT negocio_id FROM contenido.solicitudes_campania WHERE id='$sid' AND estado IN ('pendiente','procesando') LIMIT 1;")
 [ -z "$pid" ] && { echo "$(ts) solicitud $sid sin estado procesable" >> "$LOG"; exit 0; }
 
 REPO="$MARCAS/$slug"
 [ -d "$REPO" ] || { echo "$(ts) ERROR: cápsula inexistente $REPO" >> "$LOG"; psql "UPDATE contenido.solicitudes_campania SET estado='error', resumen='Cápsula de marca inexistente.', procesado_en=now() WHERE id='$sid';" >/dev/null; exit 1; }
-CHAT=$(psql "SELECT coalesce(telegram_chat_id,'') FROM contenido.proyectos WHERE slug='$slug';")
+CHAT=$(psql "SELECT coalesce(telegram_chat_id,'') FROM contenido.negocios WHERE slug='$slug';")
 BOT=$(grep '^TELEGRAM_BOT_TOKEN=' "$REPO/$slug.env" 2>/dev/null | cut -d= -f2-)
 
 echo "$(ts) solicitud $sid ($slug)" >> "$LOG"
@@ -41,15 +41,15 @@ def q(sql):
                           capture_output=True, text=True).stdout.strip()
 instr = q(f"SELECT coalesce(instruccion,'') FROM contenido.solicitudes_campania WHERE id='{sid}'")
 perfil = q(f"SELECT coalesce(pp.brief_md,'')||E'\\n---ESTILO---\\n'||coalesce(pp.estilo_md,'') "
-           f"FROM contenido.proyecto_perfil pp WHERE pp.proyecto_id='{pid}'")
+           f"FROM contenido.negocio_perfil pp WHERE pp.negocio_id='{pid}'")
 brief, _, estilo = perfil.partition('\n---ESTILO---\n')
-objetivo = q(f"SELECT coalesce(pp.slogan,'') FROM contenido.proyecto_perfil pp WHERE pp.proyecto_id='{pid}'")
-moneda = q(f"SELECT coalesce(data->'cuenta'->>'moneda','USD') FROM contenido.ads_snapshot WHERE proyecto_id='{pid}'") or "USD"
+objetivo = q(f"SELECT coalesce(pp.slogan,'') FROM contenido.negocio_perfil pp WHERE pp.negocio_id='{pid}'")
+moneda = q(f"SELECT coalesce(data->'cuenta'->>'moneda','USD') FROM contenido.ads_snapshot WHERE negocio_id='{pid}'") or "USD"
 pubs = q("SELECT coalesce(json_agg(t),'[]') FROM ("
          "SELECT pz.id AS pieza_id, pz.numero, r.caption, r.ig_permalink AS permalink, "
          "(SELECT tipo FROM contenido.media WHERE pieza_id=pz.id AND orden=1) AS tipo "
          f"FROM contenido.piezas pz JOIN contenido.revisiones r ON r.pieza_id=pz.id "
-         f"WHERE pz.proyecto_id='{pid}' AND pz.canal='instagram' AND r.estado='publicada' "
+         f"WHERE pz.negocio_id='{pid}' AND pz.canal='instagram' AND r.estado='publicada' "
          "ORDER BY pz.numero DESC LIMIT 20) t")
 try: publicaciones=json.loads(pubs)
 except Exception: publicaciones=[]
@@ -103,7 +103,7 @@ fi_sql=f"'{fi}'" if fi else "NULL"; ff_sql=f"'{ff}'" if ff else "NULL"
 url=(d.get("url_destino") or "").strip() or None
 cta=(d.get("cta") or "").strip() or None
 sql=("INSERT INTO contenido.campanias "
-     "(proyecto_id,estado,nombre,objetivo,pieza_id,razon,audiencia,presupuesto,fecha_inicio,fecha_fin,url_destino,cta,resumen) "
+     "(negocio_id,estado,nombre,objetivo,pieza_id,razon,audiencia,presupuesto,fecha_inicio,fecha_fin,url_destino,cta,resumen) "
      f"VALUES ('{pid}','propuesta',{dq(nombre)},'{objetivo}',{pieza_sql},{dq(razon)},{dq(aud)}::jsonb,{dq(pres)}::jsonb,"
      f"{fi_sql},{ff_sql},{('NULL' if url is None else dq(url))},{('NULL' if cta is None else dq(cta))},{dq(resumen)}) "
      "RETURNING id;")

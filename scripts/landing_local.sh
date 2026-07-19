@@ -22,9 +22,9 @@ exec 9>/tmp/cf_landing.lock; flock -n 9 || exit 0
 export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no"
 
 # 0) APROBADAS -> aplicar el borrador (draft) a producción (main). El panel solo marca 'aprobada'.
-psql "SELECT id||'|'||proyecto_id FROM contenido.landing_cambios WHERE estado='aprobada' ORDER BY actualizado_en" | while IFS='|' read -r aid apid; do
+psql "SELECT id||'|'||negocio_id FROM contenido.landing_cambios WHERE estado='aprobada' ORDER BY actualizado_en" | while IFS='|' read -r aid apid; do
   [ -z "$aid" ] && continue
-  aslug=$(psql "SELECT slug FROM contenido.proyectos WHERE id='$apid';")
+  aslug=$(psql "SELECT slug FROM contenido.negocios WHERE id='$apid';")
   AREPO="$MARCAS/$aslug"
   [ -d "$AREPO/.git" ] || { psql "UPDATE contenido.landing_cambios SET estado='error',actualizado_en=now() WHERE id='$aid';" >/dev/null; continue; }
   cd "$AREPO" || continue
@@ -54,16 +54,16 @@ psql "SELECT id||'|'||proyecto_id FROM contenido.landing_cambios WHERE estado='a
 done
 
 # 1) requerimiento de landing pendiente (el más viejo)
-row=$(psql "SELECT row_to_json(t) FROM (SELECT id, proyecto_id FROM contenido.landing_cambios WHERE estado='pendiente' ORDER BY creado_en LIMIT 1) t;")
+row=$(psql "SELECT row_to_json(t) FROM (SELECT id, negocio_id FROM contenido.landing_cambios WHERE estado='pendiente' ORDER BY creado_en LIMIT 1) t;")
 [ -z "$row" ] && { echo "$(ts) sin requerimientos de landing" >> "$LOG"; exit 0; }
 lid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
-pid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin)['proyecto_id'])")
+pid=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin)['negocio_id'])")
 
 # el texto del requerimiento, sin problemas de comillas: a archivo
 psql "SELECT requerimiento FROM contenido.landing_cambios WHERE id='$lid';" > /tmp/landing_req.txt
 [ -s /tmp/landing_req.txt ] || { echo "$(ts) requerimiento vacío $lid" >> "$LOG"; fail "$lid"; exit 1; }
 
-slug=$(psql "SELECT slug FROM contenido.proyectos WHERE id='$pid';")
+slug=$(psql "SELECT slug FROM contenido.negocios WHERE id='$pid';")
 [ -z "$slug" ] && { echo "$(ts) sin slug para $pid" >> "$LOG"; fail "$lid"; exit 1; }
 REPO="$MARCAS/$slug"
 [ -d "$REPO/.git" ] || { echo "$(ts) cápsula sin repo git: $REPO" >> "$LOG"; fail "$lid"; exit 1; }

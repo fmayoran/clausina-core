@@ -19,7 +19,7 @@ hb(){ psqlc "INSERT INTO contenido.batch_runs(proceso,last_run,last_msg) VALUES(
 
 exec 9>"/tmp/cf_propuesta_${sid}.lock"; flock -n 9 || exit 0
 
-row=$(psqlc "SELECT row_to_json(t) FROM (SELECT id,enfasis,canal,cantidad,proyecto_id FROM contenido.solicitudes_propuesta WHERE id='$sid' AND estado IN ('pendiente','procesando') LIMIT 1) t;")
+row=$(psqlc "SELECT row_to_json(t) FROM (SELECT id,enfasis,canal,cantidad,negocio_id FROM contenido.solicitudes_propuesta WHERE id='$sid' AND estado IN ('pendiente','procesando') LIMIT 1) t;")
 [ -z "$row" ] && { echo "$(ts) solicitud $sid sin estado procesable" >> "$LOG"; exit 0; }
 
 enfasis=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('enfasis') or '')")
@@ -27,8 +27,8 @@ canal=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get
 cantidad=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('cantidad') or 5)")
 
 # --- proyecto: cápsula y secretos de ESA marca (la pasa el dispatcher) ---
-pid=$(psqlc "SELECT id FROM contenido.proyectos WHERE slug='$slug';")
-CHAT=$(psqlc "SELECT coalesce(telegram_chat_id,'') FROM contenido.proyectos WHERE slug='$slug';")
+pid=$(psqlc "SELECT id FROM contenido.negocios WHERE slug='$slug';")
+CHAT=$(psqlc "SELECT coalesce(telegram_chat_id,'') FROM contenido.negocios WHERE slug='$slug';")
 REPO="$MARCAS/$slug"
 [ -d "$REPO" ] || { echo "$(ts) ERROR: cápsula inexistente $REPO" >> "$LOG"; psqlc "UPDATE contenido.solicitudes_propuesta SET estado='error', procesado_en=now() WHERE id='$sid';" >/dev/null; exit 1; }
 BOT=$(grep '^TELEGRAM_BOT_TOKEN=' "$REPO/$slug.env" 2>/dev/null | cut -d= -f2-)
@@ -37,7 +37,7 @@ hb "elaborando propuestas"
 psqlc "UPDATE contenido.solicitudes_propuesta SET estado='procesando' WHERE id='$sid';" >/dev/null
 
 # Contexto: últimas publicadas (para no repetir y mantener coherencia)
-recientes=$(psqlc "SELECT COALESCE(json_agg(json_build_object('titulo',titulo_interno,'caption',left(caption,200))),'[]'::json) FROM (SELECT pz.titulo_interno, r.caption FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id=pz.revision_vigente WHERE pz.proyecto_id='$pid' AND r.estado='publicada' ORDER BY r.publicado_en DESC LIMIT 10) s;")
+recientes=$(psqlc "SELECT COALESCE(json_agg(json_build_object('titulo',titulo_interno,'caption',left(caption,200))),'[]'::json) FROM (SELECT pz.titulo_interno, r.caption FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id=pz.revision_vigente WHERE pz.negocio_id='$pid' AND r.estado='publicada' ORDER BY r.publicado_en DESC LIMIT 10) s;")
 rm -f /tmp/propuestas.json /tmp/prop_ctx.json
 # Material opcional adjunto por Fer al pedido: lo listamos con paths absolutos existentes
 # (el creativo corre en el host y puede Read las imágenes directo del media store).

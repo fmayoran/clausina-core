@@ -66,8 +66,8 @@ def psql(sql):
 
 def ig_token(slug):
     """Token de IG del perfil (descifrado). Nunca se imprime."""
-    enc = psql("SELECT coalesce(pp.ig_token_enc,'') FROM contenido.proyectos p "
-               f"JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id WHERE p.slug='{slug}'")
+    enc = psql("SELECT coalesce(pp.ig_token_enc,'') FROM contenido.negocios p "
+               f"JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id WHERE p.slug='{slug}'")
     if not enc:
         raise RuntimeError(f"la marca '{slug}' no tiene token de IG en el perfil")
     return ads_crypto.decrypt(enc)

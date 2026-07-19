@@ -28,7 +28,7 @@ def release_inflight(key):
 
 
 def enqueue(job):
-    """job = {tipo, proyecto_slug, payload}. Encola al final de la cola."""
+    """job = {tipo, negocio_slug, payload}. Encola al final de la cola."""
     _client.rpush(QUEUE, json.dumps(job, ensure_ascii=False))
 
 

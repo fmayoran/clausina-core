@@ -118,7 +118,7 @@ app.use((req, res, next) => {
   return res.redirect('login');
 });
 
-// --- Marca activa (multi-tenant): cookie cf_marca -> proyecto_id en req. Default cortafuego. ---
+// --- Marca activa (multi-tenant): cookie cf_marca -> negocio_id en req. Default cortafuego. ---
 const MARCA_COOKIE = 'cf_marca';
 function readMarca(req) {
   const c = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith(MARCA_COOKIE + '='));
@@ -129,16 +129,16 @@ app.use(async (req, res, next) => {
     let slug = readMarca(req) || 'cortafuego';
     let pid = await db.getProyectoId(slug);
     if (!pid) { slug = 'cortafuego'; pid = await db.getProyectoId('cortafuego'); }
-    req.marca = slug; req.proyectoId = pid;
+    req.negocio = slug; req.negocioId = pid;
     next();
   } catch (e) { console.error('marca', e.message); res.status(500).json({ error: 'marca' }); }
 });
 
 // Lista de marcas (para el selector) + cuál está activa en esta sesión.
-app.get('/api/marcas', async (req, res) => {
+app.get('/api/negocios', async (req, res) => {
   try {
-    const marcas = (await db.getMarcas()).map(m => ({ slug: m.slug, nombre: m.nombre, activo: m.activo, logo: m.logo }));
-    res.json({ marcas, activa: req.marca });
+    const negocios = (await db.getNegocios()).map(m => ({ slug: m.slug, nombre: m.nombre, activo: m.activo, logo: m.logo }));
+    res.json({ negocios, activa: req.negocio });
   } catch (e) { console.error('marcas', e.message); res.status(500).json({ error: 'db' }); }
 });
 
@@ -149,10 +149,10 @@ app.get('/api/agencia', async (req, res) => {
 });
 
 // Cambia la marca activa de la sesión (valida contra las marcas conocidas).
-app.post('/api/marca', async (req, res) => {
+app.post('/api/negocio', async (req, res) => {
   const slug = String((req.body && req.body.slug) || '');
-  const ok = (await db.getMarcas()).some(m => m.slug === slug);
-  if (!ok) return res.status(400).json({ ok: false, error: 'marca_invalida' });
+  const ok = (await db.getNegocios()).some(m => m.slug === slug);
+  if (!ok) return res.status(400).json({ ok: false, error: 'negocio_invalido' });
   res.set('Set-Cookie', `${MARCA_COOKIE}=${encodeURIComponent(slug)}; Path=${COOKIE_PATH}; HttpOnly; Secure; SameSite=Lax; Max-Age=${TTL_S}`);
   res.json({ ok: true });
 });
@@ -178,17 +178,17 @@ async function callWebhook(url, tries = 5) {
 app.get('/api/piezas', async (req, res) => {
   try {
     const canal = ['instagram', 'aviso'].includes(req.query.canal) ? req.query.canal : undefined;
-    res.json(await db.getPiezas(canal, req.proyectoId));
+    res.json(await db.getPiezas(canal, req.negocioId));
   } catch (e) { console.error('piezas', e.message); res.status(500).json({ error: 'db' }); }
 });
 
 app.get('/api/requerimientos', async (req, res) => {
-  try { res.json(await db.getRequerimientos(req.proyectoId)); }
+  try { res.json(await db.getRequerimientos(req.negocioId)); }
   catch (e) { console.error('requerimientos', e.message); res.status(500).json({ error: 'db' }); }
 });
 
 app.get('/api/status', async (req, res) => {
-  try { res.json(await db.getStatus(req.proyectoId)); }
+  try { res.json(await db.getStatus(req.negocioId)); }
   catch (e) { console.error('status', e.message); res.status(500).json({ error: 'db' }); }
 });
 
@@ -201,24 +201,24 @@ app.get('/api/maquinas', async (req, res) => {
 // Perfil del proyecto (registro de marca, por marca activa). Lo consume el creativo.
 // Capacidades de la marca activa: qué funcionalidades usa (habilitada) y si están configuradas.
 app.get('/api/capacidades', async (req, res) => {
-  try { res.json(await db.getCapacidades(req.proyectoId)); }
+  try { res.json(await db.getCapacidades(req.negocioId)); }
   catch (e) { console.error('capacidades', e.message); res.status(500).json({ error: 'db' }); }
 });
 // Generar/regenerar el estilo, y el manual de marca (jobs del creativo).
 app.post('/api/estilo/generar', async (req, res) => {
   try {
-    const r = await db.pedirGeneracion(req.proyectoId, 'estilo');
+    const r = await db.pedirGeneracion(req.negocioId, 'estilo');
     res.status(r.ok ? 200 : 409).json(r);
   } catch (e) { console.error('estilo-gen', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 app.post('/api/manual/generar', async (req, res) => {
   try {
-    const r = await db.pedirGeneracion(req.proyectoId, 'manual');
+    const r = await db.pedirGeneracion(req.negocioId, 'manual');
     res.status(r.ok ? 200 : 409).json(r);
   } catch (e) { console.error('manual-gen', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 app.get('/api/generacion', async (req, res) => {
-  try { res.json(await db.getGeneracion(req.proyectoId)); }
+  try { res.json(await db.getGeneracion(req.negocioId)); }
   catch (e) { console.error('generacion', e.message); res.status(500).json({ error: 'db' }); }
 });
 
@@ -249,13 +249,13 @@ app.post('/api/plataforma/lente/probar', async (req, res) => {
 
 // Descubrimiento: analizar la presencia digital pública de una marca que todavía no existe,
 // para pre-cargar el wizard. El análisis lo hace un job (worker); acá solo encolamos y consultamos.
-app.post('/api/marcas/descubrir', async (req, res) => {
+app.post('/api/negocios/descubrir', async (req, res) => {
   try {
     const r = await db.crearDescubrimiento(req.body || {});
     res.status(r.ok ? 200 : 400).json(r);
   } catch (e) { console.error('descubrir', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
-app.get('/api/marcas/descubrir/:id', async (req, res) => {
+app.get('/api/negocios/descubrir/:id', async (req, res) => {
   try {
     const d = await db.getDescubrimiento(req.params.id);
     if (!d) return res.status(404).json({ error: 'no_existe' });
@@ -264,9 +264,9 @@ app.get('/api/marcas/descubrir/:id', async (req, res) => {
 });
 
 // Alta de marca (wizard "Sumá una marca").
-app.post('/api/marcas/crear', async (req, res) => {
+app.post('/api/negocios/crear', async (req, res) => {
   try {
-    const r = await db.crearMarca(req.body || {});
+    const r = await db.crearNegocio(req.body || {});
     res.status(r.ok ? 200 : 400).json(r);
   } catch (e) { console.error('crear-marca', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
@@ -279,17 +279,17 @@ app.get('/api/capacidades/todas', async (req, res) => {
 app.post('/api/capacidades/:cap', async (req, res) => {
   try {
     const b = req.body || {};
-    const r = await db.setCapacidad(req.proyectoId, req.params.cap, { habilitada: !!b.habilitada, config: b.config });
+    const r = await db.setCapacidad(req.negocioId, req.params.cap, { habilitada: !!b.habilitada, config: b.config });
     res.status(r.ok ? 200 : 409).json(r);
   } catch (e) { console.error('capacidad-set', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 
 app.get('/api/perfil', async (req, res) => {
-  try { res.json(await db.getPerfil(req.proyectoId)); }
+  try { res.json(await db.getPerfil(req.negocioId)); }
   catch (e) { console.error('perfil', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.put('/api/perfil', async (req, res) => {
-  try { res.json({ ok: await db.guardarPerfil(req.proyectoId, req.body || {}) }); }
+  try { res.json({ ok: await db.guardarPerfil(req.negocioId, req.body || {}) }); }
   catch (e) { console.error('guardar perfil', e.message); res.status(500).json({ ok: false, error: e.code || 'db' }); }
 });
 
@@ -302,48 +302,48 @@ app.post('/api/perfil/logo', async (req, res) => {
     if (!m || !LOGO_EXT[m[1]]) return res.status(400).json({ ok: false, error: 'imagen_invalida' });
     const buf = Buffer.from(m[2], 'base64');
     if (buf.length > 5 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'muy_grande' });
-    const dir = path.join('/app/media', 'marca', req.marca);
+    const dir = path.join('/app/media', 'marca', req.negocio);
     await fs.promises.mkdir(dir, { recursive: true });
     const fname = `logo-${Date.now()}.${LOGO_EXT[m[1]]}`;
     await fs.promises.writeFile(path.join(dir, fname), buf);
-    const url = `https://${req.get('host')}/media/marca/${req.marca}/${fname}`;
-    await db.setLogo(req.proyectoId, url);
+    const url = `https://${req.get('host')}/media/marca/${req.negocio}/${fname}`;
+    await db.setLogo(req.negocioId, url);
     res.json({ ok: true, url });
   } catch (e) { console.error('logo upload', e.message); res.status(500).json({ ok: false, error: 'upload' }); }
 });
 
 // --- Landing del proyecto (cambios con borrador -> preview -> aprobación -> producción) ---
 app.get('/api/landing', async (req, res) => {
-  try { res.json(await db.getLandingCambios(req.proyectoId)); }
+  try { res.json(await db.getLandingCambios(req.negocioId)); }
   catch (e) { console.error('landing list', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/landing', async (req, res) => {
-  try { const id = await db.crearLandingCambio(req.proyectoId, (req.body || {}).requerimiento);
+  try { const id = await db.crearLandingCambio(req.negocioId, (req.body || {}).requerimiento);
     res.json(id ? { ok: true, id } : { ok: false, error: 'requerimiento vacío' }); }
   catch (e) { console.error('landing crear', e.message); res.status(500).json({ ok: false }); }
 });
 app.post('/api/landing/:id/aprobar', async (req, res) => {
-  try { res.json({ ok: await db.aprobarLanding(req.proyectoId, req.params.id) }); }
+  try { res.json({ ok: await db.aprobarLanding(req.negocioId, req.params.id) }); }
   catch (e) { console.error('landing aprobar', e.message); res.status(500).json({ ok: false }); }
 });
 app.post('/api/landing/:id/rechazar', async (req, res) => {
-  try { res.json({ ok: await db.rechazarLanding(req.proyectoId, req.params.id, (req.body || {}).motivo) }); }
+  try { res.json({ ok: await db.rechazarLanding(req.negocioId, req.params.id, (req.body || {}).motivo) }); }
   catch (e) { console.error('landing rechazar', e.message); res.status(500).json({ ok: false }); }
 });
 
 // --- Auditoría de presencia digital del proyecto ---
 app.get('/api/auditoria', async (req, res) => {
-  try { res.json(await db.getAuditoria(req.proyectoId, req.query.canal)); }
+  try { res.json(await db.getAuditoria(req.negocioId, req.query.canal)); }
   catch (e) { console.error('auditoria', e.message); res.status(500).json({ error: 'db' }); }
 });
 
 // Pauta (Meta Marketing API, read-only): último snapshot sincronizado por cf-pauta-sync.
 app.get('/api/pauta', async (req, res) => {
-  try { res.json(await db.getPauta(req.proyectoId)); }
+  try { res.json(await db.getPauta(req.negocioId)); }
   catch (e) { console.error('pauta', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.get('/api/pauta/evolucion', async (req, res) => {
-  try { res.json(await db.getPautaEvolucion(req.proyectoId)); }
+  try { res.json(await db.getPautaEvolucion(req.negocioId)); }
   catch (e) { console.error('pauta-evol', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/pauta/refrescar', async (req, res) => {
@@ -353,43 +353,43 @@ app.post('/api/pauta/refrescar', async (req, res) => {
 
 // Campañas de pauta: propuestas del creativo + su ciclo de aprobación.
 app.get('/api/campanias', async (req, res) => {
-  try { res.json(await db.getCampanias(req.proyectoId)); }
+  try { res.json(await db.getCampanias(req.negocioId)); }
   catch (e) { console.error('campanias', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/solicitar', async (req, res) => {
-  try { res.json({ ok: true, id: await db.crearSolicitudCampania(req.proyectoId, (req.body || {}).instruccion) }); }
+  try { res.json({ ok: true, id: await db.crearSolicitudCampania(req.negocioId, (req.body || {}).instruccion) }); }
   catch (e) { console.error('campania-solicitar', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/:id/aprobar', async (req, res) => {
-  try { res.json({ ok: await db.aprobarCampania(req.proyectoId, req.params.id) }); }
+  try { res.json({ ok: await db.aprobarCampania(req.negocioId, req.params.id) }); }
   catch (e) { console.error('campania-aprobar', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/:id/rechazar', async (req, res) => {
-  try { res.json({ ok: await db.rechazarCampania(req.proyectoId, req.params.id, (req.body || {}).motivo) }); }
+  try { res.json({ ok: await db.rechazarCampania(req.negocioId, req.params.id, (req.body || {}).motivo) }); }
   catch (e) { console.error('campania-rechazar', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/:id/descartar', async (req, res) => {
-  try { res.json({ ok: await db.descartarCampania(req.proyectoId, req.params.id) }); }
+  try { res.json({ ok: await db.descartarCampania(req.negocioId, req.params.id) }); }
   catch (e) { console.error('campania-descartar', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/:id/activar', async (req, res) => {
-  try { res.json({ ok: await db.activarCampania(req.proyectoId, req.params.id) }); }
+  try { res.json({ ok: await db.activarCampania(req.negocioId, req.params.id) }); }
   catch (e) { console.error('campania-activar', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/:id/pausar', async (req, res) => {
-  try { res.json({ ok: await db.pausarCampania(req.proyectoId, req.params.id) }); }
+  try { res.json({ ok: await db.pausarCampania(req.negocioId, req.params.id) }); }
   catch (e) { console.error('campania-pausar', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/:id/reintentar', async (req, res) => {
-  try { res.json({ ok: await db.reintentarCampania(req.proyectoId, req.params.id) }); }
+  try { res.json({ ok: await db.reintentarCampania(req.negocioId, req.params.id) }); }
   catch (e) { console.error('campania-reintentar', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.get('/api/campanias/creativos', async (req, res) => {
-  try { res.json(await db.getCreativosDisponibles(req.proyectoId)); }
+  try { res.json(await db.getCreativosDisponibles(req.negocioId)); }
   catch (e) { console.error('campania-creativos', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/:id/creativo', async (req, res) => {
-  try { res.json({ ok: await db.setCreativoCampania(req.proyectoId, req.params.id, (req.body || {}).pieza_id) }); }
+  try { res.json({ ok: await db.setCreativoCampania(req.negocioId, req.params.id, (req.body || {}).pieza_id) }); }
   catch (e) { console.error('campania-creativo', e.message); res.status(500).json({ error: 'db' }); }
 });
 
@@ -472,7 +472,7 @@ app.post('/api/proponer', async (req, res) => {
     const canal = req.body && req.body.canal === 'aviso' ? 'aviso' : 'instagram';
     const cantidad = Math.min(8, Math.max(1, parseInt(req.body && req.body.cantidad, 10) || 5));
     const material = Array.isArray(req.body && req.body.material) ? req.body.material : [];
-    await db.pedirPropuestas(enfasis, canal, cantidad, req.proyectoId, material);
+    await db.pedirPropuestas(enfasis, canal, cantidad, req.negocioId, material);
     res.json({ ok: true });
   } catch (e) { console.error('proponer', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
@@ -481,7 +481,7 @@ app.post('/api/proponer', async (req, res) => {
 // devuelve el media_path; /api/proponer lo vincula. Imagen por base64; video por streaming+ffmpeg.
 app.post('/api/proponer/material', async (req, res) => {
   try {
-    const { mediaPath, mediaType, filename } = await guardarMaterialDisco(req.body, path.posix.join('material/prop', req.marca));
+    const { mediaPath, mediaType, filename } = await guardarMaterialDisco(req.body, path.posix.join('material/prop', req.negocio));
     res.json({ ok: true, media_path: mediaPath, media_type: mediaType, filename });
   } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
 });
@@ -492,7 +492,7 @@ app.post('/api/proponer/material-biblioteca', async (req, res) => {
     if (!srcRel || srcRel.includes('..')) return res.status(400).json({ ok: false, error: 'ruta' });
     const src = path.join('/app/media', srcRel);
     const ext = ((srcRel.match(/\.([a-z0-9]{2,5})$/i) || [, ''])[1] || 'jpg').toLowerCase();
-    const rel = path.posix.join('material/prop', req.marca, crypto.randomUUID() + '.' + ext);
+    const rel = path.posix.join('material/prop', req.negocio, crypto.randomUUID() + '.' + ext);
     const dst = path.join('/app/media', rel);
     await fs.promises.mkdir(path.dirname(dst), { recursive: true });
     await fs.promises.copyFile(src, dst);
@@ -507,7 +507,7 @@ app.post('/api/proponer/material-video', async (req, res) => {
     const MAX = 600 * 1024 * 1024;
     if (Number(req.headers['content-length'] || 0) > MAX) { const e = new Error('El video supera los 600MB'); e.http = 413; throw e; }
     await recibirStream(req, tmp, MAX);
-    const rel = path.posix.join('material/prop', req.marca, crypto.randomUUID() + '.mp4');
+    const rel = path.posix.join('material/prop', req.negocio, crypto.randomUUID() + '.mp4');
     const abs = path.join('/app/media', rel);
     await fs.promises.mkdir(path.dirname(abs), { recursive: true });
     await comprimirVideo(tmp, abs);
@@ -546,19 +546,19 @@ app.post('/api/requerimientos/:id/revisar', async (req, res) => {
 // Biblioteca de medios de la marca activa: piezas + material aportado + assets de marca (logos).
 app.get('/api/biblioteca', async (req, res) => {
   try {
-    await db.ensureCarpetasBiblioteca(req.proyectoId);
-    const data = await db.getBiblioteca(req.proyectoId);
+    await db.ensureCarpetasBiblioteca(req.negocioId);
+    const data = await db.getBiblioteca(req.negocioId);
     // Logo actual del perfil (puede ser URL del media store o de la landing; distinto del archivo en disco).
     const logoUrl = (data.logo && /^(https?:\/\/|\/media\/)/.test(data.logo)) ? data.logo : null;
     const logoBase = logoUrl ? decodeURIComponent(logoUrl.split('?')[0].split('/').pop() || '') : null;
     let marca = [];
     try {
-      const dir = path.join('/app/media', 'marca', req.marca);
+      const dir = path.join('/app/media', 'marca', req.negocio);
       const files = await fs.promises.readdir(dir);
       const items = await Promise.all(files.filter(f => !f.startsWith('.')).map(async f => {
         const st = await fs.promises.stat(path.join(dir, f)).catch(() => null);
         const tipo = /\.(mp4|webm|mov)$/i.test(f) ? 'video' : 'image';
-        return { url: '/media/marca/' + encodeURIComponent(req.marca) + '/' + encodeURIComponent(f), filename: f, tipo, fecha: st ? st.mtime : null };
+        return { url: '/media/marca/' + encodeURIComponent(req.negocio) + '/' + encodeURIComponent(f), filename: f, tipo, fecha: st ? st.mtime : null };
       }));
       marca = items.filter(it => it.filename !== logoBase).sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
     } catch (_) { /* sin carpeta de marca todavía */ }
@@ -582,8 +582,8 @@ app.get('/api/biblioteca', async (req, res) => {
 app.post('/api/biblioteca/subir', async (req, res) => {
   try {
     const carpeta = String((req.body && req.body.carpeta) || 'En proceso').slice(0, 60);
-    const { mediaPath, mediaType, filename } = await guardarMaterialDisco(req.body, path.posix.join('biblioteca', req.marca));
-    const id = await db.crearItemBiblioteca(req.proyectoId, mediaPath, mediaType, filename, carpeta);
+    const { mediaPath, mediaType, filename } = await guardarMaterialDisco(req.body, path.posix.join('biblioteca', req.negocio));
+    const id = await db.crearItemBiblioteca(req.negocioId, mediaPath, mediaType, filename, carpeta);
     res.json({ ok: true, id });
   } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
 });
@@ -598,12 +598,12 @@ app.post('/api/biblioteca/subir-video', async (req, res) => {
     const MAX = 600 * 1024 * 1024;  // 600MB de entrada (se comprime a mucho menos)
     if (Number(req.headers['content-length'] || 0) > MAX) { const e = new Error('El video supera los 600MB'); e.http = 413; throw e; }
     await recibirStream(req, tmp, MAX);
-    const rel = path.posix.join('biblioteca', req.marca, crypto.randomUUID() + '.mp4');
+    const rel = path.posix.join('biblioteca', req.negocio, crypto.randomUUID() + '.mp4');
     const abs = path.join('/app/media', rel);
     await fs.promises.mkdir(path.dirname(abs), { recursive: true });
     await comprimirVideo(tmp, abs);
     const nombre = filename.replace(/\.[^.]+$/, '');
-    const id = await db.crearItemBiblioteca(req.proyectoId, rel, 'video', nombre, carpeta);
+    const id = await db.crearItemBiblioteca(req.negocioId, rel, 'video', nombre, carpeta);
     res.json({ ok: true, id });
   } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
   finally { fs.promises.unlink(tmp).catch(() => {}); }
@@ -615,12 +615,12 @@ app.post('/api/biblioteca/preservar', async (req, res) => {
     if (!srcRel || srcRel.includes('..')) return res.status(400).json({ ok: false });
     const src = path.join('/app/media', srcRel);
     const ext = ((srcRel.match(/\.([a-z0-9]{2,5})$/i) || [, ''])[1] || 'jpg').toLowerCase();
-    const rel = path.posix.join('biblioteca', req.marca, crypto.randomUUID() + '.' + ext);
+    const rel = path.posix.join('biblioteca', req.negocio, crypto.randomUUID() + '.' + ext);
     const dst = path.join('/app/media', rel);
     await fs.promises.mkdir(path.dirname(dst), { recursive: true });
     await fs.promises.copyFile(src, dst);
     const tipo = (req.body && req.body.tipo === 'video') ? 'video' : 'image';
-    const id = await db.crearItemBiblioteca(req.proyectoId, rel, tipo, (req.body && req.body.nombre) || null, 'Terminado', 'aportado');
+    const id = await db.crearItemBiblioteca(req.negocioId, rel, tipo, (req.body && req.body.nombre) || null, 'Terminado', 'aportado');
     res.json({ ok: true, id });
   } catch (e) { console.error('preservar', e.message); res.status(500).json({ ok: false }); }
 });
@@ -629,11 +629,11 @@ app.post('/api/biblioteca/carpeta', async (req, res) => {
   try {
     const nombre = String((req.body && req.body.nombre) || '').trim();
     if (!nombre) return res.status(400).json({ ok: false, error: 'nombre_requerido' });
-    res.json({ ok: await db.crearCarpetaBiblioteca(req.proyectoId, nombre) });
+    res.json({ ok: await db.crearCarpetaBiblioteca(req.negocioId, nombre) });
   } catch (e) { console.error('biblio carpeta', e.message); res.status(500).json({ ok: false }); }
 });
 app.delete('/api/biblioteca/carpeta/:nombre', async (req, res) => {
-  try { res.json({ ok: await db.delCarpetaBiblioteca(req.proyectoId, decodeURIComponent(req.params.nombre)) }); }
+  try { res.json({ ok: await db.delCarpetaBiblioteca(req.negocioId, decodeURIComponent(req.params.nombre)) }); }
   catch (e) { console.error('biblio del carpeta', e.message); res.status(500).json({ ok: false }); }
 });
 // Mover / borrar un ítem del taller.
@@ -641,12 +641,12 @@ app.post('/api/biblioteca/item/:id/mover', async (req, res) => {
   try {
     const carpeta = String((req.body && req.body.carpeta) || '').trim();
     if (!carpeta) return res.status(400).json({ ok: false, error: 'carpeta_requerida' });
-    res.json({ ok: await db.moverItemBiblioteca(req.proyectoId, req.params.id, carpeta) });
+    res.json({ ok: await db.moverItemBiblioteca(req.negocioId, req.params.id, carpeta) });
   } catch (e) { console.error('biblio mover', e.message); res.status(500).json({ ok: false }); }
 });
 app.delete('/api/biblioteca/item/:id', async (req, res) => {
   try {
-    const row = await db.delItemBiblioteca(req.proyectoId, req.params.id);
+    const row = await db.delItemBiblioteca(req.negocioId, req.params.id);
     if (row && row.media_path) borrarMediaFile(row.media_path);
     res.json({ ok: !!row });
   } catch (e) { console.error('biblio del item', e.message); res.status(500).json({ ok: false }); }
@@ -659,7 +659,7 @@ app.post('/api/biblioteca/solicitar', async (req, res) => {
     if (!instruccion) return res.status(400).json({ ok: false, error: 'instruccion_requerida' });
     const origenUrl = (req.body && req.body.origen_url) ? String(req.body.origen_url).slice(0, 1000) : null;
     const origenTipo = (req.body && req.body.origen_tipo === 'video') ? 'video' : (origenUrl ? 'image' : null);
-    const id = await db.crearSolicitudBiblioteca(req.proyectoId, instruccion, origenUrl, origenTipo);
+    const id = await db.crearSolicitudBiblioteca(req.negocioId, instruccion, origenUrl, origenTipo);
     res.json({ ok: true, id });
   } catch (e) { console.error('biblio solicitar', e.message); res.status(500).json({ ok: false }); }
 });
@@ -667,7 +667,7 @@ app.post('/api/biblioteca/solicitar', async (req, res) => {
 // Borrar un asset/solicitud del bibliotecario (y su archivo).
 app.delete('/api/biblioteca/generado/:id', async (req, res) => {
   try {
-    const row = await db.delSolicitudBiblioteca(req.proyectoId, req.params.id);
+    const row = await db.delSolicitudBiblioteca(req.negocioId, req.params.id);
     if (row && row.resultado_path) borrarMediaFile(row.resultado_path);
     res.json({ ok: !!row });
   } catch (e) { console.error('biblio del', e.message); res.status(500).json({ ok: false }); }
@@ -855,7 +855,7 @@ app.post('/api/avisos/manual', async (req, res) => {
     let poster = b.poster_url || null;
     if (b.tipo === 'video' && !poster) poster = await asegurarPoster(req, rel);
 
-    const r = await db.crearAvisoManual(req.proyectoId, {
+    const r = await db.crearAvisoManual(req.negocioId, {
       titulo: b.titulo, duracion_s: b.duracion_s, momento: b.momento,
       tipo: b.tipo, url: urlMedia(req, rel), poster_url: poster,
     });
@@ -878,7 +878,7 @@ async function asegurarPoster(req, rel) {
 // 2) Desde DISCO (imagen, dataURL). Guarda en el media store bajo avisos/<marca>/.
 app.post('/api/avisos/subir', async (req, res) => {
   try {
-    const { mediaPath, mediaType } = await guardarMaterialDisco(req.body, path.posix.join('avisos', req.marca));
+    const { mediaPath, mediaType } = await guardarMaterialDisco(req.body, path.posix.join('avisos', req.negocio));
     res.json({ ok: true, media_path: mediaPath, tipo: mediaType });
   } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
 });
@@ -892,11 +892,11 @@ app.post('/api/avisos/subir-video', async (req, res) => {
     if (Number(req.headers['content-length'] || 0) > MAX) { const e = new Error('El video supera los 600MB'); e.http = 413; throw e; }
     await recibirStream(req, tmp, MAX);
     const base = crypto.randomUUID();
-    const rel = path.posix.join('avisos', req.marca, base + '.mp4');
+    const rel = path.posix.join('avisos', req.negocio, base + '.mp4');
     const abs = path.join('/app/media', rel);
     await fs.promises.mkdir(path.dirname(abs), { recursive: true });
     await comprimirVideo(tmp, abs);
-    const relPost = path.posix.join('avisos', req.marca, base + '.jpg');
+    const relPost = path.posix.join('avisos', req.negocio, base + '.jpg');
     const okPost = await posterVideo(abs, path.join('/app/media', relPost));
     res.json({
       ok: true, media_path: rel, tipo: 'video',
@@ -909,11 +909,11 @@ app.post('/api/avisos/subir-video', async (req, res) => {
 
 // --- Contactos de la marca (dueño, community manager, pauta…) ---
 app.get('/api/contactos', async (req, res) => {
-  try { res.json(await db.getContactos(req.proyectoId)); }
+  try { res.json(await db.getContactos(req.negocioId)); }
   catch (e) { console.error('contactos', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/contactos', async (req, res) => {
-  try { res.json(await db.guardarContactos(req.proyectoId, (req.body || {}).contactos)); }
+  try { res.json(await db.guardarContactos(req.negocioId, (req.body || {}).contactos)); }
   catch (e) { console.error('contactos-set', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 

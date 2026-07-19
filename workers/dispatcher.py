@@ -21,7 +21,7 @@ MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliote
 COLA_CORR = (
     "contenido.revisiones r "
     "JOIN contenido.piezas pz ON pz.id=r.pieza_id AND pz.revision_vigente=r.id "
-    "JOIN contenido.proyectos p ON p.id=pz.proyecto_id "
+    "JOIN contenido.negocios p ON p.id=pz.negocio_id "
     "WHERE r.estado='rechazada' AND r.derivado_en IS NULL"
 )
 
@@ -40,7 +40,7 @@ def det_correccion():
     for slug in _lines(f"SELECT DISTINCT p.slug FROM {COLA_CORR}"):
         revids = psql(f"SELECT string_agg(r.id::text, ', ') FROM {COLA_CORR} AND p.slug='{slug}'").strip()
         if revids:
-            jobs.append({"tipo": "correccion", "proyecto_slug": slug,
+            jobs.append({"tipo": "correccion", "negocio_slug": slug,
                          "payload": {"revision_ids": revids}, "lock_key": f"correccion:{slug}"})
     return jobs
 
@@ -49,10 +49,10 @@ def det_propuesta():
     jobs = []
     for row in _lines("SELECT s.id||'|'||COALESCE(p.slug,'cortafuego') "
                       "FROM contenido.solicitudes_propuesta s "
-                      "LEFT JOIN contenido.proyectos p ON p.id=s.proyecto_id "
+                      "LEFT JOIN contenido.negocios p ON p.id=s.negocio_id "
                       "WHERE s.estado='pendiente' ORDER BY s.creado_en"):
         sid, slug = row.split('|', 1)
-        jobs.append({"tipo": "propuesta", "proyecto_slug": slug,
+        jobs.append({"tipo": "propuesta", "negocio_slug": slug,
                      "payload": {"solicitud_id": sid}, "lock_key": f"propuesta:{sid}"})
     return jobs
 
@@ -62,10 +62,10 @@ def det_revision():
     jobs = []
     for row in _lines("SELECT b.id||'|'||COALESCE(p.slug,'cortafuego') "
                       "FROM contenido.tg_briefs b "
-                      "LEFT JOIN contenido.proyectos p ON p.id=b.proyecto_id "
+                      "LEFT JOIN contenido.negocios p ON p.id=b.negocio_id "
                       "WHERE b.estado='revisar' ORDER BY b.creado_en"):
         bid, slug = row.split('|', 1)
-        jobs.append({"tipo": "revision", "proyecto_slug": slug,
+        jobs.append({"tipo": "revision", "negocio_slug": slug,
                      "payload": {"brief_id": bid}, "lock_key": f"revision:{bid}"})
     return jobs
 
@@ -74,10 +74,10 @@ def det_brief():
     jobs = []
     for row in _lines("SELECT b.id||'|'||COALESCE(p.slug,'cortafuego') "
                       "FROM contenido.tg_briefs b "
-                      "LEFT JOIN contenido.proyectos p ON p.id=b.proyecto_id "
+                      "LEFT JOIN contenido.negocios p ON p.id=b.negocio_id "
                       "WHERE b.estado='pendiente' ORDER BY b.creado_en"):
         bid, slug = row.split('|', 1)
-        jobs.append({"tipo": "brief", "proyecto_slug": slug,
+        jobs.append({"tipo": "brief", "negocio_slug": slug,
                      "payload": {"brief_id": bid}, "lock_key": f"brief:{bid}"})
     return jobs
 
@@ -91,10 +91,10 @@ def det_bibliotecario():
     jobs = []
     for row in _lines("SELECT s.id||'|'||COALESCE(p.slug,'cortafuego') "
                       "FROM contenido.solicitudes_biblioteca s "
-                      "LEFT JOIN contenido.proyectos p ON p.id=s.proyecto_id "
+                      "LEFT JOIN contenido.negocios p ON p.id=s.negocio_id "
                       "WHERE s.estado='pendiente' ORDER BY s.creado_en"):
         sid, slug = row.split('|', 1)
-        jobs.append({"tipo": "bibliotecario", "proyecto_slug": slug,
+        jobs.append({"tipo": "bibliotecario", "negocio_slug": slug,
                      "payload": {"solicitud_id": sid}, "lock_key": f"bibliotecario:{sid}"})
     return jobs
 
@@ -107,10 +107,10 @@ def det_campania():
     jobs = []
     for row in _lines("SELECT s.id||'|'||COALESCE(p.slug,'cortafuego') "
                       "FROM contenido.solicitudes_campania s "
-                      "LEFT JOIN contenido.proyectos p ON p.id=s.proyecto_id "
+                      "LEFT JOIN contenido.negocios p ON p.id=s.negocio_id "
                       "WHERE s.estado='pendiente' ORDER BY s.creado_en"):
         sid, slug = row.split('|', 1)
-        jobs.append({"tipo": "campania", "proyecto_slug": slug,
+        jobs.append({"tipo": "campania", "negocio_slug": slug,
                      "payload": {"solicitud_id": sid}, "lock_key": f"campania:{sid}"})
     return jobs
 
@@ -118,26 +118,26 @@ def det_campania():
 def det_marca_capsula():
     # La cápsula deriva de la DB: aplicar pedidos de scaffold/archivar (un job por pedido).
     jobs = []
-    for row in _lines("SELECT slug||'|'||accion FROM contenido.marca_capsula_req WHERE NOT procesado ORDER BY pedido_en"):
+    for row in _lines("SELECT slug||'|'||accion FROM contenido.negocio_capsula_req WHERE NOT procesado ORDER BY pedido_en"):
         slug, accion = row.split('|', 1)
         if slug:
-            jobs.append({"tipo": "marca_capsula", "proyecto_slug": slug,
+            jobs.append({"tipo": "marca_capsula", "negocio_slug": slug,
                          "payload": {"slug": slug, "accion": accion}, "lock_key": f"marca_capsula:{slug}"})
     if jobs:
-        psql("UPDATE contenido.marca_capsula_req SET procesado=true WHERE NOT procesado")
+        psql("UPDATE contenido.negocio_capsula_req SET procesado=true WHERE NOT procesado")
     return jobs
 
 
 def det_descubrimiento():
     # Análisis de presencia digital para el wizard de alta. Corre antes de que la marca exista:
     # la marca todavía no tiene slug propio en proyectos -> el job es agnóstico (no usa cápsula).
-    psql("UPDATE contenido.marca_descubrimiento SET estado='error', "
+    psql("UPDATE contenido.negocio_descubrimiento SET estado='error', "
          "error='El análisis se quedó colgado. Probá de nuevo o cargá los datos a mano.', procesado_en=now() "
          "WHERE estado='procesando' AND creado_en < now() - interval '20 minutes'")
     jobs = []
-    for did in _lines("SELECT id FROM contenido.marca_descubrimiento WHERE estado='pendiente' ORDER BY creado_en"):
+    for did in _lines("SELECT id FROM contenido.negocio_descubrimiento WHERE estado='pendiente' ORDER BY creado_en"):
         did = did.strip()
-        jobs.append({"tipo": "descubrimiento", "proyecto_slug": "clausina",
+        jobs.append({"tipo": "descubrimiento", "negocio_slug": "clausina",
                      "payload": {"descubrimiento_id": did}, "lock_key": f"descubrimiento:{did}"})
     return jobs
 
@@ -145,16 +145,16 @@ def det_descubrimiento():
 def det_marca_gen():
     # Generación de estilo y manual de marca por el creativo. Un job por pedido pendiente.
     # Recuperación de colgados: el manual/estilo puede tardar (claude -p); 40 min es margen seguro.
-    psql("UPDATE contenido.marca_gen SET estado='error', "
+    psql("UPDATE contenido.negocio_gen SET estado='error', "
          "error='Se quedó colgado. Probá de nuevo.', procesado_en=now() "
          "WHERE estado='procesando' AND creado_en < now() - interval '40 minutes'")
     jobs = []
     for row in _lines("SELECT g.id||'|'||g.tipo||'|'||COALESCE(p.slug,'') "
-                      "FROM contenido.marca_gen g JOIN contenido.proyectos p ON p.id=g.proyecto_id "
+                      "FROM contenido.negocio_gen g JOIN contenido.negocios p ON p.id=g.negocio_id "
                       "WHERE g.estado='pendiente' ORDER BY g.creado_en"):
         gid, tipo, slug = row.split('|', 2)
         if slug:
-            jobs.append({"tipo": tipo + "_gen", "proyecto_slug": slug,
+            jobs.append({"tipo": tipo + "_gen", "negocio_slug": slug,
                          "payload": {"gen_id": gid}, "lock_key": f"{tipo}_gen:{gid}"})
     return jobs
 
@@ -166,7 +166,7 @@ def det_secrets_sync():
     for row in _lines("SELECT DISTINCT slug FROM contenido.secrets_sync_req WHERE NOT procesado"):
         slug = row.strip()
         if slug:
-            jobs.append({"tipo": "secrets_sync", "proyecto_slug": slug,
+            jobs.append({"tipo": "secrets_sync", "negocio_slug": slug,
                          "payload": {"slug": slug}, "lock_key": f"secrets_sync:{slug}"})
     if jobs:
         psql("UPDATE contenido.secrets_sync_req SET procesado=true WHERE NOT procesado")
@@ -180,7 +180,7 @@ def det_pauta_sync():
     if not pend or pend == '0':
         return []
     psql("UPDATE contenido.pauta_sync_req SET procesado=true WHERE NOT procesado")
-    return [{"tipo": "pauta_sync", "proyecto_slug": "cortafuego",
+    return [{"tipo": "pauta_sync", "negocio_slug": "cortafuego",
              "payload": {}, "lock_key": "pauta_sync"}]
 
 
@@ -195,10 +195,10 @@ def det_campania_meta():
     jobs = []
     for accion, cond in specs.items():
         for row in _lines("SELECT c.id||'|'||COALESCE(p.slug,'cortafuego') "
-                          "FROM contenido.campanias c LEFT JOIN contenido.proyectos p ON p.id=c.proyecto_id "
+                          "FROM contenido.campanias c LEFT JOIN contenido.negocios p ON p.id=c.negocio_id "
                           f"WHERE {cond} ORDER BY c.actualizado_en"):
             cmid, slug = row.split('|', 1)
-            jobs.append({"tipo": "campania_meta", "proyecto_slug": slug,
+            jobs.append({"tipo": "campania_meta", "negocio_slug": slug,
                          "payload": {"campania_id": cmid, "accion": accion},
                          "lock_key": f"campania_meta:{cmid}"})
     return jobs
@@ -208,10 +208,10 @@ def det_landing():
     jobs = []
     for estado, accion in (("pendiente", "procesar"), ("aprobada", "aplicar")):
         for row in _lines(f"SELECT lc.id||'|'||p.slug FROM contenido.landing_cambios lc "
-                          f"JOIN contenido.proyectos p ON p.id=lc.proyecto_id "
+                          f"JOIN contenido.negocios p ON p.id=lc.negocio_id "
                           f"WHERE lc.estado='{estado}' ORDER BY lc.actualizado_en"):
             cid, slug = row.split('|', 1)
-            jobs.append({"tipo": "landing", "proyecto_slug": slug,
+            jobs.append({"tipo": "landing", "negocio_slug": slug,
                          "payload": {"cambio_id": cid, "accion": accion}, "lock_key": f"landing:{cid}"})
     return jobs  # landing no tiene proceso en la barra del panel -> sin heartbeat
 
@@ -243,7 +243,7 @@ def run():
                 if jobqueue.acquire_inflight(job["lock_key"]):
                     jobqueue.enqueue(job)
                     encolados += 1
-                    log(f"encolado {job['tipo']}/{job['proyecto_slug']} ({job['lock_key']})")
+                    log(f"encolado {job['tipo']}/{job['negocio_slug']} ({job['lock_key']})")
         except Exception as e:
             log(f"!! detector {tipo} falló: {e}")
     # Latido de salud del dispatcher (lo lee la barra de control de workers del panel).

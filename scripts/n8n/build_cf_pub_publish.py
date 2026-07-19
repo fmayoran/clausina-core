@@ -44,7 +44,7 @@ nodes = [
   {"parameters": {"httpMethod": "GET", "path": "cf-pub-publish", "responseMode": "responseNode", "options": {}},
    "id": "Webhook", "name": "Webhook", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [120, 600], "webhookId": "cf-pub-publish"},
 
-  pgq("UPDATE contenido.revisiones SET estado='aprobada', aprobado_por='Fer', aprobado_en=now() WHERE token=$1 AND estado='pendiente_aprobacion' RETURNING caption, token, pieza_id, formato, (SELECT url FROM contenido.media WHERE pieza_id=revisiones.pieza_id AND orden=1) AS asset_ig, (SELECT tipo FROM contenido.media WHERE pieza_id=revisiones.pieza_id AND orden=1) AS tipo_media, COALESCE(revisiones.colaboradores, (SELECT p.ig_colaboradores FROM contenido.proyectos p WHERE p.id=(SELECT proyecto_id FROM contenido.piezas WHERE id=revisiones.pieza_id))) AS colaboradores",
+  pgq("UPDATE contenido.revisiones SET estado='aprobada', aprobado_por='Fer', aprobado_en=now() WHERE token=$1 AND estado='pendiente_aprobacion' RETURNING caption, token, pieza_id, formato, (SELECT url FROM contenido.media WHERE pieza_id=revisiones.pieza_id AND orden=1) AS asset_ig, (SELECT tipo FROM contenido.media WHERE pieza_id=revisiones.pieza_id AND orden=1) AS tipo_media, COALESCE(revisiones.colaboradores, (SELECT p.ig_colaboradores FROM contenido.negocios p WHERE p.id=(SELECT negocio_id FROM contenido.piezas WHERE id=revisiones.pieza_id))) AS colaboradores",
       "={{ $json.query.token }}", "Aprobar", "Aprobar", [300, 600]),
 
   # T1: ¿hubo cambio? (si la pieza ya estaba decidida, Aprobar no devuelve pieza_id)

@@ -36,7 +36,7 @@ def log(msg):
 
 def process(job):
     tipo = job.get("tipo")
-    slug = job.get("proyecto_slug", "?")
+    slug = job.get("negocio_slug", "?")
     lock_key = job.get("lock_key")
     handler = HANDLERS.get(tipo)
     if not handler:
@@ -64,7 +64,7 @@ def run():
             if job is None:
                 heartbeat("worker", "en espera")   # latido de salud (cada ~10s) cuando está libre
                 continue
-            heartbeat("worker", f"procesando {job.get('tipo')}/{job.get('proyecto_slug')}")
+            heartbeat("worker", f"procesando {job.get('tipo')}/{job.get('negocio_slug')}")
             process(job)
             heartbeat("worker", "en espera")
         except KeyboardInterrupt:

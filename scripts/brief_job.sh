@@ -22,7 +22,7 @@ hb(){ psql "INSERT INTO contenido.batch_runs(proceso,last_run,last_msg) VALUES('
 exec 9>"/tmp/cf_brief_${bid}.lock"; flock -n 9 || exit 0
 
 # brief por id (en estado procesable), como JSON
-row=$(psql "SELECT row_to_json(t) FROM (SELECT id,chat_id,voice_file_id,media_file_id,media_type,texto,comentarios,canal_destino,proyecto_id FROM contenido.tg_briefs WHERE id='$bid' AND estado IN ('pendiente','procesando') LIMIT 1) t;")
+row=$(psql "SELECT row_to_json(t) FROM (SELECT id,chat_id,voice_file_id,media_file_id,media_type,texto,comentarios,canal_destino,negocio_id FROM contenido.tg_briefs WHERE id='$bid' AND estado IN ('pendiente','procesando') LIMIT 1) t;")
 [ -z "$row" ] && { echo "$(ts) brief $bid sin estado procesable" >> "$LOG"; exit 0; }
 
 chat=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin)['chat_id'])")
@@ -34,7 +34,7 @@ comentarios=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdi
 canal=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('canal_destino') or 'instagram')")
 
 # --- proyecto: cápsula y secretos de ESA marca (la pasa el dispatcher) ---
-NOMBRE=$(psql "SELECT nombre FROM contenido.proyectos WHERE slug='$slug';"); [ -z "$NOMBRE" ] && NOMBRE="$slug"
+NOMBRE=$(psql "SELECT nombre FROM contenido.negocios WHERE slug='$slug';"); [ -z "$NOMBRE" ] && NOMBRE="$slug"
 REPO="$MARCAS/$slug"
 [ -d "$REPO" ] || { echo "$(ts) ERROR: cápsula inexistente $REPO" >> "$LOG"; psql "UPDATE contenido.tg_briefs SET estado='error', procesado_en=now() WHERE id='$bid';" >/dev/null; exit 1; }
 BOT=$(grep '^TELEGRAM_BOT_TOKEN=' "$REPO/$slug.env" 2>/dev/null | cut -d= -f2-)

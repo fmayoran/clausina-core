@@ -20,12 +20,12 @@ psql(){ docker exec -i "$CID" psql -U postgres -d claude -t -A -c "$1"; }
 
 exec 9>"/tmp/biblio_${sid}.lock"; flock -n 9 || exit 0
 
-row=$(psql "SELECT row_to_json(t) FROM (SELECT id,instruccion,origen_url,origen_tipo,proyecto_id FROM contenido.solicitudes_biblioteca WHERE id='$sid' AND estado IN ('pendiente','procesando') LIMIT 1) t;")
+row=$(psql "SELECT row_to_json(t) FROM (SELECT id,instruccion,origen_url,origen_tipo,negocio_id FROM contenido.solicitudes_biblioteca WHERE id='$sid' AND estado IN ('pendiente','procesando') LIMIT 1) t;")
 [ -z "$row" ] && { echo "$(ts) solicitud $sid sin estado procesable" >> "$LOG"; exit 0; }
 
 REPO="$MARCAS/$slug"
 [ -d "$REPO" ] || { echo "$(ts) ERROR: cápsula inexistente $REPO" >> "$LOG"; psql "UPDATE contenido.solicitudes_biblioteca SET estado='error', procesado_en=now() WHERE id='$sid';" >/dev/null; exit 1; }
-CHAT=$(psql "SELECT coalesce(telegram_chat_id,'') FROM contenido.proyectos WHERE slug='$slug';")
+CHAT=$(psql "SELECT coalesce(telegram_chat_id,'') FROM contenido.negocios WHERE slug='$slug';")
 BOT=$(grep '^TELEGRAM_BOT_TOKEN=' "$REPO/$slug.env" 2>/dev/null | cut -d= -f2-)
 
 instr=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('instruccion') or '')")
@@ -85,8 +85,8 @@ os.makedirs(os.path.dirname(dst), exist_ok=True); shutil.copyfile(src, dst); os.
 upd(f"estado='listo', resultado_path={dq(rel)}, resultado_tipo='{tipo}', resumen={dq(resumen)}")
 # El asset entra al TALLER de la biblioteca, carpeta "En proceso".
 nombre=(os.environ.get("INSTR") or "Generado con IA").strip()[:80]
-ins=("INSERT INTO contenido.biblioteca_item (proyecto_id, media_path, tipo, nombre, carpeta, origen, resumen) "
-     f"SELECT proyecto_id, {dq(rel)}, '{tipo}', {dq(nombre)}, 'En proceso', 'bibliotecario', {dq(resumen)} "
+ins=("INSERT INTO contenido.biblioteca_item (negocio_id, media_path, tipo, nombre, carpeta, origen, resumen) "
+     f"SELECT negocio_id, {dq(rel)}, '{tipo}', {dq(nombre)}, 'En proceso', 'bibliotecario', {dq(resumen)} "
      f"FROM contenido.solicitudes_biblioteca WHERE id='{sid}';")
 subprocess.run(["docker","exec","-i",cid,"psql","-U","postgres","-d","claude","-q","-c",ins])
 print("ok:"+rel)

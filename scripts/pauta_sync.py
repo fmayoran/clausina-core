@@ -25,7 +25,7 @@ def discover_brands():
     Devuelve {slug: {act, token(descifrado)}}."""
     out = {}
     rows = psql("SELECT p.slug||'|'||coalesce(pp.meta_ads_account_id,'')||'|'||coalesce(pp.meta_ads_token_enc,'') "
-                "FROM contenido.proyectos p JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id "
+                "FROM contenido.negocios p JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id "
                 "WHERE pp.meta_ads_account_id IS NOT NULL AND pp.meta_ads_token_enc IS NOT NULL "
                 "ORDER BY p.slug")
     for row in rows.splitlines():
@@ -196,9 +196,9 @@ def upsert_daily(pid, daily):
         if not d.get("fecha"):
             continue
         psql(
-            "INSERT INTO contenido.ads_daily(proyecto_id,fecha,gasto,impresiones,alcance,clics,actualizado_en) "
+            "INSERT INTO contenido.ads_daily(negocio_id,fecha,gasto,impresiones,alcance,clics,actualizado_en) "
             f"VALUES('{pid}','{d['fecha']}',{d['gasto']},{d['impresiones']},{d['alcance']},{d['clics']},now()) "
-            "ON CONFLICT(proyecto_id,fecha) DO UPDATE SET gasto=EXCLUDED.gasto,impresiones=EXCLUDED.impresiones,"
+            "ON CONFLICT(negocio_id,fecha) DO UPDATE SET gasto=EXCLUDED.gasto,impresiones=EXCLUDED.impresiones,"
             "alcance=EXCLUDED.alcance,clics=EXCLUDED.clics,actualizado_en=now();")
 
 
@@ -220,15 +220,15 @@ def psql(sql):
 
 
 def upsert(slug, snapshot):
-    pid = psql(f"SELECT id FROM contenido.proyectos WHERE slug='{slug}'")
+    pid = psql(f"SELECT id FROM contenido.negocios WHERE slug='{slug}'")
     if not pid:
         raise RuntimeError(f"proyecto '{slug}' no existe")
     payload = json.dumps(snapshot, ensure_ascii=False)
     tag = "j" + secrets.token_hex(6)  # dollar-quote seguro (arranca con letra)
     psql(
-        f"INSERT INTO contenido.ads_snapshot(proyecto_id,capturado_en,data) "
+        f"INSERT INTO contenido.ads_snapshot(negocio_id,capturado_en,data) "
         f"VALUES('{pid}', now(), ${tag}${payload}${tag}$::jsonb) "
-        f"ON CONFLICT(proyecto_id) DO UPDATE SET capturado_en=now(), data=EXCLUDED.data;")
+        f"ON CONFLICT(negocio_id) DO UPDATE SET capturado_en=now(), data=EXCLUDED.data;")
     return pid
 
 

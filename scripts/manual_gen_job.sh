@@ -19,17 +19,17 @@ psql(){ docker exec -i "$PG" psql -U postgres -d claude -t -A -q -c "$1"; }
 
 exec 9>"/tmp/manual_${gid}.lock"; flock -n 9 || exit 0
 
-estado=$(psql "SELECT estado FROM contenido.marca_gen WHERE id='$gid' AND tipo='manual';")
+estado=$(psql "SELECT estado FROM contenido.negocio_gen WHERE id='$gid' AND tipo='manual';")
 case "$estado" in pendiente|procesando) ;; *) echo "$(ts) $gid sin estado procesable ($estado)" >> "$LOG"; exit 0;; esac
-pid=$(psql "SELECT proyecto_id FROM contenido.marca_gen WHERE id='$gid';")
+pid=$(psql "SELECT negocio_id FROM contenido.negocio_gen WHERE id='$gid';")
 [ -z "$pid" ] && exit 0
 
 echo "$(ts) manual $gid ($slug)" >> "$LOG"
-psql "UPDATE contenido.marca_gen SET estado='procesando' WHERE id='$gid';" >/dev/null
+psql "UPDATE contenido.negocio_gen SET estado='procesando' WHERE id='$gid';" >/dev/null
 rm -f "/tmp/manual_res_$gid.html"
 
 # Versión y fecha para control: cada manual generado incrementa la versión de la marca.
-ver=$(( $(psql "SELECT coalesce(manual_version,0) FROM contenido.proyecto_perfil WHERE proyecto_id='$pid';") + 1 ))
+ver=$(( $(psql "SELECT coalesce(manual_version,0) FROM contenido.negocio_perfil WHERE negocio_id='$pid';") + 1 ))
 fecha=$(date +%d/%m/%Y)
 
 # Contexto: nombre, slogan, brief, estilo_md, logo, paleta.
@@ -41,7 +41,7 @@ def q(sql):
                           capture_output=True, text=True).stdout.strip()
 row=q("SELECT coalesce(p.nombre,'')||E'\\n---S---\\n'||coalesce(pp.slogan,'')||E'\\n---L---\\n'||coalesce(pp.logo,'')"
       "||E'\\n---B---\\n'||coalesce(pp.brief_md,'')||E'\\n---E---\\n'||coalesce(pp.estilo_md,'') "
-      f"FROM contenido.proyectos p JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id WHERE p.id='{pid}'")
+      f"FROM contenido.negocios p JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id WHERE p.id='{pid}'")
 nombre, _, r1 = row.partition('\n---S---\n')
 slogan, _, r2 = r1.partition('\n---L---\n')
 logo,   _, r3 = r2.partition('\n---B---\n')
@@ -77,7 +77,7 @@ if [ ! -s "/tmp/manual_res_$gid.html" ] || grep -q "^SIN_ESTILO" "/tmp/manual_re
   # Causa más común de "sin resultado": límite temporal de uso de la suscripción (claude -p).
   msg="El creativo no pudo generar el manual. Suele ser un límite temporal de uso; probá de nuevo en unos minutos."
   grep -qi "session limit\|usage limit\|rate limit" "$LOG" 2>/dev/null && msg="Se alcanzó el límite de uso de la suscripción. Reintentá cuando se reinicie."
-  psql "UPDATE contenido.marca_gen SET estado='error', error='$msg', procesado_en=now() WHERE id='$gid';" >/dev/null
+  psql "UPDATE contenido.negocio_gen SET estado='error', error='$msg', procesado_en=now() WHERE id='$gid';" >/dev/null
   echo "$(ts) manual $gid sin resultado" >> "$LOG"
   rm -f "/tmp/manual_ctx_$gid.json" "/tmp/manual_res_$gid.html"; exit 1
 fi
@@ -103,8 +103,8 @@ def psql(sql):
     return subprocess.run(["docker","exec","-i",pg,"psql","-U","postgres","-d","claude","-t","-A","-q","-c",sql],capture_output=True,text=True)
 def dq(v):
     t="x"+secrets.token_hex(8); return "NULL" if v is None else f"${t}${v}${t}$"
-psql(f"UPDATE contenido.proyecto_perfil SET manual_html_url={dq(htmlu)}, manual_pdf_url={dq(pdfu)}, manual_version={int(os.environ['VER'])}, manual_generado_en=now() WHERE proyecto_id='{pid}';")
-psql(f"UPDATE contenido.marca_gen SET estado='listo', error=NULL, procesado_en=now() WHERE id='{gid}';")
+psql(f"UPDATE contenido.negocio_perfil SET manual_html_url={dq(htmlu)}, manual_pdf_url={dq(pdfu)}, manual_version={int(os.environ['VER'])}, manual_generado_en=now() WHERE negocio_id='{pid}';")
+psql(f"UPDATE contenido.negocio_gen SET estado='listo', error=NULL, procesado_en=now() WHERE id='{gid}';")
 print("ok")
 PY
 

@@ -29,7 +29,7 @@
     <div class="flex items-baseline gap-3 mb-4">
       <h1 class="display font-bold text-xl tracking-tight hl"><span>Inicio</span></h1>
       <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
-      <a href="marcas" title="Ver qué tiene configurada cada marca" aria-label="Ver qué tiene configurada cada marca"
+      <a href="negocios" title="Ver qué tiene configurada cada marca" aria-label="Ver qué tiene configurada cada marca"
          class="ml-auto self-center grid place-items-center w-9 h-9 rounded-lg border border-pline dark:border-line text-pmut dark:text-mut hover:border-acc hover:acc-text transition shrink-0">
         <i data-lucide="table-properties" class="w-4 h-4"></i>
       </a>
@@ -126,7 +126,7 @@
 <script>ClausinaShell({active:'inicio'});</script>
 <script>
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-async function entrar(slug){ try{ await fetch('api/marca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})}); }catch(_){} location.href='proyecto'; }
+async function entrar(slug){ try{ await fetch('api/negocio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})}); }catch(_){} location.href='proyecto'; }
 
 // ---- Wizard "Sumá una marca" (Identidad -> Brief -> Capacidades -> crear) ----
 const WIZ_CAPS = [
@@ -156,7 +156,7 @@ async function wizAnalizar(){
   if(!w.web.trim() && !w.instagram.trim()){ wizErr('Poné al menos la web o el Instagram'); return; }
   w.an='analizando'; w.anErr=''; wizRender();
   try{
-    const d=await fetch('api/marcas/descubrir',{method:'POST',headers:{'Content-Type':'application/json'},
+    const d=await fetch('api/negocios/descubrir',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({nombre:w.nombre,web:w.web,instagram:w.instagram,notas:w.notas})}).then(r=>r.json());
     if(!d.ok){ w.an='error'; w.anErr='No se pudo lanzar el análisis'; wizRender(); return; }
     w.desc_id=d.id;
@@ -165,7 +165,7 @@ async function wizAnalizar(){
       if(!_wz){ clearInterval(_wzPoll); _wzPoll=null; return; }
       if(++intentos>150){ clearInterval(_wzPoll); _wzPoll=null; w.an='error'; w.anErr='El análisis tardó demasiado. Cargá los datos a mano.'; wizRender(); return; }
       try{
-        const r=await fetch('api/marcas/descubrir/'+d.id).then(x=>x.json());
+        const r=await fetch('api/negocios/descubrir/'+d.id).then(x=>x.json());
         if(r.estado==='listo'){ clearInterval(_wzPoll); _wzPoll=null; wizAplicar(r.resultado||{}); }
         else if(r.estado==='error'){ clearInterval(_wzPoll); _wzPoll=null; w.an='error'; w.anErr=r.error||'El análisis falló'; wizRender(); }
       }catch(_){}
@@ -312,7 +312,7 @@ async function wizNext(){
   else if(w.step===5){
     w.creando=true; wizRender();
     try{
-      const d=await fetch('api/marcas/crear',{method:'POST',headers:{'Content-Type':'application/json'},
+      const d=await fetch('api/negocios/crear',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({nombre:w.nombre.trim(),slug:w.slug,slogan:w.slogan,brief_md:w.brief_md,
           estilo_md:w.estilo_md,dominio_web:w.web,ig_handle:w.instagram,email:w.email,whatsapp:w.whatsapp,
           logo:w.logo,descubrimiento_id:w.desc_id,capacidades:[...w.caps],web_modo:w.web_modo,

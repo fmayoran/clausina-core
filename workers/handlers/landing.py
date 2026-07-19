@@ -5,4 +5,4 @@ import agent_backend
 
 def handle(job):
     p = job.get("payload") or {}
-    return agent_backend.run_script("landing_job.sh", [job["proyecto_slug"], p["cambio_id"], p["accion"]])
+    return agent_backend.run_script("landing_job.sh", [job["negocio_slug"], p["cambio_id"], p["accion"]])

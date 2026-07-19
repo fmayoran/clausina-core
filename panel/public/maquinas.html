@@ -286,7 +286,7 @@ function setBrands(ms){
   }).join('');
 }
 
-async function entrar(slug){ try{ await fetch('api/marca',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})}); }catch(_){} location.href='proyecto'; }
+async function entrar(slug){ try{ await fetch('api/negocio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})}); }catch(_){} location.href='proyecto'; }
 function offline(){ document.getElementById('lamp').className='lamp paro'; const w=document.getElementById('stateW'); w.textContent='Sin señal'; w.className='display font-extrabold text-2xl leading-none tracking-tight cor-text'; document.getElementById('stateSub').textContent='no hay conexión con el motor — reintentando'; document.getElementById('reads').innerHTML=''; }
 
 async function cargar(){

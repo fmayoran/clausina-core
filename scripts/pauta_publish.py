@@ -50,8 +50,8 @@ def config_for_campania(cid):
     row = psql(
         "SELECT coalesce(pp.meta_ads_account_id,'')||'|'||coalesce(pp.meta_ads_page_id,'')||'|'||"
         "coalesce(pp.meta_ads_ig_id,'')||'|'||coalesce(pp.meta_ads_token_enc,'')||'|'||p.slug "
-        "FROM contenido.campanias c JOIN contenido.proyectos p ON p.id=c.proyecto_id "
-        "JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=c.proyecto_id "
+        "FROM contenido.campanias c JOIN contenido.negocios p ON p.id=c.negocio_id "
+        "JOIN contenido.negocio_perfil pp ON pp.negocio_id=c.negocio_id "
         f"WHERE c.id='{cid}'")
     if not row:
         raise RuntimeError("la campaña no tiene pauta configurada en el perfil de la marca")
@@ -175,7 +175,7 @@ def crear(cid):
                "to_char(c.fecha_inicio,'YYYY-MM-DD') fi,to_char(c.fecha_fin,'YYYY-MM-DD') ff,"
                "c.url_destino,c.cta,c.meta_campaign_id,"
                "(SELECT r.ig_post_id FROM contenido.revisiones r WHERE r.pieza_id=c.pieza_id AND r.estado='publicada' LIMIT 1) ig_media,"
-               "(SELECT p.dominio_web FROM contenido.proyectos p WHERE p.id=c.proyecto_id) dominio "
+               "(SELECT p.dominio_web FROM contenido.negocios p WHERE p.id=c.negocio_id) dominio "
                f"FROM contenido.campanias c WHERE c.id='{cid}') t;")
     if not row:
         raise RuntimeError("campaña inexistente")

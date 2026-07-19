@@ -15,32 +15,32 @@ const pool = new Pool({
 
 // --- Marcas (tenants) ---
 // Cache en memoria de las marcas (proyectos): el panel resuelve la marca activa en cada request.
-let _marcas = null, _marcasAt = 0;
-async function getMarcas() {
-  if (!_marcas || Date.now() - _marcasAt > 60000) {
+let _negocios = null, _negociosAt = 0;
+async function getNegocios() {
+  if (!_negocios || Date.now() - _negociosAt > 60000) {
     const { rows } = await pool.query(
       `SELECT p.id, p.slug, p.nombre, p.activo, p.gestion, pp.logo
-         FROM contenido.proyectos p LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id
+         FROM contenido.negocios p LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id
         ORDER BY p.activo DESC, p.creado_en`);
-    _marcas = rows; _marcasAt = Date.now();
+    _negocios = rows; _negociosAt = Date.now();
   }
-  return _marcas;
+  return _negocios;
 }
 async function getProyectoId(slug) {
-  const f = (await getMarcas()).find(x => x.slug === slug);
+  const f = (await getNegocios()).find(x => x.slug === slug);
   return f ? f.id : null;
 }
 
 // --- Perfil del proyecto (registro que consume el creativo): marca + slogan + logo + brief ---
-async function getPerfil(proyectoId) {
+async function getPerfil(negocioId) {
   const { rows: [r] } = await pool.query(
     `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email, p.whatsapp, p.gestion,
             pp.slogan, pp.logo, pp.brief_md, pp.estilo_md, pp.actualizado_en,
             pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id,
             (pp.meta_ads_token_enc IS NOT NULL) AS meta_ads_token_set,
             (pp.ig_token_enc IS NOT NULL) AS ig_token_set
-       FROM contenido.proyectos p LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id
-      WHERE p.id=$1`, [proyectoId]);
+       FROM contenido.negocios p LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id
+      WHERE p.id=$1`, [negocioId]);
   return r || {};
 }
 
@@ -77,14 +77,14 @@ function evaluarCap(cap, d, cfg) {
   return { configurada: faltan.length === 0, faltan };
 }
 
-async function getCapacidades(proyectoId) {
+async function getCapacidades(negocioId) {
   const { rows: [d] } = await pool.query(
     `SELECT p.ig_handle, p.ig_user_id, p.dominio_web, pp.estilo_md, pp.ig_token_enc,
             pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id, pp.meta_ads_token_enc
-       FROM contenido.proyectos p LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id
-      WHERE p.id=$1`, [proyectoId]);
+       FROM contenido.negocios p LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id
+      WHERE p.id=$1`, [negocioId]);
   const { rows } = await pool.query(
-    'SELECT capacidad, habilitada, config FROM contenido.proyecto_capacidad WHERE proyecto_id=$1', [proyectoId]);
+    'SELECT capacidad, habilitada, config FROM contenido.negocio_capacidad WHERE negocio_id=$1', [negocioId]);
   const byId = {}; rows.forEach(r => { byId[r.capacidad] = r; });
   return CAPS.map(c => {
     const fila = byId[c.id] || { habilitada: false, config: {} };
@@ -97,15 +97,15 @@ async function getCapacidades(proyectoId) {
 
 // Contactos de la marca (dueño, community manager, pauta…). A quién escribirle, y a futuro
 // a quién notificarle cuando su aviso sale en pantalla.
-async function getContactos(proyectoId) {
+async function getContactos(negocioId) {
   const { rows } = await pool.query(
-    'SELECT id, nombre, rol, whatsapp, email, notas FROM contenido.proyecto_contacto ' +
-    'WHERE proyecto_id=$1 ORDER BY orden, creado_en', [proyectoId]);
+    'SELECT id, nombre, rol, whatsapp, email, notas FROM contenido.negocio_contacto ' +
+    'WHERE negocio_id=$1 ORDER BY orden, creado_en', [negocioId]);
   return rows;
 }
 
 // Guardado por reemplazo: la UI manda la lista completa (es corta y se edita como un bloque).
-async function guardarContactos(proyectoId, lista) {
+async function guardarContactos(negocioId, lista) {
   const items = (Array.isArray(lista) ? lista : [])
     .map(c => ({
       nombre: String(c.nombre || '').trim().slice(0, 120),
@@ -118,13 +118,13 @@ async function guardarContactos(proyectoId, lista) {
   const cli = await pool.connect();
   try {
     await cli.query('BEGIN');
-    await cli.query('DELETE FROM contenido.proyecto_contacto WHERE proyecto_id=$1', [proyectoId]);
+    await cli.query('DELETE FROM contenido.negocio_contacto WHERE negocio_id=$1', [negocioId]);
     for (let i = 0; i < items.length; i++) {
       const c = items[i];
       await cli.query(
-        `INSERT INTO contenido.proyecto_contacto (proyecto_id, nombre, rol, whatsapp, email, notas, orden)
+        `INSERT INTO contenido.negocio_contacto (negocio_id, nombre, rol, whatsapp, email, notas, orden)
            VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [proyectoId, c.nombre, c.rol, c.whatsapp, c.email, c.notas, i]);
+        [negocioId, c.nombre, c.rol, c.whatsapp, c.email, c.notas, i]);
     }
     await cli.query('COMMIT');
   } catch (e) {
@@ -132,13 +132,13 @@ async function guardarContactos(proyectoId, lista) {
   } finally {
     cli.release();
   }
-  return { ok: true, contactos: await getContactos(proyectoId) };
+  return { ok: true, contactos: await getContactos(negocioId) };
 }
 
 // Aviso cargado A MANO (no lo hizo el creativo): material ya listo, de la biblioteca o de disco.
 // Entra por la MISMA puerta que los del creativo: nace 'pendiente_aprobacion'. Nada va a la
 // pantalla sin el visto de Fer.
-async function crearAvisoManual(proyectoId, d) {
+async function crearAvisoManual(negocioId, d) {
   const titulo = String(d.titulo || '').trim().slice(0, 160);
   const url = String(d.url || '').trim();
   if (!titulo) return { ok: false, error: 'titulo_requerido' };
@@ -151,9 +151,9 @@ async function crearAvisoManual(proyectoId, d) {
   try {
     await cli.query('BEGIN');
     const { rows: [pz] } = await cli.query(
-      `INSERT INTO contenido.piezas (proyecto_id, titulo_interno, canal, estado, notas)
+      `INSERT INTO contenido.piezas (negocio_id, titulo_interno, canal, estado, notas)
          VALUES ($1,$2,'aviso','pendiente_aprobacion',$3) RETURNING id, numero`,
-      [proyectoId, titulo, 'Cargado a mano (material ya listo).']);
+      [negocioId, titulo, 'Cargado a mano (material ya listo).']);
     const { rows: [rv] } = await cli.query(
       `INSERT INTO contenido.revisiones (pieza_id, nro, estado, canal, duracion_s, momento)
          VALUES ($1, 1, 'pendiente_aprobacion', 'instagram', $2, $3) RETURNING id`,
@@ -172,17 +172,17 @@ async function crearAvisoManual(proyectoId, d) {
 }
 
 // Generación de estilo y manual de marca por el creativo (jobs). El manual necesita el estilo hecho.
-async function pedirGeneracion(proyectoId, tipo) {
+async function pedirGeneracion(negocioId, tipo) {
   if (tipo !== 'estilo' && tipo !== 'manual') return { ok: false, error: 'tipo_invalido' };
   if (tipo === 'manual') {
     const { rows } = await pool.query(
-      "SELECT length(coalesce(estilo_md,'')) AS n FROM contenido.proyecto_perfil WHERE proyecto_id=$1", [proyectoId]);
+      "SELECT length(coalesce(estilo_md,'')) AS n FROM contenido.negocio_perfil WHERE negocio_id=$1", [negocioId]);
     if (!rows[0] || rows[0].n <= 20) return { ok: false, error: 'falta_estilo' };
   }
   try {
     const { rows: [g] } = await pool.query(
-      `INSERT INTO contenido.marca_gen (proyecto_id, tipo) VALUES ($1,$2) RETURNING id`,
-      [proyectoId, tipo]);
+      `INSERT INTO contenido.negocio_gen (negocio_id, tipo) VALUES ($1,$2) RETURNING id`,
+      [negocioId, tipo]);
     return { ok: true, id: g.id };
   } catch (e) {
     if (e.code === '23505') return { ok: false, error: 'ya_en_curso' };  // índice único en curso
@@ -191,18 +191,18 @@ async function pedirGeneracion(proyectoId, tipo) {
 }
 
 // Estado de la generación para el panel: qué hay en curso y cómo quedó el manual.
-async function getGeneracion(proyectoId) {
+async function getGeneracion(negocioId) {
   const { rows } = await pool.query(
-    `SELECT tipo, estado, error FROM contenido.marca_gen
-       WHERE proyecto_id=$1 AND estado IN ('pendiente','procesando')`, [proyectoId]);
+    `SELECT tipo, estado, error FROM contenido.negocio_gen
+       WHERE negocio_id=$1 AND estado IN ('pendiente','procesando')`, [negocioId]);
   const { rows: [p] } = await pool.query(
     `SELECT length(coalesce(estilo_md,'')) AS estilo_len,
             manual_html_url, manual_pdf_url, manual_generado_en
-       FROM contenido.proyecto_perfil WHERE proyecto_id=$1`, [proyectoId]);
+       FROM contenido.negocio_perfil WHERE negocio_id=$1`, [negocioId]);
   // Último error por tipo (para avisar si la última corrida falló y ya no está en curso).
   const { rows: err } = await pool.query(
-    `SELECT DISTINCT ON (tipo) tipo, estado, error FROM contenido.marca_gen
-       WHERE proyecto_id=$1 ORDER BY tipo, creado_en DESC`, [proyectoId]);
+    `SELECT DISTINCT ON (tipo) tipo, estado, error FROM contenido.negocio_gen
+       WHERE negocio_id=$1 ORDER BY tipo, creado_en DESC`, [negocioId]);
   const ult = {}; err.forEach(r => { ult[r.tipo] = r; });
   const enCurso = t => rows.some(r => r.tipo === t);
   return {
@@ -255,13 +255,13 @@ async function guardarLente(d) {
 
 // Descubrimiento: el analista lee la presencia digital pública (web + IG) y devuelve una base de
 // identidad para pre-cargar el wizard. Corre antes de que la marca exista -> cuelga de su propia
-// tabla, no de proyecto_id (se enlaza después, si el alta se concreta).
+// tabla, no de negocio_id (se enlaza después, si el alta se concreta).
 async function crearDescubrimiento(d) {
   const web = (d.web || '').trim();
   const ig = (d.instagram || '').trim();
   if (!web && !ig) return { ok: false, error: 'sin_fuentes' };
   const { rows: [r] } = await pool.query(
-    `INSERT INTO contenido.marca_descubrimiento (nombre, web, instagram, notas)
+    `INSERT INTO contenido.negocio_descubrimiento (nombre, web, instagram, notas)
        VALUES ($1,$2,$3,$4) RETURNING id`,
     [(d.nombre || '').trim() || null, web || null, ig || null, (d.notas || '').trim() || null]);
   return { ok: true, id: r.id };
@@ -269,19 +269,19 @@ async function crearDescubrimiento(d) {
 
 async function getDescubrimiento(id) {
   const { rows } = await pool.query(
-    'SELECT id, estado, resultado, error FROM contenido.marca_descubrimiento WHERE id=$1', [id]);
+    'SELECT id, estado, resultado, error FROM contenido.negocio_descubrimiento WHERE id=$1', [id]);
   return rows[0] || null;
 }
 
 // Alta de marca desde el panel (wizard). Crea proyecto + perfil + capacidades y ENCOLA el
 // scaffold de la cápsula (artefacto derivado de la DB). No toca el disco directamente.
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
-async function crearMarca(d) {
+async function crearNegocio(d) {
   const nombre = (d.nombre || '').trim();
   const slug = (d.slug || '').trim().toLowerCase();
   if (!nombre) return { ok: false, error: 'nombre_requerido' };
   if (!SLUG_RE.test(slug)) return { ok: false, error: 'slug_invalido' };
-  const dup = await pool.query('SELECT 1 FROM contenido.proyectos WHERE slug=$1', [slug]);
+  const dup = await pool.query('SELECT 1 FROM contenido.negocios WHERE slug=$1', [slug]);
   if (dup.rowCount) return { ok: false, error: 'slug_duplicado' };
   // Capacidades elegidas + sus dependencias (pauta arrastra instagram).
   const set = new Set(Array.isArray(d.capacidades) ? d.capacidades : []);
@@ -290,34 +290,34 @@ async function crearMarca(d) {
 
   const gestion = d.gestion === 'parcial' ? 'parcial' : 'integral';
   const { rows: [p] } = await pool.query(
-    `INSERT INTO contenido.proyectos (slug, nombre, dominio_web, ig_handle, email, whatsapp, gestion)
+    `INSERT INTO contenido.negocios (slug, nombre, dominio_web, ig_handle, email, whatsapp, gestion)
        VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
     [slug, nombre, txt(d.dominio_web), txt(d.ig_handle), txt(d.email), txt(d.whatsapp), gestion]);
   await pool.query(
-    `INSERT INTO contenido.proyecto_perfil (proyecto_id, slogan, brief_md, estilo_md, logo, actualizado_en)
+    `INSERT INTO contenido.negocio_perfil (negocio_id, slogan, brief_md, estilo_md, logo, actualizado_en)
        VALUES ($1,$2,$3,$4,$5, now())`,
     [p.id, txt(d.slogan), txt(d.brief_md), txt(d.estilo_md), txt(d.logo)]);
   // Trazabilidad: de qué análisis salió esta marca.
   if (d.descubrimiento_id) {
-    await pool.query('UPDATE contenido.marca_descubrimiento SET proyecto_id=$1 WHERE id=$2',
+    await pool.query('UPDATE contenido.negocio_descubrimiento SET negocio_id=$1 WHERE id=$2',
       [p.id, d.descubrimiento_id]).catch(() => {});
   }
   for (const cap of CAPS) {
     const on = set.has(cap.id);
     const config = (cap.id === 'web' && on) ? { modo: (d.web_modo === 'administrada' ? 'administrada' : 'referencia') } : {};
     await pool.query(
-      `INSERT INTO contenido.proyecto_capacidad (proyecto_id, capacidad, habilitada, config)
+      `INSERT INTO contenido.negocio_capacidad (negocio_id, capacidad, habilitada, config)
          VALUES ($1,$2,$3,$4::jsonb) ON CONFLICT DO NOTHING`,
       [p.id, cap.id, on, JSON.stringify(config)]);
   }
-  await pool.query("INSERT INTO contenido.marca_capsula_req (slug, accion) VALUES ($1,'scaffold')", [slug]);
-  _marcasAt = 0;
+  await pool.query("INSERT INTO contenido.negocio_capsula_req (slug, accion) VALUES ($1,'scaffold')", [slug]);
+  _negociosAt = 0;
   return { ok: true, slug };
 }
 
 // Vista de agencia: todas las marcas con el estado de cada capacidad (grilla marca × capacidad).
 async function getCapacidadesTodas() {
-  const marcas = await getMarcas();
+  const marcas = await getNegocios();
   const out = [];
   for (const m of marcas) {
     out.push({ slug: m.slug, nombre: m.nombre, logo: m.logo, activo: m.activo,
@@ -326,30 +326,30 @@ async function getCapacidadesTodas() {
   return out;
 }
 
-async function setCapacidad(proyectoId, capId, { habilitada, config }) {
+async function setCapacidad(negocioId, capId, { habilitada, config }) {
   const cap = CAPS.find(c => c.id === capId);
   if (!cap) return { ok: false, error: 'capacidad_desconocida' };
   if (habilitada && (cap.depende || []).length) {
     const { rows } = await pool.query(
-      'SELECT capacidad FROM contenido.proyecto_capacidad WHERE proyecto_id=$1 AND habilitada', [proyectoId]);
+      'SELECT capacidad FROM contenido.negocio_capacidad WHERE negocio_id=$1 AND habilitada', [negocioId]);
     const on = new Set(rows.map(r => r.capacidad));
     const falta = cap.depende.filter(x => !on.has(x));
     if (falta.length) return { ok: false, error: 'depende', depende: falta };
   }
   await pool.query(
-    `INSERT INTO contenido.proyecto_capacidad (proyecto_id, capacidad, habilitada, config, actualizado_en)
+    `INSERT INTO contenido.negocio_capacidad (negocio_id, capacidad, habilitada, config, actualizado_en)
        VALUES ($1,$2,$3,COALESCE($4::jsonb,'{}'::jsonb), now())
-     ON CONFLICT (proyecto_id, capacidad) DO UPDATE SET habilitada=$3,
-       config = CASE WHEN $4 IS NULL THEN contenido.proyecto_capacidad.config ELSE $4::jsonb END,
+     ON CONFLICT (negocio_id, capacidad) DO UPDATE SET habilitada=$3,
+       config = CASE WHEN $4 IS NULL THEN contenido.negocio_capacidad.config ELSE $4::jsonb END,
        actualizado_en = now()`,
-    [proyectoId, capId, !!habilitada, config ? JSON.stringify(config) : null]);
+    [negocioId, capId, !!habilitada, config ? JSON.stringify(config) : null]);
   // Cascada: apagar una capacidad apaga las que dependen de ella.
   if (!habilitada) {
     const dependientes = CAPS.filter(c => (c.depende || []).includes(capId)).map(c => c.id);
     if (dependientes.length) {
       await pool.query(
-        `UPDATE contenido.proyecto_capacidad SET habilitada=false, actualizado_en=now()
-          WHERE proyecto_id=$1 AND capacidad = ANY($2::text[])`, [proyectoId, dependientes]);
+        `UPDATE contenido.negocio_capacidad SET habilitada=false, actualizado_en=now()
+          WHERE negocio_id=$1 AND capacidad = ANY($2::text[])`, [negocioId, dependientes]);
     }
   }
   return { ok: true };
@@ -359,12 +359,12 @@ async function setCapacidad(proyectoId, capId, { habilitada, config }) {
 async function getIgToken(slug) {
   try {
     const { rows: [r] } = await pool.query(
-      `SELECT pp.ig_token_enc FROM contenido.proyectos p JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id WHERE p.slug=$1`, [slug]);
+      `SELECT pp.ig_token_enc FROM contenido.negocios p JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id WHERE p.slug=$1`, [slug]);
     if (r && r.ig_token_enc) return cryptoAds.decrypt(r.ig_token_enc);
   } catch (e) { console.error('getIgToken', e.message); }
   return null;
 }
-async function guardarPerfil(proyectoId, d) {
+async function guardarPerfil(negocioId, d) {
   const nn = s => (s != null && String(s).trim() !== '') ? String(s).trim() : null;
   // Cifrar los tokens ANTES de escribir nada (si falta la clave, falla limpio sin guardar a medias).
   let tokEnc = null, igTokEnc = null;
@@ -373,56 +373,56 @@ async function guardarPerfil(proyectoId, d) {
     if (nn(d.meta_ads_token)) tokEnc = cryptoAds.encrypt(nn(d.meta_ads_token));
     if (nn(d.ig_token)) igTokEnc = cryptoAds.encrypt(nn(d.ig_token));
   }
-  if (nn(d.nombre)) await pool.query('UPDATE contenido.proyectos SET nombre=$2 WHERE id=$1', [proyectoId, nn(d.nombre)]);
+  if (nn(d.nombre)) await pool.query('UPDATE contenido.negocios SET nombre=$2 WHERE id=$1', [negocioId, nn(d.nombre)]);
   await pool.query(
-    `UPDATE contenido.proyectos SET ig_handle=$2, dominio_web=$3, ig_user_id=$4, telegram_chat_id=$5, email=$6, whatsapp=$7 WHERE id=$1`,
-    [proyectoId, nn(d.ig_handle), nn(d.dominio_web), nn(d.ig_user_id), nn(d.telegram_chat_id), nn(d.email), nn(d.whatsapp)]);
+    `UPDATE contenido.negocios SET ig_handle=$2, dominio_web=$3, ig_user_id=$4, telegram_chat_id=$5, email=$6, whatsapp=$7 WHERE id=$1`,
+    [negocioId, nn(d.ig_handle), nn(d.dominio_web), nn(d.ig_user_id), nn(d.telegram_chat_id), nn(d.email), nn(d.whatsapp)]);
   if (d.gestion === 'integral' || d.gestion === 'parcial') {
-    await pool.query('UPDATE contenido.proyectos SET gestion=$2 WHERE id=$1', [proyectoId, d.gestion]);
-    _marcasAt = 0;   // el inicio agrupa por esto: invalidar el cache
+    await pool.query('UPDATE contenido.negocios SET gestion=$2 WHERE id=$1', [negocioId, d.gestion]);
+    _negociosAt = 0;   // el inicio agrupa por esto: invalidar el cache
   }
   await pool.query(`
-    INSERT INTO contenido.proyecto_perfil (proyecto_id, slogan, logo, brief_md, estilo_md, actualizado_en)
+    INSERT INTO contenido.negocio_perfil (negocio_id, slogan, logo, brief_md, estilo_md, actualizado_en)
     VALUES ($1,$2,$3,$4,$5, now())
-    ON CONFLICT (proyecto_id) DO UPDATE SET slogan=$2, logo=$3, brief_md=$4, estilo_md=$5, actualizado_en=now()`,
-    [proyectoId, nn(d.slogan), nn(d.logo), nn(d.brief_md), nn(d.estilo_md)]);
+    ON CONFLICT (negocio_id) DO UPDATE SET slogan=$2, logo=$3, brief_md=$4, estilo_md=$5, actualizado_en=now()`,
+    [negocioId, nn(d.slogan), nn(d.logo), nn(d.brief_md), nn(d.estilo_md)]);
   // Pauta: IDs en claro (COALESCE: vacío = no toca); token cifrado, write-only.
   await pool.query(
-    `UPDATE contenido.proyecto_perfil SET
+    `UPDATE contenido.negocio_perfil SET
        meta_ads_account_id = COALESCE($2, meta_ads_account_id),
        meta_ads_page_id    = COALESCE($3, meta_ads_page_id),
        meta_ads_ig_id      = COALESCE($4, meta_ads_ig_id)
-     WHERE proyecto_id=$1`,
-    [proyectoId, nn(d.meta_ads_account_id), nn(d.meta_ads_page_id), nn(d.meta_ads_ig_id)]);
-  if (tokEnc) await pool.query('UPDATE contenido.proyecto_perfil SET meta_ads_token_enc=$2 WHERE proyecto_id=$1', [proyectoId, tokEnc]);
+     WHERE negocio_id=$1`,
+    [negocioId, nn(d.meta_ads_account_id), nn(d.meta_ads_page_id), nn(d.meta_ads_ig_id)]);
+  if (tokEnc) await pool.query('UPDATE contenido.negocio_perfil SET meta_ads_token_enc=$2 WHERE negocio_id=$1', [negocioId, tokEnc]);
   if (igTokEnc) {
-    await pool.query('UPDATE contenido.proyecto_perfil SET ig_token_enc=$2 WHERE proyecto_id=$1', [proyectoId, igTokEnc]);
+    await pool.query('UPDATE contenido.negocio_perfil SET ig_token_enc=$2 WHERE negocio_id=$1', [negocioId, igTokEnc]);
     // La DB es la fuente de verdad: pedimos regenerar los secretos derivados (credencial de n8n).
-    await pool.query('INSERT INTO contenido.secrets_sync_req (slug) SELECT slug FROM contenido.proyectos WHERE id=$1', [proyectoId]);
+    await pool.query('INSERT INTO contenido.secrets_sync_req (slug) SELECT slug FROM contenido.negocios WHERE id=$1', [negocioId]);
   }
-  _marcasAt = 0;   // el nombre pudo cambiar -> refrescar cache de marcas
+  _negociosAt = 0;   // el nombre pudo cambiar -> refrescar cache de marcas
   return true;
 }
 // Actualiza SOLO el logo (sin tocar slogan/brief). Lo usa la subida de archivo del perfil.
-async function setLogo(proyectoId, url) {
+async function setLogo(negocioId, url) {
   await pool.query(`
-    INSERT INTO contenido.proyecto_perfil (proyecto_id, logo, actualizado_en)
+    INSERT INTO contenido.negocio_perfil (negocio_id, logo, actualizado_en)
     VALUES ($1,$2, now())
-    ON CONFLICT (proyecto_id) DO UPDATE SET logo=$2, actualizado_en=now()`,
-    [proyectoId, url]);
-  _marcasAt = 0;   // el logo se cachea en la lista de marcas
+    ON CONFLICT (negocio_id) DO UPDATE SET logo=$2, actualizado_en=now()`,
+    [negocioId, url]);
+  _negociosAt = 0;   // el logo se cachea en la lista de marcas
   return true;
 }
 
 // Piezas con su revisión vigente + media principal (para el board por estado). Scopeado por marca.
-async function getPiezas(canal, proyectoId) {
-  const params = [proyectoId];
-  let where = 'WHERE pz.proyecto_id = $1';
+async function getPiezas(canal, negocioId) {
+  const params = [negocioId];
+  let where = 'WHERE pz.negocio_id = $1';
   if (canal) { params.push(canal); where += ` AND pz.canal = $${params.length}`; }
   const { rows } = await pool.query(`
     SELECT pz.id, pz.numero, pz.canal, pz.titulo_interno, pz.estado, pz.creado_en, pz.actualizado_en,
            r.nro, r.formato, r.motivo_rechazo, r.derivado_en,
-           COALESCE(r.colaboradores, (SELECT ig_colaboradores FROM contenido.proyectos WHERE id=pz.proyecto_id)) AS colaboradores,
+           COALESCE(r.colaboradores, (SELECT ig_colaboradores FROM contenido.negocios WHERE id=pz.negocio_id)) AS colaboradores,
            (r.bitacora IS NOT NULL) AS tiene_bitacora,
            r.ig_post_id, r.ig_permalink, r.publicado_en, r.caption,
            r.daypart, r.clima, r.transito, r.momento, r.duracion_s,
@@ -470,11 +470,11 @@ async function getPostIdsPublicados() {
 
 // Upsert de métricas de un post.
 async function upsertMetricas(id, v) {
-  // proyecto_id se deriva de la pieza dueña del post (no hace falta pasarlo): cada métrica queda en su marca.
+  // negocio_id se deriva de la pieza dueña del post (no hace falta pasarlo): cada métrica queda en su marca.
   await pool.query(
-    `INSERT INTO contenido.ig_metricas (ig_post_id, views, reach, likes, comments, saved, shares, total_interactions, proyecto_id, actualizado_en)
+    `INSERT INTO contenido.ig_metricas (ig_post_id, views, reach, likes, comments, saved, shares, total_interactions, negocio_id, actualizado_en)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,
-       (SELECT pz.proyecto_id FROM contenido.revisiones r JOIN contenido.piezas pz ON pz.id=r.pieza_id WHERE r.ig_post_id=$1 LIMIT 1), now())
+       (SELECT pz.negocio_id FROM contenido.revisiones r JOIN contenido.piezas pz ON pz.id=r.pieza_id WHERE r.ig_post_id=$1 LIMIT 1), now())
      ON CONFLICT (ig_post_id) DO UPDATE SET
        views=$2, reach=$3, likes=$4, comments=$5, saved=$6, shares=$7, total_interactions=$8, actualizado_en=now()`,
     [id, v.views || 0, v.reach || 0, v.likes || 0, v.comments || 0, v.saved || 0, v.shares || 0, v.total_interactions || 0]);
@@ -482,7 +482,7 @@ async function upsertMetricas(id, v) {
 
 // Cola de requerimientos: brief + la pieza que generó (correlación) y su estado derivado.
 // Se mantiene visible hasta que la pieza llegue a un estado terminal (publicada/descartada).
-async function getRequerimientos(proyectoId) {
+async function getRequerimientos(negocioId) {
   const { rows } = await pool.query(`
     SELECT b.id, b.estado AS brief_estado, b.origen, b.canal_destino, b.titulo AS req_titulo, b.requiere_material, b.enlace,
            b.media_type, (b.voice_file_id IS NOT NULL) AS tiene_audio,
@@ -496,38 +496,38 @@ async function getRequerimientos(proyectoId) {
     LEFT JOIN contenido.revisiones r ON r.id = pz.revision_vigente
     -- Sólo requerimientos que esperan algo (sin pieza generada aún). Una vez que generaron su
     -- pieza, ésta vive en el board de Instagram/aprobación, así que salen de la cola.
-    WHERE b.proyecto_id = $1
+    WHERE b.negocio_id = $1
       AND b.pieza_id IS NULL
       AND b.estado IN ('propuesta','pendiente','procesando','error','revisar','revisando')
     ORDER BY (b.estado='propuesta') DESC, b.creado_en DESC
-    LIMIT 100;`, [proyectoId]);
+    LIMIT 100;`, [negocioId]);
   // Pedidos de propuestas en curso (placeholder en la cola mientras el creativo elabora).
   const { rows: sol } = await pool.query(`
     SELECT id, estado AS brief_estado, canal AS canal_destino, enfasis, creado_en, true AS es_solicitud
-    FROM contenido.solicitudes_propuesta WHERE proyecto_id = $1 AND estado IN ('pendiente','procesando')
-    ORDER BY creado_en DESC`, [proyectoId]);
+    FROM contenido.solicitudes_propuesta WHERE negocio_id = $1 AND estado IN ('pendiente','procesando')
+    ORDER BY creado_en DESC`, [negocioId]);
   return [...sol, ...rows];
 }
 
 // Inserta una mención entrante en la cola (dedupe por ref_externa = ig media id). Devuelve true si era nueva.
 const TG_CHAT = process.env.PANEL_TG_CHAT || '811183062';
-async function insertMencion(refId, username, permalink, proyectoId) {
+async function insertMencion(refId, username, permalink, negocioId) {
   const titulo = `Mención de @${username}`;
   const texto = `@${username} etiquetó a la marca en Instagram.\n\nSi generás, armá una pieza de marca para agradecer o aprovechar la mención (tono de marca, sin emojis).\nPost original: ${permalink}`;
   const { rows } = await pool.query(
-    `INSERT INTO contenido.tg_briefs (chat_id, origen, estado, titulo, texto, enlace, ref_externa, proyecto_id)
+    `INSERT INTO contenido.tg_briefs (chat_id, origen, estado, titulo, texto, enlace, ref_externa, negocio_id)
      SELECT $1, 'mencion', 'propuesta', $2, $3, $4, $5, $6
      WHERE NOT EXISTS (SELECT 1 FROM contenido.tg_briefs WHERE ref_externa = $5)
-     RETURNING id`, [TG_CHAT, titulo, texto, permalink || null, refId, proyectoId]);
+     RETURNING id`, [TG_CHAT, titulo, texto, permalink || null, refId, negocioId]);
   return rows.length > 0;
 }
 
 // Pedido de propuestas al creativo (lo levanta el cron propuestas_local.sh). cantidad: 1..8.
-async function pedirPropuestas(enfasis, canal, cantidad, proyectoId, material) {
+async function pedirPropuestas(enfasis, canal, cantidad, negocioId, material) {
   const n = Math.min(8, Math.max(1, parseInt(cantidad, 10) || 5));
   const { rows: [s] } = await pool.query(
-    `INSERT INTO contenido.solicitudes_propuesta (enfasis, canal, cantidad, proyecto_id) VALUES ($1,$2,$3,$4) RETURNING id`,
-    [enfasis || null, canal === 'aviso' ? 'aviso' : 'instagram', n, proyectoId]);
+    `INSERT INTO contenido.solicitudes_propuesta (enfasis, canal, cantidad, negocio_id) VALUES ($1,$2,$3,$4) RETURNING id`,
+    [enfasis || null, canal === 'aviso' ? 'aviso' : 'instagram', n, negocioId]);
   const mats = Array.isArray(material) ? material.slice(0, 10) : [];
   for (let i = 0; i < mats.length; i++) {
     const m = mats[i];
@@ -642,7 +642,7 @@ async function getBriefMedia(id) {
 
 // Estado de los workers (infra global, igual para todas las marcas): worker (procesando/en espera),
 // dispatcher (salud del chequeo) y última corrida real de cada proceso. La barra de control lo lee.
-async function getStatus(_proyectoId) {
+async function getStatus(_negocioId) {
   const { rows } = await pool.query(`
     SELECT proceso, last_msg,
            EXTRACT(EPOCH FROM (now() - last_run))::int AS hace_s
@@ -691,7 +691,7 @@ async function getMaquinas() {
 }
 
 // Biblioteca de medios de la marca: piezas (de la base) + material aportado (media store).
-async function getBiblioteca(proyectoId) {
+async function getBiblioteca(negocioId) {
   const piezas = (await pool.query(`
     SELECT m.url, m.tipo, m.poster_url, m.orden,
            pz.id AS pieza_id, pz.canal::text AS canal, pz.titulo_interno AS titulo,
@@ -699,81 +699,81 @@ async function getBiblioteca(proyectoId) {
       FROM contenido.media m
       JOIN contenido.piezas pz ON pz.id = m.pieza_id
       JOIN contenido.revisiones r ON r.id = pz.revision_vigente
-     WHERE pz.proyecto_id = $1 AND r.estado <> 'descartada'
-     ORDER BY COALESCE(r.publicado_en, pz.actualizado_en) DESC, m.orden`, [proyectoId])).rows;
+     WHERE pz.negocio_id = $1 AND r.estado <> 'descartada'
+     ORDER BY COALESCE(r.publicado_en, pz.actualizado_en) DESC, m.orden`, [negocioId])).rows;
   const material = (await pool.query(`
     SELECT bm.media_path, bm.media_type, bm.filename, bm.creado_en,
            CASE WHEN bm.media_path LIKE 'material/pieza/%' THEN 'de un rechazo' ELSE 'de una propuesta' END AS contexto
       FROM contenido.brief_material bm
       JOIN contenido.tg_briefs b ON b.id = bm.brief_id
-     WHERE b.proyecto_id = $1 AND bm.media_path IS NOT NULL
-     ORDER BY bm.creado_en DESC`, [proyectoId])).rows;
-  const perfil = (await pool.query(`SELECT logo FROM contenido.proyecto_perfil WHERE proyecto_id = $1`, [proyectoId])).rows[0] || {};
+     WHERE b.negocio_id = $1 AND bm.media_path IS NOT NULL
+     ORDER BY bm.creado_en DESC`, [negocioId])).rows;
+  const perfil = (await pool.query(`SELECT logo FROM contenido.negocio_perfil WHERE negocio_id = $1`, [negocioId])).rows[0] || {};
   const items = (await pool.query(`
     SELECT id, codigo, media_path, tipo, nombre, carpeta, origen, resumen, creado_en
-      FROM contenido.biblioteca_item WHERE proyecto_id = $1 ORDER BY creado_en DESC`, [proyectoId])).rows;
+      FROM contenido.biblioteca_item WHERE negocio_id = $1 ORDER BY creado_en DESC`, [negocioId])).rows;
   const carpetas = (await pool.query(`
-    SELECT nombre FROM contenido.biblioteca_carpeta WHERE proyecto_id = $1 ORDER BY orden, nombre`, [proyectoId])).rows.map(r => r.nombre);
+    SELECT nombre FROM contenido.biblioteca_carpeta WHERE negocio_id = $1 ORDER BY orden, nombre`, [negocioId])).rows.map(r => r.nombre);
   const trabajando = (await pool.query(`
     SELECT id, instruccion, estado, resumen, creado_en
       FROM contenido.solicitudes_biblioteca
-     WHERE proyecto_id = $1 AND estado IN ('pendiente','procesando','error')
-     ORDER BY creado_en DESC LIMIT 40`, [proyectoId])).rows;
+     WHERE negocio_id = $1 AND estado IN ('pendiente','procesando','error')
+     ORDER BY creado_en DESC LIMIT 40`, [negocioId])).rows;
   return { piezas, material, logo: perfil.logo || null, items, carpetas, trabajando };
 }
 
 // Garantiza las carpetas de taller por defecto para un proyecto.
-async function ensureCarpetasBiblioteca(proyectoId) {
+async function ensureCarpetasBiblioteca(negocioId) {
   await pool.query(
-    `INSERT INTO contenido.biblioteca_carpeta (proyecto_id, nombre, orden)
+    `INSERT INTO contenido.biblioteca_carpeta (negocio_id, nombre, orden)
      VALUES ($1,'En proceso',10),($1,'Terminado',20)
-     ON CONFLICT (proyecto_id, nombre) DO NOTHING`, [proyectoId]);
+     ON CONFLICT (negocio_id, nombre) DO NOTHING`, [negocioId]);
 }
-async function crearCarpetaBiblioteca(proyectoId, nombre) {
+async function crearCarpetaBiblioteca(negocioId, nombre) {
   await pool.query(
-    `INSERT INTO contenido.biblioteca_carpeta (proyecto_id, nombre) VALUES ($1,$2)
-     ON CONFLICT (proyecto_id, nombre) DO NOTHING`, [proyectoId, String(nombre).slice(0, 60)]);
+    `INSERT INTO contenido.biblioteca_carpeta (negocio_id, nombre) VALUES ($1,$2)
+     ON CONFLICT (negocio_id, nombre) DO NOTHING`, [negocioId, String(nombre).slice(0, 60)]);
   return true;
 }
 // Borra una carpeta solo si está vacía y no es una de las por defecto.
-async function delCarpetaBiblioteca(proyectoId, nombre) {
+async function delCarpetaBiblioteca(negocioId, nombre) {
   if (nombre === 'En proceso' || nombre === 'Terminado') return false;
-  const { rows } = await pool.query(`SELECT count(*)::int AS n FROM contenido.biblioteca_item WHERE proyecto_id=$1 AND carpeta=$2`, [proyectoId, nombre]);
+  const { rows } = await pool.query(`SELECT count(*)::int AS n FROM contenido.biblioteca_item WHERE negocio_id=$1 AND carpeta=$2`, [negocioId, nombre]);
   if (rows[0].n > 0) return false;
-  await pool.query(`DELETE FROM contenido.biblioteca_carpeta WHERE proyecto_id=$1 AND nombre=$2`, [proyectoId, nombre]);
+  await pool.query(`DELETE FROM contenido.biblioteca_carpeta WHERE negocio_id=$1 AND nombre=$2`, [negocioId, nombre]);
   return true;
 }
-async function crearItemBiblioteca(proyectoId, mediaPath, tipo, nombre, carpeta, origen) {
+async function crearItemBiblioteca(negocioId, mediaPath, tipo, nombre, carpeta, origen) {
   const { rows } = await pool.query(
-    `INSERT INTO contenido.biblioteca_item (proyecto_id, media_path, tipo, nombre, carpeta, origen)
+    `INSERT INTO contenido.biblioteca_item (negocio_id, media_path, tipo, nombre, carpeta, origen)
      VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
-    [proyectoId, mediaPath, tipo === 'video' ? 'video' : 'image', (nombre || '').slice(0, 120) || null, carpeta || 'En proceso', origen || 'subido']);
+    [negocioId, mediaPath, tipo === 'video' ? 'video' : 'image', (nombre || '').slice(0, 120) || null, carpeta || 'En proceso', origen || 'subido']);
   return rows[0].id;
 }
-async function moverItemBiblioteca(proyectoId, id, carpeta) {
+async function moverItemBiblioteca(negocioId, id, carpeta) {
   const { rowCount } = await pool.query(
-    `UPDATE contenido.biblioteca_item SET carpeta=$3 WHERE id=$1 AND proyecto_id=$2`, [id, proyectoId, String(carpeta).slice(0, 60)]);
+    `UPDATE contenido.biblioteca_item SET carpeta=$3 WHERE id=$1 AND negocio_id=$2`, [id, negocioId, String(carpeta).slice(0, 60)]);
   return rowCount > 0;
 }
-async function delItemBiblioteca(proyectoId, id) {
+async function delItemBiblioteca(negocioId, id) {
   const { rows } = await pool.query(
-    `DELETE FROM contenido.biblioteca_item WHERE id=$1 AND proyecto_id=$2 RETURNING media_path`, [id, proyectoId]);
+    `DELETE FROM contenido.biblioteca_item WHERE id=$1 AND negocio_id=$2 RETURNING media_path`, [id, negocioId]);
   return rows[0] || null;
 }
 
 // Nueva solicitud al bibliotecario (crear/editar un asset). La toma el worker.
-async function crearSolicitudBiblioteca(proyectoId, instruccion, origenUrl, origenTipo) {
+async function crearSolicitudBiblioteca(negocioId, instruccion, origenUrl, origenTipo) {
   const { rows } = await pool.query(
-    `INSERT INTO contenido.solicitudes_biblioteca (proyecto_id, instruccion, origen_url, origen_tipo)
+    `INSERT INTO contenido.solicitudes_biblioteca (negocio_id, instruccion, origen_url, origen_tipo)
      VALUES ($1,$2,$3,$4) RETURNING id`,
-    [proyectoId, String(instruccion).slice(0, 2000), origenUrl || null, origenTipo || null]);
+    [negocioId, String(instruccion).slice(0, 2000), origenUrl || null, origenTipo || null]);
   return rows[0].id;
 }
 
 // Borra una solicitud/asset del bibliotecario; devuelve resultado_path para limpiar el archivo.
-async function delSolicitudBiblioteca(proyectoId, id) {
+async function delSolicitudBiblioteca(negocioId, id) {
   const { rows } = await pool.query(
-    `DELETE FROM contenido.solicitudes_biblioteca WHERE id=$1 AND proyecto_id=$2 RETURNING resultado_path`, [id, proyectoId]);
+    `DELETE FROM contenido.solicitudes_biblioteca WHERE id=$1 AND negocio_id=$2 RETURNING resultado_path`, [id, negocioId]);
   return rows[0] || null;
 }
 
@@ -817,17 +817,17 @@ async function getResumenAgencia() {
   const { rows } = await pool.query(`
     SELECT p.id, p.slug, p.nombre, p.activo, p.gestion, p.ig_handle, p.dominio_web, pp.logo,
       coalesce(nullif(pp.slogan,''), left(coalesce(pp.brief_md,''), 160)) AS descripcion,
-      (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='instagram' AND pz.estado='pendiente_aprobacion') AS ig_pend,
-      (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='instagram' AND pz.estado='publicada') AS ig_pub,
-      (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='aviso' AND pz.estado='pendiente_aprobacion') AS av_pend,
-      (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.proyecto_id=p.id AND pz.canal='aviso' AND pz.estado='publicada') AS av_pub,
+      (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.negocio_id=p.id AND pz.canal='instagram' AND pz.estado='pendiente_aprobacion') AS ig_pend,
+      (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.negocio_id=p.id AND pz.canal='instagram' AND pz.estado='publicada') AS ig_pub,
+      (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.negocio_id=p.id AND pz.canal='aviso' AND pz.estado='pendiente_aprobacion') AS av_pend,
+      (SELECT count(*)::int FROM contenido.piezas pz WHERE pz.negocio_id=p.id AND pz.canal='aviso' AND pz.estado='publicada') AS av_pub,
       ((SELECT count(*) FROM contenido.tg_briefs b
           LEFT JOIN contenido.piezas pz ON pz.id=b.pieza_id LEFT JOIN contenido.revisiones r ON r.id=pz.revision_vigente
-          WHERE b.proyecto_id=p.id AND ((b.pieza_id IS NULL AND b.estado IN ('propuesta','pendiente','procesando','error'))
+          WHERE b.negocio_id=p.id AND ((b.pieza_id IS NULL AND b.estado IN ('propuesta','pendiente','procesando','error'))
                  OR (b.pieza_id IS NOT NULL AND r.estado IN ('pendiente_aprobacion','rechazada','aprobada','borrador'))))
-       + (SELECT count(*) FROM contenido.solicitudes_propuesta s WHERE s.proyecto_id=p.id AND s.estado IN ('pendiente','procesando')))::int AS req_cola
-    FROM contenido.proyectos p
-    LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id=p.id
+       + (SELECT count(*) FROM contenido.solicitudes_propuesta s WHERE s.negocio_id=p.id AND s.estado IN ('pendiente','procesando')))::int AS req_cola
+    FROM contenido.negocios p
+    LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id
     ORDER BY p.activo DESC, p.creado_en`);
   return rows;
 }
@@ -889,7 +889,7 @@ async function getAvisosAprobados() {
            p.slug AS marca_slug, p.nombre AS marca_nombre
     FROM contenido.piezas pz
       JOIN contenido.revisiones r ON r.id = pz.revision_vigente
-      JOIN contenido.proyectos p ON p.id = pz.proyecto_id
+      JOIN contenido.negocios p ON p.id = pz.negocio_id
     WHERE pz.canal='aviso' AND pz.estado='publicada'
     ORDER BY pz.numero DESC`);
   return rows;
@@ -912,7 +912,7 @@ async function getPrograma(id, pantallaId) {
     FROM contenido.programa_items i
       JOIN contenido.piezas pz ON pz.id=i.pieza_id
       JOIN contenido.revisiones r ON r.id=pz.revision_vigente
-      JOIN contenido.proyectos pr ON pr.id=pz.proyecto_id
+      JOIN contenido.negocios pr ON pr.id=pz.negocio_id
     WHERE i.programa_id=$1 ORDER BY i.orden`, [id]);
   p.items = items;
   return p;
@@ -992,65 +992,65 @@ async function getProgramaActivo(pantallaId) {
     FROM contenido.programa_items i
       JOIN contenido.piezas pz ON pz.id=i.pieza_id
       JOIN contenido.revisiones r ON r.id=pz.revision_vigente
-      JOIN contenido.proyectos pr ON pr.id=pz.proyecto_id
+      JOIN contenido.negocios pr ON pr.id=pz.negocio_id
     WHERE i.programa_id=$1 ORDER BY i.orden`, [p.id]);
   return { id: p.id, nombre: p.nombre, items };
 }
 
 // --- Landings: requerimientos de cambio de landing (borrador -> preview -> aprobación -> producción) ---
-async function getLandingCambios(proyectoId) {
+async function getLandingCambios(negocioId) {
   const { rows } = await pool.query(
     `SELECT id, requerimiento, estado, preview_url, commit_sha, resumen, motivo_rechazo, creado_en, actualizado_en
-       FROM contenido.landing_cambios WHERE proyecto_id=$1 ORDER BY creado_en DESC LIMIT 30`, [proyectoId]);
+       FROM contenido.landing_cambios WHERE negocio_id=$1 ORDER BY creado_en DESC LIMIT 30`, [negocioId]);
   return rows;
 }
-async function crearLandingCambio(proyectoId, requerimiento) {
+async function crearLandingCambio(negocioId, requerimiento) {
   const r = (requerimiento || '').trim();
   if (!r) return null;
   const { rows: [row] } = await pool.query(
-    `INSERT INTO contenido.landing_cambios (proyecto_id, requerimiento) VALUES ($1,$2) RETURNING id`, [proyectoId, r]);
+    `INSERT INTO contenido.landing_cambios (negocio_id, requerimiento) VALUES ($1,$2) RETURNING id`, [negocioId, r]);
   return row.id;
 }
 // Aprobar: solo si es un borrador de ESTE proyecto -> 'aprobada' (el motor hace el merge a producción).
-async function aprobarLanding(proyectoId, id) {
+async function aprobarLanding(negocioId, id) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.landing_cambios SET estado='aprobada', actualizado_en=now()
-      WHERE id=$1 AND proyecto_id=$2 AND estado='borrador'`, [id, proyectoId]);
+      WHERE id=$1 AND negocio_id=$2 AND estado='borrador'`, [id, negocioId]);
   return rowCount > 0;
 }
 // Rechazar: agrega el motivo al requerimiento y vuelve a 'pendiente' -> el motor regenera el borrador.
-async function rechazarLanding(proyectoId, id, motivo) {
+async function rechazarLanding(negocioId, id, motivo) {
   const m = (motivo || '').trim();
   const { rowCount } = await pool.query(
     `UPDATE contenido.landing_cambios
         SET requerimiento = requerimiento || E'\n\nCorrección pedida: ' || $3,
             motivo_rechazo = $3, estado='pendiente', branch=NULL, preview_url=NULL, actualizado_en=now()
-      WHERE id=$1 AND proyecto_id=$2 AND estado='borrador'`, [id, proyectoId, m || 'ajustes']);
+      WHERE id=$1 AND negocio_id=$2 AND estado='borrador'`, [id, negocioId, m || 'ajustes']);
   return rowCount > 0;
 }
 
 // --- Auditoría de presencia digital (snapshot más reciente por proyecto/canal) ---
-async function getAuditoria(proyectoId, canal) {
+async function getAuditoria(negocioId, canal) {
   const { rows: [r] } = await pool.query(
     `SELECT canal, periodo, kpis, recomendaciones, creada_en FROM contenido.auditorias
-      WHERE proyecto_id=$1 AND canal=$2 ORDER BY creada_en DESC LIMIT 1`, [proyectoId, canal || 'instagram']);
+      WHERE negocio_id=$1 AND canal=$2 ORDER BY creada_en DESC LIMIT 1`, [negocioId, canal || 'instagram']);
   return r || null;
 }
 
 // --- Pauta (Meta Marketing API, read-only): último snapshot guardado por cf-pauta-sync ---
-async function getPauta(proyectoId) {
+async function getPauta(negocioId) {
   const { rows: [r] } = await pool.query(
-    `SELECT capturado_en, data FROM contenido.ads_snapshot WHERE proyecto_id=$1`, [proyectoId]);
+    `SELECT capturado_en, data FROM contenido.ads_snapshot WHERE negocio_id=$1`, [negocioId]);
   if (!r) return { configurada: false };
   return { configurada: true, capturado_en: r.capturado_en, ...r.data };
 }
 
 // Serie diaria para el gráfico de evolución.
-async function getPautaEvolucion(proyectoId) {
+async function getPautaEvolucion(negocioId) {
   const { rows } = await pool.query(
     `SELECT to_char(fecha,'YYYY-MM-DD') AS fecha, gasto::float AS gasto,
             impresiones::int AS impresiones, alcance::int AS alcance, clics::int AS clics
-       FROM contenido.ads_daily WHERE proyecto_id=$1 ORDER BY fecha`, [proyectoId]);
+       FROM contenido.ads_daily WHERE negocio_id=$1 ORDER BY fecha`, [negocioId]);
   return rows;
 }
 
@@ -1061,14 +1061,14 @@ async function pedirRefrescoPauta() {
 }
 
 // --- Campañas de pauta: el creativo propone; Fer aprueba; se crean PAUSADAS en Meta ---
-async function crearSolicitudCampania(proyectoId, instruccion) {
+async function crearSolicitudCampania(negocioId, instruccion) {
   const { rows: [r] } = await pool.query(
-    `INSERT INTO contenido.solicitudes_campania (proyecto_id, instruccion) VALUES ($1, $2) RETURNING id`,
-    [proyectoId, (instruccion || '').slice(0, 2000) || null]);
+    `INSERT INTO contenido.solicitudes_campania (negocio_id, instruccion) VALUES ($1, $2) RETURNING id`,
+    [negocioId, (instruccion || '').slice(0, 2000) || null]);
   return r.id;
 }
 
-async function getCampanias(proyectoId) {
+async function getCampanias(negocioId) {
   const { rows } = await pool.query(
     `SELECT c.id, c.estado, c.nombre, c.objetivo, c.pieza_id, c.razon, c.audiencia, c.presupuesto,
             c.fecha_inicio, c.fecha_fin, c.url_destino, c.cta, c.resumen,
@@ -1079,80 +1079,80 @@ async function getCampanias(proyectoId) {
        LEFT JOIN contenido.piezas pz ON pz.id = c.pieza_id
        LEFT JOIN contenido.revisiones r ON r.pieza_id = c.pieza_id AND r.estado='publicada'
        LEFT JOIN contenido.media m ON m.pieza_id = c.pieza_id AND m.orden = 1
-      WHERE c.proyecto_id = $1 AND c.estado <> 'descartada'
-      ORDER BY c.creado_en DESC`, [proyectoId]);
+      WHERE c.negocio_id = $1 AND c.estado <> 'descartada'
+      ORDER BY c.creado_en DESC`, [negocioId]);
   const { rows: [t] } = await pool.query(
     `SELECT count(*)::int AS n FROM contenido.solicitudes_campania
-      WHERE proyecto_id=$1 AND estado IN ('pendiente','procesando')`, [proyectoId]);
+      WHERE negocio_id=$1 AND estado IN ('pendiente','procesando')`, [negocioId]);
   return { campanias: rows, trabajando: t ? t.n : 0 };
 }
 
-async function aprobarCampania(proyectoId, id) {
+async function aprobarCampania(negocioId, id) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.campanias SET estado='aprobada', aprobado_en=now(), actualizado_en=now()
-      WHERE id=$1 AND proyecto_id=$2 AND estado='propuesta'`, [id, proyectoId]);
+      WHERE id=$1 AND negocio_id=$2 AND estado='propuesta'`, [id, negocioId]);
   return rowCount > 0;
 }
 
-async function rechazarCampania(proyectoId, id, motivo) {
+async function rechazarCampania(negocioId, id, motivo) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.campanias SET estado='rechazada', resumen=$3, actualizado_en=now()
-      WHERE id=$1 AND proyecto_id=$2 AND estado IN ('propuesta','aprobada')`,
-    [id, proyectoId, (motivo || 'rechazada').slice(0, 2000)]);
+      WHERE id=$1 AND negocio_id=$2 AND estado IN ('propuesta','aprobada')`,
+    [id, negocioId, (motivo || 'rechazada').slice(0, 2000)]);
   return rowCount > 0;
 }
 
-async function descartarCampania(proyectoId, id) {
+async function descartarCampania(negocioId, id) {
   // Si ya existe en Meta, dejamos el pedido 'descartar' (el worker la borra allá y marca descartada).
   // Si no, se descarta directo.
   const { rowCount } = await pool.query(
     `UPDATE contenido.campanias
         SET estado = CASE WHEN meta_campaign_id IS NOT NULL THEN 'descartar' ELSE 'descartada' END,
             actualizado_en=now()
-      WHERE id=$1 AND proyecto_id=$2 AND estado NOT IN ('descartada','descartar')`, [id, proyectoId]);
+      WHERE id=$1 AND negocio_id=$2 AND estado NOT IN ('descartada','descartar')`, [id, negocioId]);
   return rowCount > 0;
 }
 
 // Activar/pausar: el panel deja un pedido ('activar'/'pausar'); el worker lo aplica en Meta.
-async function activarCampania(proyectoId, id) {
+async function activarCampania(negocioId, id) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.campanias SET estado='activar', actualizado_en=now()
-      WHERE id=$1 AND proyecto_id=$2 AND estado='pausada' AND meta_campaign_id IS NOT NULL`, [id, proyectoId]);
+      WHERE id=$1 AND negocio_id=$2 AND estado='pausada' AND meta_campaign_id IS NOT NULL`, [id, negocioId]);
   return rowCount > 0;
 }
-async function pausarCampania(proyectoId, id) {
+async function pausarCampania(negocioId, id) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.campanias SET estado='pausar', actualizado_en=now()
-      WHERE id=$1 AND proyecto_id=$2 AND estado='activa'`, [id, proyectoId]);
+      WHERE id=$1 AND negocio_id=$2 AND estado='activa'`, [id, negocioId]);
   return rowCount > 0;
 }
 // Posts ya publicados en IG que pueden usarse como creativo de una campaña.
-async function getCreativosDisponibles(proyectoId) {
+async function getCreativosDisponibles(negocioId) {
   const { rows } = await pool.query(
     `SELECT pz.id AS pieza_id, pz.numero, r.caption, r.ig_permalink AS permalink,
             m.url, m.poster_url, m.tipo
        FROM contenido.piezas pz
        JOIN contenido.revisiones r ON r.pieza_id = pz.id AND r.estado='publicada'
        JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1
-      WHERE pz.proyecto_id = $1 AND pz.canal='instagram'
-      ORDER BY pz.numero DESC LIMIT 40`, [proyectoId]);
+      WHERE pz.negocio_id = $1 AND pz.canal='instagram'
+      ORDER BY pz.numero DESC LIMIT 40`, [negocioId]);
   return rows;
 }
 
 // Cambiar el creativo (pieza) de una propuesta — sólo antes de crearse en Meta.
-async function setCreativoCampania(proyectoId, id, piezaId) {
+async function setCreativoCampania(negocioId, id, piezaId) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.campanias SET pieza_id=$3, actualizado_en=now()
-      WHERE id=$1 AND proyecto_id=$2 AND estado='propuesta'
-        AND EXISTS (SELECT 1 FROM contenido.piezas WHERE id=$3 AND proyecto_id=$2)`,
-    [id, proyectoId, piezaId]);
+      WHERE id=$1 AND negocio_id=$2 AND estado='propuesta'
+        AND EXISTS (SELECT 1 FROM contenido.piezas WHERE id=$3 AND negocio_id=$2)`,
+    [id, negocioId, piezaId]);
   return rowCount > 0;
 }
 
-async function reintentarCampania(proyectoId, id) {
+async function reintentarCampania(negocioId, id) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.campanias SET estado='aprobada', resumen=NULL, actualizado_en=now()
-      WHERE id=$1 AND proyecto_id=$2 AND estado='error' AND meta_campaign_id IS NULL`, [id, proyectoId]);
+      WHERE id=$1 AND negocio_id=$2 AND estado='error' AND meta_campaign_id IS NULL`, [id, negocioId]);
   return rowCount > 0;
 }
 
@@ -1161,8 +1161,8 @@ async function health() {
   return true;
 }
 
-module.exports = { getMarcas, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
-  getCapacidades, getCapacidadesTodas, setCapacidad, crearMarca,
+module.exports = { getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
+  getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio,
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist,

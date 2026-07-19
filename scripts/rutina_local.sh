@@ -32,7 +32,7 @@ echo "$(ts) rechazos=$n -> ruteo por proyecto" >> "$LOG"
 hb "rechazos=$n -> corrigiendo"
 
 # 2) Rutear por proyecto. La cola = revisión rechazada, vigente de su pieza, no derivada a Fer.
-COLA="contenido.revisiones r JOIN contenido.piezas pz ON pz.id=r.pieza_id AND pz.revision_vigente=r.id JOIN contenido.proyectos p ON p.id=pz.proyecto_id WHERE r.estado='rechazada' AND r.derivado_en IS NULL"
+COLA="contenido.revisiones r JOIN contenido.piezas pz ON pz.id=r.pieza_id AND pz.revision_vigente=r.id JOIN contenido.negocios p ON p.id=pz.negocio_id WHERE r.estado='rechazada' AND r.derivado_en IS NULL"
 mapfile -t SLUGS < <(psql "SELECT DISTINCT p.slug FROM $COLA")
 [ "${#SLUGS[@]}" -eq 0 ] && { echo "$(ts) cola vacía en base (divergía del webhook), nada que hacer" >> "$LOG"; exit 0; }
 
@@ -42,7 +42,7 @@ for slug in "${SLUGS[@]}"; do
   [ -d "$REPO" ] || { echo "$(ts) sin cápsula para $slug, salteo" >> "$LOG"; continue; }
   REVIDS=$(psql "SELECT string_agg(r.id::text, ', ') FROM $COLA AND p.slug='$slug'")
   [ -z "$REVIDS" ] && continue
-  NOMBRE=$(psql "SELECT nombre FROM contenido.proyectos WHERE slug='$slug';"); [ -z "$NOMBRE" ] && NOMBRE="$slug"
+  NOMBRE=$(psql "SELECT nombre FROM contenido.negocios WHERE slug='$slug';"); [ -z "$NOMBRE" ] && NOMBRE="$slug"
   cd "$REPO" || continue
   bash "$MOTOR/scripts/perfil_a_md.sh" "$slug" >/dev/null 2>&1 || true
 
@@ -64,7 +64,7 @@ for slug in "${SLUGS[@]}"; do
                    JOIN contenido.tg_briefs b ON b.id=bm.brief_id
                    JOIN contenido.piezas pz ON pz.id=b.pieza_id
                    JOIN contenido.revisiones r ON r.id=pz.revision_vigente
-                   JOIN contenido.proyectos p ON p.id=pz.proyecto_id
+                   JOIN contenido.negocios p ON p.id=pz.negocio_id
                    WHERE r.estado='rechazada' AND r.derivado_en IS NULL AND p.slug='$slug'
                    ORDER BY bm.orden, bm.creado_en")
   fi

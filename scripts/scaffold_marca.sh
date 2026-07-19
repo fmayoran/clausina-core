@@ -17,7 +17,7 @@ REPO="$MARCAS/$slug"
 CID=$(docker ps -q -f name=crm_pgvector.1.)
 
 # La marca tiene que existir en la DB (la cápsula deriva de ahí).
-nombre=$(docker exec -i "$CID" psql -U postgres -d claude -t -A -c "SELECT nombre FROM contenido.proyectos WHERE slug='$slug'")
+nombre=$(docker exec -i "$CID" psql -U postgres -d claude -t -A -c "SELECT nombre FROM contenido.negocios WHERE slug='$slug'")
 [ -z "$nombre" ] && { echo "la marca '$slug' no existe en la DB" >&2; exit 1; }
 
 mkdir -p "$REPO/contexto" "$REPO/assets/landing"

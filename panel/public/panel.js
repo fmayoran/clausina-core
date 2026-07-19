@@ -938,7 +938,7 @@ const _nm = s => (s||'').split('—')[0].trim();   // "Ardora — Distrito" -> "
 async function initMarca(){
   const header=document.querySelector('header'); if(!header) return;
   if(document.body.classList.contains('av')||document.body.classList.contains('dash')) return;   // Audiovisual o dashboard de agencia: vistas cross-marca, sin selector
-  let data; try{ data=await fetch('api/marcas').then(r=>r.json()); }catch(_){ return; }
+  let data; try{ data=await fetch('api/negocios').then(r=>r.json()); }catch(_){ return; }
   if(!data || !data.marcas) return;
   const activa=data.activa, act=data.marcas.find(m=>m.slug===activa);
   // El logo y el título reflejan la marca activa (no "perder el contexto de marca").

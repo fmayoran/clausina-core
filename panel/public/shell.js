@@ -8,7 +8,7 @@
     Agencia: [
       { id: 'inicio',       label: 'Inicio',            icon: 'layout-dashboard', href: '.' },
       { id: 'maquinas',     label: 'Sala de máquinas',  icon: 'gauge',            href: 'maquinas' },
-      { id: 'marcas',       label: 'Marcas',            icon: 'boxes',            href: 'marcas' },
+      { id: 'negocios',     label: 'Negocios',          icon: 'boxes',            href: 'negocios' },
       { id: 'pantallas',    label: 'Pantallas',         icon: 'monitor',          href: 'audiovisual' },
       { id: 'estilo',       label: 'Estilo',            icon: 'palette',          href: 'estilo' },
       { id: 'arquitectura', label: 'Arquitectura',      icon: 'git-fork',         href: 'arquitectura' },
@@ -132,17 +132,17 @@
     if (main) { var ch = crumb(opts.active || ''); if (ch) main.insertAdjacentHTML('afterbegin', ch); }
     if (window.lucide) lucide.createIcons();
     // poblar el selector + dropdown de marcas
-    fetch('api/marcas').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+    fetch('api/negocios').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
       if (!d) return;
-      var marcas = d.marcas || [];
-      var a = marcas.find(function (m) { return m.slug === d.activa; });
+      var negocios = d.negocios || [];
+      var a = negocios.find(function (m) { return m.slug === d.activa; });
       var ini = document.getElementById('sw-ini'), nom = document.getElementById('sw-nombre');
       if (a && ini) ini.textContent = (a.nombre || '?').trim().charAt(0).toUpperCase() || '·';
       if (a && nom) nom.textContent = a.nombre || 'marca';
       var crm = document.getElementById('cr-marca'); if (crm && a) crm.textContent = a.nombre || 'marca';
       var menu = document.getElementById('sw-menu');
       if (menu) {
-        menu.innerHTML = marcas.map(function (m) {
+        menu.innerHTML = negocios.map(function (m) {
           var on = m.slug === d.activa;
           var cls = on ? 'text-pfg dark:text-fg bg-black/5 dark:bg-white/5'
                        : 'text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg hover:bg-black/5 dark:hover:bg-white/5';
@@ -209,7 +209,7 @@
 
   function esc(s) { return (s == null ? '' : String(s)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
   window.ClausinaSetMarca = function (slug) {
-    fetch('api/marca', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: slug }) })
+    fetch('api/negocio', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: slug }) })
       .then(function () { location.reload(); })
       .catch(function () { location.reload(); });
   };

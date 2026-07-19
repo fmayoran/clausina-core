@@ -18,8 +18,8 @@ E'# %s — Perfil de marca\n'
  '%s\n',
  pr.nombre, coalesce(pp.slogan,''), coalesce(pr.ig_handle,''), coalesce(pr.dominio_web,''),
  coalesce(pp.logo,''), coalesce(pp.brief_md,''))
-FROM contenido.proyectos pr
-LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id = pr.id
+FROM contenido.negocios pr
+LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id = pr.id
 WHERE pr.slug = :'slug';
 SQL
 [ -s "$OUT" ] && echo "perfil -> $OUT ($(wc -l <"$OUT") líneas)" || { echo "vacío, no escribo"; exit 1; }
@@ -29,7 +29,7 @@ OUT_EST="/root/clausina/marcas/$SLUG/contexto/ESTILO.md"
 TMP_EST="$(mktemp)"
 docker exec -i "$CID" psql -U postgres -d claude -At -v slug="$SLUG" >"$TMP_EST" <<'SQL'
 SELECT coalesce(pp.estilo_md,'')
-FROM contenido.proyectos pr LEFT JOIN contenido.proyecto_perfil pp ON pp.proyecto_id = pr.id
+FROM contenido.negocios pr LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id = pr.id
 WHERE pr.slug = :'slug';
 SQL
 if grep -q '[^[:space:]]' "$TMP_EST" 2>/dev/null; then

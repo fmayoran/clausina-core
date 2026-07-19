@@ -322,7 +322,7 @@ function renderEstilo(slug){
     <a class="est-link" href="estilo">&rarr; Ver el sistema de marca completo</a>`;
 }
 cargar();
-fetch('api/marcas').then(r=>r.ok?r.json():null).then(d=>renderEstilo(d&&d.activa)).catch(()=>renderEstilo(null));
+fetch('api/negocios').then(r=>r.ok?r.json():null).then(d=>renderEstilo(d&&d.activa)).catch(()=>renderEstilo(null));
 
 // --- Contactos de la marca (dueño, community manager, pauta…) ---
 // A quién escribirle. A futuro: a quién notificarle cuando su aviso sale en pantalla.

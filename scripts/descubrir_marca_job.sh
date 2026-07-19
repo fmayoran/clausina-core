@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Descubrimiento de marca: el analista lee la presencia digital PÚBLICA (web + IG + búsqueda)
-# y deja una base de identidad en contenido.marca_descubrimiento (estado='listo', resultado jsonb).
+# y deja una base de identidad en contenido.negocio_descubrimiento (estado='listo', resultado jsonb).
 # Corre antes de que la marca exista: NO hay cápsula, NO toca la DB de contenido, NO publica.
 # Uso: descubrir_marca_job.sh <descubrimiento_id>
 set -uo pipefail
@@ -18,11 +18,11 @@ psql(){ docker exec -i "$PG" psql -U postgres -d claude -t -A -q -c "$1"; }
 
 exec 9>"/tmp/desc_${did}.lock"; flock -n 9 || exit 0
 
-estado=$(psql "SELECT estado FROM contenido.marca_descubrimiento WHERE id='$did';")
+estado=$(psql "SELECT estado FROM contenido.negocio_descubrimiento WHERE id='$did';")
 case "$estado" in pendiente|procesando) ;; *) echo "$(ts) $did sin estado procesable ($estado)" >> "$LOG"; exit 0;; esac
 
 echo "$(ts) descubrimiento $did" >> "$LOG"
-psql "UPDATE contenido.marca_descubrimiento SET estado='procesando' WHERE id='$did';" >/dev/null
+psql "UPDATE contenido.negocio_descubrimiento SET estado='procesando' WHERE id='$did';" >/dev/null
 
 # Contexto para el analista.
 PG="$PG" DID="$did" python3 - <<'PY'
@@ -32,7 +32,7 @@ def q(sql):
     return subprocess.run(["docker","exec","-i",pg,"psql","-U","postgres","-d","claude","-t","-A","-q","-c",sql],
                           capture_output=True, text=True).stdout.strip()
 row=q("SELECT coalesce(nombre,'')||'|#|'||coalesce(web,'')||'|#|'||coalesce(instagram,'')||'|#|'||coalesce(notas,'') "
-      f"FROM contenido.marca_descubrimiento WHERE id='{did}'")
+      f"FROM contenido.negocio_descubrimiento WHERE id='{did}'")
 nombre, web, ig, notas = (row.split('|#|') + ['','','',''])[:4]
 json.dump({"nombre":nombre,"web":web,"instagram":ig,"notas":notas},
           open(f"/tmp/desc_ctx_{did}.json","w"), ensure_ascii=False)
@@ -60,7 +60,7 @@ def psql(sql):
 def dq(v):
     t="x"+secrets.token_hex(8); return f"${t}${v or ''}${t}$"
 def fallar(msg):
-    psql(f"UPDATE contenido.marca_descubrimiento SET estado='error', error={dq(msg[:1000])}, procesado_en=now() WHERE id='{did}';")
+    psql(f"UPDATE contenido.negocio_descubrimiento SET estado='error', error={dq(msg[:1000])}, procesado_en=now() WHERE id='{did}';")
     print("err:"+msg[:160])
 
 try:
@@ -99,7 +99,7 @@ if not isinstance(d.get("identidad"), dict): d["identidad"]={}
 for k in ("hallazgos","fuentes","paleta","otras_redes"):
     if not isinstance(d.get(k), list): d[k]=[]
 
-r=psql(f"UPDATE contenido.marca_descubrimiento SET estado='listo', resultado={dq(json.dumps(d, ensure_ascii=False))}::jsonb, "
+r=psql(f"UPDATE contenido.negocio_descubrimiento SET estado='listo', resultado={dq(json.dumps(d, ensure_ascii=False))}::jsonb, "
        f"error=NULL, procesado_en=now() WHERE id='{did}';")
 if r.returncode!=0:
     fallar("No se pudo guardar el análisis: "+(r.stderr or "").strip()[:300]); raise SystemExit
