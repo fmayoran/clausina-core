@@ -134,7 +134,7 @@ const WIZ_CAPS = [
   {id:'instagram', label:'Instagram', icon:'instagram', desc:'Publicaciones del feed'},
   {id:'pauta', label:'Pauta Instagram', icon:'badge-dollar-sign', desc:'Publicidad (Meta Ads)', depende:['instagram']},
   {id:'pantalla', label:'Avisos en pantalla', icon:'megaphone', desc:'Pantalla de calle (DOOH)'},
-  {id:'web', label:'Web / Landing', icon:'globe', desc:'Sitio de la marca'},
+  {id:'web', label:'Web / Landing', icon:'globe', desc:'Sitio del negocio'},
 ];
 const WIZ_PASOS=5;
 let _wz=null, _wzPoll=null;
@@ -416,7 +416,7 @@ async function cargar(){
     const capsBySlug = {}; (rc||[]).forEach(x=>{ capsBySlug[x.slug]=x.capacidades; });
     marcas.forEach(m=>{ m.capacidades = capsBySlug[m.slug] || []; });
     const activas = marcas.filter(m=>m.activo).length;
-    document.getElementById('sub').textContent = `agencia · ${activas} marca${activas===1?'':'s'} activa${activas===1?'':'s'}`;
+    document.getElementById('sub').textContent = `agencia · ${activas} negocio${activas===1?'':'s'} activo${activas===1?'':'s'}`;
     renderConsola(marcas, maq);
     // El rol sobre la marca es un dato de negocio (columna proyectos.gestion), no algo derivado
     // de qué capacidades estén prendidas: una marca puede tener IG y aun así ser rol secundario.

@@ -192,7 +192,7 @@
             <div class="genrow">
               <div class="geninfo">
                 <div class="gentt">Generar con el creativo</div>
-                <div class="gensub" id="gen-estilo-sub">Documenta el sistema de diseño a partir del brief, lo publicado y el Instagram de la marca.</div>
+                <div class="gensub" id="gen-estilo-sub">Documenta el sistema de diseño a partir del brief, lo publicado y el Instagram del negocio.</div>
               </div>
               <button class="ibtn fire" id="gen-estilo-btn" onclick="generarEstilo()">Generar estilo</button>
             </div>
@@ -371,7 +371,7 @@ async function cargarGeneracion(){
   else { eb.className='ibtn fire'; eb.disabled=false;
     eb.textContent = g.estilo.hecho ? 'Regenerar estilo' : 'Generar estilo';
     es.textContent = g.estilo.error ? g.estilo.error
-      : 'Documenta el sistema de diseño a partir del brief, lo publicado y el Instagram de la marca.'; }
+      : 'Documenta el sistema de diseño a partir del brief, lo publicado y el Instagram del negocio.'; }
   // Manual
   const mb=document.getElementById('gen-manual-btn'), ms=document.getElementById('gen-manual-sub');
   const mh=document.getElementById('gen-manual-html'), mp=document.getElementById('gen-manual-pdf');
