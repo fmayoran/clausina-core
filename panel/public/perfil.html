@@ -102,7 +102,7 @@
   <div id="toast"></div>
   <div class="wrap">
     <div class="proj-top" style="margin-bottom:14px">
-      <div class="proj-title">Perfil de la marca</div>
+      <div class="proj-title">Perfil del negocio</div>
       <span class="upd2" id="upd2"></span>
     </div>
 
@@ -112,7 +112,7 @@
       <a class="ptile" id="t-brief" href="#" onclick="openM('brief');return false;"><span class="ptl">Brief</span><span class="ptd">contexto para el creativo</span><span class="pts" id="s-brief">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
       <a class="ptile" id="t-estilo" href="#" onclick="openM('estilo');return false;"><span class="ptl">Estilo de marca</span><span class="ptd">identidad visual de la marca</span><span class="pts" id="s-estilo">—</span><span class="parrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
     </div>
-    <div class="intro" style="margin-top:14px">Registro de marca que consume el creativo. Entrá a cada bloque para verlo y editarlo. El color de cada pastilla indica si está completa. Para cambiar de marca, usá el selector del menú.</div>
+    <div class="intro" style="margin-top:14px">Registro del negocio que consume el creativo. Entrá a cada bloque para verlo y editarlo. El color de cada pastilla indica si está completa. Para cambiar de marca, usá el selector del menú.</div>
 
     <!-- Modal: Identidad -->
     <div id="m-ident" class="modal hidden">
@@ -120,7 +120,7 @@
       <div class="modal-box">
         <div class="modal-head"><div class="modal-tt">Identidad</div><button class="modal-x" onclick="closeM('ident')">×</button></div>
         <div class="modal-body">
-          <div class="fld"><label>Marca</label><input type="text" id="nombre"></div>
+          <div class="fld"><label>Negocio</label><input type="text" id="nombre"></div>
           <div class="fld"><label>Slogan</label><input type="text" id="slogan"></div>
           <div class="fld"><label>Logo <span class="hint">— subí el archivo, o pegá una URL</span></label>
             <div style="display:flex;gap:8px;align-items:center;">
@@ -131,10 +131,10 @@
             </div>
           </div>
           <div class="fld"><label>Web <span class="hint">— dominio</span></label><input type="text" id="dominio_web" placeholder="marca.ar"></div>
-          <div class="fld"><label>Email <span class="hint">— de la marca</span></label><input type="text" id="email" placeholder="hola@marca.ar"></div>
+          <div class="fld"><label>Email <span class="hint">— del negocio</span></label><input type="text" id="email" placeholder="hola@marca.ar"></div>
           <div class="fld"><label>WhatsApp <span class="hint">— +54...</span></label><input type="text" id="whatsapp" placeholder="+54 9 11 ..."></div>
           <div class="fld"><label>Telegram chat ID</label><input type="text" id="telegram_chat_id"></div>
-          <div class="fld"><label>Rol de ClaUsina <span class="hint">— agrupa la marca en el inicio</span></label>
+          <div class="fld"><label>Rol de ClaUsina <span class="hint">— agrupa el negocio en el inicio</span></label>
             <select id="gestion" style="background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:1.02rem;padding:10px 11px;outline:none;">
               <option value="integral">Gestión integral — la manejamos completa</option>
               <option value="parcial">Gestión parcial — rol secundario</option>
@@ -305,7 +305,7 @@ function uSvg(stroke,dot){
 function renderEstilo(slug){
   const box=document.getElementById('estilo-marca'); if(!box) return;
   const s=BRAND_STYLE[slug];
-  if(!s){ box.innerHTML='<div class="est-empty">El estilo de esta marca todavía no está definido. ClaUsina es el piloto; el resto lo desarrollamos cuando le toque.</div>'; return; }
+  if(!s){ box.innerHTML='<div class="est-empty">El estilo de este negocio todavía no está definido. ClaUsina es el piloto; el resto lo desarrollamos cuando le toque.</div>'; return; }
   const sw=s.paleta.map(c=>`<div class="est-sw"><div class="chip" style="background:${c.hex}"></div><div class="lab"><b>${c.n}</b><span>${c.hex} · ${c.uso}</span></div></div>`).join('');
   const tp=s.tipos.map(t=>`<div class="est-trow"><span class="rol">${t.rol}</span><span class="sam" style="font-family:${t.ff};font-weight:${t.fw}">${t.sam}</span><span class="fn">${t.fn}</span></div>`).join('');
   const vz=s.voz.map(v=>`<span>${v}</span>`).join('');

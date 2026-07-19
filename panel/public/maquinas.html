@@ -102,7 +102,7 @@
 
     <!-- PIPELINE -->
     <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1">El circuito</div>
-    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">de la propuesta a la publicación · todas las marcas</p>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">de la propuesta a la publicación · todas los negocios</p>
     <div class="screen card p-6 mb-8 overflow-x-auto">
       <div class="grid-flow" id="flow">
         <div class="st s1"><div class="st-no">01</div><div class="st-n" id="f-prop">·</div><div class="st-l">Propuestas</div><div class="st-d">esperan que las mandes</div></div>
@@ -132,7 +132,7 @@
 
     <!-- PLATAFORMA: lo que es de la agencia y no de una marca -->
     <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1 mt-8">Plataforma</div>
-    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">la lente con la que ClaUsina mira Instagram · transversal a todas las marcas</p>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">la lente con la que ClaUsina mira Instagram · transversal a todas los negocios</p>
     <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card p-5">
       <div class="flex items-start gap-3 mb-4">
         <span class="grid place-items-center w-9 h-9 rounded-lg border border-pline dark:border-line shrink-0" id="lente-ic"></span>
@@ -145,7 +145,7 @@
       <p class="text-sm leading-relaxed text-pmut dark:text-mut mb-4">
         Cuenta de Instagram Business que usamos para leer el perfil <b>público</b> de cualquier otra marca
         (bio, seguidores, cadencia, posts con engagement e imágenes del feed). Es la vía oficial de Meta
-        (<span class="mono text-[11px]">business_discovery</span>): alimenta el análisis del alta de marcas.
+        (<span class="mono text-[11px]">business_discovery</span>): alimenta el análisis del alta de negocios.
         Solo ve cuentas <b>Business o Creator</b> públicas — una cuenta personal no se puede leer.
       </p>
       <div class="grid sm:grid-cols-2 gap-3">
@@ -274,7 +274,7 @@ function setConsole(pl,procs,lg){
 
 function setBrands(ms){
   const el=document.getElementById('brands');
-  if(!ms||!ms.length){ el.innerHTML='<div class="mono text-[11px] text-pmut dark:text-mut">— sin marcas —</div>'; return; }
+  if(!ms||!ms.length){ el.innerHTML='<div class="mono text-[11px] text-pmut dark:text-mut">— sin negocios —</div>'; return; }
   el.innerHTML=ms.map(m=>{
     const esp=(m.ig_pend||0)+(m.av_pend||0),pub=(m.ig_pub||0)+(m.av_pub||0),cola=m.req_cola||0;
     const tot=Math.max(1,cola+esp+pub),w=n=>Math.round(n/tot*100);

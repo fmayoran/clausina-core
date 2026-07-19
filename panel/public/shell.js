@@ -13,7 +13,7 @@
       { id: 'estilo',       label: 'Estilo',            icon: 'palette',          href: 'estilo' },
       { id: 'arquitectura', label: 'Arquitectura',      icon: 'git-fork',         href: 'arquitectura' },
     ],
-    'Marca activa': [
+    'Negocio activo': [
       { id: 'propuestas', label: 'Propuestas',       icon: 'lightbulb',   href: 'propuestas' },
       { id: 'cola',      label: 'Cola y aprobación', icon: 'inbox',       href: 'proyecto' },
       { id: 'instagram', label: 'Instagram',         icon: 'instagram',   href: 'instagram' },
@@ -52,9 +52,9 @@
     var S='<span class="mono text-[11px] text-pmut dark:text-mut opacity-50">/</span>';
     var CUR='mono text-[11px] text-pfg dark:text-fg';
     var out='<nav class="flex items-center flex-wrap gap-2 mb-6"><a class="'+L+'" href=".">Inicio</a>';
-    if(sectionOf(active)==='Marca activa'){
-      if(active==='cola'){ out+=S+'<span class="'+CUR+'" id="cr-marca">marca</span>'; }
-      else { out+=S+'<a class="'+L+'" href="proyecto" id="cr-marca">marca</a>'+S+'<span class="'+CUR+'">'+lab+'</span>'; }
+    if(sectionOf(active)==='Negocio activo'){
+      if(active==='cola'){ out+=S+'<span class="'+CUR+'" id="cr-marca">negocio</span>'; }
+      else { out+=S+'<a class="'+L+'" href="proyecto" id="cr-marca">negocio</a>'+S+'<span class="'+CUR+'">'+lab+'</span>'; }
     } else {
       out+=S+'<span class="'+CUR+'">'+lab+'</span>';
     }
@@ -74,7 +74,7 @@
       '<div class="relative mb-3">' +
         '<button onclick="var m=document.getElementById(\'sw-menu\');if(m)m.classList.toggle(\'hidden\')" class="switch w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-pline dark:border-line hover:border-acc transition text-left">' +
           '<span class="grid place-items-center w-6 h-6 rounded-lg bg-acc text-accink display font-bold text-xs shrink-0" id="sw-ini">·</span>' +
-          '<span class="switch-tx min-w-0"><span class="block text-sm display font-semibold truncate" id="sw-nombre">marca</span><span class="block mono text-[10px] text-pmut dark:text-mut">cambiar marca</span></span>' +
+          '<span class="switch-tx min-w-0"><span class="block text-sm display font-semibold truncate" id="sw-nombre">negocio</span><span class="block mono text-[10px] text-pmut dark:text-mut">cambiar negocio</span></span>' +
           '<i data-lucide="chevrons-up-down" class="switch-tx w-4 h-4 ml-auto text-pmut dark:text-mut shrink-0"></i>' +
         '</button>' +
         '<div id="sw-menu" class="hidden absolute left-0 right-0 top-full mt-1 z-30 rounded-xl border border-pline dark:border-line bg-side dark:bg-sideD shadow-xl p-1 max-h-72 overflow-auto"></div>' +
@@ -138,8 +138,8 @@
       var a = negocios.find(function (m) { return m.slug === d.activa; });
       var ini = document.getElementById('sw-ini'), nom = document.getElementById('sw-nombre');
       if (a && ini) ini.textContent = (a.nombre || '?').trim().charAt(0).toUpperCase() || '·';
-      if (a && nom) nom.textContent = a.nombre || 'marca';
-      var crm = document.getElementById('cr-marca'); if (crm && a) crm.textContent = a.nombre || 'marca';
+      if (a && nom) nom.textContent = a.nombre || 'negocio';
+      var crm = document.getElementById('cr-marca'); if (crm && a) crm.textContent = a.nombre || 'negocio';
       var menu = document.getElementById('sw-menu');
       if (menu) {
         menu.innerHTML = negocios.map(function (m) {
@@ -158,7 +158,7 @@
     }).catch(function () {});
   };
 
-  // Grisa en el menú las capacidades que la marca activa tiene deshabilitadas (siguen visibles:
+  // Grisa en el menú las capacidades que la negocio activo tiene deshabilitadas (siguen visibles:
   // se habilitan desde el panel del proyecto). nav id -> capacidad.
   var NAV_CAP = { instagram: 'instagram', pauta: 'pauta', avisos: 'pantalla', landing: 'web' };
   function marcarCapacidades() {
@@ -174,7 +174,7 @@
     }).catch(function () {});
   }
 
-  // Guarda: si la capacidad de esta página está deshabilitada para la marca activa, mostramos
+  // Guarda: si la capacidad de esta página está deshabilitada para la negocio activo, mostramos
   // el aviso para habilitarla en vez del contenido (evita páginas vacías o rotas).
   function guardarCapacidad(capId) {
     fetch('api/capacidades').then(function (r) { return r.ok ? r.json() : null; }).then(function (caps) {
@@ -184,7 +184,7 @@
       var main = document.querySelector('.shell main');
       if (!main) return;
       main.innerHTML = '<div class="capguard"><h2>' + esc(c.label) + ' está deshabilitada</h2>' +
-        '<p>Esta marca no tiene activada esta capacidad. Podés habilitarla desde el panel del proyecto ' +
+        '<p>Este negocio no tiene activada esta capacidad. Podés habilitarla desde el panel del proyecto ' +
         'y completar su configuración.</p><a href="proyecto">Ir al panel del proyecto</a></div>';
     }).catch(function () {});
   }

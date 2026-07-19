@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ClaUsina — Marcas</title>
+<title>ClaUsina — Negocios</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="apple-touch-icon" href="fonts/clausina-icono-180.png">
 <script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
@@ -30,10 +30,10 @@
 <div class="shell">
   <main class="px-6 md:px-9 py-8 min-w-0">
     <div class="flex items-baseline gap-3 mb-1">
-      <h1 class="display font-bold text-xl tracking-tight">Marcas</h1>
+      <h1 class="display font-bold text-xl tracking-tight">Negocios</h1>
       <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
     </div>
-    <p class="mono text-[11px] text-pmut dark:text-mut mb-7">Qué tiene configurada cada marca. <b>Identidad</b>, <b>Brief</b> y <b>Biblioteca</b> están siempre activas.</p>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-7">Qué tiene configurada cada negocio. <b>Identidad</b>, <b>Brief</b> y <b>Biblioteca</b> están siempre activas.</p>
 
     <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card scrollx">
       <table class="mtx">
@@ -86,14 +86,14 @@ function filaMarca(m){
     const r = await fetch('api/capacidades/todas');
     if(r.status===401){ location.href='login'; return; }
     const marcas = await r.json();
-    if(!marcas.length){ document.getElementById('sub').textContent='sin marcas'; return; }
+    if(!marcas.length){ document.getElementById('sub').textContent='sin negocios'; return; }
     const caps = marcas[0].capacidades;
     document.getElementById('mtx-head').innerHTML =
-      `<th class="text-pmut dark:text-mut">Marca</th>` +
+      `<th class="text-pmut dark:text-mut">Negocio</th>` +
       caps.map(c=>`<th class="text-pmut dark:text-mut">${esc(c.label)}</th>`).join('');
     if(window.fixIgIcons) window.fixIgIcons();
     document.getElementById('mtx-body').innerHTML = marcas.map(filaMarca).join('');
-    document.getElementById('sub').textContent = `${marcas.length} marca(s)`;
+    document.getElementById('sub').textContent = `${marcas.length} negocio(s)`;
     if(window.lucide) lucide.createIcons();
   }catch(e){ document.getElementById('sub').textContent='error al cargar'; }
 })();

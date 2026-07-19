@@ -148,11 +148,11 @@
   </div></div>
 <header class="hero"><div class="wrap">
   <h1>ClaUsina — Arquitectura técnica y funcional</h1>
-  <p class="sub">La plataforma de contenido y operaciones multi-marca. Un motor agnóstico de marca que prepara, aprueba y publica contenido con generación asistida por IA, y una cápsula aislada por cada marca.</p>
+  <p class="sub">La plataforma de contenido y operaciones multi-marca. Un motor agnóstico de marca que prepara, aprueba y publica contenido con generación asistida por IA, y una cápsula aislada por cada negocio.</p>
   <div class="meta">
     <span class="pill">Documento vivo</span>
     <span class="pill">Actualizado: 2026-07-09</span>
-    <span class="pill">3 marcas activas</span>
+    <span class="pill">3 negocios activos</span>
     <span class="pill">Monorepo + 4 submodules</span>
   </div>
 </div></header>
@@ -360,12 +360,12 @@
   <table>
     <thead><tr><th>Pendiente</th><th>Detalle</th><th>Estado</th></tr></thead>
     <tbody>
-      <tr><td>Cola Redis a toda la plataforma</td><td>Extender la corrección por cola+worker (hoy piloto Cortafuego) a todas las marcas.</td><td><span class="st warn">en curso</span></td></tr>
+      <tr><td>Cola Redis a toda la plataforma</td><td>Extender la corrección por cola+worker (hoy piloto Cortafuego) a todas los negocios.</td><td><span class="st warn">en curso</span></td></tr>
       <tr><td>Media store con CDN</td><td>Store único fronteado con Cloudflare (<code>media.clausina.ar</code>); sacar el material de publicaciones del repo de la landing.</td><td><span class="st pend">pendiente</span></td></tr>
       <tr><td>API REST de Higgsfield en n8n</td><td>Generación automática dentro del pipeline (async con webhook), manteniendo a Fer por calidad/NSFW.</td><td><span class="st pend">pendiente</span></td></tr>
-      <tr><td>Preview por marca (cf-pub-notify)</td><td>El botón "Ver completo" apunta a <code>cortafuego.ar/preview.html</code>; falta servir preview + proxy por cada marca.</td><td><span class="st pend">pendiente</span></td></tr>
+      <tr><td>Preview por marca (cf-pub-notify)</td><td>El botón "Ver completo" apunta a <code>cortafuego.ar/preview.html</code>; falta servir preview + proxy por cada negocio.</td><td><span class="st pend">pendiente</span></td></tr>
       <tr><td>Fallback SQL en cf-crear-pendiente</td><td><code>COALESCE(j-&gt;&gt;'proyecto','cortafuego')</code>: el último resabio de marca en n8n; depende del esquema y del contrato de payload.</td><td><span class="st pend">pendiente</span></td></tr>
-      <tr><td>Skills agnósticos</td><td><code>/creativo</code> y <code>/editor</code> aún teñidos de Cortafuego; el contenido específico debería leerse del contexto de la marca activa.</td><td><span class="st pend">pendiente</span></td></tr>
+      <tr><td>Skills agnósticos</td><td><code>/creativo</code> y <code>/editor</code> aún teñidos de Cortafuego; el contenido específico debería leerse del contexto de la negocio activo.</td><td><span class="st pend">pendiente</span></td></tr>
       <tr><td>Ardora: @ardora.sport + paraguas</td><td>Conectar la sub-marca deportiva y modelar el paraguas Distrito Ardora.</td><td><span class="st pend">pendiente</span></td></tr>
     </tbody>
   </table>
@@ -382,7 +382,7 @@
       <tr><td>2026-07-05</td><td><b>Biblioteca de medios (DAM) + Bibliotecario.</b> Biblioteca por marca: taller (en proceso/terminado) + del sistema (piezas/marca), subida por streaming con <b>compresión de video</b> (ffmpeg en <code>core/Dockerfile</code>, el que usa EasyPanel). El <b>bibliotecario</b> crea/edita assets con IA (Higgsfield/ffmpeg) sin publicar. Propuestas del creativo con <b>material adjunto</b> (disco o biblioteca). <b>Colaboradores</b> de IG por publicación (elegidos al aprobar). Bitácora "cómo se generó" por pieza. Loop "pedir nueva versión" en propuestas.</td></tr>
       <tr><td>2026-07-08</td><td><b>Robustez y UX.</b> <code>callWebhook</code> reintenta ante DNS intermitente a n8n (<code>EAI_AGAIN</code> / "fetch failed"); "En cola" del proyecto ya no cuenta piezas ya generadas (evita doble conteo con "Por aprobar"); pastillas ordenadas por flujo (Propuestas → En cola → Por aprobar → Publicadas); acceso a Biblioteca como ícono + tarjeta "Pauta Instagram".</td></tr>
       <tr><td>2026-06-29</td><td><b>Sistema de marca ClaUsina + rediseño del panel.</b> Identidad nueva (logo "U en órbita" + favicon, lima/coral, Inter Tight/JetBrains Mono, dual dark/light). Panel migrado a un <b>shell reutilizable</b> (<code>shell.js</code>: sidebar + selector de marca funcional) con <b>Tailwind compilado</b> (<code>tw.css</code> commiteado, sin tocar el build). Dashboard, Sala de máquinas y Arquitectura en dark/light; páginas de contenido en dark. Lineamiento en <code>core/planes/SISTEMA_MARCA.md</code> y styleguide vivo en <code>/estilo</code>. Reorganización de <code>/proyecto</code> (pastillas con acción, cola en modal, propuestas en página propia).</td></tr>
-      <tr><td>2026-06-23</td><td>Contexto de marca en 3 capas: <b>motor + guardrails</b> en el <code>CLAUDE.md</code> raíz (compartido, código); <b>voz/identidad</b> en <code>contexto/CONTEXTO_MARCA.md</code> (desde la base, editable en el panel); <b>lo propio de la marca</b> en un <code>CLAUDE.md</code> de cápsula fino. Se deduplicó el motor que se repetía en cada marca.</td></tr>
+      <tr><td>2026-06-23</td><td>Contexto de marca en 3 capas: <b>motor + guardrails</b> en el <code>CLAUDE.md</code> raíz (compartido, código); <b>voz/identidad</b> en <code>contexto/CONTEXTO_MARCA.md</code> (desde la base, editable en el panel); <b>lo propio de la marca</b> en un <code>CLAUDE.md</code> de cápsula fino. Se deduplicó el motor que se repetía en cada negocio.</td></tr>
       <tr><td>2026-06-23</td><td>Orden de carpetas: la raíz <code>claudefolder</code> pasó a <code>clausina</code> y el motor <code>plataforma/</code> a <code>core/</code> (coincide con el repo <code>clausina-core</code>). Symlink de compatibilidad mientras la sesión viva corre desde la ruta vieja.</td></tr>
       <tr><td>2026-06-23</td><td>Primera versión de este documento de arquitectura (HTML vivo).</td></tr>
       <tr><td>2026-06-22</td><td>Monorepo contenedor <code>clausina</code> + 4 submodules; <code>clausina.ar</code> live (Worker + auto-deploy GitHub Actions); crons des-horneados (agnósticos); rebrand de n8n a "ClaUsina - X"; hook de calidad web reactivado y agnóstico.</td></tr>

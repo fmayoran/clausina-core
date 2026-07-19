@@ -140,7 +140,7 @@
     </div>
 
     <aside class="proj-right" id="sec-canales">
-      <h3 class="sech">Capacidades de la marca</h3>
+      <h3 class="sech">Capacidades del negocio</h3>
       <div class="chan-grid" id="caps-grid"></div>
     </aside>
   </div>
@@ -219,7 +219,7 @@
   function closeCola(){ document.getElementById('colamodal').classList.add('hidden'); }
   window.afterProponer = closeAsk;
   currentLoad=loadCola; loadCola(); setInterval(loadCola,6000);
-  // ---- Capacidades de la marca: pastillas con estado (activa / falta configurar / deshabilitada) ----
+  // ---- Capacidades del negocio: pastillas con estado (activa / falta configurar / deshabilitada) ----
   // Cada capacidad que está habilitada Y configurada conserva su id de indicador (mc-*), para que
   // los contadores existentes la sigan llenando. Las demás muestran su propio estado.
   const MC={instagram:'mc-ig', pauta:'mc-pauta', pantalla:'mc-av', web:'mc-web'};
@@ -252,7 +252,7 @@
   }
   async function toggleCap(id, on){
     const c=_CAPS.find(x=>x.id===id);
-    if(!on && !confirm(`Deshabilitar "${c?c.label:id}" para esta marca. ¿Confirmás?`)) return;
+    if(!on && !confirm(`Deshabilitar "${c?c.label:id}" para este negocio. ¿Confirmás?`)) return;
     try{
       const r=await fetch('api/capacidades/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({habilitada:on})});
       const d=await r.json();

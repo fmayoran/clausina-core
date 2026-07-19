@@ -29,7 +29,7 @@
     <div class="flex items-baseline gap-3 mb-4">
       <h1 class="display font-bold text-xl tracking-tight hl"><span>Inicio</span></h1>
       <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
-      <a href="negocios" title="Ver qué tiene configurada cada marca" aria-label="Ver qué tiene configurada cada marca"
+      <a href="negocios" title="Ver qué tiene configurada cada negocio" aria-label="Ver qué tiene configurada cada negocio"
          class="ml-auto self-center grid place-items-center w-9 h-9 rounded-lg border border-pline dark:border-line text-pmut dark:text-mut hover:border-acc hover:acc-text transition shrink-0">
         <i data-lucide="table-properties" class="w-4 h-4"></i>
       </a>
@@ -59,12 +59,12 @@
   </main>
 </div>
 
-<!-- Wizard: sumá una marca -->
+<!-- Wizard: sumá un negocio -->
 <div id="wiz" class="wiz-ov" style="display:none">
   <div class="wiz-bg" onclick="cerrarWizard()"></div>
   <div class="wiz-box">
     <div class="wiz-head">
-      <div><div class="wiz-tt">Sumá una marca</div><div class="wiz-step mono" id="wiz-stepn">Paso 1 de 4</div></div>
+      <div><div class="wiz-tt">Sumá un negocio</div><div class="wiz-step mono" id="wiz-stepn">Paso 1 de 4</div></div>
       <button class="wiz-x" onclick="cerrarWizard()" title="Cerrar">×</button>
     </div>
     <div class="wiz-body" id="wiz-body"></div>
@@ -128,7 +128,7 @@
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 async function entrar(slug){ try{ await fetch('api/negocio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})}); }catch(_){} location.href='proyecto'; }
 
-// ---- Wizard "Sumá una marca" (Identidad -> Brief -> Capacidades -> crear) ----
+// ---- Wizard "Sumá un negocio" (Identidad -> Brief -> Capacidades -> crear) ----
 const WIZ_CAPS = [
   {id:'estilo', label:'Estilo de marca', icon:'palette', desc:'Sistema de diseño e identidad visual'},
   {id:'instagram', label:'Instagram', icon:'instagram', desc:'Publicaciones del feed'},
@@ -214,16 +214,16 @@ function wizRender(){
   next.style.display='';
   next.classList.toggle('done', !!w.creada);  // coral mientras falte algo; verde recién al terminar
   if(w.step===1){
-    // Presencia digital: lo público de la marca. De acá sale la base de identidad.
+    // Presencia digital: lo público del negocio. De acá sale la base de identidad.
     if(w.an==='analizando'){
       body.innerHTML=`<div class="wdone"><div class="wspin"></div>
         <div class="wiz-tt">Analizando la presencia digital</div>
-        <div class="wsub" style="margin-top:8px">Estamos leyendo la web, buscando la marca y armando una base de identidad. Tarda unos minutos: podés dejar esta ventana abierta.</div></div>`;
+        <div class="wsub" style="margin-top:8px">Estamos leyendo la web, buscando el negocio y armando una base de identidad. Tarda unos minutos: podés dejar esta ventana abierta.</div></div>`;
       back.style.visibility='hidden'; next.style.display='none';
     } else if(w.an==='listo'){
       body.innerHTML=`
         <div class="wsub">Esto es lo que encontramos. Es una <b>base editable</b>: revisá y corregí todo en los pasos que siguen.</div>
-        ${w.resumen?`<div class="wfld"><label>La marca</label><div style="color:var(--fg,#F5F2EC)">${esc(w.resumen)}</div></div>`:''}
+        ${w.resumen?`<div class="wfld"><label>El negocio</label><div style="color:var(--fg,#F5F2EC)">${esc(w.resumen)}</div></div>`:''}
         ${w.confianza?`<div class="wfld"><label>Confianza del análisis</label><span class="wconf ${esc(w.confianza)}"><i></i>${esc(w.confianza)}</span></div>`:''}
         ${w.hallazgos.length?`<div class="wfind"><h4>Hallazgos</h4><ul>${w.hallazgos.map(h=>`<li>${esc(h)}</li>`).join('')}</ul></div>`:''}
         <button class="wlink" onclick="_wz.an='form';wizRender()">Volver a los datos y analizar de nuevo</button>`;
@@ -231,7 +231,7 @@ function wizRender(){
     } else {
       body.innerHTML=`
         <div class="wsub">Empecemos por lo <b>público</b> de la marca. Con esto analizamos su presencia digital y pre-cargamos identidad, brief y capacidades. Podés saltearlo y cargar todo a mano.</div>
-        <div class="wfld"><label>Nombre de la marca</label><input value="${esc(w.nombre)}" placeholder="Ej: Distrito Ardora" oninput="wizNombre(this.value)"></div>
+        <div class="wfld"><label>Nombre del negocio</label><input value="${esc(w.nombre)}" placeholder="Ej: Distrito Ardora" oninput="wizNombre(this.value)"></div>
         <div class="wfld"><label>Web <span class="hint">— opcional</span></label><input value="${esc(w.web)}" placeholder="https://marca.com.ar" oninput="_wz.web=this.value;wizErr('')"></div>
         <div class="wfld"><label>Instagram <span class="hint">— opcional</span></label><input value="${esc(w.instagram)}" placeholder="@marca" oninput="_wz.instagram=this.value;wizErr('')"></div>
         <div class="wfld"><label>Otros datos públicos <span class="hint">— opcional: otras redes, dirección, a qué se dedica</span></label>
@@ -243,8 +243,8 @@ function wizRender(){
     }
   } else if(w.step===2){
     body.innerHTML=`
-      <div class="wsub">La <b>identidad</b> de la marca. ${w.desc_id?'Pre-cargada con el análisis — revisala.':''}</div>
-      <div class="wfld"><label>Nombre de la marca</label><input value="${esc(w.nombre)}" oninput="wizNombre(this.value)"></div>
+      <div class="wsub">La <b>identidad</b> del negocio. ${w.desc_id?'Pre-cargada con el análisis — revisala.':''}</div>
+      <div class="wfld"><label>Nombre del negocio</label><input value="${esc(w.nombre)}" oninput="wizNombre(this.value)"></div>
       <div class="wfld"><label>Identificador (slug) <span class="hint">— minúsculas y guiones; se usa en URLs y en la cápsula</span></label>
         <input id="wz-slug" value="${esc(w.slug)}" placeholder="distrito-ardora" oninput="_wz.slug=this.value.toLowerCase();_wz.slugTouched=true;wizErr('')">
         <div class="werr" id="wz-err"></div></div>
@@ -256,13 +256,13 @@ function wizRender(){
     next.textContent='Siguiente';
   } else if(w.step===3){
     body.innerHTML=`
-      <div class="wsub">El <b>brief</b> es el contexto que usa el creativo: propuesta de valor, tono, público, qué hacer y evitar, productos, datos clave. Aplica a todas las marcas.</div>
+      <div class="wsub">El <b>brief</b> es el contexto que usa el creativo: propuesta de valor, tono, público, qué hacer y evitar, productos, datos clave. Aplica a todas los negocios.</div>
       <div class="wfld"><label>Brief <span class="hint">— opcional, recomendado</span></label><textarea style="min-height:220px" placeholder="Contá de qué va la marca…" oninput="_wz.brief_md=this.value">${esc(w.brief_md)}</textarea></div>
       ${w.estilo_md?`<div class="wfld"><label>Estilo visual <span class="hint">— detectado en el análisis; se guarda en el perfil</span></label><textarea oninput="_wz.estilo_md=this.value">${esc(w.estilo_md)}</textarea></div>`:''}`;
     next.textContent='Siguiente';
   } else if(w.step===4){
     body.innerHTML=`
-      <div class="wsub">¿Cuál es nuestro <b>rol</b> sobre esta marca? Agrupa la marca en el inicio.</div>
+      <div class="wsub">¿Cuál es nuestro <b>rol</b> sobre este negocio? Agrupa la marca en el inicio.</div>
       <div class="wcap${w.gestion==='integral'?' on':''}" onclick="_wz.gestion='integral';wizRender()"><div style="flex:1"><div class="wc-t">Gestión integral</div><div class="wc-d">La manejamos completa</div></div><span class="wc-chk"><i data-lucide="check" class="w-3 h-3"></i></span></div>
       <div class="wcap${w.gestion==='parcial'?' on':''}" onclick="_wz.gestion='parcial';wizRender()" style="margin-bottom:16px"><div style="flex:1"><div class="wc-t">Gestión parcial</div><div class="wc-d">Rol secundario: le damos una parte del servicio</div></div><span class="wc-chk"><i data-lucide="check" class="w-3 h-3"></i></span></div>
       <div class="wsub"><b>Identidad</b>, <b>Brief</b> y <b>Biblioteca</b> vienen por defecto. Elegí qué otras capacidades querés (las configurás ahora o después).</div>
@@ -278,11 +278,11 @@ function wizRender(){
       body.innerHTML=`<div class="wdone"><div class="wd-ic"><i data-lucide="check" class="w-7 h-7"></i></div>
         <div class="wiz-tt">Marca creada</div>
         <div class="wsub" style="margin-top:8px">Estamos preparando la cápsula de <b>${esc(w.nombre)}</b> (unos segundos). Entrá y completá la configuración de cada capacidad.</div></div>`;
-      back.style.visibility='hidden'; next.textContent='Entrar a la marca';
+      back.style.visibility='hidden'; next.textContent='Entrar al negocio';
     } else {
       const caps=WIZ_CAPS.filter(c=>w.caps.has(c.id)).map(c=>c.label);
       body.innerHTML=`
-        <div class="wsub">Repasá y creá la marca.</div>
+        <div class="wsub">Repasá y creá el negocio.</div>
         <div class="wfld"><label>Marca</label><div style="color:var(--fg,#F5F2EC)">${esc(w.nombre)} <span class="mono" style="color:#8A8F98">(${esc(w.slug)})</span></div></div>
         ${w.slogan?`<div class="wfld"><label>Slogan</label><div style="color:var(--fg,#F5F2EC)">${esc(w.slogan)}</div></div>`:''}
         ${(w.web||w.instagram)?`<div class="wfld"><label>Presencia</label><div style="color:var(--fg,#F5F2EC)">${[w.web,w.instagram].filter(Boolean).map(esc).join(' · ')}</div></div>`:''}
@@ -290,7 +290,7 @@ function wizRender(){
         <div class="wfld"><label>Rol de ClaUsina</label><div style="color:var(--fg,#F5F2EC)">${w.gestion==='parcial'?'Gestión parcial (rol secundario)':'Gestión integral'}</div></div>
         <div class="wfld"><label>Capacidades</label><div style="color:var(--fg,#F5F2EC)">Identidad · Brief · Biblioteca${caps.length?' · '+caps.map(esc).join(' · '):''}</div></div>
         <div class="werr" id="wz-err"></div>`;
-      next.textContent = w.creando ? 'Creando…' : 'Crear marca'; next.disabled=w.creando;
+      next.textContent = w.creando ? 'Creando…' : 'Crear negocio'; next.disabled=w.creando;
     }
   }
   if(window.lucide) lucide.createIcons();
@@ -318,7 +318,7 @@ async function wizNext(){
           logo:w.logo,descubrimiento_id:w.desc_id,capacidades:[...w.caps],web_modo:w.web_modo,
           gestion:w.gestion})}).then(r=>r.json());
       if(d.ok){ w.creada=d.slug; }
-      else { wizErr({slug_duplicado:'Ya existe una marca con ese identificador',slug_invalido:'Slug inválido',nombre_requerido:'Falta el nombre'}[d.error]||'No se pudo crear'); }
+      else { wizErr({slug_duplicado:'Ya existe un negocio con ese identificador',slug_invalido:'Slug inválido',nombre_requerido:'Falta el nombre'}[d.error]||'No se pudo crear'); }
     }catch(e){ wizErr('Error de conexión'); }
     w.creando=false;
   }
@@ -401,7 +401,7 @@ function capChips(caps){
 }
 function vacio(){ return `<a href="#" onclick="abrirWizard();return false;" class="group rounded-2xl border border-dashed border-pline dark:border-line p-5 grid place-items-center text-center min-h-[120px] hover:border-acc transition">
   <div><div class="w-10 h-10 rounded-xl grid place-items-center border border-pline dark:border-line mx-auto mb-2.5 group-hover:border-acc transition"><i data-lucide="plus" class="w-5 h-5 text-pmut dark:text-mut group-hover:acc-text"></i></div>
-  <div class="display font-medium">Sumá una marca</div><p class="mono text-[11px] text-pmut dark:text-mut mt-1">Configurá la próxima cápsula.</p></div></a>`; }
+  <div class="display font-medium">Sumá un negocio</div><p class="mono text-[11px] text-pmut dark:text-mut mt-1">Configurá el próximo negocio.</p></div></a>`; }
 function skel(){ return `<div class="rounded-2xl border border-pline dark:border-line bg-psurf dark:bg-surf card p-5">
   <div class="flex gap-3"><div class="w-10 h-10 rounded-xl bg-pline dark:bg-line"></div><div class="flex-1"><div class="h-4 w-1/2 rounded bg-pline dark:bg-line"></div><div class="h-3 w-3/4 rounded bg-pline dark:bg-line mt-2"></div></div></div>
   <div class="h-10 w-2/3 rounded bg-pline dark:bg-line mt-6"></div></div>`; }
