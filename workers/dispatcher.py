@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula", "descubrimiento", "marca_gen"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula", "descubrimiento", "marca_gen", "grafica"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -159,6 +159,23 @@ def det_marca_gen():
     return jobs
 
 
+def det_grafica():
+    # Diseño de piezas gráficas (folletos, afiches, vía pública). Una versión por pedido.
+    psql("UPDATE contenido.grafica_version SET estado='error', "
+         "error='Se quedó colgado. Probá de nuevo.', procesado_en=now() "
+         "WHERE estado='procesando' AND creado_en < now() - interval '40 minutes'")
+    jobs = []
+    for row in _lines("SELECT v.id||'|'||COALESCE(n.slug,'') FROM contenido.grafica_version v "
+                      "JOIN contenido.grafica g ON g.id=v.grafica_id "
+                      "JOIN contenido.negocios n ON n.id=g.negocio_id "
+                      "WHERE v.estado='pendiente' ORDER BY v.creado_en"):
+        vid, slug = row.split('|', 1)
+        if slug:
+            jobs.append({"tipo": "grafica", "negocio_slug": slug,
+                         "payload": {"version_id": vid}, "lock_key": f"grafica:{vid}"})
+    return jobs
+
+
 def det_secrets_sync():
     # La DB es la fuente de verdad: cuando cambia un token en el perfil, regeneramos los
     # secretos derivados (hoy: credencial de IG en n8n). Un job por marca pedida.
@@ -230,12 +247,13 @@ DETECTORS = {
     "marca_capsula": det_marca_capsula,
     "descubrimiento": det_descubrimiento,
     "marca_gen": det_marca_gen,
+    "grafica": det_grafica,
 }
 
 
 def run():
     encolados = 0
-    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula", "descubrimiento", "marca_gen"):
+    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula", "descubrimiento", "marca_gen", "grafica"):
         if tipo not in MIGRATED:
             continue
         try:

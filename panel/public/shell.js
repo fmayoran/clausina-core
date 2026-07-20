@@ -18,6 +18,7 @@
       { id: 'cola',      label: 'Cola y aprobación', icon: 'inbox',       href: 'proyecto' },
       { id: 'instagram', label: 'Instagram',         icon: 'instagram',   href: 'instagram' },
       { id: 'avisos',    label: 'Avisos',            icon: 'megaphone',   href: 'avisos' },
+      { id: 'grafica',   label: 'Gráfica',          icon: 'layout-template', href: 'grafica' },
       { id: 'landing',   label: 'Landing',           icon: 'globe',       href: 'landing' },
       { id: 'pauta',     label: 'Pauta',             icon: 'badge-dollar-sign', href: 'pauta' },
       { id: 'biblioteca',label: 'Biblioteca',        icon: 'images',      href: 'biblioteca' },

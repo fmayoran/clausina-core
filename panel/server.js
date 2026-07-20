@@ -222,6 +222,44 @@ app.get('/api/generacion', async (req, res) => {
   catch (e) { console.error('generacion', e.message); res.status(500).json({ error: 'db' }); }
 });
 
+// --- Gráfica: material promocional (folletos, afiches, vía pública) ---
+app.get('/api/grafica/formatos', (req, res) => res.json(db.FORMATOS));
+app.get('/api/grafica', async (req, res) => {
+  try { res.json(await db.getGraficas(req.negocioId)); }
+  catch (e) { console.error('grafica', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.get('/api/grafica/:id', async (req, res) => {
+  try {
+    const g = await db.getGrafica(req.negocioId, req.params.id);
+    if (!g) return res.status(404).json({ error: 'no_existe' });
+    res.json(g);
+  } catch (e) { console.error('grafica-get', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/grafica', async (req, res) => {
+  try {
+    const r = await db.crearGrafica(req.negocioId, req.body || {});
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { console.error('grafica-crear', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+// Iterar: nueva versión con la instrucción de cambio (parte del diseño anterior).
+app.post('/api/grafica/:id/iterar', async (req, res) => {
+  try {
+    const r = await db.iterarGrafica(req.negocioId, req.params.id, (req.body || {}).instruccion);
+    res.status(r.ok ? 200 : 409).json(r);
+  } catch (e) { console.error('grafica-iterar', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+app.post('/api/grafica/:id/estado', async (req, res) => {
+  try { res.json(await db.estadoGrafica(req.negocioId, req.params.id, (req.body || {}).estado)); }
+  catch (e) { console.error('grafica-estado', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+// Fondo subido desde disco para una pieza.
+app.post('/api/grafica/fondo', async (req, res) => {
+  try {
+    const { mediaPath } = await guardarMaterialDisco(req.body, path.posix.join('grafica', req.negocio));
+    res.json({ ok: true, url: `https://${req.get('host')}/media/` + mediaPath.split('/').map(encodeURIComponent).join('/') });
+  } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
+});
+
 // Lente de Instagram: config de PLATAFORMA (la agencia, no una marca). El token se guarda
 // cifrado y es write-only: nunca vuelve al navegador (solo decimos si está cargado).
 app.get('/api/plataforma/lente', async (req, res) => {

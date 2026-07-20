@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Gráfica</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<script>document.documentElement.classList.add('dark');</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
+<link rel="stylesheet" href="panel.css">
+<style>
+  .gwrap{padding:18px 28px 70px;max-width:1200px;}
+  .ghead{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+  .gtt{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1.15rem;color:var(--white);}
+  .gsub{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--ash);}
+  .ggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
+  .gcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:.15s;}
+  .gcard:hover{border-color:var(--pend);}
+  .gprev{aspect-ratio:3/4;background:#0c0f12;display:grid;place-items:center;overflow:hidden;}
+  .gprev img{width:100%;height:100%;object-fit:contain;}
+  .gprev .ph{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:#55554f;text-align:center;padding:14px;}
+  .gbody{padding:11px 13px;}
+  .gname{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:.98rem;color:var(--white);line-height:1.2;}
+  .gmeta{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--ash);margin-top:4px;display:flex;gap:7px;flex-wrap:wrap;align-items:center;}
+  .gst{padding:1px 7px;border-radius:9px;border:1px solid;font-size:.55rem;text-transform:uppercase;letter-spacing:.06em;}
+  .gst.lista{color:var(--pend);border-color:var(--pend-line);}
+  .gst.aprobada{color:var(--done);border-color:var(--done-line);}
+  .gst.borrador,.gst.generando{color:var(--pend);border-color:var(--pend-line);}
+  .gst.descartada{color:var(--ash);border-color:var(--line);}
+  .gnew{border:1px dashed var(--line);border-radius:12px;display:grid;place-items:center;min-height:200px;cursor:pointer;transition:.15s;}
+  .gnew:hover{border-color:var(--pend);}
+  .gnew .in{text-align:center;color:var(--ash);font-family:'JetBrains Mono',monospace;font-size:.68rem;}
+  .gnew .plus{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;margin:0 auto 9px;font-size:20px;color:var(--pend);}
+  /* modales */
+  .gov{position:fixed;inset:0;z-index:140;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.72);}
+  .gbox{background:#111317;border:1px solid #20242B;border-radius:14px;max-width:600px;width:100%;max-height:90vh;display:flex;flex-direction:column;}
+  .gbox.wide{max-width:1000px;}
+  .ghd{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid #20242B;}
+  .ghd b{font-family:'Inter Tight',sans-serif;font-size:16px;color:#ECEEF0;}
+  .ghd span{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ash);}
+  .ghd button.x{margin-left:auto;background:none;border:0;color:var(--ash);font-size:22px;cursor:pointer;line-height:1;}
+  .gbd{padding:18px;overflow-y:auto;}
+  .gft{display:flex;gap:9px;padding:14px 18px;border-top:1px solid #20242B;}
+  .gft .abtn{flex:1;justify-content:center;}
+  .fl{margin-bottom:14px;}
+  .fl label{display:block;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;}
+  .fl .hint{text-transform:none;letter-spacing:0;color:#6f6f68;}
+  .fl input,.fl textarea,.fl select{width:100%;background:#0c0c0a;border:1px solid var(--line);border-radius:7px;color:var(--white);font-family:'Inter',sans-serif;font-size:.95rem;padding:9px 11px;outline:none;}
+  .fl textarea{min-height:88px;resize:vertical;line-height:1.4;}
+  .fl input:focus,.fl textarea:focus,.fl select:focus{border-color:var(--pend);}
+  .row2{display:flex;gap:9px;}
+  .opts{display:flex;gap:8px;flex-wrap:wrap;}
+  .opt{border:1px solid var(--line);border-radius:9px;padding:8px 12px;cursor:pointer;font-size:.86rem;color:var(--white);transition:.15s;}
+  .opt:hover{border-color:var(--ash);} .opt.on{border-color:var(--pend);background:rgba(255,106,69,.08);}
+  .chks{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:7px;}
+  .chk{display:flex;align-items:center;gap:8px;font-size:.88rem;color:var(--white);cursor:pointer;}
+  .chk input{width:auto;}
+  .abtn{display:inline-flex;align-items:center;gap:7px;background:transparent;border:1px solid var(--line);color:var(--white);font-family:'Inter Tight',sans-serif;font-weight:700;font-size:.86rem;padding:9px 13px;border-radius:8px;cursor:pointer;transition:.15s;}
+  .abtn:hover{border-color:var(--ash);} .abtn:disabled{opacity:.5;cursor:default;}
+  .abtn.prim{background:var(--pend);border-color:var(--pend);color:#0c0c0a;}
+  .abtn.ok{background:var(--done);border-color:var(--done);color:#0c0c0a;}
+  .gerr{color:var(--alarm);font-family:'JetBrains Mono',monospace;font-size:.64rem;min-height:14px;}
+  /* detalle */
+  .dwrap{display:grid;grid-template-columns:1fr 300px;gap:16px;}
+  @media(max-width:860px){.dwrap{grid-template-columns:1fr;}}
+  .dprev{background:#0c0f12;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;padding:14px;min-height:320px;}
+  .dprev img{max-width:100%;max-height:62vh;object-fit:contain;}
+  .vlist{display:flex;flex-direction:column;gap:7px;max-height:240px;overflow-y:auto;}
+  .vrow{display:flex;gap:9px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:.82rem;color:var(--white);}
+  .vrow:hover{border-color:var(--ash);} .vrow.on{border-color:var(--pend);}
+  .vrow .n{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--ash);}
+  .spin{display:inline-block;width:10px;height:10px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:sp 1s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+  <header>
+    <a class="logo" href=".">CLA<b>USINA</b></a>
+    <span class="sub">Gráfica</span>
+    <nav><a href="proyecto">← Negocio</a><button class="logout" onclick="salir()">Salir</button></nav>
+  </header>
+<div class="shell"><main class="min-w-0">
+  <div id="toast"></div>
+  <div class="gwrap">
+    <div class="ghead">
+      <span class="gtt">Gráfica</span>
+      <span class="gsub" id="sub">cargando…</span>
+      <button class="abtn prim" style="margin-left:auto" onclick="abrirNueva()">+ Nueva pieza</button>
+    </div>
+    <div class="ggrid" id="grid"></div>
+  </div>
+</main></div>
+
+<!-- Nueva pieza -->
+<div id="ov-new" class="gov"><div class="gbox">
+  <div class="ghd"><b>Nueva pieza gráfica</b><span>el creativo la diseña con la identidad del negocio</span><button class="x" onclick="cerrar('ov-new')">×</button></div>
+  <div class="gbd">
+    <div class="fl"><label>Nombre <span class="hint">— para reconocerla</span></label><input id="n-nombre" placeholder="Afiche apertura"></div>
+    <div class="fl"><label>Formato</label><select id="n-formato" onchange="onFormato()"></select></div>
+    <div class="row2" id="n-medidas" style="display:none">
+      <div class="fl" style="flex:1"><label>Ancho (mm)</label><input id="n-ancho" type="number" min="20" max="6000" value="1000"></div>
+      <div class="fl" style="flex:1"><label>Alto (mm)</label><input id="n-alto" type="number" min="20" max="6000" value="700"></div>
+    </div>
+    <div class="fl"><label>Mensaje <span class="hint">— qué querés transmitir; el creativo lo edita para que funcione</span></label>
+      <textarea id="n-mensaje" placeholder="Apertura julio 2026. Asador urbano a leña en Paseo Ardora."></textarea></div>
+    <div class="fl"><label>Fondo</label>
+      <div class="opts" id="n-fondo">
+        <div class="opt on" data-modo="sin_fondo" onclick="setFondo('sin_fondo')">Sin foto</div>
+        <div class="opt" data-modo="biblioteca" onclick="setFondo('biblioteca')">De la biblioteca</div>
+        <div class="opt" data-modo="subido" onclick="setFondo('subido')">Subir una</div>
+        <div class="opt" data-modo="generar" onclick="setFondo('generar')">Que la genere el creativo</div>
+      </div>
+      <div id="n-fondo-extra" style="margin-top:9px"></div>
+    </div>
+    <div class="fl"><label>Datos del negocio a incluir</label>
+      <div class="chks" id="n-datos"></div></div>
+    <div class="gerr" id="n-err"></div>
+  </div>
+  <div class="gft"><button class="abtn" onclick="cerrar('ov-new')">Cancelar</button>
+    <button class="abtn prim" id="n-go" onclick="crearPieza()">Diseñar</button></div>
+</div></div>
+
+<!-- Detalle / iteración -->
+<div id="ov-det" class="gov"><div class="gbox wide">
+  <div class="ghd"><b id="d-nombre">Pieza</b><span id="d-meta"></span><button class="x" onclick="cerrar('ov-det')">×</button></div>
+  <div class="gbd"><div class="dwrap">
+    <div class="dprev" id="d-prev"></div>
+    <div>
+      <div class="fl"><label>Versiones</label><div class="vlist" id="d-vers"></div></div>
+      <div class="fl"><label>Pedir un cambio <span class="hint">— parte del diseño actual</span></label>
+        <textarea id="d-instr" placeholder="El título más grande. Sacá el QR. Probá otro fondo."></textarea></div>
+      <button class="abtn prim" style="width:100%" id="d-iter" onclick="iterar()">Generar nueva versión</button>
+      <div class="gerr" id="d-err" style="margin-top:8px"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <a class="abtn" id="d-pdf" target="_blank" rel="noopener" style="display:none">PDF imprenta</a>
+        <a class="abtn" id="d-png" target="_blank" rel="noopener" style="display:none">PNG</a>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="abtn ok" style="flex:1" onclick="setEstado('aprobada')">Aprobar</button>
+        <button class="abtn" onclick="setEstado('descartada')">Descartar</button>
+      </div>
+    </div>
+  </div></div>
+</div></div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="shell.js"></script>
+<script>ClausinaShell({active:'grafica',cap:'grafica',darkOnly:true});</script>
+<script>
+const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let _t; function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.classList.toggle('err',!!e); t.classList.add('show'); clearTimeout(_t); _t=setTimeout(()=>t.classList.remove('show'),3600); }
+function salir(){ fetch('api/logout',{method:'POST'}).then(()=>location.href='login'); }
+function cerrar(id){ document.getElementById(id).style.display='none'; if(id==='ov-det') DET=null; }
+
+const DATOS = [['direccion','Dirección'],['telefono','Teléfono'],['whatsapp','WhatsApp'],['instagram','Instagram'],['web','Web'],['qr','Código QR']];
+let FORMATOS=[], PIEZAS=[], FONDO_MODO='sin_fondo', FONDO_URL='', DET=null, _poll=null;
+
+// ---- listado ----
+function card(g){
+  const st = g.v_estado==='pendiente'||g.v_estado==='procesando' ? 'generando' : (g.estado||'borrador');
+  const lbl = st==='generando' ? 'diseñando…' : st;
+  const prev = g.png_url ? `<img src="${esc(g.png_url)}" loading="lazy">`
+    : `<div class="ph">${st==='generando'?'<span class="spin"></span><br>el creativo está diseñando':(g.v_error?esc(g.v_error):'sin versión')}</div>`;
+  const f = FORMATOS.find(x=>x.id===g.formato);
+  return `<div class="gcard" onclick="abrirDet('${g.id}')">
+    <div class="gprev">${prev}</div>
+    <div class="gbody"><div class="gname">${esc(g.nombre)}</div>
+      <div class="gmeta"><span class="gst ${st}">${esc(lbl)}</span>
+        <span>${esc(f?f.label:g.formato)} · ${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm</span>
+        ${g.version_actual?`<span>v${g.version_actual}</span>`:''}</div></div></div>`;
+}
+async function cargar(){
+  try{
+    const r=await fetch('api/grafica'); if(r.status===401){location.href='login';return;}
+    PIEZAS=await r.json();
+    document.getElementById('sub').textContent = PIEZAS.length ? `${PIEZAS.length} pieza(s)` : 'sin piezas todavía';
+    document.getElementById('grid').innerHTML = PIEZAS.map(card).join('') +
+      `<div class="gnew" onclick="abrirNueva()"><div class="in"><div class="plus">+</div>Nueva pieza</div></div>`;
+    const trabajando = PIEZAS.some(g=>g.v_estado==='pendiente'||g.v_estado==='procesando');
+    if(trabajando && !_poll) _poll=setInterval(cargar,6000);
+    if(!trabajando && _poll){ clearInterval(_poll); _poll=null; }
+    if(DET) refrescarDet();
+  }catch(e){ document.getElementById('sub').textContent='sin conexión'; }
+}
+
+// ---- nueva ----
+function abrirNueva(){
+  FONDO_MODO='sin_fondo'; FONDO_URL='';
+  document.getElementById('n-nombre').value=''; document.getElementById('n-mensaje').value='';
+  document.getElementById('n-err').textContent='';
+  document.getElementById('n-formato').innerHTML = FORMATOS.map(f=>
+    `<option value="${f.id}">${esc(f.grupo)} — ${esc(f.label)}${f.ancho?` (${f.ancho}×${f.alto}mm)`:''}</option>`).join('');
+  document.getElementById('n-datos').innerHTML = DATOS.map(([k,l])=>
+    `<label class="chk"><input type="checkbox" id="dt-${k}" ${['direccion','instagram'].includes(k)?'checked':''}> ${l}</label>`).join('');
+  document.querySelectorAll('#n-fondo .opt').forEach(o=>o.classList.toggle('on',o.dataset.modo==='sin_fondo'));
+  document.getElementById('n-fondo-extra').innerHTML='';
+  onFormato();
+  document.getElementById('ov-new').style.display='flex';
+}
+function onFormato(){
+  const f=FORMATOS.find(x=>x.id===document.getElementById('n-formato').value);
+  document.getElementById('n-medidas').style.display = (f && !f.ancho) ? 'flex' : 'none';
+}
+function setFondo(m){
+  FONDO_MODO=m; FONDO_URL='';
+  document.querySelectorAll('#n-fondo .opt').forEach(o=>o.classList.toggle('on',o.dataset.modo===m));
+  const x=document.getElementById('n-fondo-extra');
+  if(m==='biblioteca'){ x.innerHTML='<div class="gsub">cargando biblioteca…</div>'; cargarBiblio(); }
+  else if(m==='subido'){ x.innerHTML='<input type="file" accept="image/*" onchange="subirFondo(this)">'; }
+  else if(m==='generar'){ x.innerHTML='<textarea id="n-prompt" placeholder="Cómo querés la imagen: «fuego y brasas en primer plano, nocturno, sin texto»"></textarea>'; }
+  else x.innerHTML='';
+}
+async function cargarBiblio(){
+  try{
+    const d=await fetch('api/biblioteca').then(r=>r.json());
+    const its=(d.items||[]).filter(i=>i.tipo==='image');
+    document.getElementById('n-fondo-extra').innerHTML = its.length
+      ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:6px;max-height:180px;overflow:auto">`
+        + its.map(i=>`<img src="media/${esc(i.media_path)}" data-u="media/${esc(i.media_path)}" onclick="elegirFondo(this)" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:7px;border:2px solid transparent;cursor:pointer">`).join('')
+        + `</div>`
+      : '<div class="gsub">la biblioteca no tiene imágenes</div>';
+  }catch(e){ document.getElementById('n-fondo-extra').innerHTML='<div class="gsub">no se pudo cargar</div>'; }
+}
+function elegirFondo(el){
+  document.querySelectorAll('#n-fondo-extra img').forEach(i=>i.style.borderColor='transparent');
+  el.style.borderColor='#FF6A45';
+  FONDO_URL = new URL(el.dataset.u, location.href).href;
+}
+async function subirFondo(inp){
+  const f=(inp.files||[])[0]; if(!f) return;
+  const x=document.getElementById('n-fondo-extra');
+  x.insertAdjacentHTML('beforeend','<div class="gsub" id="upst">subiendo…</div>');
+  try{
+    const dataUrl=await new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.onerror=j;rd.readAsDataURL(f);});
+    const d=await fetch('api/grafica/fondo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,filename:f.name})}).then(r=>r.json());
+    if(d.ok){ FONDO_URL=d.url; document.getElementById('upst').textContent='listo ✓'; }
+    else document.getElementById('upst').textContent='no se pudo subir';
+  }catch(e){ document.getElementById('upst').textContent='error'; }
+}
+async function crearPieza(){
+  const err=document.getElementById('n-err'); err.textContent='';
+  const mensaje=document.getElementById('n-mensaje').value.trim();
+  if(!mensaje){ err.textContent='Escribí el mensaje que querés transmitir'; return; }
+  if((FONDO_MODO==='biblioteca'||FONDO_MODO==='subido') && !FONDO_URL){ err.textContent='Elegí la imagen de fondo'; return; }
+  const datos={}; DATOS.forEach(([k])=>{ const c=document.getElementById('dt-'+k); if(c&&c.checked) datos[k]=true; });
+  const body={ nombre:document.getElementById('n-nombre').value, formato:document.getElementById('n-formato').value,
+    ancho_mm:document.getElementById('n-ancho').value, alto_mm:document.getElementById('n-alto').value,
+    mensaje, fondo_modo:FONDO_MODO, fondo_url:FONDO_URL,
+    fondo_prompt:(document.getElementById('n-prompt')||{}).value||'', datos };
+  const b=document.getElementById('n-go'); b.disabled=true; b.textContent='Enviando…';
+  try{
+    const d=await fetch('api/grafica',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+    if(d.ok){ cerrar('ov-new'); toast('El creativo está diseñando la pieza'); cargar(); }
+    else err.textContent={formato_invalido:'Formato inválido',medidas_invalidas:'Poné medidas válidas',medidas_excesivas:'Medidas demasiado grandes'}[d.error]||'No se pudo crear';
+  }catch(e){ err.textContent='Error de conexión'; }
+  b.disabled=false; b.textContent='Diseñar';
+}
+
+// ---- detalle / iteración ----
+async function abrirDet(id){ DET=id; await refrescarDet(); document.getElementById('ov-det').style.display='flex'; }
+async function refrescarDet(){
+  if(!DET) return;
+  let g; try{ g=await fetch('api/grafica/'+DET).then(r=>r.json()); }catch(e){ return; }
+  if(g.error) return;
+  const f=FORMATOS.find(x=>x.id===g.formato);
+  document.getElementById('d-nombre').textContent=g.nombre;
+  document.getElementById('d-meta').textContent=`${f?f.label:g.formato} · ${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm · ${g.estado}`;
+  const vs=g.versiones||[], activa=vs.find(v=>v.estado==='lista')||vs[0];
+  const enCurso=vs.some(v=>v.estado==='pendiente'||v.estado==='procesando');
+  document.getElementById('d-prev').innerHTML = enCurso
+    ? '<div class="ph" style="color:#FF6A45"><span class="spin"></span><br>diseñando…</div>'
+    : (activa&&activa.png_url ? `<img src="${esc(activa.png_url)}">` : `<div class="ph">${esc((activa&&activa.error)||'sin versión')}</div>`);
+  document.getElementById('d-vers').innerHTML = vs.map(v=>
+    `<div class="vrow${activa&&v.id===activa.id?' on':''}" onclick="verVersion('${esc(v.png_url||'')}')">
+      <span class="n">v${v.nro}</span><span style="flex:1;min-width:0">${esc(v.instruccion||'—')}</span>
+      <span class="n">${v.estado==='lista'?'✓':(v.estado==='error'?'×':'…')}</span></div>`).join('') || '<div class="gsub">—</div>';
+  const pdf=document.getElementById('d-pdf'), png=document.getElementById('d-png');
+  pdf.style.display = activa&&activa.pdf_url ? '' : 'none'; if(activa&&activa.pdf_url) pdf.href=activa.pdf_url;
+  png.style.display = activa&&activa.png_url ? '' : 'none'; if(activa&&activa.png_url) png.href=activa.png_url;
+  const it=document.getElementById('d-iter'); it.disabled=enCurso; it.textContent=enCurso?'Diseñando…':'Generar nueva versión';
+}
+function verVersion(u){ if(u) document.getElementById('d-prev').innerHTML=`<img src="${esc(u)}">`; }
+async function iterar(){
+  const t=document.getElementById('d-instr'), err=document.getElementById('d-err');
+  const txt=t.value.trim(); err.textContent='';
+  if(!txt){ err.textContent='Escribí qué querés cambiar'; return; }
+  const b=document.getElementById('d-iter'); b.disabled=true; b.textContent='Enviando…';
+  try{
+    const d=await fetch('api/grafica/'+DET+'/iterar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instruccion:txt})}).then(r=>r.json());
+    if(d.ok){ t.value=''; toast('Nueva versión en camino'); cargar(); refrescarDet(); }
+    else err.textContent = d.error==='ya_en_curso'?'Ya hay una versión generándose':'No se pudo pedir';
+  }catch(e){ err.textContent='Error de conexión'; }
+  b.disabled=false; b.textContent='Generar nueva versión';
+}
+async function setEstado(e){
+  if(!DET) return;
+  if(e==='descartada' && !confirm('¿Descartar esta pieza?')) return;
+  try{
+    await fetch('api/grafica/'+DET+'/estado',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({estado:e})});
+    toast(e==='aprobada'?'Pieza aprobada':'Pieza descartada'); cerrar('ov-det'); cargar();
+  }catch(_){ toast('No se pudo',true); }
+}
+
+(async ()=>{ try{ FORMATOS=await fetch('api/grafica/formatos').then(r=>r.json()); }catch(e){} cargar(); })();
+</script>
+</body>
+</html>

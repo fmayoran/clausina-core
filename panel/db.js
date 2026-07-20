@@ -53,12 +53,15 @@ const CAPS = [
   { id: 'instagram', label: 'Instagram',          icon: 'instagram',         href: 'instagram', desc: 'Publicaciones del feed' },
   { id: 'pauta',     label: 'Pauta Instagram',    icon: 'badge-dollar-sign', href: 'pauta',     desc: 'Publicidad y pauta (Meta Ads)', depende: ['instagram'] },
   { id: 'pantalla',  label: 'Avisos en pantalla', icon: 'megaphone',         href: 'avisos',    desc: 'Avisos para la pantalla de calle' },
-  { id: 'web',       label: 'Web / Landing',      icon: 'globe',             href: 'landing',   desc: 'Sitio de la marca' },
+  { id: 'web',       label: 'Web / Landing',      icon: 'globe',             href: 'landing',   desc: 'Sitio del negocio' },
+  { id: 'grafica',   label: 'Gráfica',            icon: 'layout-template',   href: 'grafica',   desc: 'Folletos, afiches y vía pública', depende: ['estilo'] },
 ];
 
 function evaluarCap(cap, d, cfg) {
   const faltan = [];
-  if (cap.id === 'estilo') {
+  if (cap.id === 'grafica') {
+    if ((d.estilo_md || '').length <= 20) faltan.push('estilo de marca (define la identidad de las piezas)');
+  } else if (cap.id === 'estilo') {
     if ((d.estilo_md || '').length <= 20) faltan.push('sistema de diseño');
   } else if (cap.id === 'instagram') {
     if (!d.ig_handle) faltan.push('cuenta @');
@@ -223,6 +226,101 @@ async function getGeneracion(negocioId) {
                generado_en: p && p.manual_generado_en,
                error: (!enCurso('manual') && ult.manual && ult.manual.estado === 'error') ? ult.manual.error : null },
   };
+}
+
+// Catálogo de formatos de gráfica (medidas FINALES en mm, sin sangre: el job la suma).
+const FORMATOS = [
+  { id:'a6',        label:'Flyer A6',         ancho:105,  alto:148,  grupo:'Impresos' },
+  { id:'a5',        label:'Flyer A5',         ancho:148,  alto:210,  grupo:'Impresos' },
+  { id:'a4',        label:'Folleto A4',       ancho:210,  alto:297,  grupo:'Impresos' },
+  { id:'triptico',  label:'Tríptico A4',      ancho:297,  alto:210,  grupo:'Impresos' },
+  { id:'a3',        label:'Afiche A3',        ancho:297,  alto:420,  grupo:'Impresos' },
+  { id:'a2',        label:'Afiche A2',        ancho:420,  alto:594,  grupo:'Impresos' },
+  { id:'tarjeta',   label:'Tarjeta personal', ancho:90,   alto:50,   grupo:'Impresos' },
+  { id:'sextuple',  label:'Séxtuple vía pública', ancho:2100, alto:1200, grupo:'Vía pública' },
+  { id:'rollup',    label:'Roll-up',          ancho:800,  alto:2000, grupo:'Vía pública' },
+  { id:'pasacalle', label:'Pasacalle',        ancho:3000, alto:1000, grupo:'Vía pública' },
+  { id:'custom',    label:'A medida',         ancho:null, alto:null, grupo:'Vía pública' },
+];
+
+// --- Gráfica: piezas promocionales (folletos, afiches, vía pública) ---
+async function getGraficas(negocioId) {
+  const { rows } = await pool.query(`
+    SELECT g.id, g.nombre, g.formato, g.ancho_mm, g.alto_mm, g.mensaje, g.estado, g.version_actual,
+           g.fondo_modo, g.fondo_url, g.datos, g.actualizado_en,
+           v.png_url, v.pdf_url, v.estado AS v_estado, v.error AS v_error, v.nro AS v_nro
+      FROM contenido.grafica g
+      LEFT JOIN LATERAL (SELECT * FROM contenido.grafica_version x
+                          WHERE x.grafica_id=g.id ORDER BY x.nro DESC LIMIT 1) v ON true
+     WHERE g.negocio_id=$1 ORDER BY g.actualizado_en DESC`, [negocioId]);
+  return rows;
+}
+
+async function getGrafica(negocioId, id) {
+  const { rows: [g] } = await pool.query(
+    'SELECT * FROM contenido.grafica WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
+  if (!g) return null;
+  const { rows: vs } = await pool.query(
+    `SELECT id, nro, instruccion, png_url, pdf_url, html_url, estado, error, creado_en
+       FROM contenido.grafica_version WHERE grafica_id=$1 ORDER BY nro DESC`, [id]);
+  g.versiones = vs;
+  return g;
+}
+
+// Crear la pieza y encolar su primera versión.
+async function crearGrafica(negocioId, d) {
+  const f = FORMATOS.find(x => x.id === d.formato);
+  if (!f) return { ok: false, error: 'formato_invalido' };
+  const ancho = f.ancho || Math.round(Number(d.ancho_mm) || 0);
+  const alto  = f.alto  || Math.round(Number(d.alto_mm)  || 0);
+  if (!(ancho > 0 && alto > 0)) return { ok: false, error: 'medidas_invalidas' };
+  if (ancho > 6000 || alto > 6000) return { ok: false, error: 'medidas_excesivas' };
+  const nombre = (d.nombre || '').trim().slice(0, 120) || (f.label + ' — ' + new Date().toLocaleDateString('es-AR'));
+  const modo = ['biblioteca', 'subido', 'generar', 'sin_fondo'].includes(d.fondo_modo) ? d.fondo_modo : 'sin_fondo';
+
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    const { rows: [g] } = await cli.query(
+      `INSERT INTO contenido.grafica (negocio_id, nombre, formato, ancho_mm, alto_mm, mensaje,
+                                      fondo_modo, fondo_url, fondo_prompt, datos)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) RETURNING id`,
+      [negocioId, nombre, f.id, ancho, alto, (d.mensaje || '').trim() || null,
+       modo, (d.fondo_url || '').trim() || null, (d.fondo_prompt || '').trim() || null,
+       JSON.stringify(d.datos || {})]);
+    await cli.query(
+      `INSERT INTO contenido.grafica_version (grafica_id, nro, instruccion) VALUES ($1, 1, $2)`,
+      [g.id, (d.mensaje || '').trim() || null]);
+    await cli.query('COMMIT');
+    return { ok: true, id: g.id };
+  } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
+}
+
+// Nueva iteración: se parte del diseño anterior y se aplica la instrucción de cambio.
+async function iterarGrafica(negocioId, id, instruccion) {
+  const { rows: [g] } = await pool.query(
+    'SELECT id, version_actual FROM contenido.grafica WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
+  if (!g) return { ok: false, error: 'no_existe' };
+  const txt = (instruccion || '').trim();
+  if (!txt) return { ok: false, error: 'sin_instruccion' };
+  try {
+    await pool.query(
+      `INSERT INTO contenido.grafica_version (grafica_id, nro, instruccion)
+         VALUES ($1, (SELECT coalesce(max(nro),0)+1 FROM contenido.grafica_version WHERE grafica_id=$1), $2)`,
+      [id, txt]);
+    return { ok: true };
+  } catch (e) {
+    if (e.code === '23505') return { ok: false, error: 'ya_en_curso' };
+    throw e;
+  }
+}
+
+async function estadoGrafica(negocioId, id, estado) {
+  if (!['aprobada', 'descartada', 'lista'].includes(estado)) return { ok: false, error: 'estado_invalido' };
+  const { rowCount } = await pool.query(
+    'UPDATE contenido.grafica SET estado=$3, actualizado_en=now() WHERE id=$1 AND negocio_id=$2',
+    [id, negocioId, estado]);
+  return { ok: rowCount > 0 };
 }
 
 // Config de plataforma: lo transversal a todas las marcas (hoy, la lente de Instagram).
@@ -1177,6 +1275,7 @@ module.exports = { getNegocios, getProyectoId, getPerfil, getIgToken, guardarPer
   getLente, getLenteToken, guardarLente,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,
   pedirGeneracion, getGeneracion,
+  FORMATOS, getGraficas, getGrafica, crearGrafica, iterarGrafica, estadoGrafica,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,
