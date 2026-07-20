@@ -23,6 +23,7 @@
   .gprev .ph{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:#55554f;text-align:center;padding:14px;}
   .gbody{padding:11px 13px;}
   .gname{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:.98rem;color:var(--white);line-height:1.2;}
+  .gcod{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.08em;color:var(--pend);margin-top:3px;}
   .gmeta{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--ash);margin-top:4px;display:flex;gap:7px;flex-wrap:wrap;align-items:center;}
   .gst{padding:1px 7px;border-radius:9px;border:1px solid;font-size:.55rem;text-transform:uppercase;letter-spacing:.06em;}
   .gst.lista{color:var(--pend);border-color:var(--pend-line);}
@@ -149,6 +150,7 @@
 <script src="shell.js"></script>
 <script>ClausinaShell({active:'grafica',cap:'grafica',darkOnly:true});</script>
 <script>
+const cod = n => n ? 'G-'+String(n).padStart(4,'0') : '';
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let _t; function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.classList.toggle('err',!!e); t.classList.add('show'); clearTimeout(_t); _t=setTimeout(()=>t.classList.remove('show'),3600); }
 function salir(){ fetch('api/logout',{method:'POST'}).then(()=>location.href='login'); }
@@ -167,6 +169,7 @@ function card(g){
   return `<div class="gcard" onclick="abrirDet('${g.id}')">
     <div class="gprev">${prev}</div>
     <div class="gbody"><div class="gname">${esc(g.nombre)}</div>
+      <div class="gcod">${cod(g.numero)}</div>
       <div class="gmeta"><span class="gst ${st}">${esc(lbl)}</span>
         <span>${esc(f?f.label:g.formato)} · ${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm</span>
         ${g.version_actual?`<span>v${g.version_actual}</span>`:''}</div></div></div>`;
@@ -265,7 +268,7 @@ async function refrescarDet(){
   let g; try{ g=await fetch('api/grafica/'+DET).then(r=>r.json()); }catch(e){ return; }
   if(g.error) return;
   const f=FORMATOS.find(x=>x.id===g.formato);
-  document.getElementById('d-nombre').textContent=g.nombre;
+  document.getElementById('d-nombre').textContent = (g.numero? cod(g.numero)+' · ':'') + g.nombre;
   document.getElementById('d-meta').textContent=`${f?f.label:g.formato} · ${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm · ${g.estado}`;
   const vs=g.versiones||[], activa=vs.find(v=>v.estado==='lista')||vs[0];
   const enCurso=vs.some(v=>v.estado==='pendiente'||v.estado==='procesando');

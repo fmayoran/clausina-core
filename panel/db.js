@@ -246,7 +246,7 @@ const FORMATOS = [
 // --- Gráfica: piezas promocionales (folletos, afiches, vía pública) ---
 async function getGraficas(negocioId) {
   const { rows } = await pool.query(`
-    SELECT g.id, g.nombre, g.formato, g.ancho_mm, g.alto_mm, g.mensaje, g.estado, g.version_actual,
+    SELECT g.id, g.numero, g.nombre, g.formato, g.ancho_mm, g.alto_mm, g.mensaje, g.estado, g.version_actual,
            g.fondo_modo, g.fondo_url, g.datos, g.actualizado_en,
            v.png_url, v.pdf_url, v.estado AS v_estado, v.error AS v_error, v.nro AS v_nro
       FROM contenido.grafica g

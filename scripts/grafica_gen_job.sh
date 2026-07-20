@@ -120,10 +120,11 @@ timeout 900 claude -p "$PROMPT" --model sonnet --allowedTools Read Write >> "$LO
 W=$(python3 -c "import json;print(json.load(open('/tmp/graf_ctx_$vid.json'))['ancho_mm'])")
 H=$(python3 -c "import json;print(json.load(open('/tmp/graf_ctx_$vid.json'))['alto_mm'])")
 nro=$(psql "SELECT nro FROM contenido.grafica_version WHERE id='$vid';")
+num=$(printf "G-%04d" "$(psql "SELECT numero FROM contenido.grafica WHERE id='$gid';")")
 stamp=$(date +%Y%m%d%H%M%S)
 dir="$MEDIA_HOST/grafica/$slug"; rel="grafica/$slug"
 mkdir -p "$dir"
-base="pieza-${gid:0:8}-v${nro}-$stamp"
+base="${num}-v${nro}-$stamp"
 cp "/tmp/graf_res_$vid.html" "$dir/$base.html"
 if ! node "$MOTOR/scripts/grafica_render.js" "$dir/$base.html" "$dir/$base.pdf" "$dir/$base.png" "$W" "$H" >> "$LOG" 2>&1; then
   fallar "No se pudo renderizar la pieza (PDF/PNG)."
