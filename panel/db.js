@@ -95,6 +95,16 @@ async function getCapacidades(negocioId) {
   });
 }
 
+// Valida que un conjunto de URLs sean media de piezas de ESTE negocio (para la descarga).
+async function urlsDeMediaDelNegocio(negocioId, urls) {
+  if (!urls || !urls.length) return new Set();
+  const { rows } = await pool.query(
+    `SELECT DISTINCT m.url FROM contenido.media m
+       JOIN contenido.piezas pz ON pz.id = m.pieza_id
+      WHERE pz.negocio_id = $1 AND m.url = ANY($2)`, [negocioId, urls]);
+  return new Set(rows.map(r => r.url));
+}
+
 // Contactos de la marca (dueño, community manager, pauta…). A quién escribirle, y a futuro
 // a quién notificarle cuando su aviso sale en pantalla.
 async function getContactos(negocioId) {
@@ -1165,7 +1175,7 @@ module.exports = { getNegocios, getProyectoId, getPerfil, getIgToken, guardarPer
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio,
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente,
-  getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist,
+  getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,
   pedirGeneracion, getGeneracion,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,

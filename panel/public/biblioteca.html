@@ -13,6 +13,12 @@
   .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;}
   .mcell{position:relative;border-radius:12px;overflow:hidden;background:#0c0f12;aspect-ratio:1;cursor:pointer;border:1px solid #1c2128;transition:.15s;}
   .mcell:hover{border-color:#CCF24D;}
+  .mcell.picked{border-color:#CCF24D;box-shadow:0 0 0 2px #CCF24D inset;}
+  .mcell .pick{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:6px;border:1px solid rgba(255,255,255,.55);background:rgba(0,0,0,.45);display:grid;place-items:center;font-size:12px;color:#0c0c0a;}
+  .mcell .pick.on{background:#CCF24D;border-color:#CCF24D;font-weight:800;}
+  .selbar{display:flex;align-items:center;gap:10px;margin:-6px 0 12px;padding:9px 12px;border:1px solid #20242B;border-radius:10px;background:#0c0f12;}
+  .abtn.dl{background:#CCF24D;border-color:#CCF24D;color:#0c0c0a;font-weight:700;}
+  .abtn.dl:disabled{opacity:.45;cursor:default;background:transparent;color:var(--ash);border-color:#20242B;}
   .mcell img,.mcell video{width:100%;height:100%;object-fit:cover;display:block;}
   .mcell.logocell img{object-fit:contain;padding:16px;}
   .mcell .play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.55);display:grid;place-items:center;color:#fff;font-size:13px;pointer-events:none;}
@@ -109,6 +115,7 @@ const absUrl = u => /^https?:/.test(u) ? u : ('/'+String(u).replace(/^\/+/,''));
 const humanB = n => { n=+n||0; if(!n) return ''; if(n<1024) return n+' B'; const u=['KB','MB','GB']; let i=-1; do{ n/=1024; i++; }while(n>=1024&&i<u.length-1); return (n<10?n.toFixed(1):Math.round(n))+' '+u[i]; };
 let DATA={piezas:[],material:[],marca:[],items:[],trabajando:[]}, CUR=null, SRC=null, _pollT=null, _uploadFolder='En proceso';
 let _FOLDERS=[], _VITEMS=[];
+let SEL=false, PICK=new Set();   // modo selección + índices elegidos
 let _toastT; function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.classList.toggle('err',!!e); t.classList.add('show'); clearTimeout(_toastT); _toastT=setTimeout(()=>t.classList.remove('show'),3600); }
 const ESTLBL={ publicada:'publicada', pendiente_aprobacion:'pendiente', aprobada:'aprobando', rechazada:'a modificar', borrador:'borrador' };
 
@@ -157,9 +164,12 @@ function overview(){
 
 function itemCell(idx, m, taller){
   const badge = m.kind==='item'&&m.ia ? '<span class="badge ia">IA</span>' : (m.kind==='mat'?'<span class="badge mat">aportado</span>':'');
-  const del = (taller && m.kind==='item') ? `<button class="gx" title="Borrar" onclick="event.stopPropagation();borrarItem('${m.id}')">×</button>` : '';
+  const del = (taller && m.kind==='item' && !SEL) ? `<button class="gx" title="Borrar" onclick="event.stopPropagation();borrarItem('${m.id}')">×</button>` : '';
   const code = m.codigo ? `<span class="code">${esc(m.codigo)}</span>` : '';
-  return `<div class="mcell${m.logo?' logocell':''}" onclick="abrir(${idx})" title="${esc(m.nombre||'')}">${thumb(m)}${badge}${code}${del}</div>`;
+  const on = PICK.has(idx);
+  const chk = SEL ? `<span class="pick${on?' on':''}">${on?'✓':''}</span>` : '';
+  const clk = SEL ? `togglePick(${idx})` : `abrir(${idx})`;
+  return `<div class="mcell${m.logo?' logocell':''}${SEL&&on?' picked':''}" onclick="${clk}" title="${esc(m.nombre||'')}">${thumb(m)}${badge}${code}${del}${chk}</div>`;
 }
 function workCell(g){
   if(g.estado==='error') return `<div class="mcell gerr"><span class="gwtx" style="color:#FF6A45">${esc(g.resumen||'No se pudo generar')}</span><span class="gwtx">${esc(g.instruccion||'')}</span><button class="gx" style="display:block" onclick="borrarTrabajo('${g.id}')">×</button></div>`;
@@ -173,16 +183,46 @@ function folderView(){
   const taller=f.tipo==='taller'; _VITEMS=f.items;
   const sz=(DATA.folderSizes||{})[f.nombre];
   let html = `<div class="crumb mb-4"><a onclick="salir()">← Biblioteca</a><span class="mono text-[11px] text-pmut dark:text-mut">/</span><span class="mono text-[11px]" style="color:#ECEEF0">${esc(f.nombre)}</span>${sz?`<span class="mono text-[11px] text-pmut dark:text-mut">· ${humanB(sz)}</span>`:''}`;
-  if(taller) html += `<button class="abtn" style="margin-left:auto" onclick="subir()">⬆ Subir aquí</button>`;
+  html += `<span style="margin-left:auto"></span>`;
+  if(taller && !SEL) html += `<button class="abtn" onclick="subir()">⬆ Subir aquí</button>`;
+  if(f.items.length) html += SEL
+    ? `<button class="abtn" onclick="selTodo()">Todos</button><button class="abtn" onclick="selModo(false)">Cancelar</button>`
+    : `<button class="abtn" onclick="selModo(true)">⬇ Descargar</button>`;
   html += `</div>`;
+  if(SEL) html += `<div class="selbar"><span class="mono text-[11px]" id="selN">${PICK.size} seleccionado(s)</span>`
+    + `<button class="abtn dl" onclick="descargarSel()" ${PICK.size?'':'disabled'}>Descargar ${PICK.size>1?'('+PICK.size+') en .zip':''}</button></div>`;
   const work=(f.trabajando||[]).map(workCell).join('');
   const cells=f.items.map((m,i)=>itemCell(i,m,taller)).join('');
   html += `<div class="mgrid">${(work+cells)||'<div class="mono text-[11px] text-pmut dark:text-mut py-3">— carpeta vacía —</div>'}</div>`;
   document.getElementById('view').innerHTML=html;
 }
+// --- Selección múltiple + descarga (uno = archivo; varios = .zip) ---
+function selModo(on){ SEL=!!on; PICK.clear(); render(); }
+function togglePick(i){ PICK.has(i)?PICK.delete(i):PICK.add(i); render(); }
+function selTodo(){ if(PICK.size===_VITEMS.length) PICK.clear(); else _VITEMS.forEach((_,i)=>PICK.add(i)); render(); }
+async function descargarSel(){
+  if(!PICK.size) return;
+  const items=[..._VITEMS.filter((_,i)=>PICK.has(i))].map(m=>({url:m.url, nombre:m.nombre||m.codigo||'archivo'}));
+  const btn=document.querySelector('.abtn.dl'); if(btn){ btn.disabled=true; btn.textContent='Preparando…'; }
+  try{
+    const r=await fetch('api/biblioteca/descargar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})});
+    if(!r.ok){ const e=await r.json().catch(()=>({})); toast(e.error==='sin_acceso'?'No se puede descargar ese material':'No se pudo descargar',true); render(); return; }
+    // Nombre que mandó el server (Content-Disposition), o uno por defecto.
+    const cd=r.headers.get('content-disposition')||'';
+    const m=/filename="([^"]+)"/.exec(cd);
+    const blob=await r.blob();
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download = m ? m[1] : (items.length>1 ? 'biblioteca.zip' : (items[0].nombre||'archivo'));
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 20000);
+    toast(items.length>1 ? `${items.length} archivos descargados` : 'Archivo descargado');
+    selModo(false);
+  }catch(e){ toast('Error de conexión',true); render(); }
+}
 function render(){ CUR ? folderView() : overview(); }
-function entrar(i){ const f=_FOLDERS[i]; if(f){ CUR=f.nombre; render(); } }
-function salir(){ CUR=null; render(); }
+function entrar(i){ const f=_FOLDERS[i]; if(f){ CUR=f.nombre; SEL=false; PICK.clear(); render(); } }
+function salir(){ CUR=null; SEL=false; PICK.clear(); render(); }
 
 function abrir(idx){
   const m=_VITEMS[idx]; if(!m) return;

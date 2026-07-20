@@ -608,6 +608,73 @@ app.post('/api/biblioteca/subir-video', async (req, res) => {
   } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
   finally { fs.promises.unlink(tmp).catch(() => {}); }
 });
+// Descargar material de la biblioteca: 1 ítem = el archivo tal cual; varios = un .zip.
+// Seguridad: solo se sirve lo que pertenece al negocio activo (path del media store con su slug,
+// o una URL que exista como media de una pieza suya). Nada de rutas arbitrarias.
+app.post('/api/biblioteca/descargar', async (req, res) => {
+  try {
+    const pedidos = ((req.body || {}).items || []).slice(0, 200);
+    if (!pedidos.length) return res.status(400).json({ error: 'sin_items' });
+
+    // Prefijos del media store que son de este negocio.
+    const okPrefijos = ['biblioteca/', 'material/prop/', 'avisos/', 'marca/'].map(p => p + req.negocio + '/');
+    const local = u => {
+      let s = String(u || '').trim()
+        .replace(/^https?:\/\/[^/]+\/media\//, '').replace(/^\/?media\//, '');
+      if (!s || s.includes('..')) return null;
+      return okPrefijos.some(p => s.startsWith(p)) ? s : null;
+    };
+    // URLs externas (piezas publicadas): validarlas contra la DB de este negocio.
+    const externas = pedidos.map(i => String(i.url || '')).filter(u => /^https?:/.test(u) && !local(u));
+    const validas = externas.length ? await db.urlsDeMediaDelNegocio(req.negocioId, externas) : new Set();
+
+    const arch = [];
+    for (const it of pedidos) {
+      const rel = local(it.url);
+      const nombre = String(it.nombre || 'archivo').replace(/[/\\?%*:|"<>]/g, '-').slice(0, 80);
+      if (rel) arch.push({ tipo: 'disco', ruta: path.join('/app/media', rel), nombre, ext: (rel.match(/\.[a-z0-9]+$/i) || [''])[0] });
+      else if (validas.has(String(it.url))) arch.push({ tipo: 'url', url: String(it.url), nombre, ext: (String(it.url).match(/\.[a-z0-9]+(?=($|\?))/i) || [''])[0] });
+    }
+    if (!arch.length) return res.status(403).json({ error: 'sin_acceso' });
+
+    const nombreCon = a => a.nombre.toLowerCase().endsWith(a.ext.toLowerCase()) ? a.nombre : (a.nombre + a.ext);
+
+    if (arch.length === 1) {                       // uno solo: el archivo, sin zip
+      const a = arch[0];
+      res.set('Content-Disposition', `attachment; filename="${nombreCon(a)}"`);
+      if (a.tipo === 'disco') {
+        if (!fs.existsSync(a.ruta)) return res.status(404).json({ error: 'no_existe' });
+        return fs.createReadStream(a.ruta).pipe(res);
+      }
+      const r = await fetch(a.url, { signal: AbortSignal.timeout(30000) });
+      if (!r.ok) return res.status(502).json({ error: 'origen' });
+      res.set('Content-Type', r.headers.get('content-type') || 'application/octet-stream');
+      return res.end(Buffer.from(await r.arrayBuffer()));
+    }
+
+    const hoy = new Date().toISOString().slice(0, 10);
+    res.set('Content-Type', 'application/zip');
+    res.set('Content-Disposition', `attachment; filename="biblioteca-${req.negocio}-${hoy}.zip"`);
+    const archive = archiver('zip', { store: true });   // imágenes/videos ya vienen comprimidos
+    archive.on('error', e => { console.error('zip bib', e.message); if (!res.headersSent) res.status(500).end(); });
+    archive.pipe(res);
+    const usados = new Set();
+    for (const a of arch) {
+      let n = nombreCon(a), i = 1;
+      while (usados.has(n)) { n = nombreCon(a).replace(/(\.[^.]+)?$/, `-${++i}$1`); }   // sin pisar nombres repetidos
+      usados.add(n);
+      try {
+        if (a.tipo === 'disco') { if (fs.existsSync(a.ruta)) archive.file(a.ruta, { name: n }); }
+        else {
+          const r = await fetch(a.url, { signal: AbortSignal.timeout(30000) });
+          if (r.ok) archive.append(Buffer.from(await r.arrayBuffer()), { name: n });
+        }
+      } catch (e) { console.error('zip bib item', a.nombre, e.message); }
+    }
+    await archive.finalize();
+  } catch (e) { console.error('descargar bib', e.message); if (!res.headersSent) res.status(500).json({ error: 'zip' }); }
+});
+
 // Preservar un asset (p.ej. material aportado, que se depura) copiándolo a la base "Terminado".
 app.post('/api/biblioteca/preservar', async (req, res) => {
   try {
