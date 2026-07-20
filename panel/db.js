@@ -247,8 +247,8 @@ const FORMATOS = [
 async function getGraficas(negocioId) {
   const { rows } = await pool.query(`
     SELECT g.id, g.numero, g.nombre, g.formato, g.ancho_mm, g.alto_mm, g.mensaje, g.estado, g.version_actual,
-           g.fondo_modo, g.fondo_url, g.datos, g.actualizado_en,
-           v.png_url, v.pdf_url, v.estado AS v_estado, v.error AS v_error, v.nro AS v_nro
+           g.caras, g.fondo_modo, g.fondo_url, g.datos, g.actualizado_en,
+           v.png_url, v.png_dorso_url, v.pdf_url, v.estado AS v_estado, v.error AS v_error, v.nro AS v_nro
       FROM contenido.grafica g
       LEFT JOIN LATERAL (SELECT * FROM contenido.grafica_version x
                           WHERE x.grafica_id=g.id ORDER BY x.nro DESC LIMIT 1) v ON true
@@ -261,7 +261,7 @@ async function getGrafica(negocioId, id) {
     'SELECT * FROM contenido.grafica WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
   if (!g) return null;
   const { rows: vs } = await pool.query(
-    `SELECT id, nro, instruccion, png_url, pdf_url, html_url, estado, error, creado_en
+    `SELECT id, nro, instruccion, png_url, png_dorso_url, pdf_url, html_url, estado, error, creado_en
        FROM contenido.grafica_version WHERE grafica_id=$1 ORDER BY nro DESC`, [id]);
   g.versiones = vs;
   return g;
@@ -277,15 +277,16 @@ async function crearGrafica(negocioId, d) {
   if (ancho > 6000 || alto > 6000) return { ok: false, error: 'medidas_excesivas' };
   const nombre = (d.nombre || '').trim().slice(0, 120) || (f.label + ' — ' + new Date().toLocaleDateString('es-AR'));
   const modo = ['biblioteca', 'subido', 'generar', 'sin_fondo'].includes(d.fondo_modo) ? d.fondo_modo : 'sin_fondo';
+  const caras = Number(d.caras) === 2 ? 2 : 1;
 
   const cli = await pool.connect();
   try {
     await cli.query('BEGIN');
     const { rows: [g] } = await cli.query(
-      `INSERT INTO contenido.grafica (negocio_id, nombre, formato, ancho_mm, alto_mm, mensaje,
+      `INSERT INTO contenido.grafica (negocio_id, nombre, formato, ancho_mm, alto_mm, caras, mensaje,
                                       fondo_modo, fondo_url, fondo_prompt, datos)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb) RETURNING id`,
-      [negocioId, nombre, f.id, ancho, alto, (d.mensaje || '').trim() || null,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb) RETURNING id`,
+      [negocioId, nombre, f.id, ancho, alto, caras, (d.mensaje || '').trim() || null,
        modo, (d.fondo_url || '').trim() || null, (d.fondo_prompt || '').trim() || null,
        JSON.stringify(d.datos || {})]);
     await cli.query(

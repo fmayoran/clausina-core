@@ -46,7 +46,7 @@ def q(sql):
     return subprocess.run(["docker","exec","-i",pg,"psql","-U","postgres","-d","claude","-t","-A","-q","-c",sql],
                           capture_output=True, text=True).stdout.strip()
 g = json.loads(q(f"SELECT row_to_json(t) FROM (SELECT nombre, formato, ancho_mm, alto_mm, mensaje, "
-                 f"fondo_modo, fondo_url, fondo_prompt, datos FROM contenido.grafica WHERE id='{gid}') t"))
+                 f"caras, fondo_modo, fondo_url, fondo_prompt, datos FROM contenido.grafica WHERE id='{gid}') t"))
 neg = json.loads(q(f"SELECT row_to_json(t) FROM (SELECT n.nombre, n.slug, n.dominio_web, n.ig_handle, n.email, "
                    f"n.whatsapp, p.logo, p.slogan, p.estilo_md FROM contenido.negocios n "
                    f"LEFT JOIN contenido.negocio_perfil p ON p.negocio_id=n.id "
@@ -67,6 +67,7 @@ ctx = {
   "medida_final_mm": f"{W:g} x {H:g}",
   "sangre_mm": sangre, "seguridad_mm": seguridad,
   "gran_formato": grande,
+  "caras": int(g.get("caras") or 1),
   "mensaje": g.get("mensaje") or "",
   "datos": g.get("datos") or {},
   "fondo_prompt": g.get("fondo_prompt") or "",
@@ -126,12 +127,16 @@ dir="$MEDIA_HOST/grafica/$slug"; rel="grafica/$slug"
 mkdir -p "$dir"
 base="${num}-v${nro}-$stamp"
 cp "/tmp/graf_res_$vid.html" "$dir/$base.html"
-if ! node "$MOTOR/scripts/grafica_render.js" "$dir/$base.html" "$dir/$base.pdf" "$dir/$base.png" "$W" "$H" >> "$LOG" 2>&1; then
-  fallar "No se pudo renderizar la pieza (PDF/PNG)."
-fi
+RJSON=$(node "$MOTOR/scripts/grafica_render.js" "$dir/$base.html" "$dir/$base.pdf" "$dir/$base.png" "$W" "$H" 2>>"$LOG")
+echo "$RJSON" >> "$LOG"
+echo "$RJSON" | grep -q '"ok":true' || fallar "No se pudo renderizar la pieza (PDF/PNG)."
+# Dorso: el renderer lo escribe como <base>-dorso.png si la pieza tiene 2 caras.
+DORSO_SQL="png_dorso_url=NULL"
+if [ -s "$dir/$base-dorso.png" ]; then DORSO_SQL="png_dorso_url='$BASE_URL/$rel/$base-dorso.png'"; fi
 
 psql "UPDATE contenido.grafica_version SET estado='lista', error=NULL, procesado_en=now(),
-        html_url='$BASE_URL/$rel/$base.html', pdf_url='$BASE_URL/$rel/$base.pdf', png_url='$BASE_URL/$rel/$base.png'
+        html_url='$BASE_URL/$rel/$base.html', pdf_url='$BASE_URL/$rel/$base.pdf',
+        png_url='$BASE_URL/$rel/$base.png', $DORSO_SQL
       WHERE id='$vid';" >/dev/null
 psql "UPDATE contenido.grafica SET version_actual=$nro, estado='lista', actualizado_en=now() WHERE id='$gid';" >/dev/null
 echo "$(ts) grafica $vid lista (v$nro)" >> "$LOG"

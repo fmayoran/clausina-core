@@ -29,7 +29,20 @@ titular, dejá lo esencial. Un afiche con un párrafo no lo lee nadie.
   html, body { margin:0; padding:0; }
   .lienzo { width: <ancho_mm>mm; height: <alto_mm>mm; position: relative; overflow: hidden; }
   ```
-  Todo el diseño va dentro de **una sola** `.lienzo`.
+  Cada **cara** de la pieza es un bloque `.lienzo` con esas medidas.
+- **Frente y dorso.** El contexto trae `caras` (1 o 2). Con `caras: 1` hacés **una sola** `.lienzo`
+  (el frente). Con `caras: 2` hacés **dos** `.lienzo` del mismo tamaño, una debajo de la otra, y para
+  que el PDF salga con una página por cara:
+  ```css
+  .lienzo { break-after: page; }
+  .lienzo:last-child { break-after: auto; }
+  ```
+  - **Frente:** el mensaje principal (titular, imagen fuerte, el gancho).
+  - **Dorso:** el complemento — según la pieza: más información, el detalle de la propuesta, mapa/
+    cómo llegar, menú o listado, promociones, y los datos de contacto ampliados con el QR si va.
+    Misma identidad, misma paleta, pero puede ser más informativo y de lectura más cercana. El dorso
+    no repite el frente: lo completa. Si no hay contenido real para un dorso, decilo y hacé solo el
+    frente (una `.lienzo`).
 - **Sangre (bleed).** Los fondos, colores e imágenes que llegan al borde tienen que cubrir la
   `.lienzo` **completa** (hasta el filo), porque el corte se come el excedente.
 - **Zona de seguridad.** El contexto trae `seguridad_mm`: ningún texto ni el logo puede entrar en

@@ -67,7 +67,11 @@
   .dwrap{display:grid;grid-template-columns:1fr 300px;gap:16px;}
   @media(max-width:860px){.dwrap{grid-template-columns:1fr;}}
   .dprev{background:#0c0f12;border:1px solid var(--line);border-radius:10px;display:grid;place-items:center;padding:14px;min-height:320px;}
-  .dprev img{max-width:100%;max-height:62vh;object-fit:contain;}
+  .dprev{flex-direction:column;gap:10px;}
+  .dprev img{max-width:100%;max-height:56vh;object-fit:contain;}
+  .caratabs{display:flex;gap:6px;}
+  .ctab{background:transparent;border:1px solid var(--line);color:var(--ash);font-family:'JetBrains Mono',monospace;font-size:.62rem;padding:5px 12px;border-radius:7px;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;}
+  .ctab.on{border-color:var(--pend);color:var(--pend);}
   .vlist{display:flex;flex-direction:column;gap:7px;max-height:240px;overflow-y:auto;}
   .vrow{display:flex;gap:9px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:.82rem;color:var(--white);}
   .vrow:hover{border-color:var(--ash);} .vrow.on{border-color:var(--pend);}
@@ -100,6 +104,11 @@
   <div class="gbd">
     <div class="fl"><label>Nombre <span class="hint">— para reconocerla</span></label><input id="n-nombre" placeholder="Afiche apertura"></div>
     <div class="fl"><label>Formato</label><select id="n-formato" onchange="onFormato()"></select></div>
+    <div class="fl"><label>Caras</label>
+      <div class="opts" id="n-caras">
+        <div class="opt on" data-caras="1" onclick="setCaras(1)">Solo frente</div>
+        <div class="opt" data-caras="2" onclick="setCaras(2)">Frente y dorso</div>
+      </div></div>
     <div class="row2" id="n-medidas" style="display:none">
       <div class="fl" style="flex:1"><label>Ancho (mm)</label><input id="n-ancho" type="number" min="20" max="6000" value="1000"></div>
       <div class="fl" style="flex:1"><label>Alto (mm)</label><input id="n-alto" type="number" min="20" max="6000" value="700"></div>
@@ -157,7 +166,8 @@ function salir(){ fetch('api/logout',{method:'POST'}).then(()=>location.href='lo
 function cerrar(id){ document.getElementById(id).style.display='none'; if(id==='ov-det') DET=null; }
 
 const DATOS = [['direccion','Dirección'],['telefono','Teléfono'],['whatsapp','WhatsApp'],['instagram','Instagram'],['web','Web'],['qr','Código QR']];
-let FORMATOS=[], PIEZAS=[], FONDO_MODO='sin_fondo', FONDO_URL='', DET=null, _poll=null;
+let FORMATOS=[], PIEZAS=[], FONDO_MODO='sin_fondo', FONDO_URL='', CARAS=1, DET=null, _poll=null;
+function setCaras(n){ CARAS=n; document.querySelectorAll('#n-caras .opt').forEach(o=>o.classList.toggle('on',+o.dataset.caras===n)); }
 
 // ---- listado ----
 function card(g){
@@ -172,7 +182,7 @@ function card(g){
       <div class="gcod">${cod(g.numero)}</div>
       <div class="gmeta"><span class="gst ${st}">${esc(lbl)}</span>
         <span>${esc(f?f.label:g.formato)} · ${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm</span>
-        ${g.version_actual?`<span>v${g.version_actual}</span>`:''}</div></div></div>`;
+        ${g.caras===2?'<span>frente+dorso</span>':''}${g.version_actual?`<span>v${g.version_actual}</span>`:''}</div></div></div>`;
 }
 async function cargar(){
   try{
@@ -190,7 +200,8 @@ async function cargar(){
 
 // ---- nueva ----
 function abrirNueva(){
-  FONDO_MODO='sin_fondo'; FONDO_URL='';
+  FONDO_MODO='sin_fondo'; FONDO_URL=''; CARAS=1;
+  document.querySelectorAll('#n-caras .opt').forEach(o=>o.classList.toggle('on',+o.dataset.caras===1));
   document.getElementById('n-nombre').value=''; document.getElementById('n-mensaje').value='';
   document.getElementById('n-err').textContent='';
   document.getElementById('n-formato').innerHTML = FORMATOS.map(f=>
@@ -250,7 +261,7 @@ async function crearPieza(){
   const datos={}; DATOS.forEach(([k])=>{ const c=document.getElementById('dt-'+k); if(c&&c.checked) datos[k]=true; });
   const body={ nombre:document.getElementById('n-nombre').value, formato:document.getElementById('n-formato').value,
     ancho_mm:document.getElementById('n-ancho').value, alto_mm:document.getElementById('n-alto').value,
-    mensaje, fondo_modo:FONDO_MODO, fondo_url:FONDO_URL,
+    mensaje, caras:CARAS, fondo_modo:FONDO_MODO, fondo_url:FONDO_URL,
     fondo_prompt:(document.getElementById('n-prompt')||{}).value||'', datos };
   const b=document.getElementById('n-go'); b.disabled=true; b.textContent='Enviando…';
   try{
@@ -272,9 +283,15 @@ async function refrescarDet(){
   document.getElementById('d-meta').textContent=`${f?f.label:g.formato} · ${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm · ${g.estado}`;
   const vs=g.versiones||[], activa=vs.find(v=>v.estado==='lista')||vs[0];
   const enCurso=vs.some(v=>v.estado==='pendiente'||v.estado==='procesando');
-  document.getElementById('d-prev').innerHTML = enCurso
-    ? '<div class="ph" style="color:#FF6A45"><span class="spin"></span><br>diseñando…</div>'
-    : (activa&&activa.png_url ? `<img src="${esc(activa.png_url)}">` : `<div class="ph">${esc((activa&&activa.error)||'sin versión')}</div>`);
+  if(enCurso){
+    document.getElementById('d-prev').innerHTML='<div class="ph" style="color:#FF6A45"><span class="spin"></span><br>diseñando…</div>';
+  } else if(activa&&activa.png_url){
+    const dorso = activa.png_dorso_url;
+    const tabs = dorso ? `<div class="caratabs"><button class="ctab on" onclick="verCara(this,'${esc(activa.png_url)}')">Frente</button><button class="ctab" onclick="verCara(this,'${esc(dorso)}')">Dorso</button></div>` : '';
+    document.getElementById('d-prev').innerHTML = `${tabs}<img id="d-img" src="${esc(activa.png_url)}">`;
+  } else {
+    document.getElementById('d-prev').innerHTML = `<div class="ph">${esc((activa&&activa.error)||'sin versión')}</div>`;
+  }
   document.getElementById('d-vers').innerHTML = vs.map(v=>
     `<div class="vrow${activa&&v.id===activa.id?' on':''}" onclick="verVersion('${esc(v.png_url||'')}')">
       <span class="n">v${v.nro}</span><span style="flex:1;min-width:0">${esc(v.instruccion||'—')}</span>
@@ -284,7 +301,8 @@ async function refrescarDet(){
   png.style.display = activa&&activa.png_url ? '' : 'none'; if(activa&&activa.png_url) png.href=activa.png_url;
   const it=document.getElementById('d-iter'); it.disabled=enCurso; it.textContent=enCurso?'Diseñando…':'Generar nueva versión';
 }
-function verVersion(u){ if(u) document.getElementById('d-prev').innerHTML=`<img src="${esc(u)}">`; }
+function verVersion(u){ if(u){ const i=document.getElementById('d-img'); if(i) i.src=u; else document.getElementById('d-prev').innerHTML=`<img id="d-img" src="${esc(u)}">`; } }
+function verCara(btn,u){ document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('on')); btn.classList.add('on'); const i=document.getElementById('d-img'); if(i) i.src=u; }
 async function iterar(){
   const t=document.getElementById('d-instr'), err=document.getElementById('d-err');
   const txt=t.value.trim(); err.textContent='';
