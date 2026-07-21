@@ -244,7 +244,7 @@ app.post('/api/grafica', async (req, res) => {
 // Iterar: nueva versión con la instrucción de cambio (parte del diseño anterior).
 app.post('/api/grafica/:id/iterar', async (req, res) => {
   try {
-    const r = await db.iterarGrafica(req.negocioId, req.params.id, (req.body || {}).instruccion);
+    const r = await db.iterarGrafica(req.negocioId, req.params.id, req.body || {});
     res.status(r.ok ? 200 : 409).json(r);
   } catch (e) { console.error('grafica-iterar', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });

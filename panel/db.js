@@ -298,12 +298,33 @@ async function crearGrafica(negocioId, d) {
 }
 
 // Nueva iteración: se parte del diseño anterior y se aplica la instrucción de cambio.
-async function iterarGrafica(negocioId, id, instruccion) {
+async function iterarGrafica(negocioId, id, d) {
   const { rows: [g] } = await pool.query(
     'SELECT id, version_actual FROM contenido.grafica WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
   if (!g) return { ok: false, error: 'no_existe' };
-  const txt = (instruccion || '').trim();
+  let txt = (d.instruccion || '').trim();
+
+  // Cambio de fondo opcional durante la iteración.
+  const modo = ['biblioteca', 'subido', 'generar', 'sin_fondo'].includes(d.fondo_modo) ? d.fondo_modo : null;
+  if (modo) {
+    const url = (d.fondo_url || '').trim();
+    const prompt = (d.fondo_prompt || '').trim();
+    // El job genera un fondo IA cuando modo='generar' y fondo_url viene vacío; para biblioteca/subido
+    // guardamos la URL elegida; sin_fondo limpia la imagen.
+    await pool.query(
+      'UPDATE contenido.grafica SET fondo_modo=$2, fondo_url=$3, fondo_prompt=$4 WHERE id=$1',
+      [id, modo, (modo === 'biblioteca' || modo === 'subido') ? (url || null) : null, modo === 'generar' ? (prompt || null) : null]);
+    // El diseño anterior tiene el fondo viejo embebido: hay que decirle explícitamente que lo cambie.
+    const nota = {
+      biblioteca: 'Cambiá la imagen de fondo por la nueva del contexto (fondo_url).',
+      subido: 'Cambiá la imagen de fondo por la nueva del contexto (fondo_url).',
+      generar: 'Se generó un fondo nuevo: usá esa imagen (fondo_url) en lugar del fondo anterior.',
+      sin_fondo: 'Quitá la imagen de fondo: rediseñá sin foto, con fondo de color de la marca.',
+    }[modo];
+    txt = txt ? `${txt}. ${nota}` : nota;
+  }
   if (!txt) return { ok: false, error: 'sin_instruccion' };
+
   try {
     await pool.query(
       `INSERT INTO contenido.grafica_version (grafica_id, nro, instruccion)

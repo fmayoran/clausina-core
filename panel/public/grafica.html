@@ -140,7 +140,17 @@
     <div>
       <div class="fl"><label>Versiones</label><div class="vlist" id="d-vers"></div></div>
       <div class="fl"><label>Pedir un cambio <span class="hint">— parte del diseño actual</span></label>
-        <textarea id="d-instr" placeholder="El título más grande. Sacá el QR. Probá otro fondo."></textarea></div>
+        <textarea id="d-instr" placeholder="El título más grande. Sacá el QR."></textarea></div>
+      <div class="fl"><label>Imagen de fondo</label>
+        <div class="opts" id="d-fondo">
+          <div class="opt on" data-modo="mantener" onclick="dSetFondo('mantener')">Mantener</div>
+          <div class="opt" data-modo="biblioteca" onclick="dSetFondo('biblioteca')">Biblioteca</div>
+          <div class="opt" data-modo="subido" onclick="dSetFondo('subido')">Subir</div>
+          <div class="opt" data-modo="generar" onclick="dSetFondo('generar')">Generar IA</div>
+          <div class="opt" data-modo="sin_fondo" onclick="dSetFondo('sin_fondo')">Sin foto</div>
+        </div>
+        <div id="d-fondo-extra" style="margin-top:9px"></div>
+      </div>
       <button class="abtn prim" style="width:100%" id="d-iter" onclick="iterar()">Generar nueva versión</button>
       <div class="gerr" id="d-err" style="margin-top:8px"></div>
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
@@ -273,7 +283,48 @@ async function crearPieza(){
 }
 
 // ---- detalle / iteración ----
-async function abrirDet(id){ DET=id; await refrescarDet(); document.getElementById('ov-det').style.display='flex'; }
+
+// --- Cambiar el fondo al iterar (aislado del alta) ---
+let DFONDO = { modo:'mantener', url:'', prompt:'' };
+function dResetFondo(){ DFONDO={modo:'mantener',url:'',prompt:''};
+  document.querySelectorAll('#d-fondo .opt').forEach(o=>o.classList.toggle('on',o.dataset.modo==='mantener'));
+  const x=document.getElementById('d-fondo-extra'); if(x) x.innerHTML=''; }
+function dSetFondo(m){
+  DFONDO={modo:m,url:'',prompt:''};
+  document.querySelectorAll('#d-fondo .opt').forEach(o=>o.classList.toggle('on',o.dataset.modo===m));
+  const x=document.getElementById('d-fondo-extra');
+  if(m==='biblioteca'){ x.innerHTML='<div class="gsub">cargando biblioteca…</div>'; dCargarBiblio(); }
+  else if(m==='subido'){ x.innerHTML='<input type="file" accept="image/*" onchange="dSubirFondo(this)">'; }
+  else if(m==='generar'){ x.innerHTML='<textarea id="d-prompt" placeholder="Cómo querés la imagen: «fuego y brasas en primer plano, nocturno, sin texto»"></textarea>'; }
+  else x.innerHTML='';
+}
+async function dCargarBiblio(){
+  try{
+    const d=await fetch('api/biblioteca').then(r=>r.json());
+    const its=(d.items||[]).filter(i=>i.tipo==='image');
+    document.getElementById('d-fondo-extra').innerHTML = its.length
+      ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;max-height:150px;overflow:auto">'
+        + its.map(i=>`<img src="media/${esc(i.media_path)}" data-u="media/${esc(i.media_path)}" onclick="dElegirFondo(this)" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:7px;border:2px solid transparent;cursor:pointer">`).join('')
+        + '</div>'
+      : '<div class="gsub">la biblioteca no tiene imágenes</div>';
+  }catch(e){ document.getElementById('d-fondo-extra').innerHTML='<div class="gsub">no se pudo cargar</div>'; }
+}
+function dElegirFondo(el){
+  document.querySelectorAll('#d-fondo-extra img').forEach(i=>i.style.borderColor='transparent');
+  el.style.borderColor='#FF6A45'; DFONDO.url=new URL(el.dataset.u, location.href).href;
+}
+async function dSubirFondo(inp){
+  const f=(inp.files||[])[0]; if(!f) return;
+  const x=document.getElementById('d-fondo-extra');
+  x.insertAdjacentHTML('beforeend','<div class="gsub" id="dupst">subiendo…</div>');
+  try{
+    const dataUrl=await new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.onerror=j;rd.readAsDataURL(f);});
+    const d=await fetch('api/grafica/fondo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,filename:f.name})}).then(r=>r.json());
+    if(d.ok){ DFONDO.url=d.url; document.getElementById('dupst').textContent='listo ✓'; }
+    else document.getElementById('dupst').textContent='no se pudo subir';
+  }catch(e){ document.getElementById('dupst').textContent='error'; }
+}
+async function abrirDet(id){ DET=id; dResetFondo(); await refrescarDet(); document.getElementById('ov-det').style.display='flex'; }
 async function refrescarDet(){
   if(!DET) return;
   let g; try{ g=await fetch('api/grafica/'+DET).then(r=>r.json()); }catch(e){ return; }
@@ -306,11 +357,16 @@ function verCara(btn,u){ document.querySelectorAll('.ctab').forEach(t=>t.classLi
 async function iterar(){
   const t=document.getElementById('d-instr'), err=document.getElementById('d-err');
   const txt=t.value.trim(); err.textContent='';
-  if(!txt){ err.textContent='Escribí qué querés cambiar'; return; }
+  const cambiaFondo = DFONDO.modo!=='mantener';
+  if(!txt && !cambiaFondo){ err.textContent='Escribí qué querés cambiar (o cambiá el fondo)'; return; }
+  if(cambiaFondo && (DFONDO.modo==='biblioteca'||DFONDO.modo==='subido') && !DFONDO.url){ err.textContent='Elegí la imagen de fondo'; return; }
+  const body={ instruccion:txt };
+  if(cambiaFondo){ body.fondo_modo=DFONDO.modo; body.fondo_url=DFONDO.url;
+    body.fondo_prompt=(document.getElementById('d-prompt')||{}).value||''; }
   const b=document.getElementById('d-iter'); b.disabled=true; b.textContent='Enviando…';
   try{
-    const d=await fetch('api/grafica/'+DET+'/iterar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instruccion:txt})}).then(r=>r.json());
-    if(d.ok){ t.value=''; toast('Nueva versión en camino'); cargar(); refrescarDet(); }
+    const d=await fetch('api/grafica/'+DET+'/iterar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+    if(d.ok){ t.value=''; dResetFondo(); toast('Nueva versión en camino'); cargar(); refrescarDet(); }
     else err.textContent = d.error==='ya_en_curso'?'Ya hay una versión generándose':'No se pudo pedir';
   }catch(e){ err.textContent='Error de conexión'; }
   b.disabled=false; b.textContent='Generar nueva versión';
