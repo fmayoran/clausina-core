@@ -21,7 +21,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT pz.titulo_interno, r.token, r.caption, r.formato, (SELECT count(*) FROM contenido.media m WHERE m.pieza_id=pz.id) AS n_media, COALESCE((SELECT m.poster_url FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1 AND m.tipo='video'),(SELECT m.url FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1)) AS foto_url, (SELECT p.telegram_chat_id FROM contenido.proyectos p WHERE p.id=pz.proyecto_id) AS chat_id FROM contenido.revisiones r JOIN contenido.piezas pz ON pz.id=r.pieza_id WHERE r.token=$1",
+        "query": "SELECT pz.titulo_interno, r.token, r.caption, r.formato, (SELECT count(*) FROM contenido.media m WHERE m.pieza_id=pz.id) AS n_media, COALESCE((SELECT m.poster_url FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1 AND m.tipo='video'),(SELECT m.url FROM contenido.media m WHERE m.pieza_id=pz.id AND m.orden=1)) AS foto_url, (SELECT p.telegram_chat_id FROM contenido.negocios p WHERE p.id=pz.negocio_id) AS chat_id FROM contenido.revisiones r JOIN contenido.piezas pz ON pz.id=r.pieza_id WHERE r.token=$1",
         "options": {
           "queryReplacement": "={{ $json.query.token }}"
         }

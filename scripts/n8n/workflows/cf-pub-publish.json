@@ -1,5 +1,5 @@
 {
-  "name": "Cortafuego - Publicar (Fase C)",
+  "name": "ClaUsina - Publicar (Fase C)",
   "nodes": [
     {
       "parameters": {
@@ -21,7 +21,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE contenido.revisiones SET estado='aprobada', aprobado_por='Fer', aprobado_en=now() WHERE token=$1 AND estado='pendiente_aprobacion' RETURNING caption, token, pieza_id, formato, (SELECT url FROM contenido.media WHERE pieza_id=revisiones.pieza_id AND orden=1) AS asset_ig, (SELECT tipo FROM contenido.media WHERE pieza_id=revisiones.pieza_id AND orden=1) AS tipo_media, COALESCE(revisiones.colaboradores, (SELECT p.ig_colaboradores FROM contenido.proyectos p WHERE p.id=(SELECT proyecto_id FROM contenido.piezas WHERE id=revisiones.pieza_id))) AS colaboradores",
+        "query": "UPDATE contenido.revisiones SET estado='aprobada', aprobado_por='Fer', aprobado_en=now() WHERE token=$1 AND estado='pendiente_aprobacion' RETURNING caption, token, pieza_id, formato, (SELECT url FROM contenido.media WHERE pieza_id=revisiones.pieza_id AND orden=1) AS asset_ig, (SELECT tipo FROM contenido.media WHERE pieza_id=revisiones.pieza_id AND orden=1) AS tipo_media, COALESCE(revisiones.colaboradores, (SELECT p.ig_colaboradores FROM contenido.negocios p WHERE p.id=(SELECT negocio_id FROM contenido.piezas WHERE id=revisiones.pieza_id))) AS colaboradores",
         "options": {
           "queryReplacement": "={{ $json.query.token }}"
         }
@@ -175,8 +175,8 @@
       ],
       "credentials": {
         "httpQueryAuth": {
-          "id": "ZqmyQ7hDQYu8xWC9",
-          "name": "Cortafuego IG Token"
+          "id": "mNNhp1x4quWTAwgw",
+          "name": "cortafuego IG Token (auto)"
         }
       }
     },
@@ -211,8 +211,8 @@
       ],
       "credentials": {
         "httpQueryAuth": {
-          "id": "ZqmyQ7hDQYu8xWC9",
-          "name": "Cortafuego IG Token"
+          "id": "mNNhp1x4quWTAwgw",
+          "name": "cortafuego IG Token (auto)"
         }
       }
     },
@@ -322,8 +322,8 @@
       ],
       "credentials": {
         "httpQueryAuth": {
-          "id": "ZqmyQ7hDQYu8xWC9",
-          "name": "Cortafuego IG Token"
+          "id": "mNNhp1x4quWTAwgw",
+          "name": "cortafuego IG Token (auto)"
         }
       }
     },
@@ -379,8 +379,8 @@
       ],
       "credentials": {
         "httpQueryAuth": {
-          "id": "ZqmyQ7hDQYu8xWC9",
-          "name": "Cortafuego IG Token"
+          "id": "mNNhp1x4quWTAwgw",
+          "name": "cortafuego IG Token (auto)"
         }
       }
     },
@@ -456,8 +456,8 @@
       ],
       "credentials": {
         "httpQueryAuth": {
-          "id": "ZqmyQ7hDQYu8xWC9",
-          "name": "Cortafuego IG Token"
+          "id": "mNNhp1x4quWTAwgw",
+          "name": "cortafuego IG Token (auto)"
         }
       }
     },
@@ -504,8 +504,8 @@
       ],
       "credentials": {
         "httpQueryAuth": {
-          "id": "ZqmyQ7hDQYu8xWC9",
-          "name": "Cortafuego IG Token"
+          "id": "mNNhp1x4quWTAwgw",
+          "name": "cortafuego IG Token (auto)"
         }
       }
     },
@@ -536,8 +536,8 @@
       ],
       "credentials": {
         "httpQueryAuth": {
-          "id": "ZqmyQ7hDQYu8xWC9",
-          "name": "Cortafuego IG Token"
+          "id": "mNNhp1x4quWTAwgw",
+          "name": "cortafuego IG Token (auto)"
         }
       }
     },
@@ -664,8 +664,8 @@
       ],
       "credentials": {
         "httpQueryAuth": {
-          "id": "ZqmyQ7hDQYu8xWC9",
-          "name": "Cortafuego IG Token"
+          "id": "mNNhp1x4quWTAwgw",
+          "name": "cortafuego IG Token (auto)"
         }
       }
     },
@@ -696,8 +696,8 @@
       ],
       "credentials": {
         "httpQueryAuth": {
-          "id": "ZqmyQ7hDQYu8xWC9",
-          "name": "Cortafuego IG Token"
+          "id": "mNNhp1x4quWTAwgw",
+          "name": "cortafuego IG Token (auto)"
         }
       },
       "onError": "continueRegularOutput"
@@ -728,7 +728,7 @@
     {
       "parameters": {
         "respondWith": "text",
-        "responseBody": "=<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><body style='font-family:sans-serif;background:#080806;color:#f5f2ec;text-align:center;padding:60px 20px'><div style='font-size:2rem;font-weight:900;color:#ff4400'>CORTAFUEGO</div><h2 style='font-size:1.8rem'>Publicada</h2><p style='color:#8a8a82'>Ya podes cerrar esta pestana.</p></body>",
+        "responseBody": "=<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><body style='font-family:sans-serif;background:#080806;color:#f5f2ec;text-align:center;padding:60px 20px'><div style='font-size:2rem;font-weight:900;color:#1ec9ff'>ClaUsina</div><h2 style='font-size:1.8rem'>Publicada</h2><p style='color:#8a8a82'>Ya podes cerrar esta pestana.</p></body>",
         "options": {}
       },
       "id": "Respond",
