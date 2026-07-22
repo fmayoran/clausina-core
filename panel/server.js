@@ -137,7 +137,7 @@ app.use(async (req, res, next) => {
 // Lista de marcas (para el selector) + cuál está activa en esta sesión.
 app.get('/api/negocios', async (req, res) => {
   try {
-    const negocios = (await db.getNegocios()).map(m => ({ slug: m.slug, nombre: m.nombre, activo: m.activo, logo: m.logo }));
+    const negocios = (await db.getNegocios()).map(m => ({ slug: m.slug, nombre: m.nombre, activo: m.activo, logo: m.logo, prefijo: m.prefijo }));
     res.json({ negocios, activa: req.negocio });
   } catch (e) { console.error('marcas', e.message); res.status(500).json({ error: 'db' }); }
 });
@@ -475,9 +475,25 @@ app.post('/api/piezas/:id/aprobar', async (req, res) => {
     if (!p || p.estado !== 'pendiente_aprobacion') return res.status(409).json({ ok: false, error: 'no_pendiente' });
     if (p.canal === 'aviso') return res.json({ ok: await db.avisoEstado(req.params.id, 'publicada') });
     if (req.body && Array.isArray(req.body.colaboradores)) await db.setColaboradores(req.params.id, req.body.colaboradores);
-    const status = await callWebhook(`${N8N}/cf-pub-publish?token=${encodeURIComponent(p.token)}`);
+    let status;
+    try {
+      status = await callWebhook(`${N8N}/cf-pub-publish?token=${encodeURIComponent(p.token)}`);
+    } catch (netErr) {
+      // No se pudo ni contactar al publicador (n8n): DNS/red. Es reintentar, no un error de la pieza.
+      console.error('aprobar sin conexión a n8n', netErr.message);
+      return res.status(503).json({ ok: false, error: 'sin_conexion' });
+    }
     res.json({ ok: status >= 200 && status < 300, status });
   } catch (e) { console.error('aprobar', e.message); res.status(500).json({ ok: false, error: 'webhook' }); }
+});
+
+// Estado de una pieza (para confirmar que la publicación async de n8n efectivamente ocurrió).
+app.get('/api/piezas/:id/estado', async (req, res) => {
+  try {
+    const p = await db.getPiezaCanal(req.params.id);
+    if (!p) return res.status(404).json({ error: 'no_existe' });
+    res.json({ estado: p.estado });
+  } catch (e) { console.error('pieza-estado', e.message); res.status(500).json({ error: 'db' }); }
 });
 
 app.post('/api/piezas/:id/rechazar', async (req, res) => {

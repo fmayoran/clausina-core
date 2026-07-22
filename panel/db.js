@@ -19,7 +19,7 @@ let _negocios = null, _negociosAt = 0;
 async function getNegocios() {
   if (!_negocios || Date.now() - _negociosAt > 60000) {
     const { rows } = await pool.query(
-      `SELECT p.id, p.slug, p.nombre, p.activo, p.gestion, pp.logo
+      `SELECT p.id, p.slug, p.nombre, p.activo, p.gestion, p.prefijo, pp.logo
          FROM contenido.negocios p LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id
         ORDER BY p.activo DESC, p.creado_en`);
     _negocios = rows; _negociosAt = Date.now();
@@ -34,7 +34,7 @@ async function getProyectoId(slug) {
 // --- Perfil del proyecto (registro que consume el creativo): marca + slogan + logo + brief ---
 async function getPerfil(negocioId) {
   const { rows: [r] } = await pool.query(
-    `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email, p.whatsapp, p.gestion,
+    `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email, p.whatsapp, p.gestion, p.prefijo,
             pp.slogan, pp.logo, pp.brief_md, pp.estilo_md, pp.actualizado_en,
             pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id,
             (pp.meta_ads_token_enc IS NOT NULL) AS meta_ads_token_set,
@@ -507,6 +507,10 @@ async function guardarPerfil(negocioId, d) {
   await pool.query(
     `UPDATE contenido.negocios SET ig_handle=$2, dominio_web=$3, ig_user_id=$4, telegram_chat_id=$5, email=$6, whatsapp=$7 WHERE id=$1`,
     [negocioId, nn(d.ig_handle), nn(d.dominio_web), nn(d.ig_user_id), nn(d.telegram_chat_id), nn(d.email), nn(d.whatsapp)]);
+  if (typeof d.prefijo === 'string') {
+    const pf = d.prefijo.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+    if (pf) { await pool.query('UPDATE contenido.negocios SET prefijo=$2 WHERE id=$1', [proyectoId, pf]); _negociosAt = 0; }
+  }
   if (d.gestion === 'integral' || d.gestion === 'parcial') {
     await pool.query('UPDATE contenido.negocios SET gestion=$2 WHERE id=$1', [negocioId, d.gestion]);
     _negociosAt = 0;   // el inicio agrupa por esto: invalidar el cache

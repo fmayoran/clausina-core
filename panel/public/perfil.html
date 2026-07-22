@@ -134,6 +134,7 @@
           <div class="fld"><label>Email <span class="hint">— del negocio</span></label><input type="text" id="email" placeholder="hola@marca.ar"></div>
           <div class="fld"><label>WhatsApp <span class="hint">— +54...</span></label><input type="text" id="whatsapp" placeholder="+54 9 11 ..."></div>
           <div class="fld"><label>Telegram chat ID</label><input type="text" id="telegram_chat_id"></div>
+          <div class="fld"><label>Prefijo de código <span class="hint">— para las piezas, ej. CF-0260 (2-4 letras)</span></label><input type="text" id="prefijo" maxlength="4" placeholder="CF" style="text-transform:uppercase"></div>
           <div class="fld"><label>Rol de ClaUsina <span class="hint">— agrupa el negocio en el inicio</span></label>
             <select id="gestion" style="background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);font-family:'Barlow Condensed',sans-serif;font-size:1.02rem;padding:10px 11px;outline:none;">
               <option value="integral">Gestión integral — la manejamos completa</option>
@@ -247,6 +248,7 @@ async function cargar(){
     const it=document.getElementById('ig_token'); if(it){ it.value=''; it.placeholder = p.ig_token_set ? '•••••••• configurado (vacío = no cambia)' : 'pegá el token'; }
     mostrarLogo(p.logo||'');
     const g=document.getElementById('gestion'); if(g) g.value = p.gestion || 'integral';
+    const pf=document.getElementById('prefijo'); if(pf) pf.value = p.prefijo || '';
     try{ renderContactos(await fetch('api/contactos').then(r=>r.json())); }catch(_){ renderContactos([]); }
     document.getElementById('upd2').textContent = p.actualizado_en ? ('Última edición: '+fecha(p.actualizado_en)) : 'Sin cargar todavía';
     setTiles();
@@ -255,6 +257,7 @@ async function cargar(){
 async function guardar(){
   const body={}; CAMPOS.forEach(c=>{ body[c]=document.getElementById(c).value; });
   const g=document.getElementById('gestion'); if(g) body.gestion=g.value;
+  const pf=document.getElementById('prefijo'); if(pf) body.prefijo=pf.value;
   const tk=fval('meta_ads_token'); if(tk) body.meta_ads_token=tk;   // solo si escribió uno nuevo
   const it=fval('ig_token'); if(it) body.ig_token=it;
   try{

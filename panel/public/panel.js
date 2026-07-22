@@ -2,13 +2,16 @@
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fecha = s => { if(!s) return ''; const d=new Date(s); return d.toLocaleDateString('es-AR',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}); };
 const pad4 = n => String(n).padStart(4,'0');
+let PREFIJO='CF';   // prefijo del código del negocio activo (badge de piezas)
+const cod = n => (PREFIJO||'CF')+'-'+pad4(n);
+fetch('api/negocios').then(r=>r.json()).then(d=>{ const a=(d.negocios||[]).find(x=>x.slug===d.activa); if(a&&a.prefijo) PREFIJO=a.prefijo; }).catch(()=>{});
 const hace = s => { if(!s) return ''; const d=Math.max(0,(Date.now()-new Date(s).getTime())/1000|0); if(d<60) return 'recién'; const m=Math.floor(d/60); return m<60 ? 'hace '+m+'m' : 'hace '+Math.floor(m/60)+'h'; };
 const nf = x => Number(x||0).toLocaleString('es-AR');
 const thumbSrc = m => (m && m.url) ? ((m.tipo==='video' && m.poster_url) ? m.poster_url : m.url) : '';
 const revBadge = p => p.nro>1 ? `<span class="badge rev">rev ${p.nro}</span>` : `<span class="badge">rev ${p.nro}</span>`;
 const fmtBadge = p => p.formato ? `<span class="badge fmt">${esc(p.formato)}</span>` : '';
 const carrBadge = p => p.n_media>1 ? `<span class="badge">carrusel ${p.n_media}</span>` : '';
-const cfBadge = p => p.numero ? `<span class="badge cf">CF-${pad4(p.numero)}</span>` : '';
+const cfBadge = p => p.numero ? `<span class="badge cf">${cod(p.numero)}</span>` : '';
 
 let acting=false;
 let currentLoad=function(){};
@@ -254,7 +257,7 @@ function toggleReq(id){ _openReq.has(id) ? _openReq.delete(id) : _openReq.add(id
 function reqRow(b){
   const s = reqStatus(b);
   const open = _openReq.has(b.id);
-  const cf = b.pieza_numero ? `<span class="badge cf">CF-${pad4(b.pieza_numero)}</span>` : '';
+  const cf = b.pieza_numero ? `<span class="badge cf">${cod(b.pieza_numero)}</span>` : '';
   const kind = b.tiene_audio ? 'audio' : (b.media_type || 'texto');
   const title = esc(b.req_titulo || firstLine(b.texto) || '(sin texto)');
   let det = '';
@@ -310,11 +313,30 @@ async function aprobar(id, btn, colaboradores){
   const conColab = Array.isArray(colaboradores);   // IG: viene del modal de collabs (ya es la confirmación)
   if(!conColab && !confirm('Aprobar y publicar esta pieza. ¿Confirmás?')) return;
   acting=true; busy(btn,'Publicando…');
+  let disparo=false;
   try{ const opt = conColab ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({colaboradores})} : {method:'POST'};
-    const d=await fetch('api/piezas/'+id+'/aprobar',opt).then(r=>r.json());
-    toast(d.ok?'Aprobada — publicando':'No se pudo aprobar ('+(d.error||d.status)+')', !d.ok);
+    const r=await fetch('api/piezas/'+id+'/aprobar',opt); const d=await r.json().catch(()=>({}));
+    if(d.ok){ disparo=true; toast('Publicando…'); }
+    else if(d.error==='sin_conexion') toast('No se pudo contactar al publicador (n8n). Reintentá en un momento.', true);
+    else if(d.error==='no_pendiente') toast('Esa versión ya no está pendiente. Refrescá y probá con la vigente.', true);
+    else toast('No se pudo aprobar ('+(d.error||d.status||r.status)+')', true);
   }catch(e){ toast('Error de conexión', true); }
-  acting=false; setTimeout(currentLoad, 1500);
+  acting=false;
+  // La publicación la hace n8n de forma async: confirmamos que la pieza REALMENTE salió, en vez de
+  // asumir que sí (el hueco que dejó a CF-0260 pendiente sin avisar).
+  if(disparo) confirmarPublicacion(id); else setTimeout(currentLoad, 1200);
+}
+// Poll del estado real de la pieza tras aprobar. Si no publicó en ~2 min, avisa claro.
+async function confirmarPublicacion(id){
+  const t0=Date.now();
+  const tick=async ()=>{
+    let e; try{ e=(await fetch('api/piezas/'+id+'/estado').then(r=>r.json())).estado; }catch(_){}
+    if(e==='publicada'){ toast('Publicada ✓'); currentLoad(); return; }
+    if(e==='rechazada'){ toast('La publicación fue rechazada por Instagram. Revisá la pieza.', true); currentLoad(); return; }
+    if(Date.now()-t0 > 120000){ toast('Se aprobó pero todavía no publicó. Si no aparece en un rato, reintentá.', true); currentLoad(); return; }
+    setTimeout(tick, 5000);
+  };
+  setTimeout(tick, 5000);
 }
 // Aprobar una pieza de IG: primero elegir/editar los colaboradores (Collab).
 let _colId=null, _colList=[];
@@ -648,7 +670,7 @@ function campCard(c){
   return `<a class="camp cclick" href="#" onclick="openCamp('${c.id}');return false;">
     <div class="camp-top">${campThumb(c)}<div style="flex:1;min-width:0">
       <div class="camp-name">${esc(c.nombre)}</div>
-      <div class="camp-m2">${OBJ[c.objetivo]||esc(c.objetivo)} · ${presTxt(c.presupuesto,_CAMPCUR)} · ${c.pieza_numero?'CF-'+pad4(c.pieza_numero):'sin creativo'}</div>
+      <div class="camp-m2">${OBJ[c.objetivo]||esc(c.objetivo)} · ${presTxt(c.presupuesto,_CAMPCUR)} · ${c.pieza_numero?cod(c.pieza_numero):'sin creativo'}</div>
     </div><span class="st ${cls}">${lbl}</span></div>
     ${metr}${c.resumen?`<div class="camp-res">${esc(c.resumen)}</div>`:''}
   </a>`;
@@ -776,7 +798,7 @@ function openCamp(id){
     ${c.razon?`<p class="cm-razon">${esc(c.razon)}</p>`:''}
     ${mediaHtml}
     <div class="cm-grid">
-      <div><span class="cm-k">Creativo</span><span class="cm-v">${c.pieza_numero?'CF-'+pad4(c.pieza_numero):'—'}${perm}</span></div>
+      <div><span class="cm-k">Creativo</span><span class="cm-v">${c.pieza_numero?cod(c.pieza_numero):'—'}${perm}</span></div>
       <div><span class="cm-k">Presupuesto</span><span class="cm-v">${presTxt(c.presupuesto,cur)}</span></div>
       <div><span class="cm-k">Fechas</span><span class="cm-v">${esc(fechas)}</span></div>
       <div><span class="cm-k">Audiencia</span><span class="cm-v">${audTxt(c.audiencia)}</span></div>
@@ -808,9 +830,9 @@ async function abrirCreativos(){
     const r=await fetch('api/campanias/creativos'); const list=await r.json();
     document.getElementById('creativo-grid').innerHTML = (list||[]).map(c=>{
       const u=(c.tipo==='video'&&c.poster_url)?c.poster_url:c.url;
-      return `<a class="cpick${c.pieza_id===cur?' on':''}" href="#" onclick="elegirCreativo('${c.pieza_id}');return false;" title="CF-${pad4(c.numero)}">
+      return `<a class="cpick${c.pieza_id===cur?' on':''}" href="#" onclick="elegirCreativo('${c.pieza_id}');return false;" title="${cod(c.numero)}">
         <img src="${esc(u)}" loading="lazy" onerror="this.style.opacity=.15">
-        <span class="cpick-n">CF-${pad4(c.numero)}${c.tipo==='video'?' ▶':''}</span></a>`;
+        <span class="cpick-n">${cod(c.numero)}${c.tipo==='video'?' ▶':''}</span></a>`;
     }).join('') || '<div class="cm-note">No hay posts publicados disponibles como creativo.</div>';
     document.getElementById('creativopick').classList.remove('hidden');
   }catch(e){ toast('No se pudieron cargar los posts',true); }
