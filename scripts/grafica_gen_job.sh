@@ -117,6 +117,11 @@ PROMPT="Sos el DIRECTOR DE ARTE de ClaUsina. Segui EXACTAMENTE $MOTOR/scripts/gr
 timeout 900 claude -p "$PROMPT" --model sonnet --allowedTools Read Write >> "$LOG" 2>&1
 [ -s "/tmp/graf_res_$vid.html" ] || fallar "El director de arte no dejó un diseño. Suele ser un límite temporal de uso; probá de nuevo."
 
+# 4b) QR: si la pieza lo pidió, lo generamos y lo metemos en el hueco que dejó el diseño.
+QRES=$(python3 "$MOTOR/scripts/grafica_qr.py" "/tmp/graf_res_$vid.html" "/tmp/graf_ctx_$vid.json" 2>&1)
+echo "$(ts) qr: $QRES" >> "$LOG"
+echo "$QRES" | grep -q '"ok": *false' && echo "$(ts) AVISO: el QR no se pudo insertar" >> "$LOG"
+
 # 5) Render: PDF (imprenta) + PNG (preview).
 W=$(python3 -c "import json;print(json.load(open('/tmp/graf_ctx_$vid.json'))['ancho_mm'])")
 H=$(python3 -c "import json;print(json.load(open('/tmp/graf_ctx_$vid.json'))['alto_mm'])")

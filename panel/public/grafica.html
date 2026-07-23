@@ -125,7 +125,17 @@
       <div id="n-fondo-extra" style="margin-top:9px"></div>
     </div>
     <div class="fl"><label>Datos del negocio a incluir</label>
-      <div class="chks" id="n-datos"></div></div>
+      <div class="chks" id="n-datos"></div>
+      <div id="n-qr" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:9px">
+        <label style="display:block;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px">¿A dónde lleva el QR?</label>
+        <div class="opts" id="n-qrdest">
+          <div class="opt on" data-d="web" onclick="setQr('web')">Web</div>
+          <div class="opt" data-d="instagram" onclick="setQr('instagram')">Instagram</div>
+          <div class="opt" data-d="whatsapp" onclick="setQr('whatsapp')">WhatsApp</div>
+          <div class="opt" data-d="url" onclick="setQr('url')">Otra URL</div>
+        </div>
+        <div id="n-qrextra" style="margin-top:8px"></div>
+      </div></div>
     <div class="gerr" id="n-err"></div>
   </div>
   <div class="gft"><button class="abtn" onclick="cerrar('ov-new')">Cancelar</button>
@@ -177,6 +187,20 @@ function cerrar(id){ document.getElementById(id).style.display='none'; if(id==='
 
 const DATOS = [['direccion','Dirección'],['telefono','Teléfono'],['whatsapp','WhatsApp'],['instagram','Instagram'],['web','Web'],['qr','Código QR']];
 let FORMATOS=[], PIEZAS=[], FONDO_MODO='sin_fondo', FONDO_URL='', CARAS=1, DET=null, _poll=null;
+let QRDEST='web';
+function setQr(d){
+  QRDEST=d;
+  document.querySelectorAll('#n-qrdest .opt').forEach(o=>o.classList.toggle('on',o.dataset.d===d));
+  const x=document.getElementById('n-qrextra');
+  if(d==='url') x.innerHTML='<input id="qr-url" placeholder="https://… (menú, promo, ubicación)">';
+  else if(d==='whatsapp') x.innerHTML='<input id="qr-texto" placeholder="Mensaje prearmado (opcional): «Hola, quiero reservar»">';
+  else x.innerHTML='<div class="gsub">se toma del perfil del negocio</div>';
+}
+// El bloque de destino solo aparece si el QR está tildado.
+function toggleQrBox(){
+  const c=document.getElementById('dt-qr');
+  document.getElementById('n-qr').style.display = (c&&c.checked) ? 'block' : 'none';
+}
 function setCaras(n){ CARAS=n; document.querySelectorAll('#n-caras .opt').forEach(o=>o.classList.toggle('on',+o.dataset.caras===n)); }
 
 // ---- listado ----
@@ -218,6 +242,8 @@ function abrirNueva(){
     `<option value="${f.id}">${esc(f.grupo)} — ${esc(f.label)}${f.ancho?` (${f.ancho}×${f.alto}mm)`:''}</option>`).join('');
   document.getElementById('n-datos').innerHTML = DATOS.map(([k,l])=>
     `<label class="chk"><input type="checkbox" id="dt-${k}" ${['direccion','instagram'].includes(k)?'checked':''}> ${l}</label>`).join('');
+  const cq=document.getElementById('dt-qr'); if(cq) cq.addEventListener('change', toggleQrBox);
+  setQr('web'); toggleQrBox();
   document.querySelectorAll('#n-fondo .opt').forEach(o=>o.classList.toggle('on',o.dataset.modo==='sin_fondo'));
   document.getElementById('n-fondo-extra').innerHTML='';
   onFormato();
@@ -269,6 +295,12 @@ async function crearPieza(){
   if(!mensaje){ err.textContent='Escribí el mensaje que querés transmitir'; return; }
   if((FONDO_MODO==='biblioteca'||FONDO_MODO==='subido') && !FONDO_URL){ err.textContent='Elegí la imagen de fondo'; return; }
   const datos={}; DATOS.forEach(([k])=>{ const c=document.getElementById('dt-'+k); if(c&&c.checked) datos[k]=true; });
+  if(datos.qr){
+    datos.qr_destino=QRDEST;
+    if(QRDEST==='url') datos.qr_url=(document.getElementById('qr-url')||{}).value||'';
+    if(QRDEST==='whatsapp') datos.qr_texto=(document.getElementById('qr-texto')||{}).value||'';
+    if(QRDEST==='url' && !datos.qr_url.trim()){ err.textContent='Pegá la URL a la que lleva el QR'; return; }
+  }
   const body={ nombre:document.getElementById('n-nombre').value, formato:document.getElementById('n-formato').value,
     ancho_mm:document.getElementById('n-ancho').value, alto_mm:document.getElementById('n-alto').value,
     mensaje, caras:CARAS, fondo_modo:FONDO_MODO, fondo_url:FONDO_URL,
