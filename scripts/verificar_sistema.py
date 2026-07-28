@@ -151,7 +151,7 @@ def check_colgados():
 def check_publicacion():
     n = psql("SELECT count(*) FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id=pz.revision_vigente "
              "WHERE r.estado='aprobada' AND r.publicado_en IS NULL "
-             "AND r.actualizado_en < now()-interval '30 minutes'")
+             "AND r.aprobado_en < now()-interval '30 minutes'")
     if n and n.isdigit() and int(n) > 0:
         return FALLO, f"{n} pieza(s) aprobadas que NUNCA se publicaron (el circuito quedó a mitad)", []
     return OK, "sin piezas trabadas entre aprobar y publicar", []
