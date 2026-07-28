@@ -345,6 +345,15 @@ async function estadoGrafica(negocioId, id, estado) {
   return { ok: rowCount > 0 };
 }
 
+// Última verificación de integridad (la escribe el cron verificar_job.sh).
+async function getVerificacion() {
+  const { rows } = await pool.query(
+    "SELECT valor, actualizado_en FROM contenido.plataforma_config WHERE clave='verificacion'");
+  if (!rows[0] || !rows[0].valor) return null;
+  try { return { chequeos: JSON.parse(rows[0].valor), cuando: rows[0].actualizado_en }; }
+  catch (e) { return null; }
+}
+
 // Config de plataforma: lo transversal a todas las marcas (hoy, la lente de Instagram).
 // Mismo criterio que los tokens de marca: cifrado en la DB, write-only hacia el navegador.
 async function getLente() {
@@ -1298,7 +1307,7 @@ async function health() {
 module.exports = { getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio,
   crearDescubrimiento, getDescubrimiento,
-  getLente, getLenteToken, guardarLente,
+  getLente, getLenteToken, guardarLente, getVerificacion,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,
   pedirGeneracion, getGeneracion,
   FORMATOS, getGraficas, getGrafica, crearGrafica, iterarGrafica, estadoGrafica,

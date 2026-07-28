@@ -347,5 +347,28 @@ setInterval(cargar,20000);
   };
 })();
 </script>
+<script>
+// Salud del sistema: lo escribe el cron (verificar_job.sh) y acá solo se muestra.
+(async function verificacion(){
+  const box=document.getElementById('ver-box'); if(!box) return;
+  let d; try{ d=await fetch('api/verificacion').then(r=>r.json()); }catch(e){ box.innerHTML='<div class="mono text-[11px] text-pmut dark:text-mut">no se pudo leer</div>'; return; }
+  const chks=d.chequeos||[];
+  if(!chks.length){ box.innerHTML='<div class="mono text-[11px] text-pmut dark:text-mut">todavía no corrió la primera revisión</div>'; return; }
+  const col={ok:'#CCF24D',fallo:'#FF6A45',aviso:'#E0A458'};
+  const fallos=chks.filter(c=>c.estado==='fallo').length;
+  const avisos=chks.filter(c=>c.estado==='aviso').length;
+  document.getElementById('ver-cuando').textContent = d.cuando ? ('· última: '+new Date(d.cuando).toLocaleString('es-AR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})) : '';
+  box.innerHTML =
+    `<div class="mono text-[11px] mb-3" style="color:${fallos?col.fallo:(avisos?col.aviso:col.ok)}">`
+    + (fallos? `${fallos} problema(s) que requieren tu atención` : (avisos? `${avisos} aviso(s)` : 'todo sano'))
+    + `</div>`
+    + chks.map(c=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--pline,#20242B)">
+        <span style="width:8px;height:8px;border-radius:50%;background:${col[c.estado]||'#8A8F98'};margin-top:5px;flex:0 0 auto"></span>
+        <div style="min-width:0"><div class="text-sm">${c.chequeo}</div>
+          <div class="mono text-[11px] text-pmut dark:text-mut" style="line-height:1.5">${(c.mensaje||'').replace(/</g,'&lt;')}</div>
+          ${(c.detalle||[]).slice(0,4).map(x=>`<div class="mono text-[10px]" style="color:${col.fallo};line-height:1.5">— ${String(x).replace(/</g,'&lt;')}</div>`).join('')}
+        </div></div>`).join('');
+})();
+</script>
 </body>
 </html>

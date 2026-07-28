@@ -260,6 +260,12 @@ app.post('/api/grafica/fondo', async (req, res) => {
   } catch (e) { res.status(e.http || 500).json({ ok: false, error: e.message || 'upload' }); }
 });
 
+// Salud del sistema: última verificación de integridad (cron cada 30 min).
+app.get('/api/verificacion', async (req, res) => {
+  try { res.json(await db.getVerificacion() || { chequeos: [], cuando: null }); }
+  catch (e) { console.error('verificacion', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 // Lente de Instagram: config de PLATAFORMA (la agencia, no una marca). El token se guarda
 // cifrado y es write-only: nunca vuelve al navegador (solo decimos si está cargado).
 app.get('/api/plataforma/lente', async (req, res) => {

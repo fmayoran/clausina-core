@@ -16,6 +16,9 @@ CODIGO=$?
 echo "$(date -Is) exit=$CODIGO" >> "$LOG"
 echo "$SALIDA" >> "$LOG"
 
+# Guardar el resultado en la base para que el panel lo muestre (Sala de máquinas).
+python3 "$MOTOR/scripts/verificar_guardar.py" >/dev/null 2>&1
+
 [ "$CODIGO" -eq 0 ] && exit 0   # todo sano: no molestar
 
 FALLOS=$(echo "$SALIDA" | grep -F "[FALLO]" || true)
