@@ -23,6 +23,19 @@ if printf '%s' "$cmd" | grep -Eq '(^|[^[:alnum:]])git([[:space:]]|$)' \
     LANDING="/root/clausina/marcas/$slug/assets/landing"
     # Solo valida marcas cuya landing vive en assets/landing (otras se ignoran).
     if [ -d "$LANDING" ]; then
+      # Tope de 24 MB por archivo (límite de Cloudflare). La regla ya estaba escrita en los
+      # prompts del creativo y del editor, pero no la verificaba nadie: un mp4 pasado de peso
+      # se commitea, deploya, y la landing sirve un video roto sin que salte ningún error.
+      GRANDES=$(find "$LANDING" -type f -size +24M -printf '%s %p\n' 2>/dev/null \
+                | awk '{printf "    %.1f MB  %s\n", $1/1048576, $2}')
+      if [ -n "$GRANDES" ]; then
+        {
+          echo "Commit BLOQUEADO ($slug): hay archivos que superan el tope de 24 MB de Cloudflare."
+          echo "$GRANDES"
+          echo "  Recomprimí el video (o bajá la resolución) antes de commitear."
+        } >&2
+        exit 2
+      fi
       if ! out="$(python3 /root/clausina/core/scripts/validate_web.py "$LANDING" 2>&1)"; then
         {
           echo "Commit BLOQUEADO por el hook de calidad web ($slug)."

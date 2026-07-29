@@ -190,10 +190,25 @@ def check_disco():
         return AVISO, "no pude leer el disco", []
     n8n_mb = int(sh(f"du -sm {N8N_SQLITE} 2>/dev/null | cut -f1") or 0)
     extra = f" · sqlite de n8n: {n8n_mb} MB" if n8n_mb else ""
+
+    # Cápsulas pasadas de peso. El repo de un negocio se clona entero en cada deploy de
+    # Cloudflare: si engorda sin control (Cortafuego llegó a 365 MB acumulando versiones
+    # intermedias de Reels), los deploys se arrastran. Es aviso, nunca fallo.
+    gordas = []
+    for linea in sh("du -sm /root/clausina/marcas/*/ 2>/dev/null").splitlines():
+        try:
+            mb, ruta = linea.split("\t", 1)
+            if int(mb) > 300:
+                gordas.append(f"cápsula {ruta.rstrip('/').split('/')[-1]}: {mb} MB")
+        except ValueError:
+            continue
+
     if u >= 85:
-        return FALLO, f"disco al {u}%{extra}", []
+        return FALLO, f"disco al {u}%{extra}", gordas
     if u >= 70 or n8n_mb > 2000:
-        return AVISO, f"disco al {u}%{extra}", []
+        return AVISO, f"disco al {u}%{extra}", gordas
+    if gordas:
+        return AVISO, f"disco al {u}%{extra} · hay cápsulas pasadas de peso", gordas
     return OK, f"disco al {u}%{extra}", []
 
 
