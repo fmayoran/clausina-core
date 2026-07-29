@@ -20,6 +20,13 @@ ts(){ date -Is; }
 CID=$(docker ps -q -f name=crm_pgvector.1.)
 [ -z "$CID" ] && { echo "$(ts) ERROR sin contenedor de base" >> "$LOG"; exit 1; }
 
+# --- 0) Higiene: podar tablas de historial ANTES del dump (para no respaldar basura) ---
+# Lección del sqlite de n8n (993 MB): toda tabla que sólo crece termina siendo un problema.
+# job_runs es historial de diagnóstico; 30 días alcanza de sobra.
+PODA=$(docker exec -i "$CID" psql -U postgres -d claude -t -A -q -c \
+  "WITH d AS (DELETE FROM contenido.job_runs WHERE creado_en < now()-interval '30 days' RETURNING 1) SELECT count(*) FROM d;" 2>>"$LOG")
+[ -n "${PODA:-}" ] && [ "${PODA:-0}" != "0" ] && echo "$(ts) poda job_runs: $PODA fila(s)" >> "$LOG"
+
 # --- 1) Dump de la base ---
 TS=$(date +%Y%m%d_%H%M)
 F="$LOCAL/claude_$TS.dump"

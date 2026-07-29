@@ -117,3 +117,7 @@ else
   echo "$(ts) (temporales de $did conservados para diagnóstico)" >> "$LOG"
 fi
 echo "$(ts) fin descubrimiento $did" >> "$LOG"
+
+# Salir con 1 si falló, para que el worker lo anote en contenido.job_runs. El estado='error' ya
+# se ve en el panel, pero sin esto el verificador (y la alerta por Telegram) no se entera.
+[[ "$res" == ok:* ]] || { echo "$res" >&2; exit 1; }

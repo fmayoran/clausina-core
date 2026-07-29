@@ -5,10 +5,11 @@ Escala horizontalmente: levantar N réplicas comparte la misma cola (BLPOP repar
 El heartbeat a contenido.batch_runs lo hace cada job script (con el nombre de proceso correcto).
 """
 import sys
+import time
 import traceback
 
 import jobqueue
-from db import heartbeat
+from db import heartbeat, registrar_job
 from handlers import correccion, propuesta, revision, brief, landing, bibliotecario, campania, campania_meta, pauta_sync, secrets_sync, marca_capsula, descubrimiento, estilo_gen, manual_gen, grafica
 
 # Registry de handlers por tipo de job.
@@ -42,14 +43,21 @@ def process(job):
     handler = HANDLERS.get(tipo)
     if not handler:
         log(f"job desconocido tipo={tipo} -> descartado")
+        registrar_job(tipo or "?", slug, False, "tipo de job desconocido: no hay handler registrado")
         return
     log(f"-> {tipo} / {slug}")
+    # Todo job deja rastro en la DB, salga bien o mal. Antes el error moría en el journal de
+    # systemd: el pedido quedaba 'procesando' y nadie se enteraba salvo mirando journalctl.
+    t0 = time.time()
     try:
         ok, detalle = handler(job)
         log(f"<- {tipo} / {slug} ok={ok} :: {(detalle or '')[:200]}")
+        registrar_job(tipo, slug, ok, detalle, int((time.time() - t0) * 1000))
     except Exception as e:
         log(f"!! error procesando {tipo}/{slug}: {e}")
         traceback.print_exc()
+        registrar_job(tipo, slug, False, f"excepción: {e}\n{traceback.format_exc()[-1500:]}",
+                      int((time.time() - t0) * 1000))
     finally:
         # Libera el lock 'en vuelo' para que el dispatcher pueda reencolar si quedó trabajo.
         if lock_key:

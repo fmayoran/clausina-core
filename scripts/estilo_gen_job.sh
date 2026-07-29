@@ -94,4 +94,9 @@ PY
 echo "$(ts) estilo $gid -> $res" >> "$LOG"
 if [[ "$res" == ok* ]]; then
   rm -rf "$SHOTS" "/tmp/estilo_ctx_$gid.json" "/tmp/estilo_ig_$gid.json" "/tmp/estilo_res_$gid.md"
+else
+  # Salir con 1 para que el worker lo anote como fallo en contenido.job_runs. El estado='error'
+  # ya lo ve Fer en el panel, pero sin esto el verificador (y la alerta por Telegram) no se entera.
+  echo "$res" >&2
+  exit 1
 fi

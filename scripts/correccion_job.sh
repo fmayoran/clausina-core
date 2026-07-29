@@ -97,5 +97,34 @@ Armá cada body JSON inline en el -d de un único curl (sin pipes ni archivos).
 EOF
 )
 timeout 1200 claude -p "$PROMPT" --model sonnet --allowedTools "Bash" Read Write Edit Glob Grep >> "$LOG" 2>&1
-echo "$(ts) fin $slug (exit $?)" >> "$LOG"
+rc=$?
+echo "$(ts) fin $slug (exit $rc)" >> "$LOG"
+
+# El resultado del agente SE MIRA. Antes se descartaba: el script terminaba siempre en 0 y el
+# worker anotaba "ok" aunque `claude -p` se hubiera caído por timeout o por límite de uso.
+# Los rechazos quedaban sin derivar y el próximo ciclo los reintentaba, en silencio y para siempre.
+if [ $rc -ne 0 ]; then
+  # Causa más común: límite temporal de uso de la suscripción (igual que en manual_gen_job.sh).
+  msg="la corrección falló (exit $rc)"
+  [ $rc -eq 124 ] && msg="la corrección se pasó del tiempo límite (20 min)"
+  grep -qi "session limit\|usage limit\|rate limit" "$LOG" 2>/dev/null && \
+    msg="se alcanzó el límite de uso de la suscripción; reintenta solo en el próximo ciclo"
+  echo "$(ts) ERROR $slug: $msg" >> "$LOG"
+  hb "$slug: corrección FALLÓ — $msg"
+  echo "$slug: $msg" >&2
+  exit 1
+fi
+
+# Salió 0, pero eso solo dice que el proceso terminó: verificamos que el trabajo se haya hecho.
+PEND=$(psql "SELECT count(*) FROM contenido.revisiones r
+             JOIN contenido.piezas pz ON pz.id=r.pieza_id
+             JOIN contenido.negocios p ON p.id=pz.negocio_id
+             WHERE r.estado='rechazada' AND r.derivado_en IS NULL AND p.slug='$slug'
+               AND r.id::text = ANY(string_to_array(replace('$REVIDS', ' ', ''), ','))")
+if [ -n "${PEND:-}" ] && [ "${PEND:-0}" -gt 0 ] 2>/dev/null; then
+  echo "$(ts) ERROR $slug: el agente terminó bien pero dejó $PEND rechazo(s) sin derivar" >> "$LOG"
+  hb "$slug: corrección incompleta ($PEND sin derivar)"
+  echo "$slug: el agente terminó bien pero dejó $PEND rechazo(s) sin derivar" >&2
+  exit 1
+fi
 hb "$slug: corrección terminada"

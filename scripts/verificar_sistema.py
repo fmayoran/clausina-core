@@ -13,7 +13,8 @@ Chequea lo que puede romperse en silencio:
   4. Workers/dispatcher vivos (si mueren, todo queda encolado sin avisar).
   5. Jobs colgados en 'procesando' más de lo razonable.
   6. Piezas aprobadas que nunca se publicaron (el circuito quedó a mitad).
-  7. Disco.
+  7. Jobs que terminaron MAL en las últimas 24 h (contenido.job_runs).
+  8. Disco.
 
 Uso:  verificar_sistema.py [--json]
 Salida: 0 si todo OK, 1 si hay algún fallo. Pensado para cron (avisa por Telegram si falla).
@@ -157,7 +158,30 @@ def check_publicacion():
     return OK, "sin piezas trabadas entre aprobar y publicar", []
 
 
-# --- 7) Disco ----------------------------------------------------------------------
+# --- 7) Jobs que fallaron -----------------------------------------------------------
+def check_jobs():
+    """Fallos registrados por el worker en las últimas 24 h.
+
+    Complementa a 'trabajos colgados': aquel mira pedidos que quedaron en 'procesando', este
+    mira los que terminaron MAL. Un job que falla rápido y limpio no queda colgado, así que
+    antes de contenido.job_runs no lo veía nadie."""
+    crudo = psql("SELECT coalesce(json_agg(t)::text,'[]') FROM (SELECT tipo, negocio_slug, count(*) n, "
+                 "max(creado_en) ultimo FROM contenido.job_runs WHERE NOT ok "
+                 "AND creado_en > now()-interval '24 hours' GROUP BY 1,2 ORDER BY 3 DESC LIMIT 10) t")
+    if crudo is None:
+        return AVISO, "no pude leer contenido.job_runs", []
+    try:
+        filas = json.loads(crudo or "[]")
+    except Exception:
+        return AVISO, "no pude interpretar contenido.job_runs", []
+    if not filas:
+        return OK, "sin jobs fallados en 24 h", []
+    detalle = [f"{f['tipo']} / {f.get('negocio_slug') or '?'}: {f['n']} fallo(s)" for f in filas]
+    total = sum(f["n"] for f in filas)
+    return FALLO, f"{total} job(s) fallaron en 24 h", detalle
+
+
+# --- 8) Disco ----------------------------------------------------------------------
 def check_disco():
     uso = sh("df -h / | tail -1 | awk '{print $5}'").rstrip("%")
     try:
@@ -180,6 +204,7 @@ CHEQUEOS = [
     ("motor (worker/dispatcher)", check_motor),
     ("trabajos colgados", check_colgados),
     ("circuito de publicación", check_publicacion),
+    ("jobs fallados", check_jobs),
     ("disco", check_disco),
 ]
 
