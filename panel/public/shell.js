@@ -12,6 +12,7 @@
       { id: 'pantallas',    label: 'Pantallas',         icon: 'monitor',          href: 'audiovisual' },
       { id: 'estilo',       label: 'Estilo',            icon: 'palette',          href: 'estilo' },
       { id: 'arquitectura', label: 'Arquitectura',      icon: 'git-fork',         href: 'arquitectura' },
+      { id: 'usuarios',     label: 'Usuarios',          icon: 'users',            href: 'usuarios' },
     ],
     'Negocio activo': [
       { id: 'propuestas', label: 'Propuestas',       icon: 'lightbulb',   href: 'propuestas' },
@@ -118,6 +119,7 @@
     }
     shell.insertAdjacentHTML('afterbegin', html(opts.active || ''));
     if (window.fixIgIcons) window.fixIgIcons(shell);
+    aplicarPermisos(opts.active || '');
     marcarCapacidades();
     if (opts.cap) guardarCapacidad(opts.cap);
     // Páginas de contenido (panel.css) son dark-only: forzar dark y ocultar el toggle.
@@ -162,6 +164,28 @@
   // Grisa en el menú las capacidades que la negocio activo tiene deshabilitadas (siguen visibles:
   // se habilitan desde el panel del proyecto). nav id -> capacidad.
   var NAV_CAP = { instagram: 'instagram', pauta: 'pauta', avisos: 'pantalla', landing: 'web' };
+  // Secciones que son de la plataforma, no de un negocio: sólo el admin las ve.
+  // 'inicio' es el tablero de la agencia (consume /api/agencia, /api/maquinas, alta de negocios):
+  // para un usuario de negocio no tiene nada, así que además lo mandamos a la home de SU negocio.
+  var NAV_ADMIN = ['inicio', 'maquinas', 'negocios', 'arquitectura', 'usuarios'];
+
+  function aplicarPermisos(active) {
+    return fetch('api/yo').then(function (r) { return r.ok ? r.json() : null; }).then(function (yo) {
+      if (!yo || yo.admin) return yo;
+      NAV_ADMIN.forEach(function (id) {
+        var a = document.querySelector('[data-nav="' + id + '"]');
+        if (a) a.remove();
+      });
+      // Si una sección se quedó sin ítems, su título sobra.
+      document.querySelectorAll('.nsec').forEach(function (h) {
+        var n = h.nextElementSibling;
+        if (!n || n.classList.contains('nsec')) h.remove();
+      });
+      if (NAV_ADMIN.indexOf(active) >= 0) location.replace('proyecto');
+      return yo;
+    }).catch(function () { return null; });
+  }
+
   function marcarCapacidades() {
     fetch('api/capacidades').then(function (r) { return r.ok ? r.json() : null; }).then(function (caps) {
       if (!caps) return;

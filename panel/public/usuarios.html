@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Usuarios</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="fonts/clausina-icono-180.png">
+<script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
+<style>
+  .mtx{width:100%;border-collapse:separate;border-spacing:0;min-width:760px;}
+  .mtx th,.mtx td{padding:14px 12px;text-align:left;border-bottom:1px solid #E6E3DD;vertical-align:middle;}
+  .dark .mtx th,.dark .mtx td{border-bottom-color:#20242B;}
+  .mtx tbody tr:last-child td{border-bottom:0;}
+  .mtx thead th{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;font-weight:400;white-space:nowrap;}
+  .mtx tbody tr:hover{background:rgba(127,127,127,.06);}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:.62rem;padding:3px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap;}
+  /* Convención del panel: coral = pendiente/en curso, verde = listo. Acá el verde marca al admin
+     (acceso completo) y el coral al usuario sin negocios asignados, que todavía no puede operar. */
+  .p-admin{color:#7BC96F;} .p-user{color:#8A8F98;} .p-sin{color:#FF6B4A;} .p-off{color:#8A8F98;opacity:.6;}
+  .iconbtn{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;border:1px solid #E6E3DD;color:#6B6F76;transition:.15s;background:none;cursor:pointer;}
+  .dark .iconbtn{border-color:#20242B;color:#8A8F98;}
+  .iconbtn:hover{color:#0c0c0a;border-color:#0c0c0a;} .dark .iconbtn:hover{color:#F5F2EC;border-color:#F5F2EC;}
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;place-items:center;z-index:140;padding:20px;}
+  .ov.on{display:grid;}
+  .dlg{background:#F7F5F1;border:1px solid #E6E3DD;border-radius:16px;padding:26px;width:min(560px,100%);max-height:88vh;overflow:auto;}
+  .dark .dlg{background:#12151A;border-color:#20242B;}
+  label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:#8A8F98;margin:14px 0 6px;}
+  input[type=text],input[type=email],input[type=password],select{width:100%;background:#FFF;border:1px solid #E6E3DD;border-radius:8px;padding:9px 11px;font-family:'Inter',sans-serif;font-size:.95rem;color:#0c0c0a;outline:none;}
+  .dark input[type=text],.dark input[type=email],.dark input[type=password],.dark select{background:#0c0c0a;border-color:#20242B;color:#F5F2EC;}
+  input:focus,select:focus{border-color:#CCF24D;}
+  .btn{background:#CCF24D;color:#0c0c0a;border:none;border-radius:8px;font-weight:700;padding:9px 18px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .btn2{background:none;border:1px solid #E6E3DD;color:#6B6F76;border-radius:8px;padding:9px 18px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
+  .dark .btn2{border-color:#20242B;color:#8A8F98;}
+  .negfila{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #E6E3DD;}
+  .dark .negfila{border-bottom-color:#20242B;}
+  .negfila:last-child{border-bottom:0;}
+  .negfila span{flex:1;font-size:.9rem;}
+  .negfila select{width:auto;padding:5px 8px;font-size:.8rem;}
+  .err{color:#FF6B4A;font-family:'JetBrains Mono',monospace;font-size:.7rem;margin-top:12px;min-height:1em;}
+</style>
+</head>
+<body class="bg-pbg dark:bg-bg text-pfg dark:text-fg antialiased">
+<div class="shell">
+  <main class="px-6 md:px-9 py-8 min-w-0">
+    <div class="flex items-baseline gap-3 mb-1">
+      <h1 class="display font-bold text-xl tracking-tight">Usuarios</h1>
+      <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
+      <button class="iconbtn ml-auto" onclick="abrir()" title="Nuevo usuario" aria-label="Nuevo usuario">
+        <i data-lucide="user-plus" class="w-4 h-4"></i>
+      </button>
+    </div>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-7">
+      El <b>administrador</b> ve toda la plataforma. El <b>aprobador</b> aprueba y publica en sus negocios;
+      el <b>editor</b> prepara pero no aprueba.
+    </p>
+
+    <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card scrollx">
+      <table class="mtx">
+        <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Negocios</th><th></th></tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div class="ov" id="ov" onclick="if(event.target===this)cerrar()">
+  <div class="dlg">
+    <h2 class="display font-bold text-lg tracking-tight" id="dlg-tit">Nuevo usuario</h2>
+    <input type="hidden" id="f-id">
+    <label for="f-nombre">Nombre</label>
+    <input type="text" id="f-nombre" autocomplete="off">
+    <label for="f-email">Email</label>
+    <input type="email" id="f-email" autocomplete="off">
+    <label for="f-pw">Contraseña <span id="pw-nota" style="text-transform:none;letter-spacing:0"></span></label>
+    <input type="password" id="f-pw" autocomplete="new-password" placeholder="mínimo 8 caracteres">
+    <label for="f-rol">Rol de plataforma</label>
+    <select id="f-rol" onchange="pintarNegocios()">
+      <option value="usuario">Usuario de negocio</option>
+      <option value="admin">Administrador de la plataforma</option>
+    </select>
+    <label for="f-wa">WhatsApp <span style="text-transform:none;letter-spacing:0">(para avisos y aprobación futura)</span></label>
+    <input type="text" id="f-wa" placeholder="+54 9 11 ..." autocomplete="off">
+    <label for="f-tg">Chat de Telegram <span style="text-transform:none;letter-spacing:0">(opcional)</span></label>
+    <input type="text" id="f-tg" autocomplete="off">
+    <div id="bloque-neg">
+      <label>Negocios que gestiona</label>
+      <div id="f-neg"></div>
+    </div>
+    <div class="err" id="err"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn2" onclick="cerrar()">Cancelar</button>
+      <button class="btn" id="btn-g" onclick="guardar()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="shell.js"></script>
+<script>ClausinaShell({active:'usuarios'})</script>
+<script>
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let USUARIOS = [], NEGOCIOS = [];
+
+function pillRol(u){
+  if(u.rol_plataforma==='admin') return '<span class="pill p-admin">administrador</span>';
+  if(!u.negocios || !u.negocios.length) return '<span class="pill p-sin">sin negocios</span>';
+  return '<span class="pill p-user">usuario</span>';
+}
+
+function fila(u){
+  const negs = (u.negocios||[]).map(n=>`${esc(n.slug)} · ${esc(n.rol)}`).join('<br>');
+  return `<tr${u.activo?'':' style="opacity:.5"'}>
+    <td><b>${esc(u.nombre)}</b>${u.activo?'':' <span class="pill p-off">inactivo</span>'}</td>
+    <td class="mono text-[11px] text-pmut dark:text-mut">${esc(u.email)}</td>
+    <td>${pillRol(u)}</td>
+    <td class="mono text-[11px] text-pmut dark:text-mut">${u.rol_plataforma==='admin'?'todos':(negs||'—')}</td>
+    <td style="text-align:right"><button class="iconbtn" onclick="abrir('${u.id}')" title="Editar" aria-label="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button></td>
+  </tr>`;
+}
+
+function pintarNegocios(){
+  // Un admin ve todos los negocios por definición: la asignación no aplica.
+  const esAdmin = document.getElementById('f-rol').value === 'admin';
+  document.getElementById('bloque-neg').style.display = esAdmin ? 'none' : '';
+  if(esAdmin) return;
+  const u = USUARIOS.find(x=>x.id===document.getElementById('f-id').value);
+  const asignados = {};
+  (u ? u.negocios||[] : []).forEach(n=>{ asignados[n.slug]=n.rol; });
+  document.getElementById('f-neg').innerHTML = NEGOCIOS.map(n=>`
+    <div class="negfila">
+      <input type="checkbox" id="n-${esc(n.slug)}" data-slug="${esc(n.slug)}" ${asignados[n.slug]?'checked':''}>
+      <span>${esc(n.nombre)}</span>
+      <select id="r-${esc(n.slug)}">
+        <option value="aprobador"${asignados[n.slug]==='aprobador'?' selected':''}>aprueba</option>
+        <option value="editor"${asignados[n.slug]==='editor'?' selected':''}>edita</option>
+      </select>
+    </div>`).join('');
+}
+
+function abrir(id){
+  const u = id ? USUARIOS.find(x=>x.id===id) : null;
+  document.getElementById('dlg-tit').textContent = u ? 'Editar usuario' : 'Nuevo usuario';
+  document.getElementById('f-id').value    = u ? u.id : '';
+  document.getElementById('f-nombre').value= u ? u.nombre : '';
+  document.getElementById('f-email').value = u ? u.email : '';
+  document.getElementById('f-email').disabled = !!u;   // el email identifica: no se cambia
+  document.getElementById('f-pw').value    = '';
+  document.getElementById('pw-nota').textContent = u ? '(dejala vacía para no cambiarla)' : '';
+  document.getElementById('f-rol').value   = u ? u.rol_plataforma : 'usuario';
+  document.getElementById('f-wa').value    = u ? (u.whatsapp||'') : '';
+  document.getElementById('f-tg').value    = u ? (u.telegram_chat_id||'') : '';
+  document.getElementById('err').textContent = '';
+  pintarNegocios();
+  document.getElementById('ov').classList.add('on');
+  if(window.lucide) lucide.createIcons();
+}
+function cerrar(){ document.getElementById('ov').classList.remove('on'); }
+
+async function guardar(){
+  const err = document.getElementById('err'), btn = document.getElementById('btn-g');
+  err.textContent=''; btn.disabled=true;
+  const id = document.getElementById('f-id').value;
+  const rol = document.getElementById('f-rol').value;
+  const negocios = rol==='admin' ? [] : NEGOCIOS
+    .filter(n=>{ const c=document.getElementById('n-'+n.slug); return c && c.checked; })
+    .map(n=>({ negocio_id:n.id, rol:document.getElementById('r-'+n.slug).value }));
+  const body = {
+    nombre: document.getElementById('f-nombre').value.trim(),
+    rol_plataforma: rol,
+    whatsapp: document.getElementById('f-wa').value.trim(),
+    telegram_chat_id: document.getElementById('f-tg').value.trim(),
+    negocios,
+  };
+  const pw = document.getElementById('f-pw').value;
+  if(pw) body.password = pw;
+  if(!id){ body.email = document.getElementById('f-email').value.trim(); }
+  try{
+    const r = await fetch(id?('api/usuarios/'+id):'api/usuarios', {
+      method: id?'PUT':'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok){ err.textContent = d.mensaje || 'No se pudo guardar.'; btn.disabled=false; return; }
+    cerrar(); cargar();
+  }catch(_){ err.textContent='Error de conexión.'; }
+  btn.disabled=false;
+}
+
+async function cargar(){
+  try{
+    const [ru, rn] = await Promise.all([fetch('api/usuarios'), fetch('api/negocios')]);
+    if(!ru.ok){ document.getElementById('sub').textContent = ru.status===403?'solo para administradores':'error'; return; }
+    USUARIOS = (await ru.json()).usuarios || [];
+    NEGOCIOS = (await rn.json()).negocios || [];
+    document.getElementById('tb').innerHTML = USUARIOS.map(fila).join('');
+    document.getElementById('sub').textContent = `${USUARIOS.length} usuario(s)`;
+    if(window.lucide) lucide.createIcons();
+  }catch(e){ document.getElementById('sub').textContent='error al cargar'; }
+}
+cargar();
+</script>
+</body>
+</html>

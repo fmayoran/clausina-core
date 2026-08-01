@@ -245,7 +245,9 @@ app.get('/api/negocios', async (req, res) => {
     const propios = new Set((req.usuario.negocios || []).map(n => n.slug));
     const negocios = (await db.getNegocios())
       .filter(m => admin || propios.has(m.slug))
-      .map(m => ({ slug: m.slug, nombre: m.nombre, activo: m.activo, logo: m.logo, prefijo: m.prefijo }));
+      // `id` lo necesita la pantalla de usuarios para asignar negocios. Es aditivo: los demás
+      // consumidores siguen leyendo por slug.
+      .map(m => ({ id: m.id, slug: m.slug, nombre: m.nombre, activo: m.activo, logo: m.logo, prefijo: m.prefijo }));
     res.json({ negocios, activa: req.negocio });
   } catch (e) { console.error('marcas', e.message); res.status(500).json({ error: 'db' }); }
 });
