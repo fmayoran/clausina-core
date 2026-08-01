@@ -26,9 +26,20 @@ lleva la marca) y una identidad de ClaUsina para ser dueña del proyecto de Goog
    **Con un solo usuario alcanza para arrancar**: los alias (`info@`, `hola@`, `no-reply@`) son
    gratis y no cuentan como usuarios.
 3. Cuando pregunte por el dominio, elegir **"Sí, tengo uno que puedo usar"** y poner `clausina.ar`.
-4. Crear la cuenta de administrador. Sugerencia: **`hola@clausina.ar`** como cara pública, y
-   sumar `fernando@` como alias. Esta misma cuenta es la que después va a ser dueña del proyecto
-   de Google Cloud para el SSO — así la identidad de la plataforma queda en tu dominio.
+4. Crear la cuenta de administrador: **`fernando@clausina.ar`**, y sumar `hola@` e `info@` como
+   alias. Esta misma cuenta es la que después va a ser dueña del proyecto de Google Cloud para
+   el SSO — así la identidad de la plataforma queda en tu dominio.
+
+   **Qué se paga y qué no** (la duda que siempre vuelve):
+   - **Alias — gratis.** Hasta 30 por usuario. `hola@` e `info@` caen en la bandeja de
+     `fernando@` y se puede responder desde ellas.
+   - **Grupo — gratis.** Si más adelante alguien más tiene que leer `info@`, se crea como grupo
+     en vez de alias.
+   - **Usuario nuevo — paga licencia.** Lo que cuesta es que alguien **pueda entrar** con esa
+     dirección, no que la dirección exista y reciba correo.
+
+   El nombre principal **se puede cambiar después**: al renombrar, Google convierte la dirección
+   vieja en alias automáticamente. La elección no es irreversible.
 5. **Importante:** cuando ofrezca configurar el DNS automáticamente, elegir la opción
    **manual / "mi registrador no está en la lista"**. El dominio es `.ar` (NIC Argentina) con DNS
    en Cloudflare: la configuración automática de Google no aplica y puede confundir el proceso.
@@ -62,8 +73,10 @@ Qué escribe cada uno:
 ## Después, lo que gana la plataforma
 
 1. **El SSO queda bajo identidad de ClaUsina**: el proyecto de Google Cloud del
-   `GOOGLE_CLIENT_ID` lo crea `hola@clausina.ar`, no una cuenta personal ni la de un cliente.
-   Ver `SSO_GOOGLE.md`.
+   `GOOGLE_CLIENT_ID` lo crea `fernando@clausina.ar`, no una cuenta personal ni la de un cliente.
+   El mail de soporte de la pantalla de consentimiento —que el cliente ve— tiene que ser el de
+   esa cuenta o el de un grupo que administre; si se prefiere algo menos personal, sirve un
+   grupo `soporte@clausina.ar` (gratis). Ver `SSO_GOOGLE.md`.
 2. **El mail de agencia deja de salir de un Gmail**: hay que mover `MAIL_USER` /
    `AGENCIA_MAIL_USER` a la casilla nueva. Con Workspace el SMTP funciona igual (usuario +
    contraseña de aplicación, que requiere verificación en dos pasos activada).
