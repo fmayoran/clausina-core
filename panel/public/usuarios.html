@@ -119,8 +119,25 @@ function fila(u){
     <td class="mono text-[11px] text-pmut dark:text-mut">${esc(u.email)}</td>
     <td>${pillRol(u)}</td>
     <td class="mono text-[11px] text-pmut dark:text-mut">${u.rol_plataforma==='admin'?'todos':(negs||'—')}</td>
-    <td style="text-align:right"><button class="iconbtn" onclick="abrir('${u.id}')" title="Editar" aria-label="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button></td>
+    <td style="text-align:right;white-space:nowrap">
+      <button class="iconbtn" onclick="invitar('${u.id}')" title="Copiar invitación" aria-label="Copiar invitación"><i data-lucide="send" class="w-4 h-4"></i></button>
+      <button class="iconbtn" onclick="abrir('${u.id}')" title="Editar" aria-label="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+    </td>
   </tr>`;
+}
+
+/* La invitación no necesita link secreto: el acceso ya está dado por el email, y Google prueba
+   que la cuenta es suya. Copiamos el texto para mandarlo por donde quieras (WhatsApp, mail). */
+async function invitar(id){
+  const u = USUARIOS.find(x=>x.id===id); if(!u) return;
+  const txt = `Hola ${u.nombre}, ya tenés acceso al panel de ClaUsina.\n\n`
+    + `Entrá a ${location.origin} y tocá "Entrar con Google" usando ${u.email}.\n`
+    + `No hace falta que crees ninguna contraseña.`;
+  try{
+    await navigator.clipboard.writeText(txt);
+    const s=document.getElementById('sub'), antes=s.textContent;
+    s.textContent='invitación copiada'; setTimeout(()=>{s.textContent=antes;},2200);
+  }catch(_){ prompt('Copiá este texto:', txt); }
 }
 
 function pintarNegocios(){

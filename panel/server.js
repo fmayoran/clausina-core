@@ -115,6 +115,48 @@ app.post('/api/logout', (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Entrar con Google (públicos) --------------------------------------------------
+// El SSO autentica; el acceso lo sigue dando contenido.usuario. Si Google no está configurado,
+// la pantalla de login no muestra el botón y todo sigue funcionando con contraseña.
+const baseUrl = req => process.env.PANEL_URL ||
+  `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers['x-forwarded-host'] || req.headers.host}`;
+const redirectUri = req => `${baseUrl(req)}/auth/google/callback`;
+
+app.get('/api/auth/config', (req, res) => res.json({ google: auth.googleActivo() }));
+
+app.get('/auth/google', (req, res) => {
+  if (!auth.googleActivo()) return res.redirect('login?e=nogoogle');
+  const st = auth.estadoNuevo();
+  // El estado va en cookie de vida corta: sin esto, un tercero podría plantar un callback.
+  res.set('Set-Cookie', `${auth.STATE_COOKIE}=${st}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`);
+  res.redirect(auth.urlDeGoogle(redirectUri(req), st));
+});
+
+app.get('/auth/google/callback', async (req, res) => {
+  const limpiarEstado = () => res.append('Set-Cookie', `${auth.STATE_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
+  try {
+    if (!auth.googleActivo()) return res.redirect('/login?e=nogoogle');
+    const enviado = String(req.query.state || '');
+    const guardado = (req.headers.cookie || '').split(';').map(x => x.trim())
+      .find(x => x.startsWith(auth.STATE_COOKIE + '='));
+    const esperado = guardado ? decodeURIComponent(guardado.slice(auth.STATE_COOKIE.length + 1)) : '';
+    if (!enviado || enviado !== esperado || !auth.estadoValido(enviado)) { limpiarEstado(); return res.redirect('/login?e=estado'); }
+    if (!req.query.code) { limpiarEstado(); return res.redirect('/login?e=cancelado'); }
+
+    const perfil = await auth.canjearCodigo(String(req.query.code), redirectUri(req));
+    limpiarEstado();
+    if (!perfil) return res.redirect('/login?e=google');
+
+    const u = await db.getUsuarioPorEmail(perfil.email);
+    // Acá está la diferencia con un alta libre: si el mail no fue dado de alta, no entra.
+    if (!u) return res.redirect('/login?e=sinacceso&m=' + encodeURIComponent(perfil.email));
+
+    db.tocarAcceso(u.id).catch(() => {});
+    res.append('Set-Cookie', auth.cookieHeader(auth.issue(u.id), COOKIE_PATH, TTL_S));
+    res.redirect('/');
+  } catch (e) { console.error('google', e.message); limpiarEstado(); res.redirect('/login?e=google'); }
+});
+
 // Compuerta: todo lo demás (datos, acciones, board) requiere sesión válida Y un usuario vivo.
 // La cookie lleva el uid, así que a partir de acá cada request sabe quién pide — que es la
 // condición para poder validar el negocio activo contra sus permisos.

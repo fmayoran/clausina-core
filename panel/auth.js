@@ -67,6 +67,78 @@ function cookieHeader(value, path, maxAge) {
   return `${COOKIE}=${value}; Path=${path}; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 }
 
+// --- Google (OpenID Connect) ------------------------------------------------------
+// El SSO AUTENTICA, no autoriza: Google nos dice que el mail es de esa persona, pero el acceso
+// sigue saliendo de contenido.usuario. Si el mail no está en la tabla, no entra. Eso es lo que
+// reemplaza al alta libre: nadie se da acceso a sí mismo.
+const GOOGLE_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const googleActivo = () => !!(GOOGLE_ID && GOOGLE_SECRET);
+
+const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const STATE_COOKIE = 'cf_oauth';
+
+/** Estado anti-CSRF: un nonce firmado con el mismo secreto, válido 10 minutos. */
+function estadoNuevo() {
+  const p = Buffer.from(JSON.stringify({ n: crypto.randomBytes(12).toString('hex'), exp: Date.now() + 600000 })).toString('base64url');
+  return `${p}.${sign(p)}`;
+}
+function estadoValido(v) {
+  if (!v || !v.includes('.')) return false;
+  const [p, s] = v.split('.');
+  if (sign(p) !== s) return false;
+  try { return JSON.parse(Buffer.from(p, 'base64url').toString()).exp > Date.now(); } catch { return false; }
+}
+
+function urlDeGoogle(redirectUri, state) {
+  const q = new URLSearchParams({
+    client_id: GOOGLE_ID,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: 'openid email profile',       // permisos no sensibles: no disparan revisión de Google
+    state,
+    prompt: 'select_account',
+    access_type: 'online',
+  });
+  return `${AUTH_URL}?${q}`;
+}
+
+/**
+ * Canjea el code por el id_token y devuelve {email, nombre} o null.
+ *
+ * No verificamos la firma del JWT a propósito: el token viene del endpoint de Google por TLS,
+ * en una respuesta a un POST nuestro autenticado con el client_secret. Google documenta que en
+ * ese caso alcanza con validar los claims. Así evitamos sumar una librería de JWT.
+ */
+async function canjearCodigo(code, redirectUri) {
+  const r = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      code, client_id: GOOGLE_ID, client_secret: GOOGLE_SECRET,
+      redirect_uri: redirectUri, grant_type: 'authorization_code',
+    }),
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!r.ok) return null;
+  const d = await r.json();
+  if (!d.id_token) return null;
+
+  const partes = String(d.id_token).split('.');
+  if (partes.length !== 3) return null;
+  let c;
+  try { c = JSON.parse(Buffer.from(partes[1], 'base64url').toString()); } catch { return null; }
+
+  if (!['https://accounts.google.com', 'accounts.google.com'].includes(c.iss)) return null;
+  if (c.aud !== GOOGLE_ID) return null;
+  if (!c.exp || c.exp * 1000 < Date.now()) return null;
+  // Sin mail verificado no hay prueba de que la cuenta sea suya.
+  if (!c.email || c.email_verified !== true) return null;
+
+  return { email: String(c.email), nombre: String(c.name || c.email) };
+}
+
 // --- Permisos ---------------------------------------------------------------------
 // El admin pasa por encima de todo: es la plataforma. El resto sólo ve lo que tiene asignado.
 const esAdmin = u => !!u && u.rol_plataforma === 'admin';
@@ -84,8 +156,9 @@ const puedeVer = (usuario, negocioId) => rolEn(usuario, negocioId) !== null;
 const puedeAprobar = (usuario, negocioId) => ['admin', 'aprobador'].includes(rolEn(usuario, negocioId));
 
 module.exports = {
-  COOKIE, TTL_S,
+  COOKIE, TTL_S, STATE_COOKIE,
   hashPassword, verifyPassword,
   issue, readToken, readCookie, cookieHeader,
+  googleActivo, estadoNuevo, estadoValido, urlDeGoogle, canjearCodigo,
   esAdmin, rolEn, puedeVer, puedeAprobar,
 };
