@@ -1,4 +1,4 @@
-# Usuarios, autenticación y roles (plan — 29/07/2026)
+# Usuarios, autenticación y roles (IMPLEMENTADO — 29/07/2026)
 
 Base para todo lo que viene: canal hacia el cliente (WhatsApp), comandos de voz, y que un
 negocio se pueda operar sin que Fer sea el único con llave.
@@ -59,6 +59,17 @@ Sin dependencias nuevas, igual que el resto del motor:
 3. Aprobar y publicar exigen `aprobador` o `admin`.
 4. **El callback de Telegram valida el chat**: hoy cualquier chat que tenga el botón puede
    aprobar. Pasa a resolver `chat_id → usuario → rol en ese negocio`.
+
+## Pantalla (`panel/public/usuarios.html`, solo admin)
+
+Alta, edición, asignación de negocios con rol por negocio, cambio de contraseña y
+activar/desactivar. El email identifica al usuario, así que no se edita. Dos guardas:
+un admin no puede quitarse a sí mismo el rol ni desactivarse, y desactivar a alguien
+**le corta la sesión ya abierta** (el middleware recarga el usuario en cada request).
+
+`shell.js` quita del menú las secciones de plataforma (inicio, sala de máquinas, negocios,
+arquitectura, usuarios) para quien no es admin, y si cae en una lo manda a la home de SU
+negocio: el tablero de agencia consume 5 APIs solo-admin y se le veía roto.
 
 ## Fuera de alcance en esta fase (pendientes)
 
