@@ -13,6 +13,81 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
 });
 
+// --- Usuarios y permisos ---
+// El usuario llega con sus negocios ya resueltos: el middleware que valida la marca activa lo
+// consulta en CADA request, así que hacerlo en dos consultas no tendría sentido.
+const SQL_USUARIO = `
+  SELECT u.id, u.email, u.nombre, u.password_hash, u.rol_plataforma,
+         u.telegram_chat_id, u.whatsapp, u.activo,
+         COALESCE((SELECT json_agg(json_build_object('negocio_id', un.negocio_id, 'rol', un.rol, 'slug', n.slug))
+                     FROM contenido.usuario_negocio un
+                     JOIN contenido.negocios n ON n.id = un.negocio_id
+                    WHERE un.usuario_id = u.id), '[]'::json) AS negocios
+    FROM contenido.usuario u`;
+
+async function getUsuarioPorEmail(email) {
+  const { rows } = await pool.query(`${SQL_USUARIO} WHERE lower(u.email) = lower($1) AND u.activo`, [email]);
+  return rows[0] || null;
+}
+
+async function getUsuario(id) {
+  const { rows } = await pool.query(`${SQL_USUARIO} WHERE u.id = $1 AND u.activo`, [id]);
+  return rows[0] || null;
+}
+
+async function getUsuarios() {
+  const { rows } = await pool.query(
+    `${SQL_USUARIO} ORDER BY u.rol_plataforma, lower(u.nombre)`);
+  // El hash nunca sale del servidor.
+  return rows.map(({ password_hash, ...u }) => u);
+}
+
+async function tocarAcceso(id) {
+  await pool.query('UPDATE contenido.usuario SET ultimo_acceso_en = now() WHERE id = $1', [id]);
+}
+
+async function crearUsuario({ email, nombre, password_hash, rol_plataforma, telegram_chat_id, whatsapp }) {
+  const { rows } = await pool.query(
+    `INSERT INTO contenido.usuario (email, nombre, password_hash, rol_plataforma, telegram_chat_id, whatsapp)
+     VALUES ($1, $2, $3, COALESCE($4,'usuario'), NULLIF($5,''), NULLIF($6,'')) RETURNING id`,
+    [email, nombre, password_hash, rol_plataforma, telegram_chat_id || '', whatsapp || '']);
+  return rows[0].id;
+}
+
+/** Campos opcionales: los que vengan `undefined` no se tocan. La contraseña se pasa ya hasheada. */
+async function actualizarUsuario(id, { nombre, rol_plataforma, telegram_chat_id, whatsapp, activo, password_hash }) {
+  await pool.query(
+    `UPDATE contenido.usuario SET
+       nombre           = COALESCE($2, nombre),
+       rol_plataforma   = COALESCE($3, rol_plataforma),
+       telegram_chat_id = COALESCE($4, telegram_chat_id),
+       whatsapp         = COALESCE($5, whatsapp),
+       activo           = COALESCE($6, activo),
+       password_hash    = COALESCE($7, password_hash)
+     WHERE id = $1`,
+    [id, nombre ?? null, rol_plataforma ?? null, telegram_chat_id ?? null,
+     whatsapp ?? null, activo ?? null, password_hash ?? null]);
+}
+
+/** Reemplaza TODA la asignación de negocios del usuario. `negocios` = [{negocio_id, rol}]. */
+async function setNegociosDeUsuario(usuarioId, negocios) {
+  const c = await pool.connect();
+  try {
+    await c.query('BEGIN');
+    await c.query('DELETE FROM contenido.usuario_negocio WHERE usuario_id = $1', [usuarioId]);
+    for (const n of negocios || []) {
+      await c.query(
+        `INSERT INTO contenido.usuario_negocio (usuario_id, negocio_id, rol) VALUES ($1, $2, $3)`,
+        [usuarioId, n.negocio_id, n.rol === 'editor' ? 'editor' : 'aprobador']);
+    }
+    await c.query('COMMIT');
+  } catch (e) {
+    await c.query('ROLLBACK'); throw e;
+  } finally {
+    c.release();
+  }
+}
+
 // --- Marcas (tenants) ---
 // Cache en memoria de las marcas (proyectos): el panel resuelve la marca activa en cada request.
 let _negocios = null, _negociosAt = 0;
@@ -1304,7 +1379,9 @@ async function health() {
   return true;
 }
 
-module.exports = { getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
+module.exports = {
+  getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
+  getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio,
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente, getVerificacion,

@@ -59,24 +59,10 @@ async function refreshMetricas() {
   console.log(`métricas refrescadas: ${ok}`);
 }
 
-// --- Sesión: contraseña compartida + cookie firmada (HMAC), sin dependencias extra ---
-const PASSWORD = process.env.PANEL_PASSWORD || '';
-const SECRET = process.env.PANEL_SECRET || crypto.randomBytes(32).toString('hex');
-const COOKIE = 'cf_panel';
+// --- Sesión: usuario + cookie firmada (HMAC). Ver panel/auth.js y planes/USUARIOS_Y_ROLES.md ---
+const auth = require('./auth');
 const COOKIE_PATH = process.env.PANEL_COOKIE_PATH || '/panel';
-const TTL_S = 14 * 24 * 3600;
-const sign = p => crypto.createHmac('sha256', SECRET).update(p).digest('base64url');
-const issue = () => { const p = Buffer.from(JSON.stringify({ exp: Date.now() + TTL_S * 1000 })).toString('base64url'); return `${p}.${sign(p)}`; };
-function valid(tok) {
-  if (!tok || !tok.includes('.')) return false;
-  const [p, s] = tok.split('.');
-  if (sign(p) !== s) return false;
-  try { return JSON.parse(Buffer.from(p, 'base64url').toString()).exp > Date.now(); } catch { return false; }
-}
-function readCookie(req) {
-  const c = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith(COOKIE + '='));
-  return c ? decodeURIComponent(c.slice(COOKIE.length + 1)) : '';
-}
+const TTL_S = auth.TTL_S;
 
 app.disable('x-powered-by');
 app.use(express.json({ limit: '120mb' }));  // material/logo van como dataURL base64; un video sube ~33% -> holgura para archivos de ~85MB
@@ -85,7 +71,19 @@ app.use(express.json({ limit: '120mb' }));  // material/logo van como dataURL ba
 app.get('/api/health', async (req, res) => { try { await db.health(); res.json({ ok: true }); } catch { res.status(500).json({ ok: false }); } });
 app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxAge: '30d' }));
 // Almacén de medios de la agencia (volumen persistente /app/media): imágenes para panel, IG, landings, creativo. Público.
-app.use('/media', express.static('/app/media', { maxAge: '30d' }));
+// Almacén de medios. NO se puede cerrar entero: al publicar, Instagram descarga el archivo
+// desde su propio servidor (sin cookie), y hoy 219 piezas apuntan a `ig/` y 6 a `biblioteca/`.
+// Cerrarlas rompería la publicación. `manual/` queda abierta a propósito: el manual de marca
+// está pensado para compartirse por link.
+// Lo puramente interno sí se cierra: material de trabajo, referencias y assets de marca.
+// PENDIENTE: URLs firmadas al publicar, para poder cerrar también ig/ y biblioteca/.
+const MEDIA_PRIVADA = ['material', 'referencias', 'creativo', 'marca'];
+app.use('/media', (req, res, next) => {
+  const carpeta = req.path.split('/').filter(Boolean)[0] || '';
+  if (!MEDIA_PRIVADA.includes(carpeta)) return next();
+  const tok = auth.readToken(auth.readCookie(req));
+  return tok && tok.uid ? next() : res.status(403).end();
+}, express.static('/app/media', { maxAge: '30d' }));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 // Públicos para la PANTALLA: el reproductor (kiosco) y la playlist activa que poolea.
 app.get('/play', (req, res) => { res.set('Cache-Control', 'no-cache'); res.sendFile(path.join(__dirname, 'public', 'pantalla-play.html')); });
@@ -100,22 +98,47 @@ app.get('/api/pantalla/activo', async (req, res) => {
     res.json(pa ? await db.getActivoPlaylist(pa.id) : { version: 'none', nombre: null, items: [] });
   } catch (e) { console.error('activo', e.message); res.status(500).json({ error: 'db', items: [] }); }
 });
-app.post('/api/login', (req, res) => {
-  const pw = String((req.body && req.body.password) || '');
-  if (!PASSWORD || pw !== PASSWORD) return res.status(401).json({ ok: false });
-  res.set('Set-Cookie', `${COOKIE}=${issue()}; Path=${COOKIE_PATH}; HttpOnly; Secure; SameSite=Lax; Max-Age=${TTL_S}`);
-  res.json({ ok: true });
+app.post('/api/login', async (req, res) => {
+  try {
+    const email = String((req.body && req.body.email) || '').trim();
+    const pw = String((req.body && req.body.password) || '');
+    if (!email || !pw) return res.status(401).json({ ok: false });
+    const u = await db.getUsuarioPorEmail(email);
+    if (!u || !auth.verifyPassword(pw, u.password_hash)) return res.status(401).json({ ok: false });
+    db.tocarAcceso(u.id).catch(() => {});
+    res.set('Set-Cookie', auth.cookieHeader(auth.issue(u.id), COOKIE_PATH, TTL_S));
+    res.json({ ok: true, nombre: u.nombre, admin: auth.esAdmin(u) });
+  } catch (e) { console.error('login', e.message); res.status(500).json({ ok: false }); }
 });
 app.post('/api/logout', (req, res) => {
-  res.set('Set-Cookie', `${COOKIE}=; Path=${COOKIE_PATH}; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
+  res.set('Set-Cookie', auth.cookieHeader('', COOKIE_PATH, 0));
   res.json({ ok: true });
 });
 
-// Compuerta: todo lo demás (datos, acciones, board) requiere sesión válida.
-app.use((req, res, next) => {
-  if (valid(readCookie(req))) return next();
+// Compuerta: todo lo demás (datos, acciones, board) requiere sesión válida Y un usuario vivo.
+// La cookie lleva el uid, así que a partir de acá cada request sabe quién pide — que es la
+// condición para poder validar el negocio activo contra sus permisos.
+app.use(async (req, res, next) => {
+  const tok = auth.readToken(auth.readCookie(req));
+  if (tok && tok.uid) {
+    try {
+      const u = await db.getUsuario(tok.uid);
+      // Un usuario desactivado o borrado pierde la sesión aunque la cookie siga firmada.
+      if (u) { req.usuario = u; return next(); }
+    } catch (e) { console.error('sesion', e.message); return res.status(500).json({ error: 'db' }); }
+  }
   if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'auth' });
   return res.redirect('login');
+});
+
+// Quién soy: lo usa el front para saber qué mostrar y qué esconder.
+app.get('/api/yo', (req, res) => {
+  const u = req.usuario;
+  res.json({
+    id: u.id, nombre: u.nombre, email: u.email,
+    admin: auth.esAdmin(u),
+    negocios: auth.esAdmin(u) ? 'todos' : (u.negocios || []).map(n => ({ slug: n.slug, rol: n.rol })),
+  });
 });
 
 // --- Marca activa (multi-tenant): cookie cf_marca -> negocio_id en req. Default cortafuego. ---
@@ -126,24 +149,109 @@ function readMarca(req) {
 }
 app.use(async (req, res, next) => {
   try {
-    let slug = readMarca(req) || 'cortafuego';
+    // ESTE es el punto que cerraba el agujero: antes se tomaba el slug de la cookie tal cual,
+    // así que editarla en el navegador daba acceso al negocio de otro. Ahora se valida contra
+    // los permisos del usuario. Al resolverse acá, las 67 rutas que usan req.negocioId quedan
+    // cubiertas sin tocarlas una por una.
+    const u = req.usuario;
+    const admin = auth.esAdmin(u);
+    const propios = (u.negocios || []).map(n => n.slug);
+    const pedido = readMarca(req);
+
+    let slug;
+    if (admin) {
+      slug = pedido || 'cortafuego';
+    } else if (pedido && propios.includes(pedido)) {
+      slug = pedido;
+    } else if (propios.length) {
+      slug = propios[0];               // pidió uno que no es suyo (o ninguno): cae en el primero propio
+    } else {
+      return res.status(403).json({ error: 'sin_negocio', mensaje: 'Tu usuario no tiene ningún negocio asignado.' });
+    }
+
     let pid = await db.getProyectoId(slug);
-    if (!pid) { slug = 'cortafuego'; pid = await db.getProyectoId('cortafuego'); }
+    if (!pid && admin) { slug = 'cortafuego'; pid = await db.getProyectoId('cortafuego'); }
+    if (!pid) return res.status(403).json({ error: 'sin_negocio' });
+
     req.negocio = slug; req.negocioId = pid;
+    req.rol = auth.rolEn(u, pid);
     next();
   } catch (e) { console.error('marca', e.message); res.status(500).json({ error: 'marca' }); }
 });
 
+// Compuertas reutilizables.
+const soloAdmin = (req, res, next) =>
+  auth.esAdmin(req.usuario) ? next() : res.status(403).json({ error: 'solo_admin' });
+// Aprobar / rechazar / publicar: la compuerta humana de la plataforma.
+const soloAprobador = (req, res, next) =>
+  auth.puedeAprobar(req.usuario, req.negocioId) ? next() : res.status(403).json({ error: 'sin_permiso' });
+
 // Lista de marcas (para el selector) + cuál está activa en esta sesión.
+// --- Usuarios (solo admin) --------------------------------------------------------
+app.get('/api/usuarios', soloAdmin, async (req, res) => {
+  try { res.json({ usuarios: await db.getUsuarios() }); }
+  catch (e) { console.error('usuarios', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+app.post('/api/usuarios', soloAdmin, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const email = String(b.email || '').trim();
+    const nombre = String(b.nombre || '').trim();
+    const pw = String(b.password || '');
+    if (!email || !nombre || pw.length < 8) {
+      return res.status(400).json({ error: 'datos', mensaje: 'Hacen falta nombre, email y una contraseña de 8 caracteres o más.' });
+    }
+    const id = await db.crearUsuario({
+      email, nombre,
+      password_hash: auth.hashPassword(pw),
+      rol_plataforma: b.rol_plataforma === 'admin' ? 'admin' : 'usuario',
+      telegram_chat_id: b.telegram_chat_id, whatsapp: b.whatsapp,
+    });
+    if (Array.isArray(b.negocios)) await db.setNegociosDeUsuario(id, b.negocios);
+    res.json({ ok: true, id });
+  } catch (e) {
+    if (String(e.message).includes('idx_usuario_email')) {
+      return res.status(409).json({ error: 'duplicado', mensaje: 'Ya existe un usuario con ese email.' });
+    }
+    console.error('crear usuario', e.message); res.status(500).json({ error: 'db' });
+  }
+});
+
+app.put('/api/usuarios/:id', soloAdmin, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const id = String(req.params.id);
+    // Un admin no puede quitarse a sí mismo el rol ni desactivarse: sería quedarse afuera.
+    if (id === req.usuario.id && (b.rol_plataforma === 'usuario' || b.activo === false)) {
+      return res.status(400).json({ error: 'auto', mensaje: 'No podés quitarte a vos mismo el acceso de administrador.' });
+    }
+    const pw = String(b.password || '');
+    if (pw && pw.length < 8) return res.status(400).json({ error: 'datos', mensaje: 'La contraseña necesita 8 caracteres o más.' });
+    await db.actualizarUsuario(id, {
+      nombre: b.nombre, rol_plataforma: b.rol_plataforma,
+      telegram_chat_id: b.telegram_chat_id, whatsapp: b.whatsapp, activo: b.activo,
+      password_hash: pw ? auth.hashPassword(pw) : undefined,
+    });
+    if (Array.isArray(b.negocios)) await db.setNegociosDeUsuario(id, b.negocios);
+    res.json({ ok: true });
+  } catch (e) { console.error('editar usuario', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 app.get('/api/negocios', async (req, res) => {
   try {
-    const negocios = (await db.getNegocios()).map(m => ({ slug: m.slug, nombre: m.nombre, activo: m.activo, logo: m.logo, prefijo: m.prefijo }));
+    // Un usuario de negocio sólo ve los suyos en el selector.
+    const admin = auth.esAdmin(req.usuario);
+    const propios = new Set((req.usuario.negocios || []).map(n => n.slug));
+    const negocios = (await db.getNegocios())
+      .filter(m => admin || propios.has(m.slug))
+      .map(m => ({ slug: m.slug, nombre: m.nombre, activo: m.activo, logo: m.logo, prefijo: m.prefijo }));
     res.json({ negocios, activa: req.negocio });
   } catch (e) { console.error('marcas', e.message); res.status(500).json({ error: 'db' }); }
 });
 
 // Dashboard de la Agencia: todos los proyectos con descripción + indicadores (no scopeado a una marca).
-app.get('/api/agencia', async (req, res) => {
+app.get('/api/agencia', soloAdmin, async (req, res) => {
   try { res.json(await db.getResumenAgencia()); }
   catch (e) { console.error('agencia', e.message); res.status(500).json({ error: 'db' }); }
 });
@@ -193,7 +301,7 @@ app.get('/api/status', async (req, res) => {
 });
 
 // Sala de máquinas: pulso del motor (pipeline agregado + latido de procesos). No scopeado a una marca.
-app.get('/api/maquinas', async (req, res) => {
+app.get('/api/maquinas', soloAdmin, async (req, res) => {
   try { res.json(await db.getMaquinas()); }
   catch (e) { console.error('maquinas', e.message); res.status(500).json({ error: 'db' }); }
 });
@@ -248,7 +356,7 @@ app.post('/api/grafica/:id/iterar', async (req, res) => {
     res.status(r.ok ? 200 : 409).json(r);
   } catch (e) { console.error('grafica-iterar', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
-app.post('/api/grafica/:id/estado', async (req, res) => {
+app.post('/api/grafica/:id/estado', soloAprobador, async (req, res) => {
   try { res.json(await db.estadoGrafica(req.negocioId, req.params.id, (req.body || {}).estado)); }
   catch (e) { console.error('grafica-estado', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
@@ -261,25 +369,25 @@ app.post('/api/grafica/fondo', async (req, res) => {
 });
 
 // Salud del sistema: última verificación de integridad (cron cada 30 min).
-app.get('/api/verificacion', async (req, res) => {
+app.get('/api/verificacion', soloAdmin, async (req, res) => {
   try { res.json(await db.getVerificacion() || { chequeos: [], cuando: null }); }
   catch (e) { console.error('verificacion', e.message); res.status(500).json({ error: 'db' }); }
 });
 
 // Lente de Instagram: config de PLATAFORMA (la agencia, no una marca). El token se guarda
 // cifrado y es write-only: nunca vuelve al navegador (solo decimos si está cargado).
-app.get('/api/plataforma/lente', async (req, res) => {
+app.get('/api/plataforma/lente', soloAdmin, async (req, res) => {
   try { res.json(await db.getLente()); }
   catch (e) { console.error('lente', e.message); res.status(500).json({ error: 'db' }); }
 });
-app.post('/api/plataforma/lente', async (req, res) => {
+app.post('/api/plataforma/lente', soloAdmin, async (req, res) => {
   try {
     const r = await db.guardarLente(req.body || {});
     res.status(r.ok ? 200 : 400).json(r);
   } catch (e) { console.error('lente-set', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 // Probar la lente contra Instagram: confirma que el token anda ANTES de que falle un alta.
-app.post('/api/plataforma/lente/probar', async (req, res) => {
+app.post('/api/plataforma/lente/probar', soloAdmin, async (req, res) => {
   try {
     const { ig_lente_id } = await db.getLente();
     const tok = await db.getLenteToken();
@@ -293,13 +401,13 @@ app.post('/api/plataforma/lente/probar', async (req, res) => {
 
 // Descubrimiento: analizar la presencia digital pública de una marca que todavía no existe,
 // para pre-cargar el wizard. El análisis lo hace un job (worker); acá solo encolamos y consultamos.
-app.post('/api/negocios/descubrir', async (req, res) => {
+app.post('/api/negocios/descubrir', soloAdmin, async (req, res) => {
   try {
     const r = await db.crearDescubrimiento(req.body || {});
     res.status(r.ok ? 200 : 400).json(r);
   } catch (e) { console.error('descubrir', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
-app.get('/api/negocios/descubrir/:id', async (req, res) => {
+app.get('/api/negocios/descubrir/:id', soloAdmin, async (req, res) => {
   try {
     const d = await db.getDescubrimiento(req.params.id);
     if (!d) return res.status(404).json({ error: 'no_existe' });
@@ -308,7 +416,7 @@ app.get('/api/negocios/descubrir/:id', async (req, res) => {
 });
 
 // Alta de marca (wizard "Sumá una marca").
-app.post('/api/negocios/crear', async (req, res) => {
+app.post('/api/negocios/crear', soloAdmin, async (req, res) => {
   try {
     const r = await db.crearNegocio(req.body || {});
     res.status(r.ok ? 200 : 400).json(r);
@@ -316,11 +424,11 @@ app.post('/api/negocios/crear', async (req, res) => {
 });
 
 // Grilla de agencia: todas las marcas y qué tiene configurada cada una (cross-marca).
-app.get('/api/capacidades/todas', async (req, res) => {
+app.get('/api/capacidades/todas', soloAdmin, async (req, res) => {
   try { res.json(await db.getCapacidadesTodas()); }
   catch (e) { console.error('capacidades-todas', e.message); res.status(500).json({ error: 'db' }); }
 });
-app.post('/api/capacidades/:cap', async (req, res) => {
+app.post('/api/capacidades/:cap', soloAdmin, async (req, res) => {
   try {
     const b = req.body || {};
     const r = await db.setCapacidad(req.negocioId, req.params.cap, { habilitada: !!b.habilitada, config: b.config });
@@ -366,17 +474,17 @@ app.post('/api/landing', async (req, res) => {
     res.json(id ? { ok: true, id } : { ok: false, error: 'requerimiento vacío' }); }
   catch (e) { console.error('landing crear', e.message); res.status(500).json({ ok: false }); }
 });
-app.post('/api/landing/:id/aprobar', async (req, res) => {
+app.post('/api/landing/:id/aprobar', soloAprobador, async (req, res) => {
   try { res.json({ ok: await db.aprobarLanding(req.negocioId, req.params.id) }); }
   catch (e) { console.error('landing aprobar', e.message); res.status(500).json({ ok: false }); }
 });
-app.post('/api/landing/:id/rechazar', async (req, res) => {
+app.post('/api/landing/:id/rechazar', soloAprobador, async (req, res) => {
   try { res.json({ ok: await db.rechazarLanding(req.negocioId, req.params.id, (req.body || {}).motivo) }); }
   catch (e) { console.error('landing rechazar', e.message); res.status(500).json({ ok: false }); }
 });
 
 // --- Auditoría de presencia digital del proyecto ---
-app.get('/api/auditoria', async (req, res) => {
+app.get('/api/auditoria', soloAdmin, async (req, res) => {
   try { res.json(await db.getAuditoria(req.negocioId, req.query.canal)); }
   catch (e) { console.error('auditoria', e.message); res.status(500).json({ error: 'db' }); }
 });
@@ -404,23 +512,23 @@ app.post('/api/campanias/solicitar', async (req, res) => {
   try { res.json({ ok: true, id: await db.crearSolicitudCampania(req.negocioId, (req.body || {}).instruccion) }); }
   catch (e) { console.error('campania-solicitar', e.message); res.status(500).json({ error: 'db' }); }
 });
-app.post('/api/campanias/:id/aprobar', async (req, res) => {
+app.post('/api/campanias/:id/aprobar', soloAprobador, async (req, res) => {
   try { res.json({ ok: await db.aprobarCampania(req.negocioId, req.params.id) }); }
   catch (e) { console.error('campania-aprobar', e.message); res.status(500).json({ error: 'db' }); }
 });
-app.post('/api/campanias/:id/rechazar', async (req, res) => {
+app.post('/api/campanias/:id/rechazar', soloAprobador, async (req, res) => {
   try { res.json({ ok: await db.rechazarCampania(req.negocioId, req.params.id, (req.body || {}).motivo) }); }
   catch (e) { console.error('campania-rechazar', e.message); res.status(500).json({ error: 'db' }); }
 });
-app.post('/api/campanias/:id/descartar', async (req, res) => {
+app.post('/api/campanias/:id/descartar', soloAprobador, async (req, res) => {
   try { res.json({ ok: await db.descartarCampania(req.negocioId, req.params.id) }); }
   catch (e) { console.error('campania-descartar', e.message); res.status(500).json({ error: 'db' }); }
 });
-app.post('/api/campanias/:id/activar', async (req, res) => {
+app.post('/api/campanias/:id/activar', soloAprobador, async (req, res) => {
   try { res.json({ ok: await db.activarCampania(req.negocioId, req.params.id) }); }
   catch (e) { console.error('campania-activar', e.message); res.status(500).json({ error: 'db' }); }
 });
-app.post('/api/campanias/:id/pausar', async (req, res) => {
+app.post('/api/campanias/:id/pausar', soloAprobador, async (req, res) => {
   try { res.json({ ok: await db.pausarCampania(req.negocioId, req.params.id) }); }
   catch (e) { console.error('campania-pausar', e.message); res.status(500).json({ error: 'db' }); }
 });
@@ -475,7 +583,7 @@ app.get('/api/material/:mid/media', async (req, res) => {
 // --- Acciones sobre pendientes (protegidas por la sesión del panel) ---
 // El navegador manda solo el id de la pieza; el server resuelve el token y llama a n8n.
 // Acciones canal-aware: Instagram → webhooks n8n (Graph API); Aviso → estado directo en la base.
-app.post('/api/piezas/:id/aprobar', async (req, res) => {
+app.post('/api/piezas/:id/aprobar', soloAprobador, async (req, res) => {
   try {
     const p = await db.getPiezaCanal(req.params.id);
     if (!p || p.estado !== 'pendiente_aprobacion') return res.status(409).json({ ok: false, error: 'no_pendiente' });
@@ -502,7 +610,7 @@ app.get('/api/piezas/:id/estado', async (req, res) => {
   } catch (e) { console.error('pieza-estado', e.message); res.status(500).json({ error: 'db' }); }
 });
 
-app.post('/api/piezas/:id/rechazar', async (req, res) => {
+app.post('/api/piezas/:id/rechazar', soloAprobador, async (req, res) => {
   try {
     const motivo = String((req.body && req.body.motivo) || '').trim().slice(0, 500);
     if (!motivo) return res.status(400).json({ ok: false, error: 'motivo_requerido' });
@@ -515,7 +623,7 @@ app.post('/api/piezas/:id/rechazar', async (req, res) => {
   } catch (e) { console.error('rechazar', e.message); res.status(500).json({ ok: false, error: 'webhook' }); }
 });
 
-app.post('/api/piezas/:id/descartar', async (req, res) => {
+app.post('/api/piezas/:id/descartar', soloAprobador, async (req, res) => {
   try {
     const p = await db.getPiezaCanal(req.params.id);
     if (!p || p.estado !== 'pendiente_aprobacion') return res.status(409).json({ ok: false, error: 'no_pendiente' });
@@ -1072,7 +1180,7 @@ app.put('/api/programas/:id', async (req, res) => {
     res.json({ ok: await db.guardarPrograma(req.params.id, nombre, piezas, pa.id) });
   } catch (e) { console.error('guardar prog', e.message); res.status(500).json({ ok: false }); }
 });
-app.post('/api/programas/:id/activar', async (req, res) => {
+app.post('/api/programas/:id/activar', soloAprobador, async (req, res) => {
   try { const pa = await resolvePantalla(req); res.json({ ok: pa ? await db.activarPrograma(req.params.id, pa.id) : false }); }
   catch (e) { console.error('activar prog', e.message); res.status(500).json({ ok: false }); }
 });
@@ -1128,7 +1236,7 @@ app.get('/api/pantalla/vnnox', async (req, res) => {
 });
 
 // Publica un programa a la pantalla: calcula md5+size de cada video y llama a /v2/player/program/normal.
-app.post('/api/programas/:id/enviar-pantalla', async (req, res) => {
+app.post('/api/programas/:id/enviar-pantalla', soloAprobador, async (req, res) => {
   try {
     if (!vnnox.configured()) return res.status(503).json({ ok: false, error: 'vnnox_no_configurado' });
     const pa = await resolvePantalla(req); if (!pa) return res.status(404).json({ ok: false, error: 'sin_pantalla' });

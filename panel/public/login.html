@@ -31,8 +31,10 @@
     <img class="iso" src="favicon.svg" alt="ClaUsina">
     <div class="logo">Cla<b>U</b>sina<b class="dot">.</b></div>
     <div class="sub">Agencia · impulsada por Claude</div>
-    <label for="pw">Contraseña</label>
-    <input id="pw" type="password" autocomplete="current-password" autofocus>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" autofocus>
+    <label for="pw" style="margin-top:16px">Contraseña</label>
+    <input id="pw" type="password" autocomplete="current-password">
     <button id="btn" type="submit">Entrar</button>
     <div class="err" id="err"></div>
   </form>
@@ -42,9 +44,9 @@ async function entrar(e){
   const btn=document.getElementById('btn'), err=document.getElementById('err');
   err.textContent=''; btn.disabled=true; btn.textContent='Entrando…';
   try{
-    const r=await fetch('api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:document.getElementById('pw').value})});
+    const r=await fetch('api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('email').value.trim(),password:document.getElementById('pw').value})});
     if(r.ok){ location.href='.'; return; }
-    err.textContent='Contraseña incorrecta.';
+    err.textContent='Email o contraseña incorrectos.';
   }catch(_){ err.textContent='Error de conexión.'; }
   btn.disabled=false; btn.textContent='Entrar';
   document.getElementById('pw').select();
