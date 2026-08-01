@@ -24,19 +24,42 @@ ZID=$(curl -s -m 20 "$API/zones?name=$DOM" -H "$H_AUTH" \
   | python3 -c "import sys,json;r=json.load(sys.stdin).get('result') or [];print(r[0]['id'] if r else '')")
 [ -n "$ZID" ] || { echo "ERROR: no encuentro la zona $DOM (¿el token tiene permiso?)"; exit 1; }
 
-# Crea el registro si no existe con ese mismo contenido; si existe con otro, lo actualiza.
+# Crea el registro, o actualiza el que ya cumple ESA MISMA función.
+#
+# OJO — esto ya rompió una vez: en un mismo nombre conviven varios TXT (verificación de dominio,
+# SPF, y lo que venga). Reemplazar "el primer TXT que aparezca" borró el de verificación de
+# Google al escribir el SPF, y sin ese registro Google puede des-verificar el dominio y
+# suspender el servicio. Por eso los TXT se emparejan por PREFIJO: un SPF sólo pisa a otro SPF.
 upsert() { # tipo nombre contenido [prioridad]
   local tipo="$1" nombre="$2" contenido="$3" prio="${4:-}"
   local existente
   existente=$(curl -s -m 20 "$API/zones/$ZID/dns_records?type=$tipo&name=$nombre" -H "$H_AUTH" \
-    | python3 -c "
-import sys,json
-r=json.load(sys.stdin).get('result') or []
-c=$(python3 -c "import json,sys;print(json.dumps(sys.argv[1]))" "$contenido")
+    | CONTENIDO="$contenido" TIPO="$tipo" python3 -c "
+import sys, json, os
+r = json.load(sys.stdin).get('result') or []
+nuevo, tipo = os.environ['CONTENIDO'], os.environ['TIPO']
+
+def familia(v):
+    v = v.strip('\"').lower()
+    for p in ('v=spf1', 'v=dmarc1', 'google-site-verification=', 'v=dkim1'):
+        if v.startswith(p):
+            return p
+    return None
+
+# Idéntico: no hay nada que hacer.
 for x in r:
-    if x['content'].strip('\"')==c.strip('\"'): print('MISMO'); break
+    if x['content'].strip('\"') == nuevo.strip('\"'):
+        print('MISMO'); break
 else:
-    print(r[0]['id'] if r and '$tipo'!='MX' else '')")
+    if tipo == 'TXT':
+        # Sólo pisamos un TXT de la MISMA familia; si no hay, se crea uno nuevo y conviven.
+        f = familia(nuevo)
+        ids = [x['id'] for x in r if f and familia(x['content']) == f]
+        print(ids[0] if ids else '')
+    elif tipo == 'MX':
+        print('')          # los MX se agregan; la limpieza de los viejos es aparte
+    else:
+        print(r[0]['id'] if r else '')")
 
   if [ "$existente" = "MISMO" ]; then echo "  ya estaba: $tipo $nombre"; return; fi
 
