@@ -125,7 +125,8 @@ const redirectUri = req => `${baseUrl(req)}/auth/google/callback`;
 app.get('/api/auth/config', (req, res) => res.json({ google: auth.googleActivo() }));
 
 app.get('/auth/google', (req, res) => {
-  if (!auth.googleActivo()) return res.redirect('login?e=nogoogle');
+  // Absoluto: un relativo desde /auth/google resuelve a /auth/login, que no existe.
+  if (!auth.googleActivo()) return res.redirect('/login?e=nogoogle');
   const st = auth.estadoNuevo();
   // El estado va en cookie de vida corta: sin esto, un tercero podría plantar un callback.
   res.set('Set-Cookie', `${auth.STATE_COOKIE}=${st}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`);
