@@ -1,5 +1,8 @@
 # Google Workspace para clausina.ar
 
+> **ESTADO (29/07/2026): correo andando.** Dominio verificado, MX + SPF + DMARC publicados y
+> probados con un mail real a `fernando@clausina.ar`. Falta sólo el DKIM.
+
 Objetivo doble: correo propio de la agencia (hoy sale desde una casilla de Gmail que ni siquiera
 lleva la marca) y una identidad de ClaUsina para ser dueña del proyecto de Google Cloud del SSO.
 
@@ -82,6 +85,20 @@ Qué escribe cada uno:
    contraseña de aplicación, que requiere verificación en dos pasos activada).
 3. Con SPF y DKIM firmando, los avisos a clientes dejan de tener pinta de spam — hoy salen de
    una casilla de Gmail hablando en nombre de otra marca.
+
+## Incidente durante la configuración (corregido)
+
+Al escribir el SPF, `dns_workspace.sh` **borró el TXT de verificación de Google**: la lógica
+reemplazaba "el primer TXT con ese nombre", sin contemplar que en un mismo nombre conviven
+varios TXT legítimos (verificación, SPF, DKIM…). No es inocuo — Google revalida ese registro y
+sin él puede des-verificar el dominio y suspender el servicio.
+
+Detectado comparando contra el resolver de Google, restaurado en el momento, y el script
+corregido: ahora los TXT se emparejan **por familia** (`v=spf1`, `v=dmarc1`,
+`google-site-verification=`, `v=dkim1`), así un SPF sólo puede pisar a otro SPF.
+
+**Lección para cualquier script de DNS:** varios TXT en un mismo nombre son normales; nunca
+reemplazar por posición.
 
 ## Un aviso sobre el alcance del token de Cloudflare
 
