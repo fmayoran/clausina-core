@@ -71,6 +71,19 @@ app.use(express.json({ limit: '120mb' }));  // material/logo van como dataURL ba
 // Públicos (sin sesión): health, pantalla de login y sus fuentes, login/logout.
 app.get('/api/health', async (req, res) => { try { await db.health(); res.json({ ok: true }); } catch { res.status(500).json({ ok: false }); } });
 app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxAge: '30d' }));
+// Assets que necesitan las pantallas ANTERIORES a la sesión (login, definir contraseña).
+// El static de public/ se monta al final, detrás de la compuerta: sin esto esas páginas se
+// dibujaban sin hoja de estilos y sin logo. Sólo estáticos inertes — el HTML y el JS del panel
+// siguen detrás de la sesión.
+const ASSETS_PUBLICOS = /\.(css|svg|png|jpe?g|ico|webp|woff2?)$/i;
+const estaticoPublico = express.static(path.join(__dirname, 'public'), { maxAge: '30d', index: false, dotfiles: 'ignore' });
+app.use((req, res, next) => {
+  // El filtro va acá, no en las opciones de express.static: `static` sirve todo lo que encuentre.
+  // Dejamos pasar sólo estáticos inertes; el HTML y el JS del panel siguen detrás de la sesión.
+  if (req.method !== 'GET' || !ASSETS_PUBLICOS.test(req.path)) return next();
+  res.set('X-Content-Type-Options', 'nosniff');
+  return estaticoPublico(req, res, next);
+});
 // Almacén de medios de la agencia (volumen persistente /app/media): imágenes para panel, IG, landings, creativo. Público.
 // Almacén de medios. NO se puede cerrar entero: al publicar, Instagram descarga el archivo
 // desde su propio servidor (sin cookie), y hoy 219 piezas apuntan a `ig/` y 6 a `biblioteca/`.
