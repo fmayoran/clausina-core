@@ -18,20 +18,27 @@ Siete puntos, y **todos menos uno son de salida** (el sistema le habla a Fer):
 | Panel | `panel/server.js`, `panel/db.js` | salida |
 
 **Telegram no es un canal multi-negocio: es la consola personal del operador.** Solo 1 de 9
-negocios tiene `telegram_chat_id`, y apenas 2 chats escribieron alguna vez.
+negocios tenía `telegram_chat_id`, y apenas 2 chats escribieron alguna vez.
 
-## El hallazgo: WhatsApp ya está en producción
+**Decidido el 02/08 y ya aplicado:** Telegram queda para el administrador y las alertas de
+plataforma. El Router del bot descarta cualquier chat no autorizado; la lista se deriva de
+`contenido.usuario` con `scripts/sync_telegram_admins.py`.
 
-Chatwoot (`crm_chatwoot`) tiene un inbox **WhatsApp Cloud API** con número real
-(+54 9 11 6695-7605): 247 conversaciones, 2116 mensajes, **78 en los últimos 30 días**.
-La cuenta de Chatwoot se llama **Ibitat**. Está enganchado al workflow `dzain_CRM_v1`.
+## Corrección: el WhatsApp que corre en el VPS NO es de ClaUsina
 
-**No tiene ninguna relación con el motor de ClaUsina.** Son dos mundos paralelos en el mismo
-VPS: el circuito de publicación por un lado, el de conversación con clientes por el otro.
-Esa desconexión —no "Telegram contra WhatsApp"— es la deuda de arquitectura real.
+En la auditoría del 29/07 encontré un inbox de WhatsApp Cloud API en Chatwoot (`crm_chatwoot`,
+número +54 9 11 6695-7605, cuenta "Ibitat", enganchado al workflow `dzain_CRM_v1`) y lo
+interpreté como "WhatsApp ya está en producción, desconectado del motor". **Era incorrecto.**
 
-Señal de que ya lo habíamos decidido sin decirlo: `contenido.negocio_contacto` guarda
-**whatsapp y mail, no telegram**.
+Fer aclaró (02/08) que ese Chatwoot y ese número **pertenecen a otra aplicación** y no tienen
+relación con ClaUsina. Comparten el VPS y nada más. No hay nada que "reconectar": no es deuda
+de arquitectura, es un vecino.
+
+**Consecuencia práctica: ClaUsina no tiene WhatsApp. Se arranca desde cero** — cuenta de Meta
+Business propia, número dedicado y alta en WhatsApp Business Platform.
+
+Lo que sí sigue en pie: `contenido.negocio_contacto` guarda **whatsapp y mail, no telegram**,
+señal de que el canal hacia el cliente ya estaba pensado por ahí.
 
 ## Decisión de rumbo: separar por audiencia, no migrar
 
@@ -45,16 +52,12 @@ Señal de que ya lo habíamos decidido sin decirlo: `contenido.negocio_contacto`
 
 ## Pendientes
 
-1. **Averiguar bajo qué cuenta de Meta Business está el número +54 9 11 6695-7605**: si está
-   verificada, y si es de Fer o de Ibitat. Sin verificar, el tope son 250 conversaciones
-   iniciadas por el negocio cada 24 h (probablemente alcance). Se cruza con la verificación de
-   Meta que quedó frenada por el CUIT.
-2. **Conectar el mundo conversacional con el motor**: hoy Chatwoot/`dzain_CRM_v1` y ClaUsina no
-   se conocen.
-3. **Plantillas de WhatsApp** para aprobar/rechazar desde el cliente.
-4. **Identidad**: quién es quién en cada canal. Bloqueado por usuarios y roles — ver
-   `USUARIOS_Y_ROLES.md`. Hoy `telegram_chat_id` cuelga de `negocios` y `whatsapp` de
-   `negocio_contacto`; deberían converger en el usuario.
+1. **Dar de alta WhatsApp para ClaUsina desde cero**: cuenta de Meta Business propia, número
+   dedicado, alta en WhatsApp Business Platform. Se cruza con la verificación de Meta que quedó
+   frenada por el CUIT.
+2. **Plantillas de WhatsApp** para aprobar/rechazar desde el cliente (Meta las revisa una por una).
+3. **Identidad**: RESUELTO — `usuario.whatsapp` y `usuario.telegram_chat_id` ya cuelgan del
+   usuario. Ver `USUARIOS_Y_ROLES.md`.
 
 ## Sobre los comandos de voz
 
