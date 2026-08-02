@@ -1,7 +1,12 @@
-# Entrar con Google (SSO) — configuración pendiente
+# Entrar con Google (SSO)
 
-El código está desplegado y **degrada solo**: mientras no existan las credenciales, el botón no
-aparece y todo sigue funcionando con contraseña. Al cargarlas, el botón aparece solo.
+> **ANDANDO EN PRODUCCIÓN desde el 02/08/2026.** Credenciales cargadas en el env del panel y
+> probado de punta a punta con una cuenta real. Cliente OAuth creado bajo `fernando@clausina.ar`
+> (proyecto sin organización: la organización de Workspace todavía no estaba provisionada, y no
+> hace falta — el proyecto se puede migrar después sin tocar las credenciales).
+
+El código **degrada solo**: sin credenciales el botón no aparece y todo sigue con contraseña.
+La contraseña del admin queda como puerta de emergencia si Google falla.
 
 ## Decisión de fondo: no hay alta libre
 
