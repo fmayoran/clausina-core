@@ -2,6 +2,7 @@
 // Lectura sobre el schema `contenido` (base `claude`). Conexión por variables de entorno PG*.
 const { Pool } = require('pg');
 const cryptoAds = require('./crypto_ads');
+const tel = require('./telefono');
 
 const pool = new Pool({
   host: process.env.PGHOST || 'crm_pgvector',
@@ -19,7 +20,7 @@ const pool = new Pool({
 const SQL_USUARIO = `
   SELECT u.id, u.email, u.nombre, u.password_hash, u.rol_plataforma,
          u.telegram_chat_id, u.whatsapp, u.activo,
-         u.cargo, u.perfil_completado_en, u.invitado_en, u.ultimo_acceso_en,
+         u.cargo, u.perfil_completado_en, u.invitado_en, u.ultimo_acceso_en, u.whatsapp_norm,
          COALESCE((SELECT json_agg(json_build_object('negocio_id', un.negocio_id, 'rol', un.rol, 'slug', n.slug))
                      FROM contenido.usuario_negocio un
                      JOIN contenido.negocios n ON n.id = un.negocio_id
@@ -49,9 +50,10 @@ async function tocarAcceso(id) {
 
 async function crearUsuario({ email, nombre, password_hash, rol_plataforma, telegram_chat_id, whatsapp }) {
   const { rows } = await pool.query(
-    `INSERT INTO contenido.usuario (email, nombre, password_hash, rol_plataforma, telegram_chat_id, whatsapp)
-     VALUES ($1, $2, $3, COALESCE($4,'usuario'), NULLIF($5,''), NULLIF($6,'')) RETURNING id`,
-    [email, nombre, password_hash, rol_plataforma, telegram_chat_id || '', whatsapp || '']);
+    `INSERT INTO contenido.usuario (email, nombre, password_hash, rol_plataforma, telegram_chat_id, whatsapp, whatsapp_norm)
+     VALUES ($1, $2, $3, COALESCE($4,'usuario'), NULLIF($5,''), NULLIF($6,''), NULLIF($7,'')) RETURNING id`,
+    [email, nombre, password_hash, rol_plataforma, telegram_chat_id || '', whatsapp || '',
+     tel.normalizar(whatsapp || '')]);
   return rows[0].id;
 }
 
@@ -63,11 +65,13 @@ async function actualizarUsuario(id, { nombre, rol_plataforma, telegram_chat_id,
        rol_plataforma   = COALESCE($3, rol_plataforma),
        telegram_chat_id = COALESCE($4, telegram_chat_id),
        whatsapp         = COALESCE($5, whatsapp),
+       whatsapp_norm    = CASE WHEN $5 IS NULL THEN whatsapp_norm ELSE NULLIF($8,'') END,
        activo           = COALESCE($6, activo),
        password_hash    = COALESCE($7, password_hash)
      WHERE id = $1`,
     [id, nombre ?? null, rol_plataforma ?? null, telegram_chat_id ?? null,
-     whatsapp ?? null, activo ?? null, password_hash ?? null]);
+     whatsapp ?? null, activo ?? null, password_hash ?? null,
+     whatsapp == null ? null : tel.normalizar(whatsapp)]);
 }
 
 /** Lo que completa la propia persona en su primer ingreso. Marca el perfil como completo. */
@@ -76,10 +80,30 @@ async function completarPerfil(id, { nombre, whatsapp, cargo }) {
     `UPDATE contenido.usuario
         SET nombre = COALESCE(NULLIF($2,''), nombre),
             whatsapp = NULLIF($3,''),
+            whatsapp_norm = NULLIF($5,''),
             cargo = NULLIF($4,''),
             perfil_completado_en = now()
       WHERE id = $1`,
-    [id, nombre || '', whatsapp || '', cargo || '']);
+    [id, nombre || '', whatsapp || '', cargo || '', tel.normalizar(whatsapp || '')]);
+}
+
+/**
+ * Busca por el número que llega de WhatsApp. Compara por los últimos 10 dígitos, así el con-9,
+ * el sin-9 y el sin-código-de-país caen en el mismo casillero.
+ *
+ * Si el número está cargado en MÁS de un usuario devuelve null a propósito: preferimos no
+ * autorizar antes que adivinar de quién es el mensaje.
+ */
+async function getUsuarioPorWhatsapp(numero) {
+  const k = tel.clave(numero);
+  if (!k) return null;
+  const { rows } = await pool.query(
+    `${SQL_USUARIO} WHERE right(u.whatsapp_norm, 10) = $1 AND u.activo`, [k]);
+  if (rows.length !== 1) {
+    if (rows.length > 1) console.error('whatsapp ambiguo:', k, '->', rows.map(r => r.email).join(', '));
+    return null;
+  }
+  return rows[0];
 }
 
 /** Deja un token de un solo uso y devuelve cuándo vence. Pisa cualquiera anterior. */
@@ -1422,7 +1446,7 @@ async function health() {
 
 module.exports = {
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
-  completarPerfil, marcarInvitado, guardarToken, getUsuarioPorToken, consumirToken,
+  completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio,
   crearDescubrimiento, getDescubrimiento,

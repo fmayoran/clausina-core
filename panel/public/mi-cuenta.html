@@ -56,8 +56,8 @@
       <div class="ayuda">Es con el que entrás. No se cambia desde acá.</div>
 
       <label for="f-wa">WhatsApp</label>
-      <input type="text" id="f-wa" placeholder="+54 9 11 5555 5555" autocomplete="tel">
-      <div class="ayuda">Por acá te vamos a avisar cuando haya algo para que apruebes.</div>
+      <input type="text" id="f-wa" placeholder="+54 9 11 5555 5555" autocomplete="tel" oninput="ecoTel()">
+      <div class="ayuda" id="wa-eco">Por acá te vamos a avisar cuando haya algo para que apruebes.</div>
 
       <label for="f-cargo">Tu rol en el negocio <span style="text-transform:none;letter-spacing:0">(opcional)</span></label>
       <input type="text" id="f-cargo" placeholder="Dueño, encargada, marketing…" autocomplete="off">
@@ -141,6 +141,23 @@ async function guardar(){
     if(PRIMERA) setTimeout(()=>{ location.href='proyecto'; }, 700);
   }catch(_){ m.className='msg mal'; m.textContent='Error de conexión.'; }
   btn.disabled=false;
+}
+
+/* Le mostramos cómo queda interpretado el número: si el parseo sale mal, lo ve antes de
+   guardar en vez de descubrirlo el día que un mensaje suyo rebote sin explicación. */
+let _ecoT=null;
+function ecoTel(){
+  clearTimeout(_ecoT);
+  _ecoT = setTimeout(async ()=>{
+    const v=document.getElementById('f-wa').value.trim();
+    const e=document.getElementById('wa-eco');
+    if(!v){ e.textContent='Por acá te vamos a avisar cuando haya algo para que apruebes.'; e.style.color=''; return; }
+    try{
+      const d=await fetch('api/telefono/eco?v='+encodeURIComponent(v)).then(r=>r.json());
+      e.textContent = d.ok ? `Lo vamos a usar como ${d.lindo}` : 'No parece un número válido.';
+      e.style.color = d.ok ? '' : 'var(--u-mal)';
+    }catch(_){}
+  }, 350);
 }
 
 function verPw(){

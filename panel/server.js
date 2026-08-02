@@ -62,6 +62,7 @@ async function refreshMetricas() {
 // --- Sesión: usuario + cookie firmada (HMAC). Ver panel/auth.js y planes/USUARIOS_Y_ROLES.md ---
 const auth = require('./auth');
 const mail = require('./mail');
+const tel = require('./telefono');
 const COOKIE_PATH = process.env.PANEL_COOKIE_PATH || '/panel';
 const TTL_S = auth.TTL_S;
 
@@ -248,6 +249,13 @@ app.get('/api/yo', (req, res) => {
     perfil_completo: !!u.perfil_completado_en,
     negocios: auth.esAdmin(u) ? 'todos' : (u.negocios || []).map(n => ({ slug: n.slug, rol: n.rol })),
   });
+});
+
+/** Eco de cómo se va a interpretar el número. La salvaguarda real contra un mal parseo es que
+ *  la persona lo vea antes de guardar. */
+app.get('/api/telefono/eco', (req, res) => {
+  const v = String(req.query.v || '');
+  res.json({ lindo: tel.lindo(v), norm: tel.normalizar(v), ok: !!tel.clave(v) });
 });
 
 // Mi cuenta: lo completa la propia persona, no el admin. El WhatsApp lo tipea el dueño del
