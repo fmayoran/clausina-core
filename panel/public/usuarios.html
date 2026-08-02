@@ -42,6 +42,16 @@
   .negfila span{flex:1;font-size:.9rem;}
   .negfila select{width:auto;padding:5px 8px;font-size:.8rem;}
   .err{color:#FF6B4A;font-family:'JetBrains Mono',monospace;font-size:.7rem;margin-top:12px;min-height:1em;}
+  /* El campo de contraseña necesita poder verse: escribir a ciegas una clave que después le
+     dictás a un cliente es la receta para un typo que nadie descubre hasta el primer login. */
+  .pwrap{position:relative;}
+  .pwrap input{padding-right:42px;}
+  .pojo{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:grid;place-items:center;
+        width:30px;height:30px;border:none;background:none;color:#8A8F98;cursor:pointer;border-radius:6px;}
+  .pojo:hover{color:#0c0c0a;} .dark .pojo:hover{color:#F5F2EC;}
+  /* Convención del panel: coral mientras falta algo, verde cuando está listo. */
+  .pwmsg{font-family:'JetBrains Mono',monospace;font-size:.66rem;margin-top:8px;min-height:1.1em;}
+  .pwmsg.mal{color:#FF6B4A;} .pwmsg.bien{color:#7BC96F;}
 </style>
 </head>
 <body class="bg-pbg dark:bg-bg text-pfg dark:text-fg antialiased">
@@ -77,7 +87,17 @@
     <label for="f-email">Email</label>
     <input type="email" id="f-email" autocomplete="off">
     <label for="f-pw">Contraseña <span id="pw-nota" style="text-transform:none;letter-spacing:0"></span></label>
-    <input type="password" id="f-pw" autocomplete="new-password" placeholder="mínimo 8 caracteres">
+    <div class="pwrap">
+      <input type="password" id="f-pw" autocomplete="new-password" placeholder="mínimo 8 caracteres" oninput="chequearPw()">
+      <button type="button" class="pojo" onclick="verPw()" id="pw-ojo" title="Mostrar u ocultar" aria-label="Mostrar u ocultar la contraseña">
+        <i data-lucide="eye" class="w-4 h-4"></i>
+      </button>
+    </div>
+    <label for="f-pw2">Repetir contraseña</label>
+    <div class="pwrap">
+      <input type="password" id="f-pw2" autocomplete="new-password" placeholder="escribila de nuevo" oninput="chequearPw()">
+    </div>
+    <div class="pwmsg" id="pw-msg"></div>
     <label for="f-rol">Rol de plataforma</label>
     <select id="f-rol" onchange="pintarNegocios()">
       <option value="usuario">Usuario de negocio</option>
@@ -159,6 +179,29 @@ function pintarNegocios(){
     </div>`).join('');
 }
 
+/* Mostrar/ocultar. Revela los dos campos a la vez: si sólo se viera uno, seguiría siendo a
+   ciegas justo en el momento de compararlos. */
+function verPw(){
+  const a=document.getElementById('f-pw'), b=document.getElementById('f-pw2');
+  const oculto = a.type==='password';
+  a.type=b.type = oculto ? 'text' : 'password';
+  document.getElementById('pw-ojo').innerHTML =
+    `<i data-lucide="${oculto?'eye-off':'eye'}" class="w-4 h-4"></i>`;
+  if(window.lucide) lucide.createIcons();
+}
+
+/* Compara mientras se escribe, así el error se ve antes de guardar y no después. */
+function chequearPw(){
+  const pw=document.getElementById('f-pw').value, pw2=document.getElementById('f-pw2').value;
+  const m=document.getElementById('pw-msg');
+  m.className='pwmsg';
+  if(!pw && !pw2){ m.textContent=''; return true; }
+  if(pw.length < 8){ m.classList.add('mal'); m.textContent=`Faltan ${8-pw.length} caracteres.`; return false; }
+  if(!pw2){ m.classList.add('mal'); m.textContent='Repetila para confirmar.'; return false; }
+  if(pw!==pw2){ m.classList.add('mal'); m.textContent='No coinciden.'; return false; }
+  m.classList.add('bien'); m.textContent='Coinciden.'; return true;
+}
+
 function abrir(id){
   const u = id ? USUARIOS.find(x=>x.id===id) : null;
   document.getElementById('dlg-tit').textContent = u ? 'Editar usuario' : 'Nuevo usuario';
@@ -167,7 +210,15 @@ function abrir(id){
   document.getElementById('f-email').value = u ? u.email : '';
   document.getElementById('f-email').disabled = !!u;   // el email identifica: no se cambia
   document.getElementById('f-pw').value    = '';
-  document.getElementById('pw-nota').textContent = u ? '(dejala vacía para no cambiarla)' : '';
+  document.getElementById('f-pw2').value   = '';
+  // Al reabrir el diálogo los campos vuelven a estar ocultos: no dejamos una clave a la vista.
+  document.getElementById('f-pw').type = document.getElementById('f-pw2').type = 'password';
+  document.getElementById('pw-ojo').innerHTML = '<i data-lucide="eye" class="w-4 h-4"></i>';
+  document.getElementById('pw-msg').textContent = '';
+  document.getElementById('pw-msg').className = 'pwmsg';
+  document.getElementById('pw-nota').textContent = u
+    ? '(dejala vacía para no cambiarla)'
+    : '(opcional si va a entrar con Google)';
   document.getElementById('f-rol').value   = u ? u.rol_plataforma : 'usuario';
   document.getElementById('f-wa').value    = u ? (u.whatsapp||'') : '';
   document.getElementById('f-tg').value    = u ? (u.telegram_chat_id||'') : '';
@@ -180,7 +231,10 @@ function cerrar(){ document.getElementById('ov').classList.remove('on'); }
 
 async function guardar(){
   const err = document.getElementById('err'), btn = document.getElementById('btn-g');
-  err.textContent=''; btn.disabled=true;
+  err.textContent='';
+  // No dejamos guardar con las contraseñas desparejas: sería fijar una clave que nadie sabe cuál es.
+  if(!chequearPw()){ err.textContent='Revisá la contraseña antes de guardar.'; return; }
+  btn.disabled=true;
   const id = document.getElementById('f-id').value;
   const rol = document.getElementById('f-rol').value;
   const negocios = rol==='admin' ? [] : NEGOCIOS

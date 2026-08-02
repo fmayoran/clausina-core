@@ -242,12 +242,18 @@ app.post('/api/usuarios', soloAdmin, async (req, res) => {
     const email = String(b.email || '').trim();
     const nombre = String(b.nombre || '').trim();
     const pw = String(b.password || '');
-    if (!email || !nombre || pw.length < 8) {
-      return res.status(400).json({ error: 'datos', mensaje: 'Hacen falta nombre, email y una contraseña de 8 caracteres o más.' });
+    if (!email || !nombre) {
+      return res.status(400).json({ error: 'datos', mensaje: 'Hacen falta el nombre y el email.' });
+    }
+    // La contraseña es OPCIONAL: con el SSO andando, un usuario de negocio entra con Google y
+    // nunca elige una. Sin hash, verifyPassword() devuelve false y esa vía simplemente no existe
+    // para él. El admin puede ponerle una después si hace falta.
+    if (pw && pw.length < 8) {
+      return res.status(400).json({ error: 'datos', mensaje: 'La contraseña necesita 8 caracteres o más.' });
     }
     const id = await db.crearUsuario({
       email, nombre,
-      password_hash: auth.hashPassword(pw),
+      password_hash: pw ? auth.hashPassword(pw) : null,
       rol_plataforma: b.rol_plataforma === 'admin' ? 'admin' : 'usuario',
       telegram_chat_id: b.telegram_chat_id, whatsapp: b.whatsapp,
     });
