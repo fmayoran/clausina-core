@@ -87,6 +87,29 @@ async function completarPerfil(id, { nombre, whatsapp, cargo }) {
     [id, nombre || '', whatsapp || '', cargo || '', tel.normalizar(whatsapp || '')]);
 }
 
+/** Registra un mensaje de WhatsApp. Best-effort: la bitácora nunca puede tumbar el webhook. */
+async function logWhatsapp({ direccion, wa_id, usuario_id, mensaje_id, tipo, texto, crudo, estado }) {
+  try {
+    await pool.query(
+      `INSERT INTO contenido.whatsapp_mensaje
+         (direccion, wa_id, usuario_id, mensaje_id, tipo, texto, crudo, estado)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       ON CONFLICT DO NOTHING`,
+      [direccion, wa_id || null, usuario_id || null, mensaje_id || null,
+       tipo || null, texto || null, crudo ? JSON.stringify(crudo) : null, estado || null]);
+    return true;
+  } catch (e) { console.error('log whatsapp', e.message); return false; }
+}
+
+/** ¿Ya procesamos este mensaje? Meta reintenta si tardamos en responder. */
+async function whatsappYaVisto(mensajeId) {
+  if (!mensajeId) return false;
+  const { rows } = await pool.query(
+    `SELECT 1 FROM contenido.whatsapp_mensaje WHERE mensaje_id=$1 AND direccion='entrante' LIMIT 1`,
+    [mensajeId]);
+  return rows.length > 0;
+}
+
 /**
  * ¿Ese número ya está cargado en otro usuario? Devuelve el email del dueño, o null.
  * `exceptoId` deja fuera al propio usuario para que pueda reguardar el suyo sin chocar.

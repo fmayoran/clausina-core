@@ -67,6 +67,63 @@ const COOKIE_PATH = process.env.PANEL_COOKIE_PATH || '/panel';
 const TTL_S = auth.TTL_S;
 
 app.disable('x-powered-by');
+// --- WhatsApp (públicos, ANTES de la sesión y del parser de JSON) -----------------
+// La firma de Meta se calcula sobre el cuerpo CRUDO: si express.json lo parsea primero, ya no
+// hay forma de reconstruir los bytes exactos y la validación queda inservible.
+const wa = require('./whatsapp');
+
+// Meta valida la URL con un GET antes de aceptarla. Sin esto no se puede completar el alta.
+app.get('/webhook/whatsapp', (req, res) => {
+  const q = req.query;
+  if (q['hub.mode'] === 'subscribe' && q['hub.verify_token'] === wa.VERIFY && wa.VERIFY) {
+    return res.status(200).send(String(q['hub.challenge'] || ''));
+  }
+  res.sendStatus(403);
+});
+
+app.post('/webhook/whatsapp', express.raw({ type: '*/*', limit: '2mb' }), async (req, res) => {
+  const crudo = Buffer.isBuffer(req.body) ? req.body : Buffer.from('');
+  if (!wa.firmaValida(crudo, req.headers['x-hub-signature-256'])) return res.sendStatus(403);
+  // Contestamos YA: si tardamos, Meta reintenta y el mismo mensaje llega varias veces.
+  res.sendStatus(200);
+
+  let cuerpo;
+  try { cuerpo = JSON.parse(crudo.toString('utf8') || '{}'); } catch { return; }
+
+  for (const m of wa.leerMensajes(cuerpo)) {
+    try {
+      if (await db.whatsappYaVisto(m.mensaje_id)) continue;   // reintento de Meta
+      const u = await db.getUsuarioPorWhatsapp(m.wa_id);
+      await db.logWhatsapp({
+        direccion: 'entrante', wa_id: m.wa_id, usuario_id: u && u.id,
+        mensaje_id: m.mensaje_id, tipo: m.tipo, texto: m.texto, crudo: m.crudo,
+        estado: u ? 'recibido' : 'sin_usuario',
+      });
+
+      // El canal autentica; el acceso lo da contenido.usuario. Mismo criterio que el SSO.
+      if (!u) {
+        await wa.enviarTexto(m.wa_id,
+          'Hola. Este número es del panel de ClaUsina y todavía no reconozco el tuyo. ' +
+          'Si trabajás con nosotros, pedile a tu administrador que lo cargue en tu cuenta.');
+        continue;
+      }
+
+      // Fase 1: confirmamos identidad y qué negocios maneja. La interpretación del pedido viene
+      // después, cuando el circuito de ida y vuelta esté probado.
+      const negocios = (u.negocios || []).map(n => n.slug).join(', ') || 'ningún negocio asignado';
+      const r = await wa.enviarTexto(m.wa_id,
+        `Hola ${u.nombre.split(' ')[0]}. Te reconocí: trabajás sobre ${negocios}.\n\n` +
+        'Todavía estoy aprendiendo a tomar pedidos por acá; en breve vas a poder mandarme ' +
+        'requerimientos y aprobar piezas desde este chat.');
+      await db.logWhatsapp({
+        direccion: 'saliente', wa_id: m.wa_id, usuario_id: u.id, mensaje_id: r.id,
+        tipo: 'text', texto: 'respuesta de identificación',
+        estado: r.ok ? 'enviado' : 'error',
+      });
+    } catch (e) { console.error('whatsapp', e.message); }
+  }
+});
+
 app.use(express.json({ limit: '120mb' }));  // material/logo van como dataURL base64; un video sube ~33% -> holgura para archivos de ~85MB
 
 // Públicos (sin sesión): health, pantalla de login y sus fuentes, login/logout.
