@@ -154,8 +154,9 @@ function ecoTel(){
     if(!v){ e.textContent='Por acá te vamos a avisar cuando haya algo para que apruebes.'; e.style.color=''; return; }
     try{
       const d=await fetch('api/telefono/eco?v='+encodeURIComponent(v)).then(r=>r.json());
-      e.textContent = d.ok ? `Lo vamos a usar como ${d.lindo}` : 'No parece un número válido.';
-      e.style.color = d.ok ? '' : 'var(--u-mal)';
+      if(!d.ok){ e.textContent='No parece un número válido.'; e.style.color='var(--u-mal)'; }
+      else if(d.en_uso){ e.textContent='Ese número ya está cargado en otra cuenta.'; e.style.color='var(--u-mal)'; }
+      else { e.textContent=`Lo vamos a usar como ${d.lindo}`; e.style.color=''; }
     }catch(_){}
   }, 350);
 }

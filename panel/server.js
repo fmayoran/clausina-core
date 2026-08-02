@@ -253,9 +253,14 @@ app.get('/api/yo', (req, res) => {
 
 /** Eco de cómo se va a interpretar el número. La salvaguarda real contra un mal parseo es que
  *  la persona lo vea antes de guardar. */
-app.get('/api/telefono/eco', (req, res) => {
-  const v = String(req.query.v || '');
-  res.json({ lindo: tel.lindo(v), norm: tel.normalizar(v), ok: !!tel.clave(v) });
+app.get('/api/telefono/eco', async (req, res) => {
+  try {
+    const v = String(req.query.v || '');
+    const ok = !!tel.clave(v);
+    // Avisar acá es mejor que fallar al guardar: lo ve mientras escribe.
+    const enUso = ok ? await db.whatsappEnUso(v, req.usuario && req.usuario.id) : null;
+    res.json({ lindo: tel.lindo(v), norm: tel.normalizar(v), ok, en_uso: !!enUso });
+  } catch (e) { console.error('eco tel', e.message); res.status(500).json({ ok: false }); }
 });
 
 // Mi cuenta: lo completa la propia persona, no el admin. El WhatsApp lo tipea el dueño del
@@ -267,6 +272,11 @@ app.put('/api/mi-cuenta', async (req, res) => {
     const whatsapp = String(b.whatsapp || '').trim();
     if (!nombre) return res.status(400).json({ error: 'datos', mensaje: 'Poné tu nombre.' });
     if (!whatsapp) return res.status(400).json({ error: 'datos', mensaje: 'Poné tu WhatsApp: por ahí te vamos a avisar.' });
+    if (!tel.clave(whatsapp)) return res.status(400).json({ error: 'datos', mensaje: 'Ese número no parece válido. Revisalo.' });
+    // Un número, un usuario: si estuviera en dos, un mensaje entrante sería de dueño desconocido.
+    if (await db.whatsappEnUso(whatsapp, req.usuario.id)) {
+      return res.status(409).json({ error: 'duplicado', mensaje: 'Ese número ya está cargado en otra cuenta. Si es tuyo, pedile al administrador que lo libere.' });
+    }
     await db.completarPerfil(req.usuario.id, { nombre, whatsapp, cargo: String(b.cargo || '').trim() });
     res.json({ ok: true });
   } catch (e) { console.error('mi-cuenta', e.message); res.status(500).json({ error: 'db' }); }
@@ -360,6 +370,9 @@ app.post('/api/usuarios', soloAdmin, async (req, res) => {
     if (pw && pw.length < 8) {
       return res.status(400).json({ error: 'datos', mensaje: 'La contraseña necesita 8 caracteres o más.' });
     }
+    if (b.whatsapp && await db.whatsappEnUso(b.whatsapp, null)) {
+      return res.status(409).json({ error: 'duplicado', mensaje: 'Ese WhatsApp ya está cargado en otra cuenta.' });
+    }
     const id = await db.crearUsuario({
       email, nombre,
       password_hash: pw ? auth.hashPassword(pw) : null,
@@ -418,6 +431,9 @@ app.put('/api/usuarios/:id', soloAdmin, async (req, res) => {
     }
     const pw = String(b.password || '');
     if (pw && pw.length < 8) return res.status(400).json({ error: 'datos', mensaje: 'La contraseña necesita 8 caracteres o más.' });
+    if (b.whatsapp && await db.whatsappEnUso(b.whatsapp, id)) {
+      return res.status(409).json({ error: 'duplicado', mensaje: 'Ese WhatsApp ya está cargado en otra cuenta.' });
+    }
     await db.actualizarUsuario(id, {
       nombre: b.nombre, rol_plataforma: b.rol_plataforma,
       telegram_chat_id: b.telegram_chat_id, whatsapp: b.whatsapp, activo: b.activo,

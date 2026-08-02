@@ -88,6 +88,20 @@ async function completarPerfil(id, { nombre, whatsapp, cargo }) {
 }
 
 /**
+ * ¿Ese número ya está cargado en otro usuario? Devuelve el email del dueño, o null.
+ * `exceptoId` deja fuera al propio usuario para que pueda reguardar el suyo sin chocar.
+ */
+async function whatsappEnUso(numero, exceptoId) {
+  const k = tel.clave(numero);
+  if (!k) return null;
+  const { rows } = await pool.query(
+    `SELECT email FROM contenido.usuario
+      WHERE right(whatsapp_norm, 10) = $1 AND ($2::uuid IS NULL OR id <> $2)`,
+    [k, exceptoId || null]);
+  return rows[0] ? rows[0].email : null;
+}
+
+/**
  * Busca por el número que llega de WhatsApp. Compara por los últimos 10 dígitos, así el con-9,
  * el sin-9 y el sin-código-de-país caen en el mismo casillero.
  *
@@ -1446,7 +1460,7 @@ async function health() {
 
 module.exports = {
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
-  completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, guardarToken, getUsuarioPorToken, consumirToken,
+  completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio,
   crearDescubrimiento, getDescubrimiento,
