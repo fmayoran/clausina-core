@@ -202,17 +202,6 @@ app.put('/api/mi-cuenta', async (req, res) => {
   } catch (e) { console.error('mi-cuenta', e.message); res.status(500).json({ error: 'db' }); }
 });
 
-// Reenviar la invitación: para el que nunca entró, o si el mail se perdió.
-app.post('/api/usuarios/:id/invitar', soloAdmin, async (req, res) => {
-  try {
-    const u = await db.getUsuario(String(req.params.id));
-    if (!u) return res.status(404).json({ error: 'no_existe' });
-    const msg = mail.invitacion({ nombre: u.nombre, negocios: (u.negocios || []).map(n => n.slug) });
-    const r = await mail.enviar(u.email, msg.subject, msg.text);
-    if (r.ok) await db.marcarInvitado(u.id);
-    res.json(r.ok ? { ok: true } : { error: 'mail', mensaje: 'No se pudo enviar: ' + r.motivo });
-  } catch (e) { console.error('invitar', e.message); res.status(500).json({ error: 'db' }); }
-});
 
 // --- Marca activa (multi-tenant): cookie cf_marca -> negocio_id en req. Default cortafuego. ---
 const MARCA_COOKIE = 'cf_marca';
@@ -307,6 +296,20 @@ app.post('/api/usuarios', soloAdmin, async (req, res) => {
     }
     console.error('crear usuario', e.message); res.status(500).json({ error: 'db' });
   }
+});
+
+// Reenviar la invitación: para el que nunca entró, o si el mail se perdió.
+// OJO: tiene que quedar DESPUÉS de la declaración de soloAdmin — `const` no se hoistea y el
+// proceso muere al arrancar. `node --check` no lo detecta: es error de ejecución, no de sintaxis.
+app.post('/api/usuarios/:id/invitar', soloAdmin, async (req, res) => {
+  try {
+    const u = await db.getUsuario(String(req.params.id));
+    if (!u) return res.status(404).json({ error: 'no_existe' });
+    const msg = mail.invitacion({ nombre: u.nombre, negocios: (u.negocios || []).map(n => n.slug) });
+    const r = await mail.enviar(u.email, msg.subject, msg.text);
+    if (r.ok) await db.marcarInvitado(u.id);
+    res.json(r.ok ? { ok: true } : { error: 'mail', mensaje: 'No se pudo enviar: ' + r.motivo });
+  } catch (e) { console.error('invitar', e.message); res.status(500).json({ error: 'db' }); }
 });
 
 app.put('/api/usuarios/:id', soloAdmin, async (req, res) => {
