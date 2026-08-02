@@ -24,6 +24,10 @@ const USER = process.env.AGENCIA_MAIL_USER;
 const PASS = process.env.AGENCIA_MAIL_PASS;
 const FROM_NAME = process.env.AGENCIA_MAIL_FROM_NAME || 'ClaUsina';
 const TO_DEF = process.env.AGENCIA_MAIL_TO || USER;
+// Remitente visible: se autentica con USER pero el mail sale desde esta dirección, para que los
+// avisos vengan de una casilla de la agencia y no de la personal. Requiere que el alias esté
+// dado de alta como "Enviar como" en Gmail; si no está, Gmail lo reemplaza por el de la cuenta.
+const REMITENTE = process.env.AGENCIA_MAIL_REMITENTE || USER;
 
 if (!USER || !PASS) { console.error('Falta AGENCIA_MAIL_USER/PASS en plataforma.env'); process.exit(1); }
 
@@ -31,7 +35,7 @@ const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user:
 
 async function sendMail(to, subject, body, marca) {
   const subj = marca ? `ClaUsina · ${marca} — ${subject}` : `ClaUsina — ${subject}`;
-  const info = await transporter.sendMail({ from: `${FROM_NAME} <${USER}>`, to, subject: subj, text: body });
+  const info = await transporter.sendMail({ from: `${FROM_NAME} <${REMITENTE}>`, to, subject: subj, text: body });
   console.log('Mail enviado:', info.messageId);
   return true;
 }
