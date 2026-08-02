@@ -47,6 +47,9 @@
     <label for="pw" style="margin-top:16px">Contraseña</label>
     <input id="pw" type="password" autocomplete="current-password">
     <button id="btn" type="submit">Entrar</button>
+    <div style="text-align:center;margin-top:14px;">
+      <a href="#" onclick="olvide(event)" class="sub" style="margin:0;text-decoration:underline;cursor:pointer;">olvidé mi contraseña</a>
+    </div>
     <div class="err" id="err"></div>
   </form>
 <script>
@@ -70,6 +73,22 @@ fetch('api/auth/config').then(r=>r.ok?r.json():null).then(d=>{
   if(msg) document.getElementById('err').textContent = msg;
   history.replaceState(null,'',location.pathname);
 })();
+
+/* Responde siempre igual, exista o no el mail: si dijéramos "ese mail no existe",
+   cualquiera podría averiguar quién tiene cuenta en la plataforma. */
+async function olvide(e){
+  e.preventDefault();
+  const err=document.getElementById('err');
+  const email=(document.getElementById('email').value||'').trim();
+  if(!email){ err.textContent='Escribí tu email arriba y volvé a tocar acá.'; return; }
+  err.textContent='Enviando…';
+  try{
+    await fetch('api/clave/olvide',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email})});
+    err.style.color='#7BC96F';
+    err.textContent='Si esa dirección tiene cuenta, te llega un mail en un minuto.';
+  }catch(_){ err.textContent='Error de conexión.'; }
+}
 
 async function entrar(e){
   e.preventDefault();

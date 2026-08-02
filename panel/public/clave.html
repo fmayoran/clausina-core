@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Definir contraseña</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
+<style>
+  /* Mismo criterio que el resto: variables espejadas de los tokens, para seguir claro/oscuro. */
+  :root{--u-surf:#FFFFFF;--u-bg:#F7F5F1;--u-line:#DEDDD3;--u-fg:#0c0c0a;--u-mut:#5A616A;
+        --u-acc:#4d6800;--u-accfg:#FFFFFF;--u-ok:#4d6800;--u-mal:#C4442A;}
+  .dark{--u-surf:#12151A;--u-bg:#0c0c0a;--u-line:#20242B;--u-fg:#F5F2EC;--u-mut:#8A8F98;
+        --u-acc:#CCF24D;--u-accfg:#0c0c0a;--u-ok:#7BC96F;--u-mal:#FF6B4A;}
+  body{display:grid;place-items:center;min-height:100vh;padding:24px;}
+  .caja{width:min(420px,100%);background:var(--u-surf);border:1px solid var(--u-line);border-radius:16px;padding:32px;}
+  .logo{font-family:'Inter Tight',sans-serif;font-weight:800;font-size:1.5rem;letter-spacing:-.02em;}
+  .sub{font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.18em;text-transform:uppercase;color:var(--u-mut);margin:6px 0 24px;}
+  label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--u-mut);margin:16px 0 6px;}
+  input{width:100%;background:var(--u-bg);border:1px solid var(--u-line);border-radius:8px;padding:11px 13px;font-family:'Inter',sans-serif;font-size:1rem;color:var(--u-fg);outline:none;}
+  input:focus{border-color:var(--u-acc);}
+  .pwrap{position:relative;} .pwrap input{padding-right:42px;}
+  .pojo{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:grid;place-items:center;
+        width:30px;height:30px;border:none;background:none;color:var(--u-mut);cursor:pointer;border-radius:6px;}
+  .btn{width:100%;margin-top:22px;background:var(--u-acc);color:var(--u-accfg);border:none;border-radius:8px;
+       font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1rem;padding:12px;cursor:pointer;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .msg{font-family:'JetBrains Mono',monospace;font-size:.68rem;margin-top:12px;min-height:1.1em;}
+  .msg.mal{color:var(--u-mal);} .msg.bien{color:var(--u-ok);}
+  a{color:var(--u-acc);}
+</style>
+</head>
+<body class="bg-paper text-pfg dark:bg-ink dark:text-fg transition-colors">
+  <div class="caja">
+    <div class="logo">Cla<b class="acc-text">U</b>sina<b class="acc-text">.</b></div>
+    <div class="sub" id="sub">verificando el enlace…</div>
+
+    <div id="form" style="display:none">
+      <p class="mono text-[11px] text-pmut dark:text-mut" id="quien"></p>
+      <label for="p1">Contraseña</label>
+      <div class="pwrap">
+        <input type="password" id="p1" autocomplete="new-password" placeholder="mínimo 8 caracteres" oninput="chequear()">
+        <button type="button" class="pojo" onclick="ver()" id="ojo" aria-label="Mostrar u ocultar"><i data-lucide="eye" class="w-4 h-4"></i></button>
+      </div>
+      <label for="p2">Repetila</label>
+      <div class="pwrap"><input type="password" id="p2" autocomplete="new-password" oninput="chequear()"></div>
+      <button class="btn" id="btn" onclick="definir()">Definir y entrar</button>
+    </div>
+
+    <div id="invalido" style="display:none">
+      <p class="mono text-[12px] text-pmut dark:text-mut" style="line-height:1.6">
+        Este enlace venció o ya se usó. Pedí uno nuevo desde la pantalla de ingreso,
+        o pedile a tu administrador que te reenvíe la invitación.
+      </p>
+      <a href="login" class="mono text-[12px]">Ir al ingreso</a>
+    </div>
+
+    <div class="msg" id="msg"></div>
+  </div>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script>
+const T = new URLSearchParams(location.search).get('t') || '';
+
+function ver(){
+  const a=document.getElementById('p1'), b=document.getElementById('p2');
+  const oculto=a.type==='password'; a.type=b.type=oculto?'text':'password';
+  document.getElementById('ojo').innerHTML=`<i data-lucide="${oculto?'eye-off':'eye'}" class="w-4 h-4"></i>`;
+  if(window.lucide) lucide.createIcons();
+}
+
+function chequear(){
+  const a=document.getElementById('p1').value, b=document.getElementById('p2').value;
+  const m=document.getElementById('msg'); m.className='msg';
+  if(!a && !b){ m.textContent=''; return false; }
+  if(a.length<8){ m.classList.add('mal'); m.textContent=`Faltan ${8-a.length} caracteres.`; return false; }
+  if(!b){ m.classList.add('mal'); m.textContent='Repetila para confirmar.'; return false; }
+  if(a!==b){ m.classList.add('mal'); m.textContent='No coinciden.'; return false; }
+  m.classList.add('bien'); m.textContent='Coinciden.'; return true;
+}
+
+async function definir(){
+  const m=document.getElementById('msg'), btn=document.getElementById('btn');
+  if(!chequear()){ if(!document.getElementById('p1').value){ m.className='msg mal'; m.textContent='Escribí una contraseña.'; } return; }
+  btn.disabled=true;
+  try{
+    const r=await fetch('api/clave/definir',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({t:T,nueva:document.getElementById('p1').value})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){ m.className='msg mal'; m.textContent=d.mensaje||'No se pudo guardar.'; btn.disabled=false; return; }
+    // El servidor ya nos dejó la sesión puesta: entramos directo.
+    m.className='msg bien'; m.textContent='Listo. Entrando…';
+    setTimeout(()=>{ location.href='.'; }, 700);
+  }catch(_){ m.className='msg mal'; m.textContent='Error de conexión.'; btn.disabled=false; }
+}
+
+// Validamos el enlace antes de mostrar el formulario, para no hacer escribir en vano.
+(async function(){
+  if(!T){ document.getElementById('sub').textContent='enlace inválido';
+          document.getElementById('invalido').style.display=''; return; }
+  try{
+    const d = await fetch('api/clave/estado?t='+encodeURIComponent(T)).then(r=>r.json());
+    if(d.ok){
+      document.getElementById('sub').textContent='definí tu contraseña';
+      document.getElementById('quien').textContent = `Para ${d.email}`;
+      document.getElementById('form').style.display='';
+      document.getElementById('p1').focus();
+    }else{
+      document.getElementById('sub').textContent='enlace vencido';
+      document.getElementById('invalido').style.display='';
+    }
+  }catch(_){ document.getElementById('sub').textContent='no se pudo verificar';
+             document.getElementById('invalido').style.display=''; }
+  if(window.lucide) lucide.createIcons();
+})();
+</script>
+</body>
+</html>

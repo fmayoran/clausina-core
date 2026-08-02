@@ -125,6 +125,53 @@ const redirectUri = req => `${baseUrl(req)}/auth/google/callback`;
 
 app.get('/api/auth/config', (req, res) => res.json({ google: auth.googleActivo() }));
 
+// --- Definir contraseña sin haber entrado nunca (públicos) -------------------------
+// Cierra el círculo: antes la contraseña sólo se podía definir DESDE ADENTRO, así que quien no
+// quisiera usar Google no tenía forma de entrar la primera vez.
+
+app.get('/clave', (req, res) => res.sendFile(path.join(__dirname, 'public', 'clave.html')));
+
+/** Valida el enlace antes de mostrar el formulario, para no hacer escribir en vano. */
+app.get('/api/clave/estado', async (req, res) => {
+  try {
+    const u = await db.getUsuarioPorToken(auth.tokenHash(String(req.query.t || '')));
+    res.json(u ? { ok: true, email: u.email, nombre: u.nombre } : { ok: false });
+  } catch (e) { console.error('clave estado', e.message); res.status(500).json({ ok: false }); }
+});
+
+app.post('/api/clave/definir', async (req, res) => {
+  try {
+    const b = req.body || {};
+    const nueva = String(b.nueva || '');
+    if (nueva.length < 8) return res.status(400).json({ error: 'datos', mensaje: 'La contraseña necesita 8 caracteres o más.' });
+    const u = await db.getUsuarioPorToken(auth.tokenHash(String(b.t || '')));
+    if (!u) return res.status(400).json({ error: 'token', mensaje: 'El enlace venció o ya se usó. Pedí uno nuevo.' });
+    await db.consumirToken(u.id, auth.hashPassword(nueva));   // un solo uso: el token se quema
+    // Lo dejamos adentro directamente: ya probó que controla la casilla.
+    db.tocarAcceso(u.id).catch(() => {});
+    res.set('Set-Cookie', auth.cookieHeader(auth.issue(u.id), COOKIE_PATH, TTL_S));
+    res.json({ ok: true });
+  } catch (e) { console.error('clave definir', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+/** Olvidé mi contraseña. Responde siempre igual: si dijera "ese mail no existe", cualquiera
+ *  podría averiguar quién tiene cuenta. */
+app.post('/api/clave/olvide', async (req, res) => {
+  try {
+    const email = String((req.body || {}).email || '').trim();
+    if (email) {
+      const u = await db.getUsuarioPorEmail(email);
+      if (u) {
+        const t = auth.tokenNuevo();
+        await db.guardarToken(u.id, auth.tokenHash(t), 1);   // 1 hora: es un reseteo, no una invitación
+        const msg = mail.recuperacion({ nombre: u.nombre, url: `${baseUrl(req)}/clave?t=${t}` });
+        await mail.enviar(u.email, msg.subject, msg.text, msg.html);
+      }
+    }
+    res.json({ ok: true });
+  } catch (e) { console.error('clave olvide', e.message); res.json({ ok: true }); }
+});
+
 app.get('/auth/google', (req, res) => {
   // Absoluto: un relativo desde /auth/google resuelve a /auth/login, que no existe.
   if (!auth.googleActivo()) return res.redirect('/login?e=nogoogle');
@@ -307,7 +354,10 @@ app.post('/api/usuarios', soloAdmin, async (req, res) => {
       const slugs = (await db.getNegocios())
         .filter(n => (b.negocios || []).some(x => x.negocio_id === n.id))
         .map(n => n.nombre);
-      const msg = mail.invitacion({ nombre, negocios: slugs });
+      // 7 días para la invitación: es un alta, no una urgencia.
+      const t = auth.tokenNuevo();
+      await db.guardarToken(id, auth.tokenHash(t), 24 * 7);
+      const msg = mail.invitacion({ nombre, negocios: slugs, urlClave: `${baseUrl(req)}/clave?t=${t}` });
       invitacion = await mail.enviar(email, msg.subject, msg.text, msg.html);
       if (invitacion.ok) await db.marcarInvitado(id);
     }
@@ -327,7 +377,10 @@ app.post('/api/usuarios/:id/invitar', soloAdmin, async (req, res) => {
   try {
     const u = await db.getUsuario(String(req.params.id));
     if (!u) return res.status(404).json({ error: 'no_existe' });
-    const msg = mail.invitacion({ nombre: u.nombre, negocios: (u.negocios || []).map(n => n.slug) });
+    const t = auth.tokenNuevo();
+    await db.guardarToken(u.id, auth.tokenHash(t), 24 * 7);   // reenviar invalida el enlace anterior
+    const msg = mail.invitacion({ nombre: u.nombre, negocios: (u.negocios || []).map(n => n.slug),
+                                  urlClave: `${baseUrl(req)}/clave?t=${t}` });
     const r = await mail.enviar(u.email, msg.subject, msg.text, msg.html);
     if (r.ok) await db.marcarInvitado(u.id);
     res.json(r.ok ? { ok: true } : { error: 'mail', mensaje: 'No se pudo enviar: ' + r.motivo });

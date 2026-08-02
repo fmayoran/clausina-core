@@ -40,14 +40,14 @@ async function enviar(to, subject, text, html) {
 }
 
 /**
- * Invitación. NO lleva link con token y es deliberado: el acceso ya está dado por el email en
- * la base, y Google prueba que la cuenta es de esa persona. Un token sería un secreto de más
- * que puede vencer, filtrarse o confundir.
+ * Invitación. Lleva un enlace de un solo uso para definir contraseña: con Google alcanzaría
+ * (el mail ya prueba la identidad), pero sin el enlace quien NO quiera usar Google queda sin
+ * forma de entrar la primera vez — la contraseña sólo se podía definir desde adentro.
  */
 const esc = s => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-function invitacion({ nombre, negocios }) {
+function invitacion({ nombre, negocios, urlClave }) {
   const lista = (negocios || []).length ? negocios.join(', ') : '';
 
   const text =
@@ -59,7 +59,7 @@ Para entrar, abrí ${PANEL_URL}
 
 Podés ingresar de dos maneras:
   · Con tu cuenta de Google, usando esta misma dirección.
-  · Con una contraseña, si preferís: la definís vos desde Mi cuenta.
+  · Con una contraseña que definas vos${urlClave ? `: ${urlClave}` : ''}
 
 La primera vez te vamos a pedir un par de datos de contacto.
 
@@ -109,7 +109,7 @@ Si no esperabas este correo, ignoralo.
             <b style="color:#0C0C0A;">Con Google</b> — tocá “Entrar con Google” y usá esta misma dirección de correo. No hace falta crear ninguna contraseña.
           </p>
           <p style="margin:0;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:#3A3A38;">
-            <b style="color:#0C0C0A;">Con contraseña</b> — si preferís, la definís vos mismo desde Mi cuenta una vez adentro.
+            <b style="color:#0C0C0A;">Con contraseña</b> — si preferís no usar Google, ${urlClave ? `<a href="${urlClave}" style="color:#4d6800;font-weight:600;">definí tu contraseña acá</a>. El enlace vale 7 días.` : 'definila desde Mi cuenta una vez adentro.'}
           </p>
         </td></tr>
       </table>
@@ -129,4 +129,56 @@ Si no esperabas este correo, ignoralo.
   return { subject: 'Tu acceso al panel de ClaUsina', text, html };
 }
 
-module.exports = { activo, enviar, invitacion };
+function recuperacion({ nombre, url }) {
+  const text =
+`Hola ${nombre}:
+
+Pediste recuperar el acceso al panel de ClaUsina.
+
+Definí una contraseña nueva acá:
+${url}
+
+El enlace vale 1 hora y se puede usar una sola vez.
+
+Si no fuiste vos, ignorá este correo: tu contraseña actual sigue funcionando.
+
+— ClaUsina`;
+
+  const html = `<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Recuperar el acceso</title></head>
+<body style="margin:0;padding:0;background:#F0EDE7;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F0EDE7;padding:32px 16px;">
+<tr><td align="center">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E2DED6;">
+    <tr><td style="background:#0C0C0A;padding:26px 30px;">
+      <span style="font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:700;color:#F5F2EC;letter-spacing:-0.4px;">Cla<span style="color:#CCF24D;">U</span>sina<span style="color:#CCF24D;">.</span></span>
+    </td></tr>
+    <tr><td style="padding:34px 30px 10px;">
+      <h1 style="margin:0 0 14px;font-family:Georgia,'Times New Roman',serif;font-size:22px;line-height:1.3;color:#0C0C0A;font-weight:700;">Recuperar tu acceso</h1>
+      <p style="margin:0 0 6px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#3A3A38;">
+        Hola ${esc(nombre)}, definí una contraseña nueva con el botón de abajo.
+      </p>
+    </td></tr>
+    <tr><td align="center" style="padding:14px 30px 24px;">
+      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+        <td style="background:#CCF24D;border-radius:8px;">
+          <a href="${url}" style="display:inline-block;padding:13px 30px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#0C0C0A;text-decoration:none;">Definir contraseña</a>
+        </td></tr></table>
+    </td></tr>
+    <tr><td style="padding:0 30px 30px;">
+      <p style="margin:0;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.55;color:#8A8F98;">
+        El enlace vale 1 hora y se usa una sola vez. Si no fuiste vos, ignorá este correo: tu contraseña actual sigue funcionando.
+      </p>
+    </td></tr>
+    <tr><td style="background:#F7F5F1;border-top:1px solid #E2DED6;padding:16px 30px;">
+      <span style="font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;color:#8A8F98;">ClaUsina · <a href="https://clausina.ar" style="color:#8A8F98;">clausina.ar</a></span>
+    </td></tr>
+  </table>
+</td></tr></table>
+</body></html>`;
+
+  return { subject: 'Recuperar el acceso al panel de ClaUsina', text, html };
+}
+
+module.exports = { activo, enviar, invitacion, recuperacion };

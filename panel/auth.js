@@ -67,6 +67,13 @@ function cookieHeader(value, path, maxAge) {
   return `${COOKIE}=${value}; Path=${path}; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 }
 
+// --- Token de un solo uso para definir contraseña ---------------------------------
+// Cierra el círculo: sin esto, la contraseña sólo se podía definir DESDE ADENTRO del panel, así
+// que quien no quisiera usar Google no tenía cómo entrar la primera vez.
+// Guardamos el hash, nunca el token: si alguien lee la base, no le sirve de nada.
+const tokenNuevo = () => crypto.randomBytes(32).toString('hex');
+const tokenHash = t => crypto.createHash('sha256').update(String(t)).digest('hex');
+
 // --- Google (OpenID Connect) ------------------------------------------------------
 // El SSO AUTENTICA, no autoriza: Google nos dice que el mail es de esa persona, pero el acceso
 // sigue saliendo de contenido.usuario. Si el mail no está en la tabla, no entra. Eso es lo que
@@ -157,7 +164,7 @@ const puedeAprobar = (usuario, negocioId) => ['admin', 'aprobador'].includes(rol
 
 module.exports = {
   COOKIE, TTL_S, STATE_COOKIE,
-  hashPassword, verifyPassword,
+  hashPassword, verifyPassword, tokenNuevo, tokenHash,
   issue, readToken, readCookie, cookieHeader,
   googleActivo, estadoNuevo, estadoValido, urlDeGoogle, canjearCodigo,
   esAdmin, rolEn, puedeVer, puedeAprobar,

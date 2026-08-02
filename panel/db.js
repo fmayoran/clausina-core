@@ -82,6 +82,30 @@ async function completarPerfil(id, { nombre, whatsapp, cargo }) {
     [id, nombre || '', whatsapp || '', cargo || '']);
 }
 
+/** Deja un token de un solo uso y devuelve cuándo vence. Pisa cualquiera anterior. */
+async function guardarToken(id, hash, horas) {
+  const { rows } = await pool.query(
+    `UPDATE contenido.usuario SET token_hash=$2, token_expira=now() + ($3 || ' hours')::interval
+      WHERE id=$1 RETURNING token_expira`, [id, hash, String(horas)]);
+  return rows[0] && rows[0].token_expira;
+}
+
+/** Busca por token vigente. Devuelve null si no existe, venció, o el usuario está inactivo. */
+async function getUsuarioPorToken(hash) {
+  const { rows } = await pool.query(
+    `${SQL_USUARIO} WHERE u.token_hash = $1 AND u.token_expira > now() AND u.activo`, [hash]);
+  return rows[0] || null;
+}
+
+/** Un solo uso: al definir la contraseña, el token se quema. */
+async function consumirToken(id, passwordHash) {
+  await pool.query(
+    `UPDATE contenido.usuario
+        SET password_hash=$2, token_hash=NULL, token_expira=NULL,
+            perfil_completado_en = COALESCE(perfil_completado_en, NULL)
+      WHERE id=$1`, [id, passwordHash]);
+}
+
 async function marcarInvitado(id) {
   await pool.query('UPDATE contenido.usuario SET invitado_en = now() WHERE id = $1', [id]);
 }
@@ -1398,7 +1422,7 @@ async function health() {
 
 module.exports = {
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
-  completarPerfil, marcarInvitado,
+  completarPerfil, marcarInvitado, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio,
   crearDescubrimiento, getDescubrimiento,
