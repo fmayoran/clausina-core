@@ -21,6 +21,7 @@
   /* Convención del panel: coral = pendiente/en curso, verde = listo. Acá el verde marca al admin
      (acceso completo) y el coral al usuario sin negocios asignados, que todavía no puede operar. */
   .p-admin{color:#7BC96F;} .p-user{color:#8A8F98;} .p-sin{color:#FF6B4A;} .p-off{color:#8A8F98;opacity:.6;}
+  .p-ok{color:#7BC96F;} .p-medio{color:#E8A33D;}
   .iconbtn{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;border:1px solid #E6E3DD;color:#6B6F76;transition:.15s;background:none;cursor:pointer;}
   .dark .iconbtn{border-color:#20242B;color:#8A8F98;}
   .iconbtn:hover{color:#0c0c0a;border-color:#0c0c0a;} .dark .iconbtn:hover{color:#F5F2EC;border-color:#F5F2EC;}
@@ -71,7 +72,7 @@
 
     <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card scrollx">
       <table class="mtx">
-        <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Negocios</th><th></th></tr></thead>
+        <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Negocios</th><th></th></tr></thead>
         <tbody id="tb"></tbody>
       </table>
     </div>
@@ -134,12 +135,23 @@ function pillRol(u){
   return '<span class="pill p-user">usuario</span>';
 }
 
+/* Estado del onboarding, deducido de las tres marcas de tiempo que ya guardamos.
+   Convención del panel: coral mientras falta algo, verde cuando terminó. */
+function estadoDe(u){
+  if(u.perfil_completado_en) return ['p-ok','activo','Entró y completó su perfil'];
+  if(u.ultimo_acceso_en)     return ['p-medio','sin completar','Entró pero no completó el perfil'];
+  if(u.invitado_en)          return ['p-sin','invitado','Se le mandó la invitación pero nunca entró'];
+  return ['p-sin','sin invitar','Todavía no se le mandó la invitación'];
+}
+
 function fila(u){
   const negs = (u.negocios||[]).map(n=>`${esc(n.slug)} · ${esc(n.rol)}`).join('<br>');
+  const [cls, txt, tip] = estadoDe(u);
   return `<tr${u.activo?'':' style="opacity:.5"'}>
     <td><b>${esc(u.nombre)}</b>${u.activo?'':' <span class="pill p-off">inactivo</span>'}</td>
     <td class="mono text-[11px] text-pmut dark:text-mut">${esc(u.email)}</td>
     <td>${pillRol(u)}</td>
+    <td><span class="pill ${cls}" title="${esc(tip)}">${txt}</span></td>
     <td class="mono text-[11px] text-pmut dark:text-mut">${u.rol_plataforma==='admin'?'todos':(negs||'—')}</td>
     <td style="text-align:right;white-space:nowrap">
       <button class="iconbtn" onclick="invitar('${u.id}')" title="Copiar invitación" aria-label="Copiar invitación"><i data-lucide="send" class="w-4 h-4"></i></button>

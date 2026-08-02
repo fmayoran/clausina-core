@@ -25,6 +25,10 @@
       { id: 'biblioteca',label: 'Biblioteca',        icon: 'images',      href: 'biblioteca' },
       { id: 'perfil',    label: 'Perfil',            icon: 'settings-2',  href: 'perfil' },
     ],
+    // Fuera de las secciones de negocio: es la cuenta de quien está mirando, no del negocio activo.
+    Vos: [
+      { id: 'micuenta',  label: 'Mi cuenta',         icon: 'user-round',  href: 'mi-cuenta' },
+    ],
   };
 
   function link(it, active) {

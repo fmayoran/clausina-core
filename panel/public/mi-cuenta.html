@@ -22,6 +22,14 @@
   .msg{font-family:'JetBrains Mono',monospace;font-size:.7rem;margin-top:14px;min-height:1.1em;}
   .msg.mal{color:#FF6B4A;} .msg.bien{color:#7BC96F;}
   .caja{max-width:520px;}
+  .pwrap{position:relative;}
+  .pwrap input{padding-right:42px;}
+  .pojo{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:grid;place-items:center;
+        width:30px;height:30px;border:none;background:none;color:#8A8F98;cursor:pointer;border-radius:6px;}
+  .pojo:hover{color:#0c0c0a;} .dark .pojo:hover{color:#F5F2EC;}
+  .pwmsg{font-family:'JetBrains Mono',monospace;font-size:.66rem;margin-top:8px;min-height:1.1em;}
+  .pwmsg.mal{color:#FF6B4A;} .pwmsg.bien{color:#7BC96F;}
+  .dark #bloque-pw{border-top-color:#20242B !important;}
 </style>
 </head>
 <body class="bg-pbg dark:bg-bg text-pfg dark:text-fg antialiased">
@@ -49,15 +57,41 @@
 
       <button class="btn" id="btn" onclick="guardar()">Guardar</button>
       <div class="msg" id="msg"></div>
+
+      <!-- Entrar con Google es cómodo, pero no obligatorio: el que prefiera una contraseña
+           la define acá y a partir de ahí tiene las dos puertas. -->
+      <div id="bloque-pw" style="margin-top:44px;padding-top:28px;border-top:1px solid #E6E3DD;">
+        <h2 class="display font-bold text-base tracking-tight">Contraseña</h2>
+        <p class="mono text-[11px] text-pmut dark:text-mut mt-2" id="pw-estado"></p>
+
+        <div id="pw-actual-box">
+          <label for="p-actual">Contraseña actual</label>
+          <div class="pwrap"><input type="password" id="p-actual" autocomplete="current-password"></div>
+        </div>
+
+        <label for="p-nueva">Contraseña nueva</label>
+        <div class="pwrap">
+          <input type="password" id="p-nueva" autocomplete="new-password" placeholder="mínimo 8 caracteres" oninput="chequearPw()">
+          <button type="button" class="pojo" onclick="verPw()" id="pw-ojo" title="Mostrar u ocultar" aria-label="Mostrar u ocultar">
+            <i data-lucide="eye" class="w-4 h-4"></i>
+          </button>
+        </div>
+        <label for="p-nueva2">Repetir la nueva</label>
+        <div class="pwrap"><input type="password" id="p-nueva2" autocomplete="new-password" oninput="chequearPw()"></div>
+        <div class="pwmsg" id="pw-msg"></div>
+
+        <button class="btn" id="btn-pw" onclick="guardarPw()">Guardar contraseña</button>
+        <div class="msg" id="msg-pw"></div>
+      </div>
     </div>
   </main>
 </div>
 
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 <script src="shell.js"></script>
-<script>ClausinaShell({active:''})</script>
+<script>ClausinaShell({active:'micuenta'})</script>
 <script>
-let PRIMERA = false;
+let PRIMERA = false, TIENE_PW = false;
 
 async function cargar(){
   try{
@@ -67,6 +101,12 @@ async function cargar(){
     document.getElementById('f-wa').value     = yo.whatsapp || '';
     document.getElementById('f-cargo').value  = yo.cargo || '';
     PRIMERA = !yo.perfil_completo;
+    // Si nunca definió una, no le pedimos la actual: entró con Google y no tiene.
+    TIENE_PW = !!yo.tiene_password;
+    document.getElementById('pw-actual-box').style.display = TIENE_PW ? '' : 'none';
+    document.getElementById('pw-estado').textContent = TIENE_PW
+      ? 'Podés entrar con Google o con tu contraseña. Acá la cambiás.'
+      : 'Hoy entrás con Google. Si preferís, definí una contraseña y vas a poder usar las dos.';
     if(PRIMERA){
       // Primer ingreso: explicamos por qué lo frenamos acá antes de dejarlo pasar.
       document.getElementById('tit').textContent = `Bienvenido, ${(yo.nombre||'').split(' ')[0]}`;
@@ -95,6 +135,48 @@ async function guardar(){
   }catch(_){ m.className='msg mal'; m.textContent='Error de conexión.'; }
   btn.disabled=false;
 }
+
+function verPw(){
+  const a=document.getElementById('p-nueva'), b=document.getElementById('p-nueva2');
+  const oculto = a.type==='password';
+  a.type=b.type = oculto ? 'text' : 'password';
+  document.getElementById('pw-ojo').innerHTML =
+    `<i data-lucide="${oculto?'eye-off':'eye'}" class="w-4 h-4"></i>`;
+  if(window.lucide) lucide.createIcons();
+}
+
+function chequearPw(){
+  const a=document.getElementById('p-nueva').value, b=document.getElementById('p-nueva2').value;
+  const m=document.getElementById('pw-msg'); m.className='pwmsg';
+  if(!a && !b){ m.textContent=''; return true; }
+  if(a.length<8){ m.classList.add('mal'); m.textContent=`Faltan ${8-a.length} caracteres.`; return false; }
+  if(!b){ m.classList.add('mal'); m.textContent='Repetila para confirmar.'; return false; }
+  if(a!==b){ m.classList.add('mal'); m.textContent='No coinciden.'; return false; }
+  m.classList.add('bien'); m.textContent='Coinciden.'; return true;
+}
+
+async function guardarPw(){
+  const m=document.getElementById('msg-pw'), btn=document.getElementById('btn-pw');
+  m.className='msg'; m.textContent='';
+  const nueva=document.getElementById('p-nueva').value;
+  if(!nueva){ m.className='msg mal'; m.textContent='Escribí la contraseña nueva.'; return; }
+  if(!chequearPw()){ m.className='msg mal'; m.textContent='Revisá la contraseña.'; return; }
+  btn.disabled=true;
+  try{
+    const r=await fetch('api/mi-cuenta/password',{method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({actual:document.getElementById('p-actual').value, nueva})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){ m.className='msg mal'; m.textContent=d.mensaje||'No se pudo guardar.'; btn.disabled=false; return; }
+    m.className='msg bien'; m.textContent='Contraseña guardada. Ya podés entrar con ella.';
+    ['p-actual','p-nueva','p-nueva2'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('pw-msg').textContent='';
+    TIENE_PW = true;
+    document.getElementById('pw-actual-box').style.display='';
+    document.getElementById('pw-estado').textContent='Podés entrar con Google o con tu contraseña. Acá la cambiás.';
+  }catch(_){ m.className='msg mal'; m.textContent='Error de conexión.'; }
+  btn.disabled=false;
+}
+
 cargar();
 </script>
 </body>

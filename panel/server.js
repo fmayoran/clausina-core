@@ -181,6 +181,8 @@ app.get('/api/yo', (req, res) => {
   res.json({
     id: u.id, nombre: u.nombre, email: u.email,
     whatsapp: u.whatsapp || '', cargo: u.cargo || '',
+    // No devolvemos el hash, sólo si existe: la pantalla necesita saber si pedir la actual.
+    tiene_password: !!u.password_hash,
     admin: auth.esAdmin(u),
     // El front lo usa para mandar al onboarding antes de dejar entrar al panel.
     perfil_completo: !!u.perfil_completado_en,
@@ -200,6 +202,26 @@ app.put('/api/mi-cuenta', async (req, res) => {
     await db.completarPerfil(req.usuario.id, { nombre, whatsapp, cargo: String(b.cargo || '').trim() });
     res.json({ ok: true });
   } catch (e) { console.error('mi-cuenta', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+// Contraseña propia: entrar con Google es cómodo, pero no todos lo quieren. El que prefiera
+// una contraseña se la define acá, y a partir de ahí tiene las dos puertas.
+app.put('/api/mi-cuenta/password', async (req, res) => {
+  try {
+    const b = req.body || {};
+    const nueva = String(b.nueva || '');
+    if (nueva.length < 8) {
+      return res.status(400).json({ error: 'datos', mensaje: 'La contraseña necesita 8 caracteres o más.' });
+    }
+    // Si YA tiene una, hay que probar que la sabe: una sesión robada no debería alcanzar para
+    // cambiarla. Si no tiene (entró con Google), la define directo.
+    const u = await db.getUsuarioPorEmail(req.usuario.email);
+    if (u && u.password_hash && !auth.verifyPassword(String(b.actual || ''), u.password_hash)) {
+      return res.status(400).json({ error: 'actual', mensaje: 'La contraseña actual no coincide.' });
+    }
+    await db.actualizarUsuario(req.usuario.id, { password_hash: auth.hashPassword(nueva) });
+    res.json({ ok: true });
+  } catch (e) { console.error('mi-password', e.message); res.status(500).json({ error: 'db' }); }
 });
 
 
@@ -286,7 +308,7 @@ app.post('/api/usuarios', soloAdmin, async (req, res) => {
         .filter(n => (b.negocios || []).some(x => x.negocio_id === n.id))
         .map(n => n.nombre);
       const msg = mail.invitacion({ nombre, negocios: slugs });
-      invitacion = await mail.enviar(email, msg.subject, msg.text);
+      invitacion = await mail.enviar(email, msg.subject, msg.text, msg.html);
       if (invitacion.ok) await db.marcarInvitado(id);
     }
     res.json({ ok: true, id, invitacion });
@@ -306,7 +328,7 @@ app.post('/api/usuarios/:id/invitar', soloAdmin, async (req, res) => {
     const u = await db.getUsuario(String(req.params.id));
     if (!u) return res.status(404).json({ error: 'no_existe' });
     const msg = mail.invitacion({ nombre: u.nombre, negocios: (u.negocios || []).map(n => n.slug) });
-    const r = await mail.enviar(u.email, msg.subject, msg.text);
+    const r = await mail.enviar(u.email, msg.subject, msg.text, msg.html);
     if (r.ok) await db.marcarInvitado(u.id);
     res.json(r.ok ? { ok: true } : { error: 'mail', mensaje: 'No se pudo enviar: ' + r.motivo });
   } catch (e) { console.error('invitar', e.message); res.status(500).json({ error: 'db' }); }
