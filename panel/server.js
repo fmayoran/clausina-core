@@ -61,6 +61,7 @@ async function refreshMetricas() {
 
 // --- Sesión: usuario + cookie firmada (HMAC). Ver panel/auth.js y planes/USUARIOS_Y_ROLES.md ---
 const auth = require('./auth');
+const mail = require('./mail');
 const COOKIE_PATH = process.env.PANEL_COOKIE_PATH || '/panel';
 const TTL_S = auth.TTL_S;
 
@@ -179,9 +180,38 @@ app.get('/api/yo', (req, res) => {
   const u = req.usuario;
   res.json({
     id: u.id, nombre: u.nombre, email: u.email,
+    whatsapp: u.whatsapp || '', cargo: u.cargo || '',
     admin: auth.esAdmin(u),
+    // El front lo usa para mandar al onboarding antes de dejar entrar al panel.
+    perfil_completo: !!u.perfil_completado_en,
     negocios: auth.esAdmin(u) ? 'todos' : (u.negocios || []).map(n => ({ slug: n.slug, rol: n.rol })),
   });
+});
+
+// Mi cuenta: lo completa la propia persona, no el admin. El WhatsApp lo tipea el dueño del
+// número, que es quien lo sabe bien.
+app.put('/api/mi-cuenta', async (req, res) => {
+  try {
+    const b = req.body || {};
+    const nombre = String(b.nombre || '').trim();
+    const whatsapp = String(b.whatsapp || '').trim();
+    if (!nombre) return res.status(400).json({ error: 'datos', mensaje: 'Poné tu nombre.' });
+    if (!whatsapp) return res.status(400).json({ error: 'datos', mensaje: 'Poné tu WhatsApp: por ahí te vamos a avisar.' });
+    await db.completarPerfil(req.usuario.id, { nombre, whatsapp, cargo: String(b.cargo || '').trim() });
+    res.json({ ok: true });
+  } catch (e) { console.error('mi-cuenta', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+// Reenviar la invitación: para el que nunca entró, o si el mail se perdió.
+app.post('/api/usuarios/:id/invitar', soloAdmin, async (req, res) => {
+  try {
+    const u = await db.getUsuario(String(req.params.id));
+    if (!u) return res.status(404).json({ error: 'no_existe' });
+    const msg = mail.invitacion({ nombre: u.nombre, negocios: (u.negocios || []).map(n => n.slug) });
+    const r = await mail.enviar(u.email, msg.subject, msg.text);
+    if (r.ok) await db.marcarInvitado(u.id);
+    res.json(r.ok ? { ok: true } : { error: 'mail', mensaje: 'No se pudo enviar: ' + r.motivo });
+  } catch (e) { console.error('invitar', e.message); res.status(500).json({ error: 'db' }); }
 });
 
 // --- Marca activa (multi-tenant): cookie cf_marca -> negocio_id en req. Default cortafuego. ---
@@ -258,7 +288,19 @@ app.post('/api/usuarios', soloAdmin, async (req, res) => {
       telegram_chat_id: b.telegram_chat_id, whatsapp: b.whatsapp,
     });
     if (Array.isArray(b.negocios)) await db.setNegociosDeUsuario(id, b.negocios);
-    res.json({ ok: true, id });
+
+    // Invitación: best-effort. Si el mail falla, el usuario YA quedó creado y con acceso —
+    // lo que no puede pasar es que un problema de correo haga fracasar el alta.
+    let invitacion = { ok: false, motivo: 'no_solicitada' };
+    if (b.invitar !== false) {
+      const slugs = (await db.getNegocios())
+        .filter(n => (b.negocios || []).some(x => x.negocio_id === n.id))
+        .map(n => n.nombre);
+      const msg = mail.invitacion({ nombre, negocios: slugs });
+      invitacion = await mail.enviar(email, msg.subject, msg.text);
+      if (invitacion.ok) await db.marcarInvitado(id);
+    }
+    res.json({ ok: true, id, invitacion });
   } catch (e) {
     if (String(e.message).includes('idx_usuario_email')) {
       return res.status(409).json({ error: 'duplicado', mensaje: 'Ya existe un usuario con ese email.' });

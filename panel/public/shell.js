@@ -171,7 +171,13 @@
 
   function aplicarPermisos(active) {
     return fetch('api/yo').then(function (r) { return r.ok ? r.json() : null; }).then(function (yo) {
-      if (!yo || yo.admin) return yo;
+      if (!yo) return null;
+      // Primer ingreso: completar el perfil antes de entrar al panel. El admin no pasa por acá
+      // (la migración marcó como completos a los usuarios que ya existían).
+      if (!yo.perfil_completo && !/mi-cuenta/.test(location.pathname)) {
+        location.replace('mi-cuenta'); return yo;
+      }
+      if (yo.admin) return yo;
       NAV_ADMIN.forEach(function (id) {
         var a = document.querySelector('[data-nav="' + id + '"]');
         if (a) a.remove();

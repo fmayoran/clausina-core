@@ -11,7 +11,8 @@
   "dependencies": {
     "archiver": "^7.0.1",
     "express": "^4.19.2",
-    "pg": "^8.11.5"
+    "pg": "^8.11.5",
+    "nodemailer": "^6.9.14"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.0"

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Mi cuenta</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="fonts/clausina-icono-180.png">
+<script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
+<style>
+  label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:#8A8F98;margin:18px 0 6px;}
+  input{width:100%;background:#FFF;border:1px solid #E6E3DD;border-radius:8px;padding:10px 12px;font-family:'Inter',sans-serif;font-size:1rem;color:#0c0c0a;outline:none;}
+  .dark input{background:#0c0c0a;border-color:#20242B;color:#F5F2EC;}
+  input:focus{border-color:#CCF24D;}
+  input:disabled{opacity:.55;cursor:not-allowed;}
+  .ayuda{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:#8A8F98;margin-top:5px;text-transform:none;letter-spacing:0;}
+  .btn{background:#CCF24D;color:#0c0c0a;border:none;border-radius:8px;font-weight:700;padding:11px 22px;cursor:pointer;font-family:'Inter Tight',sans-serif;font-size:1rem;margin-top:24px;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .msg{font-family:'JetBrains Mono',monospace;font-size:.7rem;margin-top:14px;min-height:1.1em;}
+  .msg.mal{color:#FF6B4A;} .msg.bien{color:#7BC96F;}
+  .caja{max-width:520px;}
+</style>
+</head>
+<body class="bg-pbg dark:bg-bg text-pfg dark:text-fg antialiased">
+<div class="shell">
+  <main class="px-6 md:px-9 py-8 min-w-0">
+    <div class="caja">
+      <h1 class="display font-bold text-xl tracking-tight" id="tit">Mi cuenta</h1>
+      <p class="mono text-[11px] text-pmut dark:text-mut mt-2 mb-1" id="bajada">
+        Tus datos de contacto.
+      </p>
+
+      <label for="f-nombre">Nombre</label>
+      <input type="text" id="f-nombre" autocomplete="name">
+
+      <label for="f-email">Email</label>
+      <input type="email" id="f-email" disabled>
+      <div class="ayuda">Es con el que entrás. No se cambia desde acá.</div>
+
+      <label for="f-wa">WhatsApp</label>
+      <input type="text" id="f-wa" placeholder="+54 9 11 5555 5555" autocomplete="tel">
+      <div class="ayuda">Por acá te vamos a avisar cuando haya algo para que apruebes.</div>
+
+      <label for="f-cargo">Tu rol en el negocio <span style="text-transform:none;letter-spacing:0">(opcional)</span></label>
+      <input type="text" id="f-cargo" placeholder="Dueño, encargada, marketing…" autocomplete="off">
+
+      <button class="btn" id="btn" onclick="guardar()">Guardar</button>
+      <div class="msg" id="msg"></div>
+    </div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="shell.js"></script>
+<script>ClausinaShell({active:''})</script>
+<script>
+let PRIMERA = false;
+
+async function cargar(){
+  try{
+    const yo = await fetch('api/yo').then(r=>r.json());
+    document.getElementById('f-nombre').value = yo.nombre || '';
+    document.getElementById('f-email').value  = yo.email || '';
+    document.getElementById('f-wa').value     = yo.whatsapp || '';
+    document.getElementById('f-cargo').value  = yo.cargo || '';
+    PRIMERA = !yo.perfil_completo;
+    if(PRIMERA){
+      // Primer ingreso: explicamos por qué lo frenamos acá antes de dejarlo pasar.
+      document.getElementById('tit').textContent = `Bienvenido, ${(yo.nombre||'').split(' ')[0]}`;
+      document.getElementById('bajada').innerHTML =
+        'Antes de empezar, completá un par de datos. Es la única vez que te los pedimos.';
+    }
+  }catch(_){ document.getElementById('msg').className='msg mal';
+             document.getElementById('msg').textContent='No se pudieron cargar tus datos.'; }
+}
+
+async function guardar(){
+  const m = document.getElementById('msg'), btn = document.getElementById('btn');
+  m.className='msg'; m.textContent=''; btn.disabled=true;
+  const body = {
+    nombre:   document.getElementById('f-nombre').value.trim(),
+    whatsapp: document.getElementById('f-wa').value.trim(),
+    cargo:    document.getElementById('f-cargo').value.trim(),
+  };
+  try{
+    const r = await fetch('api/mi-cuenta', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d = await r.json().catch(()=>({}));
+    if(!r.ok){ m.className='msg mal'; m.textContent = d.mensaje || 'No se pudo guardar.'; btn.disabled=false; return; }
+    m.className='msg bien'; m.textContent='Guardado.';
+    // Recién completado el perfil, lo soltamos al panel.
+    if(PRIMERA) setTimeout(()=>{ location.href='proyecto'; }, 700);
+  }catch(_){ m.className='msg mal'; m.textContent='Error de conexión.'; }
+  btn.disabled=false;
+}
+cargar();
+</script>
+</body>
+</html>

@@ -86,27 +86,29 @@
     <input type="text" id="f-nombre" autocomplete="off">
     <label for="f-email">Email</label>
     <input type="email" id="f-email" autocomplete="off">
-    <label for="f-pw">Contraseña <span id="pw-nota" style="text-transform:none;letter-spacing:0"></span></label>
-    <div class="pwrap">
+    <label for="f-pw" class="solo-edicion">Contraseña <span id="pw-nota" style="text-transform:none;letter-spacing:0"></span></label>
+    <div class="pwrap solo-edicion">
       <input type="password" id="f-pw" autocomplete="new-password" placeholder="mínimo 8 caracteres" oninput="chequearPw()">
       <button type="button" class="pojo" onclick="verPw()" id="pw-ojo" title="Mostrar u ocultar" aria-label="Mostrar u ocultar la contraseña">
         <i data-lucide="eye" class="w-4 h-4"></i>
       </button>
     </div>
-    <label for="f-pw2">Repetir contraseña</label>
-    <div class="pwrap">
+    <label for="f-pw2" class="solo-edicion">Repetir contraseña</label>
+    <div class="pwrap solo-edicion">
       <input type="password" id="f-pw2" autocomplete="new-password" placeholder="escribila de nuevo" oninput="chequearPw()">
     </div>
-    <div class="pwmsg" id="pw-msg"></div>
+    <div class="pwmsg solo-edicion" id="pw-msg"></div>
     <label for="f-rol">Rol de plataforma</label>
     <select id="f-rol" onchange="pintarNegocios()">
       <option value="usuario">Usuario de negocio</option>
       <option value="admin">Administrador de la plataforma</option>
     </select>
-    <label for="f-wa">WhatsApp <span style="text-transform:none;letter-spacing:0">(para avisos y aprobación futura)</span></label>
-    <input type="text" id="f-wa" placeholder="+54 9 11 ..." autocomplete="off">
-    <label for="f-tg">Chat de Telegram <span style="text-transform:none;letter-spacing:0">(opcional)</span></label>
-    <input type="text" id="f-tg" autocomplete="off">
+    <!-- El WhatsApp lo completa la propia persona en su primer ingreso: lo sabe mejor que
+         nosotros. El chat de Telegram no se pide porque no es un dato que nadie conozca. -->
+    <div id="bloque-contacto">
+      <label for="f-wa">WhatsApp <span style="text-transform:none;letter-spacing:0">(lo completa la persona)</span></label>
+      <input type="text" id="f-wa" placeholder="+54 9 11 ..." autocomplete="off">
+    </div>
     <div id="bloque-neg">
       <label>Negocios que gestiona</label>
       <div id="f-neg"></div>
@@ -216,12 +218,14 @@ function abrir(id){
   document.getElementById('pw-ojo').innerHTML = '<i data-lucide="eye" class="w-4 h-4"></i>';
   document.getElementById('pw-msg').textContent = '';
   document.getElementById('pw-msg').className = 'pwmsg';
-  document.getElementById('pw-nota').textContent = u
-    ? '(dejala vacía para no cambiarla)'
-    : '(opcional si va a entrar con Google)';
+  // Alta: sólo nombre, email y negocios. Todo lo demás lo completa la persona al entrar,
+  // o el admin después si hace falta corregir algo.
+  const nuevo = !u;
+  document.querySelectorAll('.solo-edicion').forEach(x => { x.style.display = nuevo ? 'none' : ''; });
+  document.getElementById('bloque-contacto').style.display = nuevo ? 'none' : '';
+  document.getElementById('pw-nota').textContent = u ? '(dejala vacía para no cambiarla)' : '';
   document.getElementById('f-rol').value   = u ? u.rol_plataforma : 'usuario';
   document.getElementById('f-wa').value    = u ? (u.whatsapp||'') : '';
-  document.getElementById('f-tg').value    = u ? (u.telegram_chat_id||'') : '';
   document.getElementById('err').textContent = '';
   pintarNegocios();
   document.getElementById('ov').classList.add('on');
@@ -244,7 +248,6 @@ async function guardar(){
     nombre: document.getElementById('f-nombre').value.trim(),
     rol_plataforma: rol,
     whatsapp: document.getElementById('f-wa').value.trim(),
-    telegram_chat_id: document.getElementById('f-tg').value.trim(),
     negocios,
   };
   const pw = document.getElementById('f-pw').value;
@@ -258,7 +261,15 @@ async function guardar(){
     });
     const d = await r.json().catch(()=>({}));
     if(!r.ok){ err.textContent = d.mensaje || 'No se pudo guardar.'; btn.disabled=false; return; }
-    cerrar(); cargar();
+    cerrar(); await cargar();
+    // El alta no falla si el mail no sale: el usuario ya quedó creado y con acceso.
+    const s = document.getElementById('sub'), antes = s.textContent;
+    if(!id && d.invitacion && !d.invitacion.ok){
+      s.textContent = 'usuario creado, pero la invitación no salió — reenviala con el botón';
+    } else if(!id){
+      s.textContent = 'usuario creado e invitación enviada';
+    }
+    if(!id) setTimeout(()=>{ s.textContent = antes; }, 5000);
   }catch(_){ err.textContent='Error de conexión.'; }
   btn.disabled=false;
 }

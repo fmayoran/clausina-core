@@ -19,6 +19,7 @@ const pool = new Pool({
 const SQL_USUARIO = `
   SELECT u.id, u.email, u.nombre, u.password_hash, u.rol_plataforma,
          u.telegram_chat_id, u.whatsapp, u.activo,
+         u.cargo, u.perfil_completado_en, u.invitado_en, u.ultimo_acceso_en,
          COALESCE((SELECT json_agg(json_build_object('negocio_id', un.negocio_id, 'rol', un.rol, 'slug', n.slug))
                      FROM contenido.usuario_negocio un
                      JOIN contenido.negocios n ON n.id = un.negocio_id
@@ -67,6 +68,22 @@ async function actualizarUsuario(id, { nombre, rol_plataforma, telegram_chat_id,
      WHERE id = $1`,
     [id, nombre ?? null, rol_plataforma ?? null, telegram_chat_id ?? null,
      whatsapp ?? null, activo ?? null, password_hash ?? null]);
+}
+
+/** Lo que completa la propia persona en su primer ingreso. Marca el perfil como completo. */
+async function completarPerfil(id, { nombre, whatsapp, cargo }) {
+  await pool.query(
+    `UPDATE contenido.usuario
+        SET nombre = COALESCE(NULLIF($2,''), nombre),
+            whatsapp = NULLIF($3,''),
+            cargo = NULLIF($4,''),
+            perfil_completado_en = now()
+      WHERE id = $1`,
+    [id, nombre || '', whatsapp || '', cargo || '']);
+}
+
+async function marcarInvitado(id) {
+  await pool.query('UPDATE contenido.usuario SET invitado_en = now() WHERE id = $1', [id]);
 }
 
 /** Reemplaza TODA la asignación de negocios del usuario. `negocios` = [{negocio_id, rol}]. */
@@ -1381,6 +1398,7 @@ async function health() {
 
 module.exports = {
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
+  completarPerfil, marcarInvitado,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio,
   crearDescubrimiento, getDescubrimiento,
