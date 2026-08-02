@@ -11,48 +11,50 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tw.css">
 <style>
-  .mtx{width:100%;border-collapse:separate;border-spacing:0;min-width:760px;}
-  .mtx th,.mtx td{padding:14px 12px;text-align:left;border-bottom:1px solid #E6E3DD;vertical-align:middle;}
-  .dark .mtx th,.dark .mtx td{border-bottom-color:#20242B;}
+  /* Variables locales espejadas de los tokens del sistema (tw.css), para que el modal, los
+     inputs y los botones sigan el tema claro/oscuro como el resto del panel. Antes estaban
+     hardcodeados en hex y en modo claro quedaban fuera de la paleta: el acento del sistema en
+     claro es verde oliva (#4d6800), no el lima, que sólo funciona sobre fondo oscuro. */
+  :root{--u-surf:#FFFFFF;--u-bg:#F7F5F1;--u-line:#DEDDD3;--u-fg:#0c0c0a;--u-mut:#5A616A;
+        --u-acc:#4d6800;--u-accfg:#FFFFFF;--u-ok:#4d6800;--u-mal:#C4442A;--u-medio:#8A6410;}
+  .dark{--u-surf:#12151A;--u-bg:#0c0c0a;--u-line:#20242B;--u-fg:#F5F2EC;--u-mut:#8A8F98;
+        --u-acc:#CCF24D;--u-accfg:#0c0c0a;--u-ok:#7BC96F;--u-mal:#FF6B4A;--u-medio:#E8A33D;}
+  .mtx{width:100%;border-collapse:separate;border-spacing:0;min-width:820px;}
+  .mtx th,.mtx td{padding:14px 12px;text-align:left;border-bottom:1px solid var(--u-line);vertical-align:middle;}
   .mtx tbody tr:last-child td{border-bottom:0;}
-  .mtx thead th{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;font-weight:400;white-space:nowrap;}
+  .mtx thead th{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;font-weight:400;white-space:nowrap;color:var(--u-mut);}
   .mtx tbody tr:hover{background:rgba(127,127,127,.06);}
   .pill{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:.62rem;padding:3px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap;}
-  /* Convención del panel: coral = pendiente/en curso, verde = listo. Acá el verde marca al admin
-     (acceso completo) y el coral al usuario sin negocios asignados, que todavía no puede operar. */
-  .p-admin{color:#7BC96F;} .p-user{color:#8A8F98;} .p-sin{color:#FF6B4A;} .p-off{color:#8A8F98;opacity:.6;}
-  .p-ok{color:#7BC96F;} .p-medio{color:#E8A33D;}
-  .iconbtn{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;border:1px solid #E6E3DD;color:#6B6F76;transition:.15s;background:none;cursor:pointer;}
-  .dark .iconbtn{border-color:#20242B;color:#8A8F98;}
-  .iconbtn:hover{color:#0c0c0a;border-color:#0c0c0a;} .dark .iconbtn:hover{color:#F5F2EC;border-color:#F5F2EC;}
+  /* Convención del panel: coral mientras falta algo, verde cuando terminó. */
+  .p-admin,.p-ok{color:var(--u-ok);} .p-user{color:var(--u-mut);} .p-sin{color:var(--u-mal);}
+  .p-medio{color:var(--u-medio);} .p-off{color:var(--u-mut);opacity:.6;}
+  .iconbtn{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--u-line);color:var(--u-mut);transition:.15s;background:none;cursor:pointer;}
+  .iconbtn:hover{color:var(--u-fg);border-color:var(--u-fg);}
+  .iconbtn:disabled{opacity:.35;cursor:default;}
   .ov{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;place-items:center;z-index:140;padding:20px;}
   .ov.on{display:grid;}
-  .dlg{background:#F7F5F1;border:1px solid #E6E3DD;border-radius:16px;padding:26px;width:min(560px,100%);max-height:88vh;overflow:auto;}
-  .dark .dlg{background:#12151A;border-color:#20242B;}
-  label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:#8A8F98;margin:14px 0 6px;}
-  input[type=text],input[type=email],input[type=password],select{width:100%;background:#FFF;border:1px solid #E6E3DD;border-radius:8px;padding:9px 11px;font-family:'Inter',sans-serif;font-size:.95rem;color:#0c0c0a;outline:none;}
-  .dark input[type=text],.dark input[type=email],.dark input[type=password],.dark select{background:#0c0c0a;border-color:#20242B;color:#F5F2EC;}
-  input:focus,select:focus{border-color:#CCF24D;}
-  .btn{background:#CCF24D;color:#0c0c0a;border:none;border-radius:8px;font-weight:700;padding:9px 18px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
+  .dlg{background:var(--u-surf);border:1px solid var(--u-line);border-radius:16px;padding:26px;width:min(560px,100%);max-height:88vh;overflow:auto;color:var(--u-fg);}
+  label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--u-mut);margin:14px 0 6px;}
+  input[type=text],input[type=email],input[type=password],select{width:100%;background:var(--u-bg);border:1px solid var(--u-line);border-radius:8px;padding:9px 11px;font-family:'Inter',sans-serif;font-size:.95rem;color:var(--u-fg);outline:none;}
+  input:focus,select:focus{border-color:var(--u-acc);}
+  .btn{background:var(--u-acc);color:var(--u-accfg);border:none;border-radius:8px;font-weight:700;padding:9px 18px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
   .btn:disabled{opacity:.5;cursor:default;}
-  .btn2{background:none;border:1px solid #E6E3DD;color:#6B6F76;border-radius:8px;padding:9px 18px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
-  .dark .btn2{border-color:#20242B;color:#8A8F98;}
-  .negfila{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #E6E3DD;}
-  .dark .negfila{border-bottom-color:#20242B;}
+  .btn2{background:none;border:1px solid var(--u-line);color:var(--u-mut);border-radius:8px;padding:9px 18px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
+  .btn2:hover{color:var(--u-fg);border-color:var(--u-fg);}
+  .negfila{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--u-line);}
   .negfila:last-child{border-bottom:0;}
   .negfila span{flex:1;font-size:.9rem;}
   .negfila select{width:auto;padding:5px 8px;font-size:.8rem;}
-  .err{color:#FF6B4A;font-family:'JetBrains Mono',monospace;font-size:.7rem;margin-top:12px;min-height:1em;}
+  .err{color:var(--u-mal);font-family:'JetBrains Mono',monospace;font-size:.7rem;margin-top:12px;min-height:1em;}
   /* El campo de contraseña necesita poder verse: escribir a ciegas una clave que después le
-     dictás a un cliente es la receta para un typo que nadie descubre hasta el primer login. */
+     dictás a alguien es la receta para un typo que nadie descubre hasta el primer login. */
   .pwrap{position:relative;}
   .pwrap input{padding-right:42px;}
   .pojo{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:grid;place-items:center;
-        width:30px;height:30px;border:none;background:none;color:#8A8F98;cursor:pointer;border-radius:6px;}
-  .pojo:hover{color:#0c0c0a;} .dark .pojo:hover{color:#F5F2EC;}
-  /* Convención del panel: coral mientras falta algo, verde cuando está listo. */
+        width:30px;height:30px;border:none;background:none;color:var(--u-mut);cursor:pointer;border-radius:6px;}
+  .pojo:hover{color:var(--u-fg);}
   .pwmsg{font-family:'JetBrains Mono',monospace;font-size:.66rem;margin-top:8px;min-height:1.1em;}
-  .pwmsg.mal{color:#FF6B4A;} .pwmsg.bien{color:#7BC96F;}
+  .pwmsg.mal{color:var(--u-mal);} .pwmsg.bien{color:var(--u-ok);}
 </style>
 </head>
 <body class="bg-pbg dark:bg-bg text-pfg dark:text-fg antialiased">
@@ -127,7 +129,7 @@
 <script>ClausinaShell({active:'usuarios'})</script>
 <script>
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let USUARIOS = [], NEGOCIOS = [];
+let USUARIOS = [], NEGOCIOS = [], YO = null;
 
 function pillRol(u){
   if(u.rol_plataforma==='admin') return '<span class="pill p-admin">administrador</span>';
@@ -138,6 +140,7 @@ function pillRol(u){
 /* Estado del onboarding, deducido de las tres marcas de tiempo que ya guardamos.
    Convención del panel: coral mientras falta algo, verde cuando terminó. */
 function estadoDe(u){
+  if(!u.activo)              return ['p-off','deshabilitado','Sin acceso. Podés volver a habilitarlo.'];
   if(u.perfil_completado_en) return ['p-ok','activo','Entró y completó su perfil'];
   if(u.ultimo_acceso_en)     return ['p-medio','sin completar','Entró pero no completó el perfil'];
   if(u.invitado_en)          return ['p-sin','invitado','Se le mandó la invitación pero nunca entró'];
@@ -147,6 +150,7 @@ function estadoDe(u){
 function fila(u){
   const negs = (u.negocios||[]).map(n=>`${esc(n.slug)} · ${esc(n.rol)}`).join('<br>');
   const [cls, txt, tip] = estadoDe(u);
+  const propio = YO && YO.id === u.id;   // no ofrecemos deshabilitarse a uno mismo
   return `<tr${u.activo?'':' style="opacity:.5"'}>
     <td><b>${esc(u.nombre)}</b>${u.activo?'':' <span class="pill p-off">inactivo</span>'}</td>
     <td class="mono text-[11px] text-pmut dark:text-mut">${esc(u.email)}</td>
@@ -154,24 +158,44 @@ function fila(u){
     <td><span class="pill ${cls}" title="${esc(tip)}">${txt}</span></td>
     <td class="mono text-[11px] text-pmut dark:text-mut">${u.rol_plataforma==='admin'?'todos':(negs||'—')}</td>
     <td style="text-align:right;white-space:nowrap">
-      <button class="iconbtn" onclick="invitar('${u.id}')" title="Copiar invitación" aria-label="Copiar invitación"><i data-lucide="send" class="w-4 h-4"></i></button>
+      <button class="iconbtn" onclick="invitar('${u.id}')" title="Reenviar invitación por mail" aria-label="Reenviar invitación"><i data-lucide="send" class="w-4 h-4"></i></button>
+      <button class="iconbtn" onclick="alternarActivo('${u.id}')" ${propio?'disabled title="No podés deshabilitarte a vos mismo"':`title="${u.activo?'Deshabilitar el acceso':'Volver a habilitar'}"`} aria-label="${u.activo?'Deshabilitar':'Habilitar'}"><i data-lucide="${u.activo?'user-x':'user-check'}" class="w-4 h-4"></i></button>
       <button class="iconbtn" onclick="abrir('${u.id}')" title="Editar" aria-label="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button>
     </td>
   </tr>`;
 }
 
-/* La invitación no necesita link secreto: el acceso ya está dado por el email, y Google prueba
-   que la cuenta es suya. Copiamos el texto para mandarlo por donde quieras (WhatsApp, mail). */
+/* Reenvía la invitación por mail. Antes esto copiaba un texto al portapapeles — quedó de
+   cuando el panel todavía no sabía mandar correo — y el nombre del botón mentía. */
 async function invitar(id){
   const u = USUARIOS.find(x=>x.id===id); if(!u) return;
-  const txt = `Hola ${u.nombre}, ya tenés acceso al panel de ClaUsina.\n\n`
-    + `Entrá a ${location.origin} y tocá "Entrar con Google" usando ${u.email}.\n`
-    + `No hace falta que crees ninguna contraseña.`;
+  const s = document.getElementById('sub'), antes = s.textContent;
+  s.textContent = 'enviando invitación…';
   try{
-    await navigator.clipboard.writeText(txt);
-    const s=document.getElementById('sub'), antes=s.textContent;
-    s.textContent='invitación copiada'; setTimeout(()=>{s.textContent=antes;},2200);
-  }catch(_){ prompt('Copiá este texto:', txt); }
+    const r = await fetch(`api/usuarios/${id}/invitar`, {method:'POST'});
+    const d = await r.json().catch(()=>({}));
+    s.textContent = r.ok ? `invitación enviada a ${u.email}` : (d.mensaje || 'no se pudo enviar');
+    if(r.ok) await cargar();
+  }catch(_){ s.textContent = 'error de conexión'; }
+  setTimeout(()=>{ s.textContent = antes; }, 5000);
+}
+
+/* Habilitar o deshabilitar. Deshabilitar corta la sesión abierta en el acto: el middleware
+   recarga el usuario en cada request, así que la cookie firmada deja de valer. */
+async function alternarActivo(id){
+  const u = USUARIOS.find(x=>x.id===id); if(!u) return;
+  const accion = u.activo ? 'deshabilitar' : 'habilitar';
+  if(u.activo && !confirm(`¿Deshabilitar a ${u.nombre}?\n\nPierde el acceso en el acto, incluso si tiene una sesión abierta. Podés volver a habilitarlo cuando quieras.`)) return;
+  const s = document.getElementById('sub'), antes = s.textContent;
+  s.textContent = accion + '…';
+  try{
+    const r = await fetch(`api/usuarios/${id}`, {method:'PUT',headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({activo: !u.activo})});
+    const d = await r.json().catch(()=>({}));
+    s.textContent = r.ok ? `${u.nombre} ${u.activo?'deshabilitado':'habilitado'}` : (d.mensaje||'no se pudo');
+    if(r.ok) await cargar();
+  }catch(_){ s.textContent='error de conexión'; }
+  setTimeout(()=>{ s.textContent = antes; }, 4000);
 }
 
 function pintarNegocios(){
@@ -288,7 +312,8 @@ async function guardar(){
 
 async function cargar(){
   try{
-    const [ru, rn] = await Promise.all([fetch('api/usuarios'), fetch('api/negocios')]);
+    const [ru, rn, ry] = await Promise.all([fetch('api/usuarios'), fetch('api/negocios'), fetch('api/yo')]);
+    YO = ry.ok ? await ry.json() : null;
     if(!ru.ok){ document.getElementById('sub').textContent = ru.status===403?'solo para administradores':'error'; return; }
     USUARIOS = (await ru.json()).usuarios || [];
     NEGOCIOS = (await rn.json()).negocios || [];

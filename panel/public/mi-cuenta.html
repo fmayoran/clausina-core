@@ -11,25 +11,32 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tw.css">
 <style>
-  label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:#8A8F98;margin:18px 0 6px;}
-  input{width:100%;background:#FFF;border:1px solid #E6E3DD;border-radius:8px;padding:10px 12px;font-family:'Inter',sans-serif;font-size:1rem;color:#0c0c0a;outline:none;}
-  .dark input{background:#0c0c0a;border-color:#20242B;color:#F5F2EC;}
-  input:focus{border-color:#CCF24D;}
+  /* Variables locales espejadas de los tokens del sistema (tw.css), para que el modal, los
+     inputs y los botones sigan el tema claro/oscuro como el resto del panel. Antes estaban
+     hardcodeados en hex y en modo claro quedaban fuera de la paleta: el acento del sistema en
+     claro es verde oliva (#4d6800), no el lima, que sólo funciona sobre fondo oscuro. */
+  :root{--u-surf:#FFFFFF;--u-bg:#F7F5F1;--u-line:#DEDDD3;--u-fg:#0c0c0a;--u-mut:#5A616A;
+        --u-acc:#4d6800;--u-accfg:#FFFFFF;--u-ok:#4d6800;--u-mal:#C4442A;--u-medio:#8A6410;}
+  .dark{--u-surf:#12151A;--u-bg:#0c0c0a;--u-line:#20242B;--u-fg:#F5F2EC;--u-mut:#8A8F98;
+        --u-acc:#CCF24D;--u-accfg:#0c0c0a;--u-ok:#7BC96F;--u-mal:#FF6B4A;--u-medio:#E8A33D;}
+  label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:var(--u-mut);margin:18px 0 6px;}
+  input{width:100%;background:var(--u-bg);border:1px solid var(--u-line);border-radius:8px;padding:10px 12px;font-family:'Inter',sans-serif;font-size:1rem;color:var(--u-fg);outline:none;}
+  input:focus{border-color:var(--u-acc);}
   input:disabled{opacity:.55;cursor:not-allowed;}
-  .ayuda{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:#8A8F98;margin-top:5px;text-transform:none;letter-spacing:0;}
-  .btn{background:#CCF24D;color:#0c0c0a;border:none;border-radius:8px;font-weight:700;padding:11px 22px;cursor:pointer;font-family:'Inter Tight',sans-serif;font-size:1rem;margin-top:24px;}
+  .ayuda{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-mut);margin-top:5px;text-transform:none;letter-spacing:0;}
+  .btn{background:var(--u-acc);color:var(--u-accfg);border:none;border-radius:8px;font-weight:700;padding:11px 22px;cursor:pointer;font-family:'Inter Tight',sans-serif;font-size:1rem;margin-top:24px;}
   .btn:disabled{opacity:.5;cursor:default;}
   .msg{font-family:'JetBrains Mono',monospace;font-size:.7rem;margin-top:14px;min-height:1.1em;}
-  .msg.mal{color:#FF6B4A;} .msg.bien{color:#7BC96F;}
+  .msg.mal{color:var(--u-mal);} .msg.bien{color:var(--u-ok);}
   .caja{max-width:520px;}
   .pwrap{position:relative;}
   .pwrap input{padding-right:42px;}
   .pojo{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:grid;place-items:center;
-        width:30px;height:30px;border:none;background:none;color:#8A8F98;cursor:pointer;border-radius:6px;}
-  .pojo:hover{color:#0c0c0a;} .dark .pojo:hover{color:#F5F2EC;}
+        width:30px;height:30px;border:none;background:none;color:var(--u-mut);cursor:pointer;border-radius:6px;}
+  .pojo:hover{color:var(--u-fg);}
   .pwmsg{font-family:'JetBrains Mono',monospace;font-size:.66rem;margin-top:8px;min-height:1.1em;}
-  .pwmsg.mal{color:#FF6B4A;} .pwmsg.bien{color:#7BC96F;}
-  .dark #bloque-pw{border-top-color:#20242B !important;}
+  .pwmsg.mal{color:var(--u-mal);} .pwmsg.bien{color:var(--u-ok);}
+  #bloque-pw{border-top:1px solid var(--u-line) !important;}
 </style>
 </head>
 <body class="bg-pbg dark:bg-bg text-pfg dark:text-fg antialiased">
