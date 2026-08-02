@@ -80,3 +80,21 @@ negocio: el tablero de agencia consume 5 APIs solo-admin y se le veía roto.
   que su rol no puede usar.
 
 Relacionado: `MENSAJERIA_TELEGRAM_WHATSAPP.md`.
+
+## Telegram: consola del operador (02/08/2026)
+
+Decisión de Fer: **Telegram queda para el administrador y las alertas de plataforma.** La
+interacción del cliente con el creativo y la aprobación de piezas se construyen sobre WhatsApp.
+
+Hasta acá el bot le hacía caso a cualquier chat que recibiera el botón: quien tuviera acceso a
+ese mensaje podía aprobar una pieza. Ahora el nodo Router del workflow `ClaUsina - Telegram
+(botones)` arranca con un guardián que descarta todo lo que no venga de un chat autorizado.
+
+**Cómo se mantiene la lista:** los nodos Code de n8n no pueden consultar Postgres, y no queremos
+darles acceso. Se aplica el mismo patrón que ya usa la plataforma para los secretos —
+*consumidor que no lee la base → copia derivada, regenerada desde la base*. El script
+`scripts/sync_telegram_admins.py` lee `contenido.usuario` (rol admin + activo + chat asociado) y
+reescribe la constante en el Router vía la API de n8n. Es idempotente y **falla cerrado**: si
+ningún admin tiene chat asociado, aborta en vez de dejar el bot mudo o abierto.
+
+Hay que correrlo cuando cambie quién es admin o cuando alguien asocie/desasocie su chat.
