@@ -1,5 +1,8 @@
 # Mensajería — Telegram y WhatsApp (diagnóstico 29/07/2026)
 
+> **ESTADO:** las dos decisiones de este diagnóstico están aplicadas. Telegram quedó cerrado al
+> administrador (02/08) y WhatsApp está andando (03/08, ver `WHATSAPP.md`).
+
 Auditoría hecha antes de sumar comandos de voz. No es un plan cerrado: es el mapa del terreno
 y las decisiones que quedan pendientes.
 
@@ -52,9 +55,8 @@ señal de que el canal hacia el cliente ya estaba pensado por ahí.
 
 ## Pendientes
 
-1. **Dar de alta WhatsApp para ClaUsina desde cero**: cuenta de Meta Business propia, número
-   dedicado, alta en WhatsApp Business Platform. Se cruza con la verificación de Meta que quedó
-   frenada por el CUIT.
+1. ~~Dar de alta WhatsApp para ClaUsina desde cero~~ — **HECHO el 03/08/2026**: número
+   +54 9 11 7261-3604 andando, circuito entrante probado. No hizo falta el CUIT. Ver `WHATSAPP.md`.
 2. **Plantillas de WhatsApp** para aprobar/rechazar desde el cliente (Meta las revisa una por una).
 3. **Identidad**: RESUELTO — `usuario.whatsapp` y `usuario.telegram_chat_id` ya cuelgan del
    usuario. Ver `USUARIOS_Y_ROLES.md`.

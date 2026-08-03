@@ -3,14 +3,14 @@
 Base para todo lo que viene: canal hacia el cliente (WhatsApp), comandos de voz, y que un
 negocio se pueda operar sin que Fer sea el único con llave.
 
-## Punto de partida
+## Punto de partida (lo que había ANTES de este trabajo)
 
-- **No hay usuarios.** Una sola contraseña compartida (`PANEL_PASSWORD`) y una cookie firmada
+- **No había usuarios.** Una sola contraseña compartida (`PANEL_PASSWORD`) y una cookie firmada
   con HMAC cuyo contenido es únicamente `{exp}`: no lleva identidad.
-- **El negocio activo sale de una cookie que el servidor no valida** (`cf_marca`, `server.js`).
+- **El negocio activo salía de una cookie que el servidor no validaba** (`cf_marca`, `server.js`).
   Hoy es inocuo porque el único usuario es Fer. Con un cliente adentro, cambiar el slug en la
   cookie del navegador da acceso al negocio de otro. **Este es el agujero que hay que cerrar.**
-- De 106 rutas del panel, **67 resuelven el negocio por un único middleware**. Blindar ahí
+- De 106 rutas del panel, **67 resolvían el negocio por un único middleware**. Blindar ahí
   adentro cubre todas: no hay que tocar 67 endpoints.
 
 ## Modelo

@@ -140,6 +140,7 @@
     <a href="#componentes">3 · Componentes</a>
     <a href="#proceso">4 · Proceso</a>
     <a href="#canales">5 · Canales</a>
+    <a href="#identidad">5b · Identidad</a>
     <a href="#datos">6 · Datos</a>
     <a href="#infra">7 · Infra</a>
     <a href="#negocios">8 · Negocios</a>
@@ -151,7 +152,7 @@
   <p class="sub">La plataforma de contenido y operaciones multi-negocio. Un motor agnóstico de negocio que prepara, aprueba y publica contenido con generación asistida por IA, y una cápsula aislada por cada negocio.</p>
   <div class="meta">
     <span class="pill">Documento vivo</span>
-    <span class="pill">Actualizado: 2026-07-09</span>
+    <span class="pill">Actualizado: 2026-08-03</span>
     <span class="pill">3 negocios activos</span>
     <span class="pill">Monorepo + 4 submodules</span>
   </div>
@@ -276,11 +277,24 @@
     <div class="card"><h4>Pauta Instagram (Meta Ads)</h4><p>Publicidad por <b>Marketing API</b>. El creativo propone campañas (objetivo, creativo = post publicado, público, presupuesto); Fer aprueba → se crean <b>pausadas</b> → activar/pausar. Reporte + gráfico de evolución. Secretos de ads en <code>&lt;slug&gt;.env</code>; <b>nada gasta sin aprobación</b>.</p></div>
     <div class="card"><h4>Pantalla DOOH (Paseo Ardora)</h4><p>Cartel de calle vertical (2×3 m, mudo). El <code>/editor</code> arma spots 2:3 ~10s. Aprobar = "en pantalla". Integración <b>VNNOX</b> (botón "A la pantalla", device T1-4G).</p></div>
     <div class="card"><h4>Web / Novedades</h4><p>Landings estáticas en Cloudflare. El feed de novedades hace fetch a <code>cf-novedades</code> (n8n → DB) y renderiza; al publicar una pieza aparece sola, sin redeploy. Home conserva su SEO estático.</p></div>
-    <div class="card"><h4>Telegram</h4><p>Canal operativo: tarjetas de aprobación con botones, ingreso de briefs por voz/foto y avisos a Fer. Workflow <code>cf-telegram</code> + bot.</p></div>
+    <div class="card"><h4>Telegram — consola del operador</h4><p>Desde 08/2026 es <b>sólo para el administrador</b> y las alertas de plataforma: tarjetas de aprobación, briefs por voz/foto y avisos. El Router descarta cualquier chat no autorizado; la lista se <b>deriva</b> de <code>contenido.usuario</code> con <code>sync_telegram_admins.py</code> (n8n no puede leer la DB, mismo patrón que los secretos).</p></div>
+      <div class="card"><h4>WhatsApp — canal del cliente</h4><p>Un número de ClaUsina (<b>+54 9 11 7261-3604</b>, Cloud API) que habla con el WhatsApp del usuario de cada negocio. <b>El usuario escribe primero</b>: eso abre la ventana de 24 h y la respuesta es libre y sin costo; las plantillas pagas sólo hacen falta cuando ClaUsina inicia. Webhook en el panel (no n8n), firma validada. El canal autentica; <code>contenido.usuario</code> autoriza.</p></div>
   </div>
 </div></section>
 
 <!-- 6 -->
+<!-- 5b -->
+<section id="identidad"><div class="wrap">
+  <h2>5b · Identidad, acceso y roles</h2>
+  <p class="lead">Antes de 08/2026 el panel tenía <b>una contraseña compartida</b> y el negocio activo salía de una cookie que el servidor no validaba: cambiarla daba acceso al negocio de otro. Eso ya no es así.</p>
+  <div class="grid g2">
+    <div class="card"><h4>Usuarios y roles</h4><p><code>usuario</code> + <code>usuario_negocio</code> (N:N: una persona gestiona varios negocios). <b>admin</b> ve toda la plataforma; <b>aprobador</b> aprueba y publica en los suyos; <b>editor</b> prepara pero no aprueba. La compuerta que define el rol es <b>quién aprueba</b>, porque nada sale sin visto humano.</p></div>
+    <div class="card"><h4>Aislamiento entre negocios</h4><p>El middleware que resuelve la marca activa <b>valida el slug contra los permisos</b>. Al estar en un solo lugar, las 67 rutas que usan el negocio activo quedan cubiertas sin tocarlas. 12 rutas son sólo-admin; 13 de aprobar/publicar exigen rol.</p></div>
+    <div class="card"><h4>Cómo se entra</h4><p><b>Google (OIDC)</b> o contraseña propia, a elección. El SSO <b>autentica</b>; el acceso lo sigue dando <code>contenido.usuario</code>: mail que no está en la tabla no entra — eso reemplaza al alta libre. La contraseña del admin es la puerta de emergencia si Google falla.</p></div>
+    <div class="card"><h4>Alta por invitación</h4><p>El admin carga nombre, mail y negocios. Sale una invitación por mail desde <b>hola@clausina.ar</b> con enlace de un solo uso para definir contraseña. En el primer ingreso la persona completa su WhatsApp — lo tipea el dueño del número, no el admin. Un número, un usuario: hay índice único.</p></div>
+  </div>
+</div></section>
+
 <section id="datos"><div class="wrap">
   <h2>6 · Modelo de datos</h2>
   <p class="lead">Base <code>claude</code> (independiente de las apps ajenas en <code>crm</code>), schema <code>contenido</code>. Multi-negocio: un negocio = una fila en <code>negocectos</code>; el resto cuelga de ahí.</p>
@@ -378,6 +392,9 @@
   <table class="chg">
     <thead><tr><th>Fecha</th><th>Cambio</th></tr></thead>
     <tbody>
+      <tr><td>2026-08-03</td><td><b>WhatsApp: canal hacia el cliente.</b> Número propio de ClaUsina (<b>+54 9 11 7261-3604</b>, Cloud API). El usuario del negocio escribe primero — eso abre la ventana de 24 h y la respuesta es libre y sin costo; las plantillas pagas sólo se necesitan cuando ClaUsina inicia. Webhook en el <b>panel</b> (no n8n), con firma de Meta validada y bitácora de entrantes y salientes. El canal <b>autentica</b>, <code>contenido.usuario</code> <b>autoriza</b>. <b>Trampa cara:</b> son <b>tres</b> suscripciones distintas (URL+token en la app; la cuenta de WhatsApp suscripta a la app; la app suscripta al campo <code>messages</code>) y el webhook figura validado con luz verde aunque falten dos. Los números se normalizan antes de comparar (la misma línea estaba cargada con y sin el 9) y hay índice único: un número, un usuario.</td></tr>
+      <tr><td>2026-08-02</td><td><b>Usuarios, autenticación y roles.</b> Antes había <b>una contraseña compartida</b> y el negocio activo salía de una cookie que el servidor <i>no validaba</i>: editarla daba acceso al negocio de otro. Ahora <code>usuario</code> + <code>usuario_negocio</code> (N:N), roles <b>admin / aprobador / editor</b>, y el middleware valida el slug contra los permisos — al estar en un solo lugar cubre las 67 rutas sin tocarlas. Se entra con <b>Google (OIDC)</b> o contraseña propia; el SSO autentica pero el acceso lo sigue dando la base, lo que reemplaza al alta libre. <b>Alta por invitación</b> por mail desde <code>hola@clausina.ar</code>, con enlace de un solo uso; la persona completa su WhatsApp en el primer ingreso. <b>Telegram pasa a ser la consola del operador</b>: el bot descarta cualquier chat no autorizado.</td></tr>
+      <tr><td>2026-08-02</td><td><b>Correo propio en clausina.ar.</b> Google Workspace con MX, SPF, DKIM y DMARC aplicados por API sobre Cloudflare (<code>dns_workspace.sh</code>). Los avisos y las invitaciones dejan de salir de una casilla de Gmail. <b>Trampa:</b> en un mismo nombre conviven varios TXT y reemplazar "el primero" borró el de verificación de Google — se emparejan por familia.</td></tr>
       <tr><td>2026-07-28</td><td><b>Versión confiable: respaldo real + verificación automática.</b> Análisis del sistema: la deuda no era performance (la tabla más grande tiene 320 kB) sino <b>confiabilidad</b>. (1) <b>Respaldo que sale del VPS</b>: el script tenía la lógica off-site pero el clon nunca se creó — los dumps vivían en el mismo disco que la base y el media store (254 MB irreemplazables) no se respaldaba. Ahora repo privado <code>clausina-backups</code> con base + material, y <b>verifica el SHA en el remoto</b> (un push que "no falla" no garantiza nada). (2) <b>Verificador de integridad</b> (<code>verificar_sistema.py</code>, cron 30 min, visible en Sala de máquinas → Integridad y con aviso por Telegram): detecta SQL de n8n que ya no coincide con el schema — <i>la causa exacta de los 3 días sin publicar</i> —, n8n inalcanzable, respaldo que no sale, motor caído, trabajos colgados, piezas trabadas entre aprobar y publicar, disco. (3) <b>Publicación idempotente</b> (<code>reconciliar_publicacion.py</code>, cron 15 min): la API de IG devuelve error transitorio <i>pero publica igual</i> — reintentar duplicaba (pasó: 5 Reels). Ahora se reconcilia contra la cuenta real: si publicó, se marca publicada (el reintento queda bloqueado); si no, vuelve a pendiente.</td></tr>
       <tr><td>2026-07-19</td><td><b>Renombre: proyecto/marca → NEGOCIO.</b> La entidad que gestiona ClaUsina pasa a llamarse <b>negocio</b> (a futuro un negocio podrá tener &gt;1 marca). "Marca" se conserva SOLO como <b>branding</b> (voz/estilo/manual de marca, sub-marcas). DB: <code>proyectos</code>→<code>negocios</code>, <code>proyecto_*</code>→<code>negocio_*</code>, columna <code>proyecto_id</code>→<code>negocio_id</code> (20 tablas). Backend/UI/endpoints (<code>/api/negocios</code>). NO se tocaron: la carpeta de logos <code>/media/marca/</code> ni las rutas de cápsula en disco <code>marcas/&lt;slug&gt;/</code> (storage / submodules).</td></tr>
       <tr><td>2026-07-18</td><td><b>Estilo + Manual de marca (generados por el creativo).</b> Desde Perfil: <b>generar/regenerar estilo</b> (el director de arte documenta el sistema de diseño desde brief + publicaciones + IG) y <b>manual de marca</b> (HTML online + PDF A4 paginado a sangre, con versión + fecha). Disciplina de diseño (frontend-design) destilada en los prompts. Jerarquía de texto con piso de contraste. Tabla <code>negocio_gen</code>; jobs <code>estilo_gen</code>/<code>manual_gen</code>.</td></tr>
