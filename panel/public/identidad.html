@@ -22,6 +22,9 @@
   input[type=text],input[type=number],select,textarea{width:100%;background:var(--u-bg);border:1px solid var(--u-line);
         border-radius:8px;padding:9px 11px;font-family:'Inter',sans-serif;font-size:.95rem;color:var(--u-fg);outline:none;}
   input:focus,select:focus,textarea:focus{border-color:var(--u-acc);}
+  /* En oscuro el placeholder por defecto se lee casi como un valor cargado, y acá la diferencia
+     importa: el ticket vacío es información (nadie declaró precios), no un campo que ya está lleno. */
+  input::placeholder{color:var(--u-mut);opacity:.45;font-style:italic;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
   @media(max-width:760px){.grid2,.grid3{grid-template-columns:1fr;}}
