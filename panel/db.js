@@ -741,18 +741,57 @@ async function setLogo(negocioId, url) {
 
 // Catálogos (actividades y atributos): son estáticos, se cachean como la lista de negocios.
 let _catIdent = null, _catIdentAt = 0;
+function invalidarCatIdentidad() { _catIdentAt = 0; }
 async function getCatalogosIdentidad() {
   if (!_catIdent || Date.now() - _catIdentAt > 300000) {
     const { rows: actividades } = await pool.query(
-      `SELECT a.id, a.codigo, a.nombre, p.codigo AS grupo_codigo, p.nombre AS grupo
+      `SELECT a.id, a.codigo, a.nombre, a.padre_id, p.codigo AS grupo_codigo, p.nombre AS grupo
          FROM contenido.actividad a JOIN contenido.actividad p ON p.id = a.padre_id
         WHERE a.activa AND p.activa
         ORDER BY p.orden, a.orden`);
+    const { rows: raices } = await pool.query(
+      `SELECT id, codigo, nombre FROM contenido.actividad WHERE padre_id IS NULL AND activa ORDER BY orden`);
+    // `actividades` en cada atributo: vacío = universal (se ofrece a todos los rubros).
     const { rows: atributos } = await pool.query(
-      `SELECT codigo, nombre, grupo FROM contenido.atributo ORDER BY grupo, orden`);
-    _catIdent = { actividades, atributos }; _catIdentAt = Date.now();
+      `SELECT t.codigo, t.nombre, t.grupo,
+              COALESCE(array_agg(m.actividad_id) FILTER (WHERE m.actividad_id IS NOT NULL), '{}') AS actividades
+         FROM contenido.atributo t
+         LEFT JOIN contenido.atributo_actividad m ON m.atributo_codigo = t.codigo
+        GROUP BY t.codigo, t.nombre, t.grupo, t.orden
+        ORDER BY t.grupo, t.orden`);
+    _catIdent = { actividades, raices, atributos }; _catIdentAt = Date.now();
   }
   return _catIdent;
+}
+
+// Un atributo se ofrece si es universal, o si está mapeado a la actividad elegida o a su raíz.
+function atributoAplica(attr, actividadId, padreId) {
+  if (!attr.actividades || !attr.actividades.length) return true;
+  return attr.actividades.includes(actividadId) || attr.actividades.includes(padreId);
+}
+
+// Mapeo atributo → rubros, para la pantalla de configuración (solo admin).
+async function setMapeoAtributo(codigo, actividadIds) {
+  const ids = [...new Set((Array.isArray(actividadIds) ? actividadIds : []).map(Number).filter(Boolean))];
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    const { rows: [t] } = await cli.query('SELECT codigo FROM contenido.atributo WHERE codigo=$1', [codigo]);
+    if (!t) { const e = new Error('atributo inexistente'); e.code = 'no_existe'; throw e; }
+    await cli.query('DELETE FROM contenido.atributo_actividad WHERE atributo_codigo=$1', [codigo]);
+    if (ids.length) {
+      // Sólo raíces: es la granularidad de la pantalla. La tabla admite hojas si hiciera falta.
+      await cli.query(
+        `INSERT INTO contenido.atributo_actividad (atributo_codigo, actividad_id)
+         SELECT $1, id FROM contenido.actividad WHERE id = ANY($2::int[]) AND padre_id IS NULL`,
+        [codigo, ids]);
+    }
+    await cli.query('COMMIT');
+  } catch (e) {
+    await cli.query('ROLLBACK'); throw e;
+  } finally { cli.release(); }
+  invalidarCatIdentidad();
+  return { ok: true, ...(await getCatalogosIdentidad()) };
 }
 
 async function getIdentidad(negocioId) {
@@ -778,9 +817,13 @@ async function guardarIdentidad(negocioId, d, usuarioId) {
   let tMin = num(d.ticket_min), tMax = num(d.ticket_max);
   if (tMin != null && tMax != null && tMin > tMax) [tMin, tMax] = [tMax, tMin];
 
-  // Los atributos se validan contra el catálogo: lo que no está, no entra (si no, el filtro miente).
-  const { atributos: catAttrs } = await getCatalogosIdentidad();
-  const validos = new Set(catAttrs.map(a => a.codigo));
+  // Los atributos se validan contra el catálogo Y contra el rubro elegido: lo que no aplica no
+  // entra (si no, el filtro miente). Cambiar de rubro descarta lo que el rubro nuevo no admite.
+  const { atributos: catAttrs, actividades } = await getCatalogosIdentidad();
+  const actId = num(d.actividad_id);
+  const act = actividades.find(a => a.id === actId);
+  const padreId = act ? act.padre_id : null;
+  const validos = new Set(catAttrs.filter(a => atributoAplica(a, actId, padreId)).map(a => a.codigo));
   const atributos = [...new Set((Array.isArray(d.atributos) ? d.atributos : []).filter(a => validos.has(a)))];
 
   const localidades = (Array.isArray(d.zona_localidades) ? d.zona_localidades : [])
@@ -1615,7 +1658,7 @@ module.exports = {
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
   completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
-  getIdentidad, guardarIdentidad, getCatalogosIdentidad,
+  getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio,
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente, getVerificacion,

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Rubros y atributos</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="fonts/clausina-icono-180.png">
+<script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
+<style>
+  :root{--u-surf:#FFFFFF;--u-bg:#F7F5F1;--u-line:#DEDDD3;--u-fg:#0c0c0a;--u-mut:#5A616A;
+        --u-acc:#4d6800;--u-accfg:#FFFFFF;--u-ok:#4d6800;--u-mal:#C4442A;--u-medio:#8A6410;}
+  .dark{--u-surf:#12151A;--u-bg:#0c0c0a;--u-line:#20242B;--u-fg:#F5F2EC;--u-mut:#8A8F98;
+        --u-acc:#CCF24D;--u-accfg:#0c0c0a;--u-ok:#7BC96F;--u-mal:#FF6B4A;--u-medio:#E8A33D;}
+  .card2{background:var(--u-surf);border:1px solid var(--u-line);border-radius:16px;padding:24px;margin-bottom:18px;}
+  .sec{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;
+       color:var(--u-mut);border-bottom:1px solid var(--u-line);padding-bottom:8px;margin:0 0 18px;}
+  .fila{display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:start;
+        padding:13px 0;border-bottom:1px solid var(--u-line);}
+  .fila:last-child{border-bottom:0;}
+  @media(max-width:720px){.fila{grid-template-columns:1fr;gap:8px;}}
+  .anom{font-size:.92rem;}
+  .acod{font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--u-mut);display:block;margin-top:2px;}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;}
+  .chip{font-family:'JetBrains Mono',monospace;font-size:.64rem;padding:5px 11px;border-radius:999px;
+        border:1px solid var(--u-line);color:var(--u-mut);cursor:pointer;user-select:none;transition:.15s;background:none;}
+  .chip:hover{color:var(--u-fg);border-color:var(--u-fg);}
+  .chip.on{color:var(--u-acc);border-color:var(--u-acc);background:color-mix(in srgb,var(--u-acc) 12%,transparent);}
+  .chip.univ{border-style:dashed;}
+  .chip.univ.on{color:var(--u-medio);border-color:var(--u-medio);background:color-mix(in srgb,var(--u-medio) 12%,transparent);}
+  .gtit{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.12em;text-transform:uppercase;
+        color:var(--u-mut);opacity:.75;margin:20px 0 6px;}
+  .gtit:first-child{margin-top:0;}
+  .rub{display:flex;flex-wrap:wrap;gap:8px;}
+  .rubi{font-family:'JetBrains Mono',monospace;font-size:.64rem;padding:6px 12px;border-radius:8px;
+        border:1px solid var(--u-line);color:var(--u-mut);}
+  .rubi b{color:var(--u-fg);font-weight:500;}
+  .msg{font-family:'JetBrains Mono',monospace;font-size:.66rem;min-height:1em;margin-top:6px;}
+  .msg.mal{color:var(--u-mal);} .msg.bien{color:var(--u-ok);}
+</style>
+</head>
+<body class="bg-paper text-pfg dark:bg-ink dark:text-fg transition-colors">
+<div class="shell">
+  <main class="px-6 md:px-9 py-8 min-w-0" style="max-width:1000px;">
+    <div class="flex items-baseline gap-3 mb-1">
+      <h1 class="display font-bold text-xl tracking-tight">Rubros y atributos</h1>
+      <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
+    </div>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-7" style="max-width:72ch;line-height:1.6;">
+      Qué atributos se le ofrecen a cada rubro en la ficha de <a href="identidad" class="acc-text">Identidad</a>.
+      Un atributo marcado <b>Todos</b> es universal. Ofrecerlos todos a todos ensucia la carga:
+      un complejo deportivo no necesita "apto celíacos" y una farmacia no necesita "carta de vinos".
+      Se guarda solo al tocar.
+    </p>
+
+    <div class="card2">
+      <div class="sec">Rubros disponibles</div>
+      <div class="rub" id="rubros"></div>
+    </div>
+
+    <div class="card2">
+      <div class="sec">Atributos</div>
+      <div id="lista"></div>
+      <div class="msg" id="msg"></div>
+    </div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="shell.js"></script>
+<script>ClausinaShell({active:'rubros'})</script>
+<script>
+let CAT = { raices: [], atributos: [], actividades: [] };
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function pintar() {
+  $('rubros').innerHTML = CAT.raices.map(r => {
+    const n = CAT.actividades.filter(a => a.padre_id === r.id).length;
+    return `<span class="rubi"><b>${esc(r.nombre)}</b> · ${n}</span>`;
+  }).join('');
+
+  const grupos = {};
+  CAT.atributos.forEach(a => { (grupos[a.grupo] = grupos[a.grupo] || []).push(a); });
+  $('lista').innerHTML = Object.keys(grupos).map(g =>
+    `<div class="gtit">${esc(g)}</div>` + grupos[g].map(a => {
+      const univ = !a.actividades.length;
+      return `<div class="fila">
+        <div><span class="anom">${esc(a.nombre)}</span><span class="acod">${esc(a.codigo)}</span></div>
+        <div class="chips">
+          <button type="button" class="chip univ${univ ? ' on' : ''}"
+                  onclick="alternar('${esc(a.codigo)}',null)">Todos</button>
+          ${CAT.raices.map(r => `<button type="button" class="chip${a.actividades.includes(r.id) ? ' on' : ''}"
+                  onclick="alternar('${esc(a.codigo)}',${r.id})">${esc(r.nombre)}</button>`).join('')}
+        </div>
+      </div>`;
+    }).join('')).join('');
+  $('sub').textContent = `${CAT.atributos.length} atributos · ${CAT.raices.length} rubros`;
+}
+
+// null = "Todos": vacía el mapeo (universal). Un rubro concreto: alterna ese rubro.
+async function alternar(codigo, raizId) {
+  const a = CAT.atributos.find(x => x.codigo === codigo); if (!a) return;
+  let ids;
+  if (raizId === null) {
+    if (!a.actividades.length) return;      // ya es universal, nada que hacer
+    ids = [];
+  } else {
+    ids = a.actividades.includes(raizId)
+      ? a.actividades.filter(x => x !== raizId)
+      : a.actividades.concat(raizId);
+  }
+  const msg = $('msg'); msg.className = 'msg'; msg.textContent = 'guardando…';
+  try {
+    const r = await fetch('api/identidad/atributo-mapeo', { method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ codigo, actividades: ids }) });
+    const j = await r.json();
+    if (r.ok && j.ok) {
+      CAT = { raices: j.raices, atributos: j.atributos, actividades: j.actividades };
+      pintar();
+      msg.className = 'msg bien'; msg.textContent = 'guardado';
+      setTimeout(() => { msg.textContent = ''; }, 2200);
+    } else {
+      msg.className = 'msg mal';
+      msg.textContent = r.status === 403 ? 'solo para administradores' : 'no se pudo guardar';
+    }
+  } catch (e) { msg.className = 'msg mal'; msg.textContent = 'error de conexión'; }
+}
+
+(async () => {
+  try {
+    const r = await fetch('api/identidad/catalogos');
+    if (!r.ok) { $('sub').textContent = 'error'; return; }
+    CAT = await r.json();
+    pintar();
+    if (window.lucide) lucide.createIcons();
+  } catch (e) { $('sub').textContent = 'error al cargar'; }
+})();
+</script>
+</body>
+</html>

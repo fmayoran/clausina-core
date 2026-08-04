@@ -715,6 +715,41 @@ app.put('/api/identidad', async (req, res) => {
   try { res.json(await db.guardarIdentidad(req.negocioId, req.body || {}, req.usuario && req.usuario.id)); }
   catch (e) { console.error('guardar identidad', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
+// Qué atributos se le ofrecen a cada rubro. Config de plataforma, no de un negocio.
+app.put('/api/identidad/atributo-mapeo', soloAdmin, async (req, res) => {
+  try {
+    const { codigo, actividades } = req.body || {};
+    if (!codigo) return res.status(400).json({ ok: false, error: 'falta_codigo' });
+    res.json(await db.setMapeoAtributo(String(codigo), actividades));
+  } catch (e) {
+    console.error('atributo-mapeo', e.message);
+    res.status(e.code === 'no_existe' ? 404 : 500).json({ ok: false, error: e.code || 'db' });
+  }
+});
+
+// Geocodificación de sedes contra Nominatim (OpenStreetMap): sin clave y sin costo. Su política
+// pide User-Agent identificable y un pedido por segundo — se cumple porque lo dispara una persona
+// apretando un botón, de a una sede. El resultado NO se guarda solo: se propone y alguien confirma.
+let _geoUltimo = 0;
+app.get('/api/geocodificar', async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (q.length < 5) return res.status(400).json({ error: 'consulta_corta' });
+  const espera = 1100 - (Date.now() - _geoUltimo);
+  if (espera > 0) await new Promise(r => setTimeout(r, espera));
+  _geoUltimo = Date.now();
+  try {
+    const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=ar&q='
+      + encodeURIComponent(q);
+    const r = await fetch(url, { headers: { 'User-Agent': 'ClaUsina/1.0 (panel.clausina.ar)' } });
+    if (!r.ok) return res.status(502).json({ error: 'geocodificador' });
+    const datos = await r.json();
+    res.json({
+      resultados: (datos || []).map(d => ({
+        nombre: d.display_name, lat: Number(d.lat), lon: Number(d.lon), tipo: d.type,
+      })),
+    });
+  } catch (e) { console.error('geocodificar', e.message); res.status(502).json({ error: 'geocodificador' }); }
+});
 
 app.get('/api/perfil', async (req, res) => {
   try { res.json(await db.getPerfil(req.negocioId)); }

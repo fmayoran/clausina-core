@@ -13,6 +13,7 @@
       { id: 'estilo',       label: 'Estilo',            icon: 'palette',          href: 'estilo' },
       { id: 'arquitectura', label: 'Arquitectura',      icon: 'git-fork',         href: 'arquitectura' },
       { id: 'usuarios',     label: 'Usuarios',          icon: 'users',            href: 'usuarios' },
+      { id: 'rubros',       label: 'Rubros y atributos',icon: 'tags',             href: 'rubros' },
     ],
     'Negocio activo': [
       { id: 'propuestas', label: 'Propuestas',       icon: 'lightbulb',   href: 'propuestas' },
@@ -172,7 +173,7 @@
   // Secciones que son de la plataforma, no de un negocio: sólo el admin las ve.
   // 'inicio' es el tablero de la agencia (consume /api/agencia, /api/maquinas, alta de negocios):
   // para un usuario de negocio no tiene nada, así que además lo mandamos a la home de SU negocio.
-  var NAV_ADMIN = ['inicio', 'maquinas', 'negocios', 'arquitectura', 'usuarios'];
+  var NAV_ADMIN = ['inicio', 'maquinas', 'negocios', 'arquitectura', 'usuarios', 'rubros'];
 
   function aplicarPermisos(active) {
     return fetch('api/yo').then(function (r) { return r.ok ? r.json() : null; }).then(function (yo) {
