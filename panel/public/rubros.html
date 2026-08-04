@@ -18,14 +18,14 @@
   .card2{background:var(--u-surf);border:1px solid var(--u-line);border-radius:16px;padding:24px;margin-bottom:18px;}
   .sec{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;
        color:var(--u-mut);border-bottom:1px solid var(--u-line);padding-bottom:8px;margin:0 0 18px;}
-  .fila{display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:start;
-        padding:13px 0;border-bottom:1px solid var(--u-line);}
+  .fila{display:grid;grid-template-columns:158px 1fr;gap:14px;align-items:center;
+        padding:11px 0;border-bottom:1px solid var(--u-line);}
   .fila:last-child{border-bottom:0;}
   @media(max-width:720px){.fila{grid-template-columns:1fr;gap:8px;}}
   .anom{font-size:.92rem;}
   .acod{font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--u-mut);display:block;margin-top:2px;}
-  .chips{display:flex;flex-wrap:wrap;gap:7px;}
-  .chip{font-family:'JetBrains Mono',monospace;font-size:.64rem;padding:5px 11px;border-radius:999px;
+  .chips{display:flex;flex-wrap:wrap;gap:5px;}
+  .chip{font-family:'JetBrains Mono',monospace;font-size:.6rem;padding:5px 9px;border-radius:999px;
         border:1px solid var(--u-line);color:var(--u-mut);cursor:pointer;user-select:none;transition:.15s;background:none;}
   .chip:hover{color:var(--u-fg);border-color:var(--u-fg);}
   .chip.on{color:var(--u-acc);border-color:var(--u-acc);background:color-mix(in srgb,var(--u-acc) 12%,transparent);}
@@ -44,7 +44,7 @@
 </head>
 <body class="bg-paper text-pfg dark:bg-ink dark:text-fg transition-colors">
 <div class="shell">
-  <main class="px-6 md:px-9 py-8 min-w-0" style="max-width:1000px;">
+  <main class="px-6 md:px-9 py-8 min-w-0" style="max-width:1080px;">
     <div class="flex items-baseline gap-3 mb-1">
       <h1 class="display font-bold text-xl tracking-tight">Rubros y atributos</h1>
       <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
