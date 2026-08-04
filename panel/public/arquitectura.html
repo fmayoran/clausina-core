@@ -297,11 +297,11 @@
 
 <section id="datos"><div class="wrap">
   <h2>6 · Modelo de datos</h2>
-  <p class="lead">Base <code>claude</code> (independiente de las apps ajenas en <code>crm</code>), schema <code>contenido</code>. Multi-negocio: un negocio = una fila en <code>negocectos</code>; el resto cuelga de ahí.</p>
+  <p class="lead">Base <code>claude</code> (independiente de las apps ajenas en <code>crm</code>), schema <code>contenido</code>. Multi-negocio: un negocio = una fila en <code>negocios</code>; el resto cuelga de ahí.</p>
   <div class="erd">
     <div class="row">
       <div class="ent">
-        <div class="t">proyectos</div>
+        <div class="t">negocios</div>
         <div class="f">slug · nombre<br>ig_user_id · ig_handle<br>dominio_web · telegram_chat_id</div>
       </div>
       <span class="arrow">→</span>
@@ -332,6 +332,7 @@
     <li><b>Estados</b> (<code>estado_pub</code>): borrador → pendiente_aprobacion → aprobada → publicada · más rechazada y descartada. <code>derivado_en</code> marca lo escalado a Fer.</li>
     <li><b>Triggers:</b> <code>sync_pieza</code> mantiene <code>estado</code> y <code>revision_vigente</code> de la pieza. DDL en <code>scripts/db/</code>.</li>
     <li><b>Pauta:</b> <code>ads_snapshot</code> + <code>ads_daily</code> (reporte y evolución), <code>campanias</code> + <code>solicitudes_campania</code> (propuestas y creación en Meta), <code>pauta_sync_req</code> (refresco on-demand). Secretos de ads en <code>marcas/&lt;slug&gt;/&lt;slug&gt;.env</code>, nunca en la DB.</li>
+    <li><b>Identidad en dos capas (v2.0):</b> la <b>narrativa</b> vive en <code>negocio_perfil</code> (<code>brief_md</code>, <code>estilo_md</code>) y la lee el creativo; los <b>hechos</b> viven en <code>negocio_identidad</code> + <code>negocio_sede</code> y los consulta una máquina. La actividad sale de una taxonomía curada (<code>actividad</code>) y los atributos de un vocabulario controlado (<code>atributo</code>): si cada negocio escribiera el suyo, el filtro no encontraría nada. <code>revisado_en</code> en NULL = ficha propuesta, sin confirmar por una persona.</li>
     <li><b>Biblioteca:</b> <code>biblioteca_carpeta</code> + <code>biblioteca_item</code> (DAM) y <code>solicitudes_biblioteca</code> (bibliotecario). El material adjunto a un pedido de propuestas vive en <code>solicitud_propuesta_material</code> y se traslada al requerimiento generado.</li>
   </ul>
 </div></section>
@@ -374,6 +375,10 @@
   <table>
     <thead><tr><th>Pendiente</th><th>Detalle</th><th>Estado</th></tr></thead>
     <tbody>
+      <tr><td>v2.0 · F2 a F7</td><td>Sigue el plan de <code>core/planes/V2.md</code>: catálogo de capacidades con grupo (F2), clientes (F3), reservas de punta a punta en un negocio (F4), puente del call to action (F5), productos y órdenes (F6), catálogo MCP para agentes externos (F7).</td><td><span class="st warn">en curso</span></td></tr>
+      <tr><td>Fichas de identidad sin confirmar</td><td>Los 8 negocios tienen ficha <b>propuesta</b>, extraída de sus briefs. Falta que una persona las confirme y que cada negocio aporte su <b>ticket</b> (ningún brief declara precios).</td><td><span class="st pend">pendiente</span></td></tr>
+      <tr><td>Geocodificar las sedes</td><td><code>ardora-sport</code> y <code>set-point-wilde</code> definen su zona por <b>radio</b>, que sin lat/lon no se puede resolver. O se geocodifica antes de F7, o pasan a lista de localidades.</td><td><span class="st pend">pendiente</span></td></tr>
+      <tr><td>Actividad secundaria por negocio</td><td>Hoy es una sola: FarmaNobel es farmacia <i>y</i> perfumería y quedó como farmacia. Conviene resolverlo antes de exponer el catálogo.</td><td><span class="st pend">pendiente</span></td></tr>
       <tr><td>Cola Redis a toda la plataforma</td><td>Extender la corrección por cola+worker (hoy piloto Cortafuego) a todas los negocios.</td><td><span class="st warn">en curso</span></td></tr>
       <tr><td>Media store con CDN</td><td>Store único fronteado con Cloudflare (<code>media.clausina.ar</code>); sacar el material de publicaciones del repo de la landing.</td><td><span class="st pend">pendiente</span></td></tr>
       <tr><td>API REST de Higgsfield en n8n</td><td>Generación automática dentro del pipeline (async con webhook), manteniendo a Fer por calidad/NSFW.</td><td><span class="st pend">pendiente</span></td></tr>
@@ -392,6 +397,7 @@
   <table class="chg">
     <thead><tr><th>Fecha</th><th>Cambio</th></tr></thead>
     <tbody>
+      <tr><td>2026-08-04</td><td><b>v2.0 · F1 — Identidad estructurada.</b> Arranca la v2.0 (<code>core/planes/V2.md</code>): la plataforma se reorganiza en <b>identidad / comunicación / capacidades operativas</b>, tres grupos con ritmos de cambio y modos de falla distintos — la comunicación se apoya en la compuerta humana y es recuperable; las operaciones no toleran ese diseño porque una reserva mal tomada cuesta plata. Esta fase construye la base: la identidad, que hasta hoy era <b>sólo prosa</b> en el brief, ahora tiene además una capa consultable (actividad, sedes, zona de influencia, ticket, público, atributos). Es lo único de toda la v2 caro de retrofitear: sin ella, la búsqueda "parrilla, de noche, en Berazategui, $30-50k por persona" no se puede resolver. Los 8 negocios quedaron con ficha <b>propuesta</b>, extraída de sus propios briefs. <b>Sin ticket ni coordenadas a propósito</b>: ningún brief dice precios y no hay geocodificador — inventarlos en los campos que deciden si un negocio aparece en una búsqueda sería peor que dejarlos vacíos. Dos decisiones de correctitud: las <b>sedes conservan su id</b> entre guardados (en F4 una reserva va a apuntar a una sede) y la <b>sede principal única</b> la garantiza un índice en la base, no el panel.</td></tr>
       <tr><td>2026-08-03</td><td><b>WhatsApp: canal hacia el cliente.</b> Número propio de ClaUsina (<b>+54 9 11 7261-3604</b>, Cloud API). El usuario del negocio escribe primero — eso abre la ventana de 24 h y la respuesta es libre y sin costo; las plantillas pagas sólo se necesitan cuando ClaUsina inicia. Webhook en el <b>panel</b> (no n8n), con firma de Meta validada y bitácora de entrantes y salientes. El canal <b>autentica</b>, <code>contenido.usuario</code> <b>autoriza</b>. <b>Trampa cara:</b> son <b>tres</b> suscripciones distintas (URL+token en la app; la cuenta de WhatsApp suscripta a la app; la app suscripta al campo <code>messages</code>) y el webhook figura validado con luz verde aunque falten dos. Los números se normalizan antes de comparar (la misma línea estaba cargada con y sin el 9) y hay índice único: un número, un usuario.</td></tr>
       <tr><td>2026-08-02</td><td><b>Usuarios, autenticación y roles.</b> Antes había <b>una contraseña compartida</b> y el negocio activo salía de una cookie que el servidor <i>no validaba</i>: editarla daba acceso al negocio de otro. Ahora <code>usuario</code> + <code>usuario_negocio</code> (N:N), roles <b>admin / aprobador / editor</b>, y el middleware valida el slug contra los permisos — al estar en un solo lugar cubre las 67 rutas sin tocarlas. Se entra con <b>Google (OIDC)</b> o contraseña propia; el SSO autentica pero el acceso lo sigue dando la base, lo que reemplaza al alta libre. <b>Alta por invitación</b> por mail desde <code>hola@clausina.ar</code>, con enlace de un solo uso; la persona completa su WhatsApp en el primer ingreso. <b>Telegram pasa a ser la consola del operador</b>: el bot descarta cualquier chat no autorizado.</td></tr>
       <tr><td>2026-08-02</td><td><b>Correo propio en clausina.ar.</b> Google Workspace con MX, SPF, DKIM y DMARC aplicados por API sobre Cloudflare (<code>dns_workspace.sh</code>). Los avisos y las invitaciones dejan de salir de una casilla de Gmail. <b>Trampa:</b> en un mismo nombre conviven varios TXT y reemplazar "el primero" borró el de verificación de Google — se emparejan por familia.</td></tr>
