@@ -862,12 +862,25 @@ async function borrarTodosLosClientes(negocioId) {
 // que se acepte una reserva para dentro de un rato o se rechace una válida.
 const TZ = 'America/Argentina/Buenos_Aires';
 
+// La capacidad se mide en la unidad que use el negocio: cubiertos en una parrilla, canchas en un
+// complejo, cupos en un curso. La reserva se pide en esa misma unidad.
+const UNIDADES = [
+  { id: 'personas',  sing: 'persona',  plur: 'personas'  },
+  { id: 'cubiertos', sing: 'cubierto', plur: 'cubiertos' },
+  { id: 'canchas',   sing: 'cancha',   plur: 'canchas'   },
+  { id: 'mesas',     sing: 'mesa',     plur: 'mesas'     },
+  { id: 'lugares',   sing: 'lugar',    plur: 'lugares'   },
+  { id: 'cupos',     sing: 'cupo',     plur: 'cupos'     },
+];
+
 const CFG_RESERVAS = {
   anticipacion_max_dias: 30,   // hasta cuándo se puede reservar hacia adelante
   anticipacion_min_horas: 2,   // cuánto antes, como mínimo (no es lo mismo que lo anterior)
-  personas_min: 1,
-  personas_max: 12,
-  tolerancia_min: 15,          // cuánto se sostiene la mesa pasada la hora reservada
+  unidad: 'personas',
+  cantidad_min: 1,
+  cantidad_max: 12,
+  // Se cuenta DESDE EL INICIO DEL TURNO: la reserva es por turno completo, no por una hora suelta.
+  tolerancia_min: 15,
 };
 
 async function getConfigReservas(negocioId) {
@@ -890,12 +903,13 @@ async function guardarConfigReservas(negocioId, d, esAdmin) {
     ...actual,
     anticipacion_max_dias:  num(d.anticipacion_max_dias,  actual.anticipacion_max_dias,  1, 365),
     anticipacion_min_horas: num(d.anticipacion_min_horas, actual.anticipacion_min_horas, 0, 720),
-    personas_min:           num(d.personas_min,           actual.personas_min,           1, 1000),
-    personas_max:           num(d.personas_max,           actual.personas_max,           1, 1000),
+    cantidad_min:           num(d.cantidad_min,           actual.cantidad_min,           1, 100000),
+    cantidad_max:           num(d.cantidad_max,           actual.cantidad_max,           1, 100000),
     tolerancia_min:         num(d.tolerancia_min,         actual.tolerancia_min,         0, 480),
+    unidad: UNIDADES.some(u => u.id === d.unidad) ? d.unidad : (actual.unidad || 'personas'),
     auto_confirmar:         !!d.auto_confirmar,
   };
-  if (cfg.personas_min > cfg.personas_max) cfg.personas_min = cfg.personas_max;
+  if (cfg.cantidad_min > cfg.cantidad_max) cfg.cantidad_min = cfg.cantidad_max;
   if (esAdmin && ['clausina', 'externo'].includes(d.fuente_verdad)) cfg.fuente_verdad = d.fuente_verdad;
   await pool.query(
     `INSERT INTO contenido.negocio_capacidad (negocio_id, capacidad, habilitada, config, actualizado_en)
@@ -1006,7 +1020,7 @@ async function getDisponibilidad(negocioId, desde, hasta) {
        FROM dias
        JOIN t ON EXTRACT(isodow FROM dias.fecha)::smallint = ANY(t.dias)
        LEFT JOIN LATERAL (
-         SELECT sum(personas)::int AS ocupado, count(*)::int AS reservas
+         SELECT sum(cantidad)::int AS ocupado, count(*)::int AS reservas
            FROM contenido.reserva rr
           WHERE rr.negocio_id=$1 AND rr.turno_id=t.id AND rr.fecha=dias.fecha
             AND rr.estado IN ('solicitada','confirmada','cumplida')) r ON true
@@ -1025,15 +1039,16 @@ async function getReservas(negocioId, { desde, hasta, estado } = {}) {
   if (desde && hasta) { params.push(desde, hasta); filtro += ` AND r.fecha BETWEEN $2::date AND $3::date`; }
   if (estado) { params.push(estado); filtro += ` AND r.estado = $${params.length}`; }
   const { rows } = await pool.query(
-    `SELECT r.id, r.fecha::text, to_char(r.hora,'HH24:MI') AS hora, r.personas, r.estado, r.canal,
+    `SELECT r.id, r.fecha::text, r.cantidad, r.estado, r.canal,
             r.notas, r.agente_id, r.ref_externa, r.creado_en,
             r.turno_id, t.nombre AS turno,
+            to_char(t.hora_desde,'HH24:MI') AS hora_desde, to_char(t.hora_hasta,'HH24:MI') AS hora_hasta,
             r.cliente_id, c.nombre AS cliente, c.telefono, c.email
        FROM contenido.reserva r
        JOIN contenido.turno t ON t.id = r.turno_id
        JOIN contenido.cliente c ON c.id = r.cliente_id
       WHERE r.negocio_id=$1${filtro}
-      ORDER BY r.fecha DESC, r.hora DESC`, params);
+      ORDER BY r.fecha DESC, t.hora_desde DESC`, params);
   return rows;
 }
 
@@ -1069,12 +1084,11 @@ async function _resolverCliente(cli, negocioId, d) {
 
 async function crearReserva(negocioId, d) {
   const cfg = await getConfigReservas(negocioId);
-  const personas = +d.personas || 0;
-  if (personas < cfg.personas_min || personas > cfg.personas_max) {
-    const e = new Error('personas fuera de rango'); e.code = 'personas_fuera'; e.detalle = cfg; throw e;
+  const cantidad = +d.cantidad || 0;
+  if (cantidad < cfg.cantidad_min || cantidad > cfg.cantidad_max) {
+    const e = new Error('cantidad fuera de rango'); e.code = 'cantidad_fuera'; e.detalle = cfg; throw e;
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha || '')) { const e = new Error('fecha'); e.code = 'fecha_invalida'; throw e; }
-  if (!/^\d{1,2}:\d{2}$/.test(d.hora || '')) { const e = new Error('hora'); e.code = 'hora_invalida'; throw e; }
 
   // Una reserva creada por un agente externo entra como SOLICITADA, nunca confirmada, salvo que
   // el negocio active auto_confirmar. Es el principio de la plataforma —nada sale sin visto
@@ -1103,18 +1117,13 @@ async function crearReserva(negocioId, d) {
     const { rows: [dw] } = await cli.query(`SELECT EXTRACT(isodow FROM $1::date)::int AS d`, [d.fecha]);
     if (!t.dias.includes(dw.d)) { const e = new Error('día'); e.code = 'turno_no_aplica'; throw e; }
 
-    // La hora tiene que caer dentro de la ventana del turno.
-    const hhmm = d.hora.padStart(5, '0');
-    if (hhmm < t.hora_desde || hhmm >= t.hora_hasta) {
-      const e = new Error('hora fuera del turno'); e.code = 'hora_fuera'; e.detalle = t; throw e;
-    }
-
-    // Anticipación, en hora local: mínima (no reservar para dentro de un rato) y máxima.
+    // La reserva es por turno completo, así que la anticipación se mide contra el INICIO del
+    // turno. Es el mismo momento desde el que corre la tolerancia.
     const { rows: [v] } = await cli.query(
       `SELECT (($1::date + $2::time) AT TIME ZONE $3) AS cuando,
               now() + ($4 || ' hours')::interval AS piso,
               now() + ($5 || ' days')::interval  AS techo`,
-      [d.fecha, hhmm, TZ, String(cfg.anticipacion_min_horas), String(cfg.anticipacion_max_dias)]);
+      [d.fecha, t.hora_desde, TZ, String(cfg.anticipacion_min_horas), String(cfg.anticipacion_max_dias)]);
     if (v.cuando < v.piso) { const e = new Error('muy sobre la hora'); e.code = 'muy_pronto'; e.detalle = cfg; throw e; }
     if (v.cuando > v.techo) { const e = new Error('demasiado lejos'); e.code = 'muy_lejos'; e.detalle = cfg; throw e; }
 
@@ -1127,12 +1136,12 @@ async function crearReserva(negocioId, d) {
 
     // Capacidad, ya bajo lock.
     const { rows: [o] } = await cli.query(
-      `SELECT COALESCE(sum(personas),0)::int AS ocupado FROM contenido.reserva
+      `SELECT COALESCE(sum(cantidad),0)::int AS ocupado FROM contenido.reserva
         WHERE negocio_id=$1 AND turno_id=$2 AND fecha=$3::date
           AND estado IN ('solicitada','confirmada','cumplida')`,
       [negocioId, d.turno_id, d.fecha]);
     const libre = t.capacidad - o.ocupado;
-    if (personas > libre) {
+    if (cantidad > libre) {
       const e = new Error('sin lugar'); e.code = 'sin_lugar';
       e.detalle = { capacidad: t.capacidad, ocupado: o.ocupado, libre }; throw e;
     }
@@ -1140,14 +1149,14 @@ async function crearReserva(negocioId, d) {
     const clienteId = await _resolverCliente(cli, negocioId, d);
     const { rows: [r] } = await cli.query(
       `INSERT INTO contenido.reserva
-         (negocio_id, cliente_id, turno_id, fecha, hora, personas, estado, canal, agente_id, notas, ref_externa)
-       VALUES ($1,$2,$3,$4::date,$5::time,$6,$7,$8,$9,$10,$11) RETURNING id`,
-      [negocioId, clienteId, d.turno_id, d.fecha, hhmm, personas, estado, canal,
+         (negocio_id, cliente_id, turno_id, fecha, cantidad, estado, canal, agente_id, notas, ref_externa)
+       VALUES ($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10) RETURNING id`,
+      [negocioId, clienteId, d.turno_id, d.fecha, cantidad, estado, canal,
        String(d.agente_id || '').trim() || null, String(d.notas || '').trim() || null,
        String(d.ref_externa || '').trim() || null]);
 
     await cli.query('COMMIT');
-    return { ok: true, id: r.id, estado, libre: libre - personas };
+    return { ok: true, id: r.id, estado, libre: libre - cantidad };
   } catch (e) {
     await cli.query('ROLLBACK'); throw e;
   } finally { cli.release(); }
@@ -2090,7 +2099,7 @@ module.exports = {
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
   getClientes, crearCliente, actualizarCliente, borrarCliente, exportarClientes, borrarTodosLosClientes,
-  getConfigReservas, guardarConfigReservas, getTurnos, guardarTurno, borrarTurno,
+  getConfigReservas, guardarConfigReservas, UNIDADES, getTurnos, guardarTurno, borrarTurno,
   getBloqueos, crearBloqueo, borrarBloqueo,
   getDisponibilidad, getReservas, crearReserva, cambiarEstadoReserva,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,

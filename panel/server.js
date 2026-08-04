@@ -702,8 +702,8 @@ app.post('/api/capacidades/:cap', soloAdmin, async (req, res) => {
 });
 
 // --- Reservas (v2.0 / F4) ---------------------------------------------------------------
-const RES_ERR = new Set(['personas_fuera','fecha_invalida','hora_invalida','turno_invalido',
-  'turno_no_aplica','hora_fuera','muy_pronto','muy_lejos','bloqueado','sin_lugar','sin_cliente',
+const RES_ERR = new Set(['cantidad_fuera','fecha_invalida','turno_invalido',
+  'turno_no_aplica','muy_pronto','muy_lejos','bloqueado','sin_lugar','sin_cliente',
   'cliente_invalido','sin_nombre','sin_dias','horario_invalido','ya_bloqueado','con_reservas',
   'estado_invalido']);
 const resError = (res, e, donde) => {
@@ -725,7 +725,7 @@ function rango(req, porDefecto = 42) {
 app.get('/api/reservas/config', async (req, res) => {
   try {
     const [cfg, turnos] = await Promise.all([db.getConfigReservas(req.negocioId), db.getTurnos(req.negocioId)]);
-    res.json({ config: cfg, turnos });
+    res.json({ config: cfg, turnos, unidades: db.UNIDADES });
   } catch (e) { console.error('reservas-config', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.put('/api/reservas/config', async (req, res) => {
