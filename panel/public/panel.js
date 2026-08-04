@@ -973,3 +973,44 @@ async function initMarca(){
   // El cambio de proyecto se hace desde el dashboard de la Agencia (no hay selector en las páginas).
 }
 initMarca();
+
+
+/* ── Configuración de capacidad (v2.0/F2) ────────────────────────────────────
+   Los IDs de red/ads viven en columnas del negocio y se leen y escriben por
+   /api/perfil. TRAMPA: guardarPerfil() pisa TODAS las columnas del negocio y del
+   perfil, así que mandar un cuerpo parcial borraría el brief, el estilo y los
+   contactos. Por eso se relee el perfil completo y se fusionan sólo los campos
+   editados justo antes de escribir. */
+const CFG_CAMPOS_TODOS = ['nombre','slogan','ig_handle','dominio_web','email','whatsapp',
+  'ig_user_id','telegram_chat_id','logo','brief_md','estilo_md',
+  'meta_ads_account_id','meta_ads_page_id','meta_ads_ig_id'];
+async function cfgCargar(ids, tokens) {
+  try {
+    const p = await fetch('api/perfil').then(r => r.json());
+    ids.forEach(id => { const e = document.getElementById(id); if (e) e.value = p[id] || ''; });
+    (tokens || []).forEach(t => {
+      const e = document.getElementById(t.id); if (!e) return;
+      e.value = '';
+      e.placeholder = p[t.flag] ? '•••••••• configurado (vacío = no cambia)' : 'pegá el token';
+    });
+  } catch (_) {}
+}
+async function cfgGuardar(ids, tokens) {
+  try {
+    const actual = await fetch('api/perfil').then(r => r.json());
+    const body = {};
+    CFG_CAMPOS_TODOS.forEach(c => { body[c] = actual[c] || ''; });
+    body.gestion = actual.gestion; body.prefijo = actual.prefijo;
+    ids.forEach(id => { const e = document.getElementById(id); if (e) body[id] = e.value; });
+    (tokens || []).forEach(t => {
+      const e = document.getElementById(t.id);
+      const v = e ? String(e.value || '').trim() : '';
+      if (v) body[t.campo] = v;                      // vacío = no cambia
+    });
+    const d = await fetch('api/perfil', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body) }).then(r => r.json());
+    toast(d.ok ? 'Configuración guardada'
+      : (d.error === 'no_enc_key' ? 'Falta configurar APP_ENC_KEY en el panel' : 'No se pudo guardar'), !d.ok);
+    return !!d.ok;
+  } catch (e) { toast('Error de conexión', true); return false; }
+}

@@ -258,3 +258,15 @@ header .marcasel:hover{border-color:var(--fire);}
 .cpick.on{border-color:var(--fire);}
 .cpick img{width:100%;height:100%;object-fit:cover;}
 .cpick-n{position:absolute;left:4px;bottom:4px;font-family:'JetBrains Mono',monospace;font-size:.56rem;background:rgba(0,0,0,.72);color:#fff;padding:1px 5px;border-radius:5px;}
+
+/* ── Configuración de una capacidad (modal en Instagram, Pauta…) ──────────────
+   Los campos vivían en Perfil; con la v2.0 la configuración va con su capacidad. */
+.cfgfld{display:flex;flex-direction:column;gap:5px;margin-bottom:13px;}
+.cfgfld label{font-family:'JetBrains Mono',monospace;font-size:.62rem;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--ember,#CCF24D);}
+.cfgfld input{background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);
+  font-family:'Inter',sans-serif;font-size:.95rem;padding:9px 11px;outline:none;width:100%;}
+.cfgfld input:focus{border-color:var(--ember,#CCF24D);}
+.cfgfld .cfghint{font-family:'JetBrains Mono',monospace;font-size:.56rem;color:var(--ash);
+  text-transform:none;letter-spacing:0;}
+.cfgsep{border-top:1px solid var(--line);padding-top:12px;margin-top:4px;}

@@ -18,6 +18,7 @@
     <span class="upd" id="upd"></span>
     <nav>
       <a href="proyecto">← Proyecto</a>
+      <a href="#" onclick="cfgIG(true);return false;" title="Configurar la cuenta de Instagram">Configurar</a>
       <button class="logout" onclick="salir()">Salir</button>
     </nav>
   </header>
@@ -27,11 +28,35 @@
     <div class="col pend"><h2><span class="dot"></span>Pendiente de aprobación <span class="n" id="n-pend"></span></h2><div class="cards" id="c-pend"></div></div>
     <div class="col pub"><h2><span class="dot"></span>Publicada <span class="n" id="n-pub"></span></h2><div class="cards" id="c-pub"></div></div>
   </div>
+
+  <!-- Configuración de la capacidad: antes vivía en Perfil > Redes (v2.0/F2). -->
+  <div id="cfgmodal" class="modal hidden">
+    <div class="modal-bg" onclick="cfgIG(false)"></div>
+    <div class="modal-box">
+      <div class="modal-head"><div class="modal-tt">Cuenta de Instagram</div><button class="modal-x" onclick="cfgIG(false)" title="Cerrar">×</button></div>
+      <div class="modal-body">
+        <div class="cfgfld"><label>Cuenta <span class="cfghint">— con @</span></label><input type="text" id="ig_handle" placeholder="@cuenta"></div>
+        <div class="cfgfld"><label>IG User ID</label><input type="text" id="ig_user_id"></div>
+        <div class="cfgfld"><label>Token de Instagram <span class="cfghint">— se guarda cifrado; no se muestra</span></label><input type="password" id="ig_token" autocomplete="off"></div>
+      </div>
+      <div class="modal-foot"><button class="ibtn" onclick="cfgIGGuardar()">Guardar</button><button class="ibtn ghost" onclick="cfgIG(false)">Cerrar</button></div>
+    </div>
+  </div>
 </main></div>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="shell.js"></script>
 <script>ClausinaShell({active:'instagram',cap:'instagram',darkOnly:true});</script>
 <script src="panel.js"></script>
-<script>currentLoad=loadInstagram; loadInstagram(); setInterval(loadInstagram,6000);</script>
+<script>
+currentLoad=loadInstagram; loadInstagram(); setInterval(loadInstagram,6000);
+const IG_IDS=['ig_handle','ig_user_id'];
+const IG_TOKENS=[{id:'ig_token',flag:'ig_token_set',campo:'ig_token'}];
+function cfgIG(abrir){
+  const m=document.getElementById('cfgmodal');
+  m.classList.toggle('hidden',!abrir);
+  if(abrir) cfgCargar(IG_IDS, IG_TOKENS);
+}
+async function cfgIGGuardar(){ if(await cfgGuardar(IG_IDS, IG_TOKENS)) cfgIG(false); }
+</script>
 </body>
 </html>

@@ -18,6 +18,7 @@
     <span class="upd" id="upd"></span>
     <nav>
       <a href="proyecto">← Proyecto</a>
+      <a href="#" onclick="cfgAds(true);return false;" title="Configurar la cuenta de Meta Ads">Configurar</a>
       <button class="logout" onclick="salir()">Salir</button>
     </nav>
   </header>
@@ -59,11 +60,36 @@
       <div class="modal-foot"><button class="btn no" onclick="closeAsk()">Cancelar</button><button class="btn ok" onclick="pedirCampania()">Pedir</button></div>
     </div>
   </div>
+
+  <!-- Configuración de la capacidad: antes vivía en Perfil > Redes (v2.0/F2). -->
+  <div id="cfgmodal" class="modal hidden">
+    <div class="modal-bg" onclick="cfgAds(false)"></div>
+    <div class="modal-box">
+      <div class="modal-head"><div class="modal-tt">Cuenta de Meta Ads</div><button class="modal-x" onclick="cfgAds(false)" title="Cerrar">×</button></div>
+      <div class="modal-body">
+        <div class="cfgfld"><label>Ad Account ID <span class="cfghint">— solo el número</span></label><input type="text" id="meta_ads_account_id" placeholder="2233685384046448"></div>
+        <div class="cfgfld"><label>Page ID <span class="cfghint">— Página de Facebook</span></label><input type="text" id="meta_ads_page_id"></div>
+        <div class="cfgfld"><label>IG account ID (ads)</label><input type="text" id="meta_ads_ig_id"></div>
+        <div class="cfgfld cfgsep"><label>Token de Meta Ads <span class="cfghint">— se guarda cifrado; no se muestra</span></label><input type="password" id="meta_ads_token" autocomplete="off"></div>
+      </div>
+      <div class="modal-foot"><button class="ibtn" onclick="cfgAdsGuardar()">Guardar</button><button class="ibtn ghost" onclick="cfgAds(false)">Cerrar</button></div>
+    </div>
+  </div>
 </main></div>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="shell.js"></script>
 <script>ClausinaShell({active:'pauta',cap:'pauta',darkOnly:true});</script>
 <script src="panel.js"></script>
-<script>currentLoad=loadPauta; loadPauta(); setInterval(loadPauta,60000);</script>
+<script>
+currentLoad=loadPauta; loadPauta(); setInterval(loadPauta,60000);
+const ADS_IDS=['meta_ads_account_id','meta_ads_page_id','meta_ads_ig_id'];
+const ADS_TOKENS=[{id:'meta_ads_token',flag:'meta_ads_token_set',campo:'meta_ads_token'}];
+function cfgAds(abrir){
+  const m=document.getElementById('cfgmodal');
+  m.classList.toggle('hidden',!abrir);
+  if(abrir) cfgCargar(ADS_IDS, ADS_TOKENS);
+}
+async function cfgAdsGuardar(){ if(await cfgGuardar(ADS_IDS, ADS_TOKENS)) cfgAds(false); }
+</script>
 </body>
 </html>

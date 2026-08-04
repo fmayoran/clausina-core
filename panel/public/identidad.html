@@ -151,7 +151,6 @@
       <button class="tab" data-pane="marca">Marca y contacto<span class="badge" id="b-marca"></span></button>
       <button class="tab" data-pane="brief">Brief<span class="badge" id="b-brief"></span></button>
       <button class="tab" data-pane="estilo">Estilo<span class="badge" id="b-estilo"></span></button>
-      <button class="tab" data-pane="redes">Redes<span class="badge" id="b-redes"></span></button>
     </div>
 
     <!-- ══════════ FICHA (estructurada) ══════════ -->
@@ -336,32 +335,6 @@
       <div class="bar"><button class="btn" onclick="guardarPerfil()">Guardar</button></div>
     </div>
 
-    <!-- ══════════ REDES ══════════ -->
-    <div class="pane" id="p-redes">
-      <div class="card2">
-        <div class="sec">Instagram</div>
-        <div class="grid2">
-          <div><label for="ig_handle">Cuenta <span class="hint">— con @</span></label><input type="text" id="ig_handle" placeholder="@cuenta"></div>
-          <div><label for="ig_user_id">IG User ID</label><input type="text" id="ig_user_id"></div>
-          <div class="full"><label for="ig_token">Token de Instagram <span class="hint">— se guarda cifrado; no se muestra</span></label><input type="password" id="ig_token" autocomplete="off" placeholder="pegá el token"></div>
-        </div>
-      </div>
-      <div class="card2">
-        <div class="sec">Meta Ads <span style="text-transform:none;letter-spacing:0;">— publicidad en Instagram (opcional)</span></div>
-        <div class="grid2">
-          <div><label for="meta_ads_account_id">Ad Account ID <span class="hint">— solo el número</span></label><input type="text" id="meta_ads_account_id" placeholder="2233685384046448"></div>
-          <div><label for="meta_ads_page_id">Page ID <span class="hint">— Página de Facebook</span></label><input type="text" id="meta_ads_page_id"></div>
-          <div><label for="meta_ads_ig_id">IG account ID (ads)</label><input type="text" id="meta_ads_ig_id"></div>
-          <div><label for="meta_ads_token">Token de Meta Ads <span class="hint">— se guarda cifrado; no se muestra</span></label><input type="password" id="meta_ads_token" autocomplete="off" placeholder="pegá el token"></div>
-        </div>
-      </div>
-      <div class="bar"><button class="btn" onclick="guardarPerfil()">Guardar</button></div>
-      <p class="mono text-[11px] text-pmut dark:text-mut mt-3" style="max-width:70ch;line-height:1.6;">
-        Estrictamente esto es configuración de los canales, no identidad. Vive acá porque es
-        donde se cargaba hasta ahora; cuando las capacidades tengan su propia configuración,
-        se muda con Instagram y Pauta.
-      </p>
-    </div>
   </main>
 </div>
 
@@ -614,7 +587,6 @@ function fval(id) { const e = $(id); return e ? String(e.value || '').trim() : '
 function marcarSolapas() {
   const set = (id, ok) => { const b = $('b-' + id); if (b) b.className = 'badge ' + (ok ? 'si' : 'no'); };
   set('marca', !!fval('nombre') && !!fval('slogan'));
-  set('redes', !!fval('ig_handle'));
   set('brief', fval('brief_md').length > 20);
   set('estilo', fval('estilo_md').length > 20);
 }
@@ -624,9 +596,6 @@ async function cargarPerfil() {
     const r = await fetch('api/perfil'); if (r.status === 401) { location.href = 'login'; return; }
     const p = await r.json();
     CAMPOS.forEach(c => { const el = $(c); if (el) el.value = p[c] || ''; });
-    // Tokens: write-only, nunca se muestran. Placeholder según si están configurados.
-    const tk = $('meta_ads_token'); if (tk) { tk.value = ''; tk.placeholder = p.meta_ads_token_set ? '•••••••• configurado (vacío = no cambia)' : 'pegá el token'; }
-    const it = $('ig_token'); if (it) { it.value = ''; it.placeholder = p.ig_token_set ? '•••••••• configurado (vacío = no cambia)' : 'pegá el token'; }
     mostrarLogo(p.logo || '');
     const g = $('gestion'); if (g) g.value = p.gestion || 'integral';
     const pf = $('prefijo'); if (pf) pf.value = p.prefijo || '';
@@ -637,11 +606,13 @@ async function cargarPerfil() {
 }
 
 async function guardarPerfil() {
-  const body = {}; CAMPOS.forEach(c => { const el = $(c); if (el) body[c] = el.value; });
+  // Los campos de red y ads ya no se editan acá (se mudaron a Instagram y Pauta), pero TIENEN
+  // que viajar igual: guardarPerfil() del backend pisa todas las columnas y omitirlos los borraría.
+  const actual = await fetch('api/perfil').then(r => r.json()).catch(() => ({}));
+  const body = {};
+  CAMPOS.forEach(c => { const el = $(c); body[c] = el ? el.value : (actual[c] || ''); });
   const g = $('gestion'); if (g) body.gestion = g.value;
   const pf = $('prefijo'); if (pf) body.prefijo = pf.value;
-  const tk = fval('meta_ads_token'); if (tk) body.meta_ads_token = tk;   // solo si escribió uno nuevo
-  const it = fval('ig_token'); if (it) body.ig_token = it;
   try {
     const d = await fetch('api/perfil', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body) }).then(r => r.json());
