@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reservar</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Página autocontenida a propósito: se sirve FUERA de la sesión del panel, donde los .js del
+     panel no están disponibles. Tokens propios, del mismo sistema visual. */
+  :root{--surf:#12151A;--bg:#0c0c0a;--line:#20242B;--fg:#F5F2EC;--mut:#8A8F98;
+        --acc:#CCF24D;--accfg:#0c0c0a;--ok:#7BC96F;--mal:#FF6B4A;}
+  @media (prefers-color-scheme: light){
+    :root{--surf:#FFFFFF;--bg:#F7F5F1;--line:#DEDDD3;--fg:#0c0c0a;--mut:#5A616A;
+          --acc:#4d6800;--accfg:#FFFFFF;--ok:#4d6800;--mal:#C4442A;}
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:'Inter',system-ui,sans-serif;
+       line-height:1.55;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:560px;margin:0 auto;padding:32px 20px 60px;}
+  .cab{display:flex;align-items:center;gap:14px;margin-bottom:6px;}
+  .logo{width:52px;height:52px;border-radius:12px;object-fit:contain;background:var(--surf);
+        border:1px solid var(--line);padding:6px;flex:0 0 auto;}
+  h1{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1.5rem;margin:0;letter-spacing:-.01em;}
+  .slogan{color:var(--mut);font-size:.9rem;margin:2px 0 0;}
+  .sede{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--mut);margin:14px 0 26px;}
+  .card{background:var(--surf);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px;}
+  label{display:block;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--mut);margin:0 0 7px;}
+  input[type=text],input[type=tel],input[type=email],select,textarea{
+    width:100%;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:11px 12px;
+    font-family:'Inter',sans-serif;font-size:1rem;color:var(--fg);outline:none;}
+  input:focus,select:focus,textarea:focus{border-color:var(--acc);}
+  textarea{min-height:72px;resize:vertical;}
+  .fila{margin-bottom:16px;}
+  .fila:last-child{margin-bottom:0;}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(max-width:460px){.dos{grid-template-columns:1fr;}}
+  .dias{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch;}
+  .dchip{flex:0 0 auto;border:1px solid var(--line);background:none;border-radius:11px;
+         padding:9px 12px;cursor:pointer;color:var(--fg);text-align:center;min-width:64px;}
+  .dchip .dow{display:block;font-family:'JetBrains Mono',monospace;font-size:.55rem;
+              text-transform:uppercase;letter-spacing:.1em;color:var(--mut);}
+  .dchip .num{display:block;font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1.05rem;}
+  .dchip.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 14%,transparent);}
+  .turnos{display:flex;flex-direction:column;gap:8px;}
+  .tbtn{display:flex;align-items:center;gap:12px;border:1px solid var(--line);background:none;
+        border-radius:11px;padding:12px 14px;cursor:pointer;color:var(--fg);text-align:left;width:100%;}
+  .tbtn:hover{border-color:var(--fg);}
+  .tbtn.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent);}
+  .tbtn b{font-family:'Inter Tight',sans-serif;font-weight:600;font-size:.98rem;}
+  .tbtn .h{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--mut);}
+  .tbtn .q{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--mut);}
+  .btn{width:100%;background:var(--acc);color:var(--accfg);border:0;border-radius:11px;
+       font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1rem;padding:14px;cursor:pointer;}
+  .btn:disabled{opacity:.45;cursor:default;}
+  .chk{display:flex;gap:10px;align-items:flex-start;margin-top:14px;cursor:pointer;
+       font-size:.84rem;color:var(--mut);text-transform:none;letter-spacing:0;}
+  .chk input{width:auto;margin-top:3px;}
+  .msg{font-family:'JetBrains Mono',monospace;font-size:.7rem;margin-top:12px;min-height:1em;color:var(--mal);}
+  .nota{font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--mut);margin-top:8px;line-height:1.6;}
+  .oculto{display:none !important;}
+  .ok{text-align:center;padding:20px 0;}
+  .ok .tick{width:54px;height:54px;border-radius:50%;background:color-mix(in srgb,var(--ok) 18%,transparent);
+            color:var(--ok);display:grid;place-items:center;margin:0 auto 16px;font-size:1.6rem;}
+  .ok h2{font-family:'Inter Tight',sans-serif;font-size:1.2rem;margin:0 0 8px;}
+  .ok p{color:var(--mut);font-size:.92rem;margin:0;}
+  .pie{text-align:center;font-family:'JetBrains Mono',monospace;font-size:.56rem;
+       color:var(--mut);opacity:.65;margin-top:30px;}
+  .pie a{color:inherit;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="cab">
+    <img class="logo oculto" id="logo" alt="">
+    <div>
+      <h1 id="nombre">…</h1>
+      <p class="slogan oculto" id="slogan"></p>
+    </div>
+  </div>
+  <div class="sede oculto" id="sede"></div>
+
+  <div id="form">
+    <div class="card">
+      <div class="fila">
+        <label>Elegí el día</label>
+        <div class="dias" id="dias"></div>
+      </div>
+      <div class="fila">
+        <label>Elegí el turno</label>
+        <div class="turnos" id="turnos"></div>
+      </div>
+      <div class="fila">
+        <label id="lbl-cant">Cantidad</label>
+        <input type="text" id="cantidad" inputmode="numeric" value="2">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="fila"><label for="nom">Tu nombre</label>
+        <input type="text" id="nom" autocomplete="name"></div>
+      <div class="fila"><label for="tel">Tu teléfono</label>
+        <input type="tel" id="tel" autocomplete="tel" placeholder="11 5555-5555"></div>
+      <div class="fila"><label for="notas">Algo que debamos saber <span style="text-transform:none;letter-spacing:0">(opcional)</span></label>
+        <textarea id="notas"></textarea></div>
+      <!-- Trampa para robots: una persona no la ve y no la completa. -->
+      <div class="oculto"><label>No completar</label><input type="text" id="web" tabindex="-1" autocomplete="off"></div>
+      <label class="chk" for="cons">
+        <input type="checkbox" id="cons">
+        Quiero recibir novedades y promociones. Es opcional: la reserva se hace igual.
+      </label>
+    </div>
+
+    <button class="btn" id="enviar" onclick="enviar()">Reservar</button>
+    <div class="msg" id="msg"></div>
+    <div class="nota" id="nota"></div>
+  </div>
+
+  <div class="card oculto" id="listo">
+    <div class="ok">
+      <div class="tick">✓</div>
+      <h2 id="ok-tit">Reserva registrada</h2>
+      <p id="ok-txt"></p>
+    </div>
+  </div>
+
+  <div class="pie">Reservas gestionadas con <a href="https://clausina.ar" target="_blank" rel="noopener">ClaUsina</a></div>
+</div>
+
+<script>
+const SLUG = location.pathname.split('/')[2] || '';
+const CLICK = new URLSearchParams(location.search).get('c') || '';
+const UNI = { personas:['persona','personas'], cubiertos:['cubierto','cubiertos'],
+              canchas:['cancha','canchas'], mesas:['mesa','mesas'],
+              lugares:['lugar','lugares'], cupos:['cupo','cupos'] };
+const DOW = ['dom','lun','mar','mié','jue','vie','sáb'];
+let NEG = null, TURNOS = [], FECHA = null, TURNO = null;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const plural = n => (UNI[NEG.unidad] || UNI.personas)[n === 1 ? 0 : 1];
+
+function pintarDias() {
+  const fechas = [...new Set(TURNOS.map(t => t.fecha))].sort();
+  if (!fechas.length) {
+    $('dias').innerHTML = '<span class="nota">No hay días disponibles por ahora.</span>';
+    return;
+  }
+  if (!FECHA || !fechas.includes(FECHA)) FECHA = fechas[0];
+  $('dias').innerHTML = fechas.map(f => {
+    const d = new Date(f + 'T12:00:00');
+    return `<button class="dchip${f === FECHA ? ' on' : ''}" onclick="elegirDia('${f}')">
+      <span class="dow">${DOW[d.getDay()]}</span><span class="num">${d.getDate()}</span></button>`;
+  }).join('');
+  pintarTurnos();
+}
+function elegirDia(f) { FECHA = f; TURNO = null; pintarDias(); }
+
+function pintarTurnos() {
+  const ts = TURNOS.filter(t => t.fecha === FECHA && t.libre > 0);
+  if (!ts.length) {
+    $('turnos').innerHTML = '<span class="nota">No queda lugar este día. Probá con otro.</span>';
+    TURNO = null; actualizar(); return;
+  }
+  if (!TURNO || !ts.some(t => t.turno_id === TURNO)) TURNO = ts[0].turno_id;
+  $('turnos').innerHTML = ts.map(t => `
+    <button class="tbtn${t.turno_id === TURNO ? ' on' : ''}" onclick="elegirTurno('${t.turno_id}')">
+      <span><b>${esc(t.nombre)}</b><br><span class="h">${t.hora_desde}–${t.hora_hasta}</span></span>
+      <span class="q">${t.libre} ${plural(t.libre)}</span>
+    </button>`).join('');
+  actualizar();
+}
+function elegirTurno(id) { TURNO = id; pintarTurnos(); }
+
+function actualizar() {
+  const t = TURNOS.find(x => x.fecha === FECHA && x.turno_id === TURNO);
+  const tope = Math.min(NEG.cantidad_max, t ? t.libre : NEG.cantidad_max);
+  $('lbl-cant').textContent = 'Cantidad · ' + plural(2);
+  $('nota').textContent = t
+    ? `Hasta ${tope} ${plural(tope)} por reserva. La reserva ocupa el turno completo.` : '';
+  $('enviar').disabled = !TURNO;
+}
+
+async function enviar() {
+  const b = $('enviar'), m = $('msg');
+  m.textContent = ''; b.disabled = true; b.textContent = 'Reservando…';
+  const cuerpo = {
+    turno_id: TURNO, fecha: FECHA, cantidad: parseInt($('cantidad').value, 10) || 0,
+    cliente_nombre: $('nom').value, cliente_telefono: $('tel').value,
+    notas: $('notas').value, consentimiento: $('cons').checked,
+    web: $('web').value, click: CLICK,
+  };
+  try {
+    const r = await fetch(`/api/publico/${encodeURIComponent(SLUG)}/reserva`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+    const j = await r.json();
+    if (r.ok && j.ok) {
+      $('form').classList.add('oculto');
+      $('listo').classList.remove('oculto');
+      $('ok-txt').textContent = j.estado === 'confirmada'
+        ? 'Tu reserva quedó confirmada. Te esperamos.'
+        : 'Recibimos tu pedido. El negocio lo confirma y te avisa.';
+      if (j.estado !== 'confirmada') $('ok-tit').textContent = 'Reserva pedida';
+      window.scrollTo(0, 0);
+      return;
+    }
+    m.textContent = {
+      sin_lugar: 'Se acaba de ocupar ese turno. Probá con otro.',
+      cantidad_fuera: 'Esa cantidad no entra en una sola reserva.',
+      muy_pronto: 'Falta muy poco para ese turno. Elegí uno más adelante.',
+      muy_lejos: 'Todavía no se puede reservar tan adelante.',
+      bloqueado: 'Ese día no está disponible.',
+      sin_cliente: 'Necesitamos tu nombre y tu teléfono.',
+      turno_no_aplica: 'Ese turno no corre ese día.',
+      demasiados_intentos: 'Demasiados intentos. Probá en un rato.',
+    }[j.error] || 'No pudimos tomar la reserva. Probá de nuevo.';
+    if (j.error === 'sin_lugar') cargar();
+  } catch (e) { m.textContent = 'No hay conexión. Probá de nuevo.'; }
+  b.disabled = false; b.textContent = 'Reservar';
+}
+
+async function cargar() {
+  try {
+    const [rn, rd] = await Promise.all([
+      fetch(`/api/publico/${encodeURIComponent(SLUG)}`),
+      fetch(`/api/publico/${encodeURIComponent(SLUG)}/disponibilidad`),
+    ]);
+    if (!rn.ok) { $('nombre').textContent = 'No disponible'; return; }
+    NEG = await rn.json();
+    document.title = 'Reservar en ' + NEG.nombre;
+    $('nombre').textContent = NEG.nombre;
+    if (NEG.slogan) { $('slogan').textContent = NEG.slogan; $('slogan').classList.remove('oculto'); }
+    if (NEG.logo) { $('logo').src = NEG.logo; $('logo').classList.remove('oculto'); }
+    if (NEG.sede) {
+      const s = [NEG.sede.direccion, NEG.sede.localidad, NEG.sede.partido].filter(Boolean).join(' · ');
+      if (s) { $('sede').textContent = s; $('sede').classList.remove('oculto'); }
+    }
+    $('cantidad').value = NEG.cantidad_min || 2;
+    TURNOS = (await rd.json()).turnos || [];
+    pintarDias();
+  } catch (e) { $('nombre').textContent = 'No disponible'; }
+}
+cargar();
+</script>
+</body>
+</html>

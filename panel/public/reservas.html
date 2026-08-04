@@ -127,6 +127,9 @@
   .rchip.s-no_show .pto{background:var(--u-medio);}
   .sinres{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--u-mut);
           opacity:.7;padding:2px 0 8px;}
+  .lcod{font-family:'JetBrains Mono',monospace;font-size:.76rem;color:var(--u-acc);}
+  .lurl{font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--u-mut);}
+  .emb b{color:var(--u-fg);}
   /* Ficha del detalle */
   .ficha{display:grid;grid-template-columns:auto 1fr;gap:9px 16px;margin-top:16px;}
   .ficha dt{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.1em;
@@ -243,6 +246,7 @@
     <div class="tabs" id="tabs">
       <button class="tab on" data-pane="cal">Calendario</button>
       <button class="tab" data-pane="lista">Reservas</button>
+      <button class="tab" data-pane="links">Enlaces</button>
       <button class="tab" data-pane="cfg">Configuración</button>
     </div>
 
@@ -294,6 +298,34 @@
       </div>
     </div>
 
+    <!-- ══════════ ENLACES (puente del CTA) ══════════ -->
+    <div class="pane" id="p-links">
+      <p class="mono text-[11px] text-pmut dark:text-mut mb-5" style="max-width:76ch;line-height:1.6;">
+        Un enlace corto convierte una pieza en una invitación a reservar. Atarlo a la pieza es lo
+        que después permite decir <b>cuántas reservas generó ese posteo</b>.
+      </p>
+      <div class="aviso" id="aviso-publico" style="display:none;">
+        Las reservas de este negocio <b>no están abiertas al público</b>: los enlaces se pueden
+        crear, pero quien los abra no va a poder reservar. Se habilita en Configuración.
+      </div>
+      <div class="card2">
+        <div class="sec">Nuevo enlace</div>
+        <div class="grid3" style="align-items:end;">
+          <div><label for="l-pieza">Pieza</label>
+            <select id="l-pieza"><option value="">Sin pieza — enlace suelto</option></select>
+            <div class="hint">Sin pieza sirve igual: para la bio o un QR en la mesa</div></div>
+          <div><label for="l-etq">Etiqueta</label>
+            <input type="text" id="l-etq" placeholder="Reservá tu mesa"></div>
+          <div><button class="btn" onclick="crearLink()">Crear enlace</button></div>
+        </div>
+        <div class="msg" id="msg-link" style="margin-top:10px;"></div>
+      </div>
+      <div class="card2">
+        <div class="sec">Enlaces creados</div>
+        <div id="links"></div>
+      </div>
+    </div>
+
     <!-- ══════════ CONFIGURACIÓN ══════════ -->
     <div class="pane" id="p-cfg">
       <div class="card2">
@@ -319,6 +351,11 @@
             <div class="hint">Solo administradores.</div>
           </div>
         </div>
+        <label class="chk" for="c-publico" style="margin-top:18px;">
+          <input type="checkbox" id="c-publico">
+          Abrir las reservas al público (habilita la página de reserva y los enlaces)
+        </label>
+        <div class="hint">Mientras esté sin marcar, nadie de afuera puede reservar. El silencio es no.</div>
         <label class="chk" for="c-auto" style="margin-top:18px;">
           <input type="checkbox" id="c-auto">
           Confirmar automáticamente las reservas que llegan de agentes externos
@@ -470,6 +507,7 @@ document.getElementById('tabs').addEventListener('click', e => {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t === b));
   document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + b.dataset.pane));
   if (b.dataset.pane === 'lista') cargarLista();
+  if (b.dataset.pane === 'links') cargarLinks();
 });
 
 /* ═══════ Campo de fecha (formato dd/mm/aaaa + calendario) ═══════ */
@@ -904,6 +942,79 @@ async function guardarReserva() {
   btn.disabled = false;
 }
 
+/* ═══════ Enlaces (puente del CTA) ═══════ */
+let LINKS = [], PIEZAS = [];
+const urlDe = t => `${location.origin}/a/${t}`;
+
+function pintarLinks() {
+  $('l-pieza').innerHTML = '<option value="">Sin pieza — enlace suelto</option>' +
+    PIEZAS.map(p => `<option value="${p.id}">${escapar(p.numero)} · ${escapar(p.titulo_interno || p.canal)}</option>`).join('');
+  $('aviso-publico').style.display = CFG.publico ? 'none' : '';
+  $('links').innerHTML = LINKS.length ? `<table class="mtx">
+    <thead><tr><th>Enlace</th><th>Pieza</th><th>Etiqueta</th><th>Aperturas</th><th>Reservas</th><th>Estado</th><th></th></tr></thead>
+    <tbody>${LINKS.map(l => {
+      // Conversión: de los que entraron, cuántos reservaron. Es la métrica que justifica todo esto.
+      const conv = l.aperturas ? Math.round(l.completados / l.aperturas * 100) : null;
+      return `<tr>
+        <td><span class="lcod">/a/${escapar(l.token)}</span><div class="lurl">${escapar(urlDe(l.token))}</div></td>
+        <td class="mono2">${l.pieza_numero ? escapar(l.pieza_numero) : '—'}</td>
+        <td>${escapar(l.etiqueta) || '<span class="mono2">—</span>'}</td>
+        <td class="mono2"><b class="emb">${l.aperturas}</b></td>
+        <td class="mono2"><b class="emb">${l.completados}</b>${conv !== null ? ` <span style="opacity:.6">(${conv}%)</span>` : ''}
+          ${l.reservado ? `<div class="lurl">${l.reservado} ${unidad().plur}</div>` : ''}</td>
+        <td><span class="pill ${l.activo ? 'e-confirmada' : 'e-cancelada'}">${l.activo ? 'activo' : 'de baja'}</span></td>
+        <td style="white-space:nowrap">
+          <button class="iconbtn" onclick="copiarLink('${escapar(l.token)}')" title="Copiar el enlace" aria-label="Copiar"><i data-lucide="copy" class="w-4 h-4"></i></button>
+          <a class="iconbtn" href="${escapar(urlDe(l.token))}" target="_blank" rel="noopener" title="Abrir" aria-label="Abrir"><i data-lucide="external-link" class="w-4 h-4"></i></a>
+          <button class="iconbtn ${l.activo ? 'mal' : ''}" onclick="activoLink('${l.id}',${!l.activo})"
+            title="${l.activo ? 'Dar de baja' : 'Reactivar'}" aria-label="Cambiar estado">
+            <i data-lucide="${l.activo ? 'ban' : 'rotate-ccw'}" class="w-4 h-4"></i></button>
+        </td></tr>`;
+    }).join('')}</tbody></table>`
+    : '<div class="vacio">Todavía no hay enlaces. Creá uno arriba.</div>';
+  if (window.lucide) lucide.createIcons();
+}
+
+async function cargarLinks() {
+  try {
+    const r = await fetch('api/acciones');
+    if (!r.ok) return;
+    const d = await r.json();
+    LINKS = d.links || []; PIEZAS = d.piezas || [];
+    pintarLinks();
+  } catch (e) {}
+}
+async function crearLink() {
+  const m = $('msg-link'); m.className = 'msg'; m.textContent = 'creando…';
+  try {
+    const r = await fetch('api/acciones', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ capacidad: 'reservas', pieza_id: $('l-pieza').value || null,
+                             etiqueta: $('l-etq').value }) });
+    const j = await r.json();
+    if (r.ok && j.ok) { $('l-etq').value = ''; m.className = 'msg bien';
+      m.textContent = 'enlace ' + urlDe(j.token); await cargarLinks(); }
+    else { m.className = 'msg mal'; m.textContent = 'no se pudo crear'; }
+  } catch (e) { m.className = 'msg mal'; m.textContent = 'error de conexión'; }
+}
+async function activoLink(id, activo) {
+  try {
+    await fetch(`api/acciones/${id}/activo`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ activo }) });
+    cargarLinks();
+  } catch (e) {}
+}
+function copiarLink(token) {
+  const m = $('msg-link');
+  // navigator.clipboard sólo existe en contexto seguro; el fallback cubre el resto.
+  const txt = urlDe(token);
+  const ok = () => { m.className = 'msg bien'; m.textContent = 'copiado: ' + txt;
+                     setTimeout(() => { m.textContent = ''; }, 2500); };
+  if (navigator.clipboard) navigator.clipboard.writeText(txt).then(ok).catch(() => {});
+  else { const t = document.createElement('textarea'); t.value = txt; document.body.appendChild(t);
+         t.select(); document.execCommand('copy'); t.remove(); ok(); }
+}
+
 /* ═══════ Configuración ═══════ */
 function pintarUnidad() {
   const u = UNIDADES.find(x => x.id === $('c-unidad').value) || unidad();
@@ -922,6 +1033,7 @@ function pintarCfg() {
   $('c-cmin').value = CFG.cantidad_min;
   $('c-cmax').value = CFG.cantidad_max;
   $('c-auto').checked = !!CFG.auto_confirmar;
+  $('c-publico').checked = !!CFG.publico;
   if (ES_ADMIN) { $('box-fuente').style.display = ''; $('c-fuente').value = CFG.fuente_verdad || 'clausina'; }
   $('aviso-espejo').style.display = CFG.fuente_verdad === 'externo' ? '' : 'none';
 }
@@ -931,6 +1043,7 @@ async function guardarCfg() {
     anticipacion_max_dias: +$('c-maxdias').value, anticipacion_min_horas: +$('c-minhoras').value,
     tolerancia_min: +$('c-tol').value, cantidad_min: +$('c-cmin').value,
     cantidad_max: +$('c-cmax').value, unidad: $('c-unidad').value,
+    publico: $('c-publico').checked,
     auto_confirmar: $('c-auto').checked,
   };
   if (ES_ADMIN) body.fuente_verdad = $('c-fuente').value;

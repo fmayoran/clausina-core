@@ -914,6 +914,8 @@ async function guardarConfigReservas(negocioId, d, esAdmin) {
     tolerancia_min:         num(d.tolerancia_min,         actual.tolerancia_min,         0, 480),
     unidad: UNIDADES.some(u => u.id === d.unidad) ? d.unidad : (actual.unidad || 'personas'),
     auto_confirmar:         !!d.auto_confirmar,
+    // Abrir las reservas al público es un acto explícito: el silencio es no.
+    publico:                !!d.publico,
   };
   if (cfg.cantidad_min > cfg.cantidad_max) cfg.cantidad_min = cfg.cantidad_max;
   if (esAdmin && ['clausina', 'externo'].includes(d.fuente_verdad)) cfg.fuente_verdad = d.fuente_verdad;
@@ -1084,11 +1086,14 @@ async function _resolverCliente(cli, negocioId, d) {
       return c.id;
     }
   }
+  // El consentimiento es SEPARADO de la reserva: reservar una mesa no es aceptar que te manden
+  // publicidad. Sólo entra en true si la persona marcó la casilla.
   const { rows: [n] } = await cli.query(
-    `INSERT INTO contenido.cliente (negocio_id, nombre, telefono, telefono_norm, email, origen)
-     VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+    `INSERT INTO contenido.cliente (negocio_id, nombre, telefono, telefono_norm, email, origen, consentimiento)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
     [negocioId, nombre, numero, norm, String(d.cliente_email || '').trim().toLowerCase() || null,
-     ['whatsapp','landing','agente'].includes(d.canal) ? d.canal : 'carga']);
+     ['whatsapp','landing','agente'].includes(d.canal) ? d.canal : 'carga',
+     d.consentimiento === true]);
   return n.id;
 }
 
@@ -1104,8 +1109,10 @@ async function crearReserva(negocioId, d) {
   // el negocio active auto_confirmar. Es el principio de la plataforma —nada sale sin visto
   // humano— aplicado del lado operativo. Ver core/planes/V2.md.
   const canal = ['panel','whatsapp','landing','agente'].includes(d.canal) ? d.canal : 'panel';
-  const estado = (canal === 'agente' && !cfg.auto_confirmar) ? 'solicitada'
-               : (canal === 'panel' ? 'confirmada' : 'solicitada');
+  // Sólo lo que entra por el panel lo cargó una persona del negocio: eso se confirma solo. Todo
+  // lo demás —cliente desde una landing, WhatsApp, agente externo— queda SOLICITADA salvo que el
+  // negocio active auto_confirmar. Es la regla de la plataforma del lado operativo.
+  const estado = canal === 'panel' ? 'confirmada' : (cfg.auto_confirmar ? 'confirmada' : 'solicitada');
 
   const cli = await pool.connect();
   try {
@@ -1168,11 +1175,11 @@ async function crearReserva(negocioId, d) {
     const clienteId = await _resolverCliente(cli, negocioId, d);
     const { rows: [r] } = await cli.query(
       `INSERT INTO contenido.reserva
-         (negocio_id, cliente_id, turno_id, fecha, cantidad, estado, canal, agente_id, notas, ref_externa)
-       VALUES ($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10) RETURNING id`,
+         (negocio_id, cliente_id, turno_id, fecha, cantidad, estado, canal, agente_id, notas, ref_externa, link_id)
+       VALUES ($1,$2,$3,$4::date,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
       [negocioId, clienteId, d.turno_id, d.fecha, cantidad, estado, canal,
        String(d.agente_id || '').trim() || null, String(d.notas || '').trim() || null,
-       String(d.ref_externa || '').trim() || null]);
+       String(d.ref_externa || '').trim() || null, d.link_id || null]);
 
     await cli.query('COMMIT');
     return { ok: true, id: r.id, estado, libre: libre - cantidad };
@@ -1190,6 +1197,143 @@ async function cambiarEstadoReserva(negocioId, id, estado) {
        AND NOT (estado='cancelada' AND $3 IN ('solicitada','confirmada'))`,
     [id, negocioId, estado]);
   return { ok: rowCount > 0 };
+}
+
+// --- Puente del call to action (v2.0 / F5) ----------------------------------------------
+// Una pieza lleva una acción; la acción vive en un enlace corto; lo que pasa con ese enlace queda
+// atribuido. Es lo que permite decir "este posteo generó siete reservas".
+const crypto = require('crypto');
+
+// Token corto y sin ambigüedad visual: sin 0/O ni 1/l/I, porque estos enlaces se dictan por
+// teléfono y se imprimen en QR.
+const ALFABETO = '23456789abcdefghijkmnpqrstuvwxyz';
+function tokenCorto(n = 8) {
+  const b = crypto.randomBytes(n);
+  let out = '';
+  for (let i = 0; i < n; i++) out += ALFABETO[b[i] % ALFABETO.length];
+  return out;
+}
+
+// Piezas a las que se le puede colgar una acción: las que ya salieron o están por salir.
+// Liviano a propósito — getPiezas trae media, bitácora y revisiones, y acá sólo hace falta el rótulo.
+async function getPiezasParaAccion(negocioId) {
+  const { rows } = await pool.query(
+    `SELECT pz.id, pz.numero, pz.canal, pz.titulo_interno, pz.estado
+       FROM contenido.piezas pz
+      WHERE pz.negocio_id=$1 AND pz.estado IN ('pendiente_aprobacion','aprobada','publicada')
+      ORDER BY pz.creado_en DESC LIMIT 60`, [negocioId]);
+  return rows;
+}
+
+async function crearLink(negocioId, d) {
+  const cap = ['reservas'].includes(d.capacidad) ? d.capacidad : 'reservas';
+  for (let intento = 0; intento < 5; intento++) {
+    try {
+      const { rows: [r] } = await pool.query(
+        `INSERT INTO contenido.accion_link (negocio_id, pieza_id, token, capacidad, etiqueta, params)
+         VALUES ($1,$2,$3,$4,$5,COALESCE($6::jsonb,'{}'::jsonb)) RETURNING id, token`,
+        [negocioId, d.pieza_id || null, tokenCorto(), cap,
+         String(d.etiqueta || '').trim() || null, d.params ? JSON.stringify(d.params) : null]);
+      return { ok: true, id: r.id, token: r.token };
+    } catch (e) {
+      if (e.code === '23505') continue;   // token repetido: se reintenta con otro
+      throw e;
+    }
+  }
+  const e = new Error('no se pudo generar el token'); e.code = 'token'; throw e;
+}
+
+// Los enlaces con su embudo: cuántos entraron y cuántos completaron.
+async function getLinks(negocioId) {
+  const { rows } = await pool.query(
+    `SELECT l.id, l.token, l.capacidad, l.etiqueta, l.activo, l.creado_en, l.pieza_id,
+            p.numero AS pieza_numero,
+            COALESCE(c.aperturas, 0)::int AS aperturas,
+            COALESCE(c.completados, 0)::int AS completados,
+            COALESCE(r.personas, 0)::int AS reservado
+       FROM contenido.accion_link l
+       LEFT JOIN contenido.piezas p ON p.id = l.pieza_id
+       LEFT JOIN LATERAL (
+         SELECT count(*) AS aperturas, count(*) FILTER (WHERE reserva_id IS NOT NULL) AS completados
+           FROM contenido.accion_click WHERE link_id = l.id) c ON true
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(sum(cantidad),0) AS personas FROM contenido.reserva
+          WHERE link_id = l.id AND estado IN ('solicitada','confirmada','cumplida')) r ON true
+      WHERE l.negocio_id = $1
+      ORDER BY l.creado_en DESC`, [negocioId]);
+  return rows;
+}
+
+async function setLinkActivo(negocioId, id, activo) {
+  const { rowCount } = await pool.query(
+    'UPDATE contenido.accion_link SET activo=$3 WHERE id=$1 AND negocio_id=$2', [id, negocioId, !!activo]);
+  return { ok: rowCount > 0 };
+}
+
+// --- Superficie pública ------------------------------------------------------------------
+// Todo lo de acá lo consume gente SIN sesión. Regla: expone identidad y disponibilidad, nunca
+// clientes ni reservas de otros. Cada consulta filtra por negocio y por el opt-in del negocio.
+
+// Un negocio sólo aparece públicamente si habilitó reservas Y marcó `publico` en la config.
+// El silencio es no: nadie queda expuesto por olvido.
+async function negocioPublico(slug) {
+  const { rows: [n] } = await pool.query(
+    `SELECT p.id, p.slug, p.nombre, pp.slogan, pp.logo, nc.config
+       FROM contenido.negocios p
+       LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id = p.id
+       JOIN contenido.negocio_capacidad nc ON nc.negocio_id = p.id AND nc.capacidad = 'reservas'
+      WHERE p.slug = $1 AND p.activo AND nc.habilitada`, [slug]);
+  if (!n || !(n.config || {}).publico) return null;
+  const { rows: [sede] } = await pool.query(
+    `SELECT direccion, localidad, partido FROM contenido.negocio_sede
+      WHERE negocio_id=$1 ORDER BY principal DESC, orden LIMIT 1`, [n.id]);
+  const cfg = { ...CFG_RESERVAS, ...(n.config || {}) };
+  return {
+    id: n.id, slug: n.slug, nombre: n.nombre, slogan: n.slogan, logo: n.logo,
+    sede: sede || null,
+    // Sólo lo que hace falta para reservar. Nada de fuente_verdad ni de auto_confirmar.
+    unidad: cfg.unidad, cantidad_min: cfg.cantidad_min, cantidad_max: cfg.cantidad_max,
+    anticipacion_max_dias: cfg.anticipacion_max_dias, anticipacion_min_horas: cfg.anticipacion_min_horas,
+  };
+}
+
+async function disponibilidadPublica(negocioId, desde, hasta) {
+  const dias = await getDisponibilidad(negocioId, desde, hasta);
+  // Hacia afuera no se dice cuánto se vendió: sólo si queda lugar y cuánto. La ocupación de un
+  // negocio es información suya, no del público.
+  return dias.filter(d => !d.bloqueado).map(d => ({
+    fecha: d.fecha, turno_id: d.turno_id, nombre: d.nombre,
+    hora_desde: d.hora_desde, hora_hasta: d.hora_hasta,
+    libre: Math.max(0, d.capacidad - d.ocupado),
+  }));
+}
+
+async function registrarApertura(token, ipHash, referer) {
+  const { rows: [l] } = await pool.query(
+    `SELECT l.id, l.negocio_id, l.capacidad, l.etiqueta, l.params, n.slug
+       FROM contenido.accion_link l JOIN contenido.negocios n ON n.id = l.negocio_id
+      WHERE l.token = $1 AND l.activo`, [token]);
+  if (!l) return null;
+  const { rows: [c] } = await pool.query(
+    `INSERT INTO contenido.accion_click (link_id, negocio_id, ip_hash, referer)
+     VALUES ($1,$2,$3,$4) RETURNING id`,
+    [l.id, l.negocio_id, ipHash || null, (referer || '').slice(0, 300) || null]);
+  return { link: l, clickId: c.id };
+}
+
+// De qué enlace salió una apertura. Se valida contra el negocio para que un id de otro no sirva.
+async function linkDeApertura(clickId, negocioId) {
+  const { rows: [c] } = await pool.query(
+    'SELECT link_id FROM contenido.accion_click WHERE id=$1 AND negocio_id=$2', [clickId, negocioId]);
+  return c ? c.link_id : null;
+}
+
+// Cierra el embudo: esta apertura terminó en esta reserva.
+async function marcarCompletado(clickId, reservaId) {
+  if (!clickId) return;
+  await pool.query(
+    `UPDATE contenido.accion_click SET reserva_id=$2, completado_en=now()
+      WHERE id=$1 AND reserva_id IS NULL`, [clickId, reservaId]);
 }
 
 // --- Identidad estructurada (v2.0 / F1) --------------------------------------------------
@@ -2121,6 +2265,8 @@ module.exports = {
   getConfigReservas, guardarConfigReservas, UNIDADES, getTurnos, guardarTurno, borrarTurno,
   getBloqueos, crearBloqueo, borrarBloqueo,
   getDisponibilidad, getReservas, crearReserva, cambiarEstadoReserva,
+  crearLink, getLinks, setLinkActivo, getPiezasParaAccion,
+  negocioPublico, disponibilidadPublica, registrarApertura, marcarCompletado, linkDeApertura,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente, getVerificacion,

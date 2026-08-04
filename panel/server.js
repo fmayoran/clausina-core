@@ -133,6 +133,103 @@ app.use('/fonts', express.static(path.join(__dirname, 'public', 'fonts'), { maxA
 // El static de public/ se monta al final, detrás de la compuerta: sin esto esas páginas se
 // dibujaban sin hoja de estilos y sin logo. Sólo estáticos inertes — el HTML y el JS del panel
 // siguen detrás de la sesión.
+// ═══════════════════ SUPERFICIE PÚBLICA (v2.0 / F5) ═══════════════════════════════════════
+// TODO lo de este bloque lo consume gente SIN sesión, así que va ANTES de la compuerta de auth.
+// Reglas que no se negocian acá adentro:
+//   · el negocio tiene que haber marcado `publico` en su config de reservas — el silencio es no;
+//   · se expone identidad y disponibilidad, nunca clientes ni reservas ajenas;
+//   · hay límite por IP: sin sesión, cualquiera puede intentar llenar la agenda de un negocio.
+const RATE = new Map();
+function limite(req, res, tope, ventanaMs) {
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || 'x';
+  const ahora = Date.now();
+  const k = req.path.split('/').slice(0, 4).join('/') + '|' + ip;
+  const e = RATE.get(k);
+  if (!e || ahora - e.desde > ventanaMs) { RATE.set(k, { desde: ahora, n: 1 }); return true; }
+  if (e.n >= tope) { res.status(429).json({ error: 'demasiados_intentos' }); return false; }
+  e.n++;
+  return true;
+}
+// Poda: sin esto el Map crece para siempre, que es la misma lección del sqlite de n8n.
+setInterval(() => {
+  const corte = Date.now() - 3600e3;
+  for (const [k, v] of RATE) if (v.desde < corte) RATE.delete(k);
+}, 600e3).unref();
+
+const ipHash = req => {
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.ip || '';
+  // Hash y no la IP: para contar visitas alcanza, y una IP es un dato personal que no necesitamos.
+  return ip ? require('crypto').createHash('sha256').update(ip + '|clausina').digest('hex').slice(0, 32) : null;
+};
+
+// Enlace corto de una acción: registra la apertura y manda a la página del negocio.
+app.get('/a/:token', async (req, res) => {
+  if (!limite(req, res, 60, 60e3)) return;
+  try {
+    const r = await db.registrarApertura(String(req.params.token), ipHash(req), req.headers.referer);
+    if (!r) return res.status(404).send('Enlace no válido o dado de baja.');
+    res.redirect(`/r/${r.link.slug}?c=${r.clickId}`);
+  } catch (e) { console.error('link', e.message); res.status(500).send('Error'); }
+});
+
+// La página pública de reservas de un negocio.
+app.get('/r/:slug', async (req, res) => {
+  if (!limite(req, res, 120, 60e3)) return;
+  try {
+    const n = await db.negocioPublico(String(req.params.slug));
+    if (!n) return res.status(404).send('Este negocio no tiene reservas abiertas al público.');
+    res.sendFile(path.join(__dirname, 'public', 'publico', 'reservar.html'));
+  } catch (e) { console.error('publico', e.message); res.status(500).send('Error'); }
+});
+
+app.get('/api/publico/:slug', async (req, res) => {
+  if (!limite(req, res, 120, 60e3)) return;
+  try {
+    const n = await db.negocioPublico(String(req.params.slug));
+    if (!n) return res.status(404).json({ error: 'no_disponible' });
+    const { id, ...publico } = n;          // el uuid interno no sale
+    res.json(publico);
+  } catch (e) { console.error('publico', e.message); res.status(500).json({ error: 'error' }); }
+});
+
+app.get('/api/publico/:slug/disponibilidad', async (req, res) => {
+  if (!limite(req, res, 120, 60e3)) return;
+  try {
+    const n = await db.negocioPublico(String(req.params.slug));
+    if (!n) return res.status(404).json({ error: 'no_disponible' });
+    const { desde, hasta } = rango(req, Math.min(n.anticipacion_max_dias || 30, 60));
+    res.json({ desde, hasta, turnos: await db.disponibilidadPublica(n.id, desde, hasta) });
+  } catch (e) { console.error('disp publica', e.message); res.status(500).json({ error: 'error' }); }
+});
+
+app.post('/api/publico/:slug/reserva', async (req, res) => {
+  // Más apretado que las lecturas: crear consume capacidad real del negocio.
+  if (!limite(req, res, 6, 600e3)) return;
+  try {
+    const n = await db.negocioPublico(String(req.params.slug));
+    if (!n) return res.status(404).json({ error: 'no_disponible' });
+    const b = req.body || {};
+    // Trampa para robots: un campo que una persona no ve y por lo tanto no completa.
+    if (String(b.web || '').trim()) return res.status(400).json({ ok: false, error: 'invalido' });
+    if (!String(b.cliente_nombre || '').trim() || !String(b.cliente_telefono || '').trim()) {
+      return res.status(409).json({ ok: false, error: 'sin_cliente' });
+    }
+    const click = /^[0-9a-f-]{36}$/i.test(String(b.click || '')) ? b.click : null;
+    const linkId = click ? await db.linkDeApertura(click, n.id) : null;
+    const r = await db.crearReserva(n.id, {
+      turno_id: b.turno_id, fecha: b.fecha, cantidad: b.cantidad,
+      cliente_nombre: b.cliente_nombre, cliente_telefono: b.cliente_telefono,
+      cliente_email: b.cliente_email, notas: b.notas,
+      consentimiento: b.consentimiento === true,
+      canal: 'landing', link_id: linkId,
+    });
+    if (click) await db.marcarCompletado(click, r.id);
+    // Hacia afuera no se devuelve cuánto quedó libre: es información del negocio.
+    res.json({ ok: true, estado: r.estado });
+  } catch (e) { resError(res, e, 'reserva publica'); }
+});
+// ═══════════════════ FIN DE LA SUPERFICIE PÚBLICA ═════════════════════════════════════════
+
 const ASSETS_PUBLICOS = /\.(css|svg|png|jpe?g|ico|webp|woff2?)$/i;
 const estaticoPublico = express.static(path.join(__dirname, 'public'), { maxAge: '30d', index: false, dotfiles: 'ignore' });
 app.use((req, res, next) => {
@@ -747,6 +844,22 @@ app.delete('/api/reservas/turnos/:id', async (req, res) => {
     const r = await db.borrarTurno(req.negocioId, req.params.id);
     res.status(r.ok ? 200 : 404).json(r);
   } catch (e) { resError(res, e, 'borrar turno'); }
+});
+
+// --- Enlaces de acción (v2.0 / F5) -------------------------------------------------------
+app.get('/api/acciones', async (req, res) => {
+  try { res.json({ links: await db.getLinks(req.negocioId), piezas: await db.getPiezasParaAccion(req.negocioId) }); }
+  catch (e) { console.error('acciones', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/acciones', async (req, res) => {
+  try { res.json(await db.crearLink(req.negocioId, req.body || {})); }
+  catch (e) { resError(res, e, 'crear accion'); }
+});
+app.post('/api/acciones/:id/activo', async (req, res) => {
+  try {
+    const r = await db.setLinkActivo(req.negocioId, req.params.id, (req.body || {}).activo);
+    res.status(r.ok ? 200 : 404).json(r);
+  } catch (e) { resError(res, e, 'activo accion'); }
 });
 
 app.get('/api/reservas/bloqueos', async (req, res) => {
