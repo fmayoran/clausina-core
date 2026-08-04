@@ -1298,14 +1298,29 @@ async function negocioPublico(slug) {
 }
 
 async function disponibilidadPublica(negocioId, desde, hasta) {
+  const cfg = await getConfigReservas(negocioId);
   const dias = await getDisponibilidad(negocioId, desde, hasta);
+  // La ventana real, en hora local: no tiene sentido ofrecer un turno que el backend va a
+  // rechazar por anticipación. Se calcula en la base para usar la misma zona horaria.
+  const { rows: [v] } = await pool.query(
+    `SELECT (now() + ($1 || ' hours')::interval) AT TIME ZONE $3 AS piso,
+            (now() + ($2 || ' days')::interval)  AT TIME ZONE $3 AS techo`,
+    [String(cfg.anticipacion_min_horas), String(cfg.anticipacion_max_dias), TZ]);
+  const piso = new Date(v.piso), techo = new Date(v.techo);
   // Hacia afuera no se dice cuánto se vendió: sólo si queda lugar y cuánto. La ocupación de un
   // negocio es información suya, no del público.
-  return dias.filter(d => !d.bloqueado).map(d => ({
-    fecha: d.fecha, turno_id: d.turno_id, nombre: d.nombre,
-    hora_desde: d.hora_desde, hora_hasta: d.hora_hasta,
-    libre: Math.max(0, d.capacidad - d.ocupado),
-  }));
+  return dias
+    .filter(d => !d.bloqueado)
+    .filter(d => {
+      const inicio = new Date(d.fecha + 'T' + d.hora_desde + ':00');
+      return inicio >= piso && inicio <= techo;
+    })
+    .map(d => ({
+      fecha: d.fecha, turno_id: d.turno_id, nombre: d.nombre,
+      hora_desde: d.hora_desde, hora_hasta: d.hora_hasta,
+      libre: Math.max(0, d.capacidad - d.ocupado),
+    }))
+    .filter(d => d.libre > 0);
 }
 
 async function registrarApertura(token, ipHash, referer) {

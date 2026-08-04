@@ -226,7 +226,13 @@ app.post('/api/publico/:slug/reserva', async (req, res) => {
     if (click) await db.marcarCompletado(click, r.id);
     // Hacia afuera no se devuelve cuánto quedó libre: es información del negocio.
     res.json({ ok: true, estado: r.estado });
-  } catch (e) { resError(res, e, 'reserva publica'); }
+  } catch (e) {
+    // NO se usa resError acá: adjunta `detalle`, que en varios errores es la config entera del
+    // negocio (fuente de verdad, auto-confirmar). Hacia afuera va sólo el código.
+    if (RES_ERR.has(e.code)) return res.status(409).json({ ok: false, error: e.code });
+    console.error('reserva publica', e.message);
+    res.status(500).json({ ok: false, error: 'error' });
+  }
 });
 // ═══════════════════ FIN DE LA SUPERFICIE PÚBLICA ═════════════════════════════════════════
 
