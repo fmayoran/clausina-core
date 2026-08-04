@@ -121,6 +121,50 @@
   .dchip{font-family:'JetBrains Mono',monospace;font-size:.64rem;padding:6px 11px;border-radius:8px;
          border:1px solid var(--u-line);color:var(--u-mut);cursor:pointer;user-select:none;background:none;}
   .dchip.on{color:var(--u-acc);border-color:var(--u-acc);background:color-mix(in srgb,var(--u-acc) 12%,transparent);}
+  /* ── Campo de fecha propio ──────────────────────────────────────────────
+     <input type="date"> se renderiza según el idioma del NAVEGADOR, no del sitio: en un Chrome
+     en inglés muestra mm/dd/aaaa y no hay forma de forzarlo desde la página. Por eso un campo
+     propio, que además nos deja controlar el calendario. */
+  .fecha{position:relative;}
+  .fecha-txt{cursor:pointer;padding-right:38px !important;}
+  .fecha-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:grid;
+             place-items:center;width:28px;height:28px;border:0;background:none;color:var(--u-mut);
+             cursor:pointer;border-radius:6px;}
+  .fecha-btn:hover{color:var(--u-fg);}
+  .fecha-pop{display:none;position:absolute;z-index:60;top:calc(100% + 5px);left:0;
+             background:var(--u-surf);border:1px solid var(--u-line);border-radius:12px;
+             padding:12px;width:262px;box-shadow:0 12px 34px rgba(0,0,0,.28);}
+  .fecha-pop.on{display:block;}
+  .fp-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px;}
+  .fp-mes{font-family:'Inter Tight',sans-serif;font-weight:600;font-size:.86rem;text-transform:capitalize;}
+  .fp-nav{border:1px solid var(--u-line);background:none;color:var(--u-mut);border-radius:6px;
+          width:26px;height:26px;cursor:pointer;line-height:1;}
+  .fp-nav:hover{color:var(--u-fg);border-color:var(--u-fg);}
+  .fp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+  .fp-dow{font-family:'JetBrains Mono',monospace;font-size:.5rem;color:var(--u-mut);
+          text-align:center;padding-bottom:3px;letter-spacing:.06em;}
+  .fp-d{border:0;background:none;color:var(--u-fg);border-radius:6px;height:30px;cursor:pointer;
+        font-family:'JetBrains Mono',monospace;font-size:.7rem;}
+  .fp-d:hover{background:color-mix(in srgb,var(--u-acc) 18%,transparent);}
+  .fp-d.vacia{visibility:hidden;cursor:default;}
+  .fp-d.off{color:var(--u-mut);opacity:.32;cursor:default;}
+  .fp-d.off:hover{background:none;}
+  .fp-d.hoy{outline:1px solid var(--u-mut);}
+  .fp-d.sel{background:var(--u-acc);color:var(--u-accfg);font-weight:700;}
+  /* ── Autocompletar de cliente ── */
+  .ac{position:relative;}
+  .ac-pop{display:none;position:absolute;z-index:60;top:calc(100% + 4px);left:0;right:0;
+          background:var(--u-surf);border:1px solid var(--u-line);border-radius:10px;
+          max-height:210px;overflow:auto;box-shadow:0 12px 30px rgba(0,0,0,.26);}
+  .ac-pop.on{display:block;}
+  .ac-it{display:block;width:100%;text-align:left;border:0;background:none;cursor:pointer;
+         padding:9px 12px;color:var(--u-fg);font-size:.9rem;border-bottom:1px solid var(--u-line);}
+  .ac-it:last-child{border-bottom:0;}
+  .ac-it:hover{background:color-mix(in srgb,var(--u-acc) 14%,transparent);}
+  .ac-it small{display:block;font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--u-mut);}
+  .ac-nada{padding:10px 12px;font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-mut);}
+  .ac-estado{font-family:'JetBrains Mono',monospace;font-size:.58rem;margin-top:5px;min-height:1em;}
+  .ac-estado.ok{color:var(--u-ok);} .ac-estado.nuevo{color:var(--u-medio);}
   /* ── Modal ── */
   .ov{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;place-items:center;z-index:140;padding:20px;}
   .ov.on{display:grid;}
@@ -253,7 +297,12 @@
       <div class="card2">
         <div class="sec">Bloqueos <span class="der mono2">excepciones: feriados, eventos privados</span></div>
         <div class="grid3" style="align-items:end;margin-bottom:16px;">
-          <div><label for="b-fecha">Fecha</label><input type="date" id="b-fecha"></div>
+          <div><label for="b-fecha-txt">Fecha</label>
+            <div class="fecha" id="fd-bloqueo">
+              <input type="text" class="fecha-txt" id="b-fecha-txt" readonly placeholder="dd/mm/aaaa">
+              <button type="button" class="fecha-btn" aria-label="Abrir calendario"><i data-lucide="calendar" class="w-4 h-4"></i></button>
+              <div class="fecha-pop"></div>
+            </div></div>
           <div><label for="b-turno">Turno</label>
             <select id="b-turno"><option value="">Todo el día</option></select></div>
           <div><label for="b-motivo">Motivo</label><input type="text" id="b-motivo" placeholder="Feriado"></div>
@@ -271,17 +320,25 @@
   <div class="dlg">
     <h2 class="display font-bold text-lg tracking-tight">Nueva reserva</h2>
     <div class="grid2">
-      <div><label for="r-fecha">Fecha</label><input type="date" id="r-fecha" onchange="turnosDelDia()"></div>
-      <div><label for="r-turno">Turno</label><select id="r-turno"></select></div>
+      <div><label for="r-fecha-txt">Fecha</label>
+        <div class="fecha" id="fd-reserva">
+          <input type="text" class="fecha-txt" id="r-fecha-txt" readonly placeholder="dd/mm/aaaa">
+          <button type="button" class="fecha-btn" aria-label="Abrir calendario"><i data-lucide="calendar" class="w-4 h-4"></i></button>
+          <div class="fecha-pop"></div>
+        </div></div>
+      <div><label for="r-turno">Turno</label><select id="r-turno" onchange="topeDelTurno()"></select></div>
       <div class="full"><label for="r-cantidad" id="lbl-cantidad">Cantidad</label>
         <input type="number" id="r-cantidad" min="1" value="2">
-        <div class="hint">La reserva ocupa el turno completo.</div></div>
+        <div class="hint" id="hint-cantidad">La reserva ocupa el turno completo.</div></div>
     </div>
     <label for="r-cliente">Cliente</label>
-    <input type="text" id="r-cliente" placeholder="Nombre y apellido" autocomplete="off">
+    <div class="ac" id="ac-cliente">
+      <input type="text" id="r-cliente" placeholder="Buscar en la base o escribir uno nuevo" autocomplete="off">
+      <div class="ac-pop"></div>
+    </div>
+    <div class="ac-estado" id="ac-estado"></div>
     <label for="r-tel">Teléfono</label>
     <input type="text" id="r-tel" placeholder="+54 9 11 ..." autocomplete="off">
-    <div class="hint">Si el teléfono ya está en la base del negocio, se reusa ese cliente.</div>
     <label for="r-notas">Notas</label>
     <textarea id="r-notas"></textarea>
     <div class="err" id="err-res"></div>
@@ -304,6 +361,9 @@
       <div><label for="t-desde">Desde</label><input type="time" id="t-desde" value="20:00"></div>
       <div><label for="t-hasta">Hasta</label><input type="time" id="t-hasta" value="23:59"></div>
     </div>
+    <div><label for="t-max">Máximo por reserva</label>
+      <input type="number" id="t-max" min="1" placeholder="">
+      <div class="hint" id="hint-tmax">Vacío = hereda el máximo general.</div></div>
     <label>Días en que aplica</label>
     <div class="dchips" id="t-dias"></div>
     <label class="chk" for="t-activo" style="margin-top:16px;">
@@ -349,6 +409,107 @@ document.getElementById('tabs').addEventListener('click', e => {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t === b));
   document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + b.dataset.pane));
   if (b.dataset.pane === 'lista') cargarLista();
+});
+
+/* ═══════ Campo de fecha (formato dd/mm/aaaa + calendario) ═══════ */
+// El nativo <input type="date"> muestra el formato del navegador, no el del sitio. Este campo
+// siempre escribe dd/mm/aaaa y trae su propio calendario.
+const aLatino = iso => iso ? `${iso.slice(8,10)}/${iso.slice(5,7)}/${iso.slice(0,4)}` : '';
+
+function CampoFecha(cont, opts) {
+  opts = opts || {};
+  let iso = '', mes = '';
+  const txt = cont.querySelector('.fecha-txt');
+  const pop = cont.querySelector('.fecha-pop');
+
+  function pintar() {
+    const y = +mes.slice(0, 4), m = +mes.slice(5, 7);
+    const nom = new Date(mes + 'T12:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+    const arranque = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() || 7) - 1;
+    const dias = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    let celdas = '';
+    for (let i = 0; i < arranque; i++) celdas += '<button type="button" class="fp-d vacia"></button>';
+    for (let d = 1; d <= dias; d++) {
+      const f = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const fuera = opts.min && f < opts.min;
+      celdas += `<button type="button" class="fp-d${fuera ? ' off' : ''}${f === iso ? ' sel' : ''}${f === hoy() ? ' hoy' : ''}"
+        ${fuera ? 'disabled' : `data-f="${f}"`}>${d}</button>`;
+    }
+    pop.innerHTML = `<div class="fp-cab">
+        <button type="button" class="fp-nav" data-mes="-1">‹</button>
+        <span class="fp-mes">${nom}</span>
+        <button type="button" class="fp-nav" data-mes="1">›</button>
+      </div>
+      <div class="fp-grid">${DIAS.map(([, l]) => `<span class="fp-dow">${l.slice(0,1)}</span>`).join('')}${celdas}</div>`;
+  }
+  function abrir() { mes = (iso || hoy()).slice(0, 8) + '01'; pintar(); pop.classList.add('on'); }
+  function cerrar() { pop.classList.remove('on'); }
+
+  txt.addEventListener('click', () => pop.classList.contains('on') ? cerrar() : abrir());
+  cont.querySelector('.fecha-btn').addEventListener('click', e => {
+    e.preventDefault(); pop.classList.contains('on') ? cerrar() : abrir();
+  });
+  pop.addEventListener('click', e => {
+    const nav = e.target.closest('.fp-nav');
+    if (nav) { const d = new Date(mes + 'T12:00:00Z');
+      d.setUTCMonth(d.getUTCMonth() + (+nav.dataset.mes), 1);
+      mes = d.toISOString().slice(0, 10); pintar(); return; }
+    const dia = e.target.closest('.fp-d[data-f]');
+    if (dia) { api.valor = dia.dataset.f; cerrar(); if (opts.onChange) opts.onChange(iso); }
+  });
+  // Cerrar al tocar fuera: si no, quedan dos calendarios abiertos pisándose.
+  document.addEventListener('click', e => { if (!cont.contains(e.target)) cerrar(); });
+
+  const api = {
+    get valor() { return iso; },
+    set valor(v) { iso = v || ''; txt.value = aLatino(iso); },
+  };
+  return api;
+}
+let FD_RESERVA = null, FD_BLOQUEO = null;
+
+/* ═══════ Autocompletar de cliente ═══════ */
+// Buscar en la base del negocio antes de crear uno nuevo: el mismo cliente cargado dos veces con
+// el nombre escrito distinto es la forma más común de ensuciar una base.
+let CLIENTE_SEL = null, _acT = null;
+function acEstado() {
+  const e = $('ac-estado');
+  if (CLIENTE_SEL) { e.className = 'ac-estado ok'; e.textContent = 'Cliente existente de la base.'; }
+  else if ($('r-cliente').value.trim() || $('r-tel').value.trim()) {
+    e.className = 'ac-estado nuevo'; e.textContent = 'Se va a crear un cliente nuevo.';
+  } else { e.className = 'ac-estado'; e.textContent = ''; }
+}
+function acCerrar() { document.querySelector('#ac-cliente .ac-pop').classList.remove('on'); }
+async function acBuscar() {
+  const q = $('r-cliente').value.trim();
+  const pop = document.querySelector('#ac-cliente .ac-pop');
+  if (q.length < 2) { acCerrar(); return; }
+  try {
+    const r = await fetch('api/clientes?q=' + encodeURIComponent(q) + '&limit=8');
+    const d = await r.json();
+    const cs = d.clientes || [];
+    pop.innerHTML = cs.length
+      ? cs.map(c => `<button type="button" class="ac-it" data-id="${c.id}"
+           data-nombre="${escapar(c.nombre || '')}" data-tel="${escapar(c.telefono || '')}">
+           ${escapar(c.nombre) || '(sin nombre)'}<small>${escapar(c.telefono) || 'sin teléfono'}</small></button>`).join('')
+      : '<div class="ac-nada">Nadie con ese nombre. Se creará un cliente nuevo.</div>';
+    pop.classList.add('on');
+  } catch (e) { acCerrar(); }
+}
+document.getElementById('r-cliente').addEventListener('input', () => {
+  CLIENTE_SEL = null; acEstado();
+  clearTimeout(_acT); _acT = setTimeout(acBuscar, 260);
+});
+document.getElementById('r-tel').addEventListener('input', () => { CLIENTE_SEL = null; acEstado(); });
+document.querySelector('#ac-cliente .ac-pop').addEventListener('click', e => {
+  const it = e.target.closest('.ac-it'); if (!it) return;
+  CLIENTE_SEL = it.dataset.id;
+  $('r-cliente').value = it.dataset.nombre;
+  $('r-tel').value = it.dataset.tel;
+  acCerrar(); acEstado();
+});
+document.addEventListener('click', e => {
+  if (!document.getElementById('ac-cliente').contains(e.target)) acCerrar();
 });
 
 /* ═══════ Calendario mensual ═══════ */
@@ -501,22 +662,35 @@ async function estado(id, e) {
 
 /* ═══════ Reserva ═══════ */
 function turnosDelDia() {
-  const f = $('r-fecha').value;
+  const f = FD_RESERVA.valor;
   const dw = f ? isodow(f) : 0;
   const aptos = TURNOS.filter(t => t.activo && t.dias.includes(dw));
   $('r-turno').innerHTML = aptos.length
     ? aptos.map(t => `<option value="${t.id}">${escapar(t.nombre)} · ${t.hora_desde}–${t.hora_hasta}</option>`).join('')
     : '<option value="">— ningún turno aplica ese día —</option>';
+  topeDelTurno();
+}
+// El tope efectivo puede venir del turno (si lo redefinió) o del general. Se refleja en el
+// campo para que nadie escriba un número que el backend va a rebotar.
+function topeDelTurno() {
+  const t = TURNOS.find(x => x.id === $('r-turno').value);
+  const tope = (t && t.cantidad_max) || CFG.cantidad_max;
+  $('r-cantidad').max = tope;
+  $('hint-cantidad').textContent = `La reserva ocupa el turno completo. Máximo ${tope} ` +
+    `${unidad().plur}${t && t.cantidad_max ? ' en este turno' : ''}.`;
 }
 function abrirReserva(fecha, turnoId) {
-  $('r-fecha').value = fecha || SEL || hoy();
+  FD_RESERVA.valor = fecha || SEL || hoy();
   turnosDelDia();
   if (turnoId) $('r-turno').value = turnoId;
   $('lbl-cantidad').textContent = 'Cantidad · ' + unidad().plur;
   $('r-cantidad').value = CFG.cantidad_min || 1;
   $('r-cliente').value = ''; $('r-tel').value = ''; $('r-notas').value = '';
+  CLIENTE_SEL = null; acEstado(); acCerrar();
+  topeDelTurno();
   $('err-res').textContent = '';
   $('ov-res').classList.add('on');
+  if (window.lucide) lucide.createIcons();
 }
 function cerrarReserva() { $('ov-res').classList.remove('on'); }
 
@@ -538,8 +712,10 @@ async function guardarReserva() {
     const r = await fetch('api/reservas', { method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        turno_id: $('r-turno').value, fecha: $('r-fecha').value,
-        cantidad: +$('r-cantidad').value, cliente_nombre: $('r-cliente').value,
+        turno_id: $('r-turno').value, fecha: FD_RESERVA.valor,
+        cantidad: +$('r-cantidad').value,
+        cliente_id: CLIENTE_SEL || undefined,
+        cliente_nombre: $('r-cliente').value,
         cliente_telefono: $('r-tel').value, notas: $('r-notas').value, canal: 'panel',
       }) });
     const j = await r.json();
@@ -549,7 +725,8 @@ async function guardarReserva() {
       if (j.error === 'sin_lugar' && j.detalle) m += ` Quedan ${j.detalle.libre} lugar(es).`;
       if (j.error === 'muy_pronto' && j.detalle) m += ` Este negocio pide ${j.detalle.anticipacion_min_horas} h.`;
       if (j.error === 'muy_lejos' && j.detalle) m += ` El máximo es ${j.detalle.anticipacion_max_dias} días.`;
-      if (j.error === 'cantidad_fuera' && j.detalle) m += ` Entre ${j.detalle.cantidad_min} y ${j.detalle.cantidad_max}.`;
+      if (j.error === 'cantidad_fuera' && j.detalle) m += ` Entre ${j.detalle.cantidad_min} y ${j.detalle.cantidad_max}` +
+        (j.detalle.propio ? ' en este turno.' : '.');
       err.textContent = m;
     }
   } catch (e) { err.textContent = 'Error de conexión.'; }
@@ -610,12 +787,13 @@ $('t-dias').addEventListener('click', e => {
 });
 function pintarTurnos() {
   $('turnos').innerHTML = TURNOS.length ? `<table class="mtx">
-    <thead><tr><th>Nombre</th><th>Horario</th><th>Días</th><th>Capacidad</th><th>Estado</th><th></th></tr></thead>
+    <thead><tr><th>Nombre</th><th>Horario</th><th>Días</th><th>Capacidad</th><th>Máx/reserva</th><th>Estado</th><th></th></tr></thead>
     <tbody>${TURNOS.map(t => `<tr>
       <td>${escapar(t.nombre)}</td>
       <td class="mono2">${t.hora_desde}–${t.hora_hasta}</td>
       <td class="mono2">${DIAS.filter(([n]) => t.dias.includes(n)).map(([, l]) => l).join(' ')}</td>
       <td class="mono2">${t.capacidad}</td>
+      <td class="mono2">${t.cantidad_max ? t.cantidad_max : `${CFG.cantidad_max} <span style="opacity:.6">(heredado)</span>`}</td>
       <td><span class="pill ${t.activo ? 'e-confirmada' : 'e-cancelada'}">${t.activo ? 'activo' : 'inactivo'}</span></td>
       <td style="white-space:nowrap">
         <button class="iconbtn" onclick="abrirTurno('${t.id}')" title="Editar" aria-label="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button>
@@ -633,6 +811,9 @@ function abrirTurno(id) {
   $('t-id').value = t ? t.id : '';
   $('t-nombre').value = t ? t.nombre : '';
   $('t-cap').value = t ? t.capacidad : 40;
+  $('t-max').value = t && t.cantidad_max ? t.cantidad_max : '';
+  $('t-max').placeholder = String(CFG.cantidad_max || '');
+  $('hint-tmax').textContent = `Vacío = hereda el máximo general (${CFG.cantidad_max} ${unidad().plur}).`;
   $('t-desde').value = t ? t.hora_desde : '20:00';
   $('t-hasta').value = t ? t.hora_hasta : '23:59';
   $('t-activo').checked = t ? t.activo : true;
@@ -646,7 +827,8 @@ async function guardarTurno() {
   const id = $('t-id').value, err = $('err-turno'), btn = $('btn-turno');
   err.textContent = ''; btn.disabled = true;
   const body = { nombre: $('t-nombre').value, capacidad: +$('t-cap').value,
-    dias: [...T_DIAS], hora_desde: $('t-desde').value, hora_hasta: $('t-hasta').value,
+    cantidad_max: $('t-max').value, dias: [...T_DIAS],
+    hora_desde: $('t-desde').value, hora_hasta: $('t-hasta').value,
     activo: $('t-activo').checked };
   try {
     const r = await fetch('api/reservas/turnos' + (id ? '/' + id : ''),
@@ -688,11 +870,11 @@ async function cargarBloqueos() {
 }
 async function crearBloqueo() {
   const m = $('msg-bloq'); m.className = 'msg';
-  if (!$('b-fecha').value) { m.className = 'msg mal'; m.textContent = 'elegí una fecha'; return; }
+  if (!FD_BLOQUEO.valor) { m.className = 'msg mal'; m.textContent = 'elegí una fecha'; return; }
   try {
     const r = await fetch('api/reservas/bloqueos', { method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fecha: $('b-fecha').value, turno_id: $('b-turno').value || null,
+      body: JSON.stringify({ fecha: FD_BLOQUEO.valor, turno_id: $('b-turno').value || null,
                              motivo: $('b-motivo').value }) });
     const j = await r.json();
     if (r.ok && j.ok) { $('b-motivo').value = ''; m.className = 'msg bien'; m.textContent = 'bloqueado';
@@ -718,6 +900,8 @@ async function cargarTodo() {
 }
 (async () => {
   MES = primerDia(hoy()); SEL = hoy();
+  FD_RESERVA = CampoFecha(document.getElementById('fd-reserva'), { min: hoy(), onChange: turnosDelDia });
+  FD_BLOQUEO = CampoFecha(document.getElementById('fd-bloqueo'), {});
   try { const y = await fetch('api/yo'); ES_ADMIN = y.ok ? !!(await y.json()).admin : false; } catch (_) {}
   try { await cargarTodo(); await cargarBloqueos(); }
   catch (e) { $('sub').textContent = 'error al cargar'; }

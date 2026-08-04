@@ -925,7 +925,7 @@ async function guardarConfigReservas(negocioId, d, esAdmin) {
 // ── Turnos ────────────────────────────────────────────────────────────────────
 async function getTurnos(negocioId) {
   const { rows } = await pool.query(
-    `SELECT id, nombre, capacidad, dias, to_char(hora_desde,'HH24:MI') AS hora_desde,
+    `SELECT id, nombre, capacidad, cantidad_max, dias, to_char(hora_desde,'HH24:MI') AS hora_desde,
             to_char(hora_hasta,'HH24:MI') AS hora_hasta, activo, orden
        FROM contenido.turno WHERE negocio_id=$1 ORDER BY orden, hora_desde`, [negocioId]);
   return rows;
@@ -942,18 +942,22 @@ async function guardarTurno(negocioId, id, d) {
     const e = new Error('horario inválido'); e.code = 'horario_invalido'; throw e;
   }
   if (d.hora_desde >= d.hora_hasta) { const e = new Error('horario al revés'); e.code = 'horario_invalido'; throw e; }
+  // Vacío o 0 = hereda el máximo general. Se guarda NULL y no una copia del valor: así, si el
+  // general cambia, los turnos que no lo pisaron siguen al día sin tocarlos.
+  const maxPropio = (d.cantidad_max === '' || d.cantidad_max == null || +d.cantidad_max <= 0)
+    ? null : Math.min(Math.round(+d.cantidad_max), 100000);
   const args = [negocioId, nombre, capacidad, dias, d.hora_desde, d.hora_hasta,
-                d.activo === false ? false : true, +d.orden || 0];
+                d.activo === false ? false : true, +d.orden || 0, maxPropio];
   if (id) {
     const { rowCount } = await pool.query(
       `UPDATE contenido.turno SET nombre=$2, capacidad=$3, dias=$4::smallint[], hora_desde=$5::time,
-              hora_hasta=$6::time, activo=$7, orden=$8 WHERE id=$9 AND negocio_id=$1`,
-      [...args, id]);
+              hora_hasta=$6::time, activo=$7, orden=$8, cantidad_max=$9
+        WHERE id=$10 AND negocio_id=$1`, [...args, id]);
     return { ok: rowCount > 0 };
   }
   const { rows: [r] } = await pool.query(
-    `INSERT INTO contenido.turno (negocio_id, nombre, capacidad, dias, hora_desde, hora_hasta, activo, orden)
-     VALUES ($1,$2,$3,$4::smallint[],$5::time,$6::time,$7,$8) RETURNING id`, args);
+    `INSERT INTO contenido.turno (negocio_id, nombre, capacidad, dias, hora_desde, hora_hasta, activo, orden, cantidad_max)
+     VALUES ($1,$2,$3,$4::smallint[],$5::time,$6::time,$7,$8,$9) RETURNING id`, args);
   return { ok: true, id: r.id };
 }
 
@@ -1085,7 +1089,7 @@ async function _resolverCliente(cli, negocioId, d) {
 async function crearReserva(negocioId, d) {
   const cfg = await getConfigReservas(negocioId);
   const cantidad = +d.cantidad || 0;
-  if (cantidad < cfg.cantidad_min || cantidad > cfg.cantidad_max) {
+  if (cantidad < cfg.cantidad_min) {
     const e = new Error('cantidad fuera de rango'); e.code = 'cantidad_fuera'; e.detalle = cfg; throw e;
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha || '')) { const e = new Error('fecha'); e.code = 'fecha_invalida'; throw e; }
@@ -1108,10 +1112,19 @@ async function crearReserva(negocioId, d) {
       [`reserva|${negocioId}|${d.turno_id}|${d.fecha}`]);
 
     const { rows: [t] } = await cli.query(
-      `SELECT id, nombre, capacidad, dias, to_char(hora_desde,'HH24:MI') AS hora_desde,
+      `SELECT id, nombre, capacidad, cantidad_max, dias, to_char(hora_desde,'HH24:MI') AS hora_desde,
               to_char(hora_hasta,'HH24:MI') AS hora_hasta, activo
          FROM contenido.turno WHERE id=$1 AND negocio_id=$2`, [d.turno_id, negocioId]);
     if (!t || !t.activo) { const e = new Error('turno'); e.code = 'turno_invalido'; throw e; }
+
+    // El tope por reserva sale del turno si lo redefinió; si no, del general. Se valida acá y no
+    // antes porque hasta no leer el turno no se sabe cuál de los dos manda.
+    const topeEfectivo = t.cantidad_max || cfg.cantidad_max;
+    if (cantidad > topeEfectivo) {
+      const e = new Error('cantidad fuera de rango'); e.code = 'cantidad_fuera';
+      e.detalle = { ...cfg, cantidad_max: topeEfectivo, turno: t.nombre,
+                    propio: t.cantidad_max != null }; throw e;
+    }
 
     // ¿El turno corre ese día de la semana?
     const { rows: [dw] } = await cli.query(`SELECT EXTRACT(isodow FROM $1::date)::int AS d`, [d.fecha]);
