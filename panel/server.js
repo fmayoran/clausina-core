@@ -701,6 +701,90 @@ app.post('/api/capacidades/:cap', soloAdmin, async (req, res) => {
   } catch (e) { console.error('capacidad-set', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 
+// --- Reservas (v2.0 / F4) ---------------------------------------------------------------
+const RES_ERR = new Set(['personas_fuera','fecha_invalida','hora_invalida','turno_invalido',
+  'turno_no_aplica','hora_fuera','muy_pronto','muy_lejos','bloqueado','sin_lugar','sin_cliente',
+  'cliente_invalido','sin_nombre','sin_dias','horario_invalido','ya_bloqueado','con_reservas',
+  'estado_invalido']);
+const resError = (res, e, donde) => {
+  if (RES_ERR.has(e.code)) return res.status(409).json({ ok: false, error: e.code, detalle: e.detalle });
+  console.error(donde, e.message);
+  return res.status(500).json({ ok: false, error: 'db' });
+};
+const hoyISO = () => new Date().toISOString().slice(0, 10);
+const masDias = (iso, n) => new Date(Date.parse(iso + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+// Ventana pedida, acotada: una consulta de dos años se convierte en un cálculo enorme por gusto.
+function rango(req, porDefecto = 42) {
+  const desde = /^\d{4}-\d{2}-\d{2}$/.test(req.query.desde || '') ? req.query.desde : hoyISO();
+  let hasta = /^\d{4}-\d{2}-\d{2}$/.test(req.query.hasta || '') ? req.query.hasta : masDias(desde, porDefecto);
+  if (hasta > masDias(desde, 366)) hasta = masDias(desde, 366);
+  if (hasta < desde) hasta = desde;
+  return { desde, hasta };
+}
+
+app.get('/api/reservas/config', async (req, res) => {
+  try {
+    const [cfg, turnos] = await Promise.all([db.getConfigReservas(req.negocioId), db.getTurnos(req.negocioId)]);
+    res.json({ config: cfg, turnos });
+  } catch (e) { console.error('reservas-config', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.put('/api/reservas/config', async (req, res) => {
+  try { res.json(await db.guardarConfigReservas(req.negocioId, req.body || {}, auth.esAdmin(req.usuario))); }
+  catch (e) { resError(res, e, 'guardar config reservas'); }
+});
+app.post('/api/reservas/turnos', async (req, res) => {
+  try { res.json(await db.guardarTurno(req.negocioId, null, req.body || {})); }
+  catch (e) { resError(res, e, 'crear turno'); }
+});
+app.put('/api/reservas/turnos/:id', async (req, res) => {
+  try {
+    const r = await db.guardarTurno(req.negocioId, req.params.id, req.body || {});
+    res.status(r.ok ? 200 : 404).json(r);
+  } catch (e) { resError(res, e, 'editar turno'); }
+});
+app.delete('/api/reservas/turnos/:id', async (req, res) => {
+  try {
+    const r = await db.borrarTurno(req.negocioId, req.params.id);
+    res.status(r.ok ? 200 : 404).json(r);
+  } catch (e) { resError(res, e, 'borrar turno'); }
+});
+
+app.get('/api/reservas/bloqueos', async (req, res) => {
+  try { const { desde, hasta } = rango(req, 120); res.json({ bloqueos: await db.getBloqueos(req.negocioId, desde, hasta) }); }
+  catch (e) { console.error('bloqueos', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/reservas/bloqueos', async (req, res) => {
+  try { res.json(await db.crearBloqueo(req.negocioId, req.body || {})); }
+  catch (e) { resError(res, e, 'crear bloqueo'); }
+});
+app.delete('/api/reservas/bloqueos/:id', async (req, res) => {
+  try {
+    const r = await db.borrarBloqueo(req.negocioId, req.params.id);
+    res.status(r.ok ? 200 : 404).json(r);
+  } catch (e) { resError(res, e, 'borrar bloqueo'); }
+});
+
+app.get('/api/reservas/disponibilidad', async (req, res) => {
+  try { const { desde, hasta } = rango(req); res.json({ desde, hasta, dias: await db.getDisponibilidad(req.negocioId, desde, hasta) }); }
+  catch (e) { console.error('disponibilidad', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.get('/api/reservas', async (req, res) => {
+  try {
+    const { desde, hasta } = rango(req);
+    res.json({ reservas: await db.getReservas(req.negocioId, { desde, hasta, estado: req.query.estado }) });
+  } catch (e) { console.error('reservas', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/reservas', async (req, res) => {
+  try { res.json(await db.crearReserva(req.negocioId, req.body || {})); }
+  catch (e) { resError(res, e, 'crear reserva'); }
+});
+app.post('/api/reservas/:id/estado', async (req, res) => {
+  try {
+    const r = await db.cambiarEstadoReserva(req.negocioId, req.params.id, (req.body || {}).estado);
+    res.status(r.ok ? 200 : 409).json(r);
+  } catch (e) { resError(res, e, 'estado reserva'); }
+});
+
 // --- Clientes (v2.0 / F3) ---------------------------------------------------------------
 // Todo pasa por req.negocioId, que el middleware ya validó contra los permisos del usuario:
 // no hay forma de leer ni tocar la base de otro negocio desde acá.

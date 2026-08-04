@@ -236,6 +236,7 @@ const CAPS = [
   { id: 'web',       grupo: 'comunicacion', label: 'Web / Landing',      icon: 'globe',             href: 'landing',   desc: 'Sitio del negocio' },
   { id: 'grafica',   grupo: 'comunicacion', label: 'Gráfica',            icon: 'layout-template',   href: 'grafica',   desc: 'Folletos, afiches y vía pública', depende: ['estilo'] },
   { id: 'clientes',  grupo: 'operacion',    label: 'Clientes',           icon: 'users-round',       href: 'clientes',  desc: 'Base de clientes del negocio' },
+  { id: 'reservas',  grupo: 'operacion',    label: 'Reservas',           icon: 'calendar-check',    href: 'reservas',  desc: 'Turnos, disponibilidad y reservas', depende: ['clientes'] },
 ];
 const GRUPOS_CAP = [
   { id: 'identidad',    label: 'Identidad',   desc: 'Quién es el negocio' },
@@ -261,6 +262,10 @@ function evaluarCap(cap, d, cfg) {
   } else if (cap.id === 'web') {
     if (!d.dominio_web) faltan.push('dominio');
     if (!cfg.modo) faltan.push('modo (administrada o referencia)');
+  } else if (cap.id === 'reservas') {
+    if (!cfg.fuente_verdad) faltan.push('fuente de verdad (ClaUsina o sistema del negocio)');
+    // Sin al menos un turno activo el módulo no puede aceptar nada: es config, no un detalle.
+    if (!d.turnos_activos) faltan.push('al menos un turno activo');
   } else if (cap.id === 'clientes') {
     // Decisión de Fer: la fuente de verdad se declara por capacidad y por negocio. Sin
     // declararla, ClaUsina podría terminar compitiendo con el sistema que el cliente ya usa.
@@ -273,7 +278,8 @@ function evaluarCap(cap, d, cfg) {
 async function getCapacidades(negocioId) {
   const { rows: [d] } = await pool.query(
     `SELECT p.ig_handle, p.ig_user_id, p.dominio_web, pp.estilo_md, pp.ig_token_enc,
-            pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id, pp.meta_ads_token_enc
+            pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id, pp.meta_ads_token_enc,
+            (SELECT count(*) FROM contenido.turno t WHERE t.negocio_id=p.id AND t.activo)::int AS turnos_activos
        FROM contenido.negocios p LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id
       WHERE p.id=$1`, [negocioId]);
   const { rows } = await pool.query(
@@ -848,6 +854,314 @@ async function exportarClientes(negocioId) {
 async function borrarTodosLosClientes(negocioId) {
   const { rowCount } = await pool.query('DELETE FROM contenido.cliente WHERE negocio_id=$1', [negocioId]);
   return { ok: true, borrados: rowCount };
+}
+
+// --- Reservas (v2.0 / F4) ----------------------------------------------------------------
+// Zona horaria explícita: el servidor corre en UTC y una reserva es un momento LOCAL. Comparar
+// "faltan 2 horas" sin esto da tres horas de diferencia, que es exactamente el error que hace
+// que se acepte una reserva para dentro de un rato o se rechace una válida.
+const TZ = 'America/Argentina/Buenos_Aires';
+
+const CFG_RESERVAS = {
+  anticipacion_max_dias: 30,   // hasta cuándo se puede reservar hacia adelante
+  anticipacion_min_horas: 2,   // cuánto antes, como mínimo (no es lo mismo que lo anterior)
+  personas_min: 1,
+  personas_max: 12,
+  tolerancia_min: 15,          // cuánto se sostiene la mesa pasada la hora reservada
+};
+
+async function getConfigReservas(negocioId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT config FROM contenido.negocio_capacidad WHERE negocio_id=$1 AND capacidad='reservas'`,
+    [negocioId]);
+  return { ...CFG_RESERVAS, ...((r && r.config) || {}) };
+}
+
+// Los parámetros operativos (anticipación, personas, tolerancia) los maneja quien opera el
+// negocio. La FUENTE DE VERDAD es estructural —define si ClaUsina manda sobre el dato o es un
+// espejo— así que sólo la toca un admin.
+async function guardarConfigReservas(negocioId, d, esAdmin) {
+  const num = (v, def, min, max) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(min, Math.min(Math.round(n), max)) : def;
+  };
+  const actual = await getConfigReservas(negocioId);
+  const cfg = {
+    ...actual,
+    anticipacion_max_dias:  num(d.anticipacion_max_dias,  actual.anticipacion_max_dias,  1, 365),
+    anticipacion_min_horas: num(d.anticipacion_min_horas, actual.anticipacion_min_horas, 0, 720),
+    personas_min:           num(d.personas_min,           actual.personas_min,           1, 1000),
+    personas_max:           num(d.personas_max,           actual.personas_max,           1, 1000),
+    tolerancia_min:         num(d.tolerancia_min,         actual.tolerancia_min,         0, 480),
+    auto_confirmar:         !!d.auto_confirmar,
+  };
+  if (cfg.personas_min > cfg.personas_max) cfg.personas_min = cfg.personas_max;
+  if (esAdmin && ['clausina', 'externo'].includes(d.fuente_verdad)) cfg.fuente_verdad = d.fuente_verdad;
+  await pool.query(
+    `INSERT INTO contenido.negocio_capacidad (negocio_id, capacidad, habilitada, config, actualizado_en)
+     VALUES ($1,'reservas',
+             COALESCE((SELECT habilitada FROM contenido.negocio_capacidad
+                        WHERE negocio_id=$1 AND capacidad='reservas'), false),
+             $2::jsonb, now())
+     ON CONFLICT (negocio_id, capacidad) DO UPDATE SET config=$2::jsonb, actualizado_en=now()`,
+    [negocioId, JSON.stringify(cfg)]);
+  return { ok: true, config: cfg };
+}
+
+// ── Turnos ────────────────────────────────────────────────────────────────────
+async function getTurnos(negocioId) {
+  const { rows } = await pool.query(
+    `SELECT id, nombre, capacidad, dias, to_char(hora_desde,'HH24:MI') AS hora_desde,
+            to_char(hora_hasta,'HH24:MI') AS hora_hasta, activo, orden
+       FROM contenido.turno WHERE negocio_id=$1 ORDER BY orden, hora_desde`, [negocioId]);
+  return rows;
+}
+
+async function guardarTurno(negocioId, id, d) {
+  const nombre = String(d.nombre || '').trim();
+  const capacidad = Math.max(1, Math.min(+d.capacidad || 0, 100000));
+  const dias = [...new Set((Array.isArray(d.dias) ? d.dias : []).map(Number)
+    .filter(n => n >= 1 && n <= 7))].sort();
+  if (!nombre) { const e = new Error('falta nombre'); e.code = 'sin_nombre'; throw e; }
+  if (!dias.length) { const e = new Error('sin días'); e.code = 'sin_dias'; throw e; }
+  if (!/^\d{1,2}:\d{2}$/.test(d.hora_desde || '') || !/^\d{1,2}:\d{2}$/.test(d.hora_hasta || '')) {
+    const e = new Error('horario inválido'); e.code = 'horario_invalido'; throw e;
+  }
+  if (d.hora_desde >= d.hora_hasta) { const e = new Error('horario al revés'); e.code = 'horario_invalido'; throw e; }
+  const args = [negocioId, nombre, capacidad, dias, d.hora_desde, d.hora_hasta,
+                d.activo === false ? false : true, +d.orden || 0];
+  if (id) {
+    const { rowCount } = await pool.query(
+      `UPDATE contenido.turno SET nombre=$2, capacidad=$3, dias=$4::smallint[], hora_desde=$5::time,
+              hora_hasta=$6::time, activo=$7, orden=$8 WHERE id=$9 AND negocio_id=$1`,
+      [...args, id]);
+    return { ok: rowCount > 0 };
+  }
+  const { rows: [r] } = await pool.query(
+    `INSERT INTO contenido.turno (negocio_id, nombre, capacidad, dias, hora_desde, hora_hasta, activo, orden)
+     VALUES ($1,$2,$3,$4::smallint[],$5::time,$6::time,$7,$8) RETURNING id`, args);
+  return { ok: true, id: r.id };
+}
+
+async function borrarTurno(negocioId, id) {
+  try {
+    const { rowCount } = await pool.query(
+      'DELETE FROM contenido.turno WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
+    return { ok: rowCount > 0 };
+  } catch (e) {
+    // ON DELETE RESTRICT desde reserva: un turno con reservas no se borra, se desactiva.
+    if (e.code === '23503') { const x = new Error('turno con reservas'); x.code = 'con_reservas'; throw x; }
+    throw e;
+  }
+}
+
+// ── Bloqueos ──────────────────────────────────────────────────────────────────
+async function getBloqueos(negocioId, desde, hasta) {
+  const { rows } = await pool.query(
+    `SELECT b.id, b.fecha::text, b.turno_id, b.motivo, t.nombre AS turno
+       FROM contenido.bloqueo b LEFT JOIN contenido.turno t ON t.id=b.turno_id
+      WHERE b.negocio_id=$1 AND b.fecha BETWEEN $2::date AND $3::date
+      ORDER BY b.fecha, t.orden NULLS FIRST`, [negocioId, desde, hasta]);
+  return rows;
+}
+
+async function crearBloqueo(negocioId, d) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha || '')) { const e = new Error('fecha'); e.code = 'fecha_invalida'; throw e; }
+  try {
+    const { rows: [r] } = await pool.query(
+      `INSERT INTO contenido.bloqueo (negocio_id, fecha, turno_id, motivo)
+       SELECT $1, $2::date, $3::uuid, $4
+        WHERE $3::uuid IS NULL
+           OR EXISTS (SELECT 1 FROM contenido.turno WHERE id=$3::uuid AND negocio_id=$1)
+       RETURNING id`,
+      [negocioId, d.fecha, d.turno_id || null, String(d.motivo || '').trim() || null]);
+    if (!r) { const e = new Error('turno ajeno'); e.code = 'turno_invalido'; throw e; }
+    return { ok: true, id: r.id };
+  } catch (e) {
+    if (e.code === '23505') { const x = new Error('ya bloqueado'); x.code = 'ya_bloqueado'; throw x; }
+    throw e;
+  }
+}
+
+async function borrarBloqueo(negocioId, id) {
+  const { rowCount } = await pool.query(
+    'DELETE FROM contenido.bloqueo WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
+  return { ok: rowCount > 0 };
+}
+
+// ── Disponibilidad: lo que alimenta la vista calendarizada ───────────────────
+// Un turno aparece en un día si ese día de la semana está en `dias`. La ocupación cuenta sólo
+// las reservas que pesan: una cancelada libera el lugar, una no_show ya pasó.
+async function getDisponibilidad(negocioId, desde, hasta) {
+  const { rows } = await pool.query(
+    `WITH dias AS (SELECT d::date AS fecha FROM generate_series($2::date, $3::date, '1 day') d),
+          t AS (SELECT * FROM contenido.turno WHERE negocio_id=$1 AND activo)
+     SELECT dias.fecha::text, t.id AS turno_id, t.nombre, t.capacidad, t.orden,
+            to_char(t.hora_desde,'HH24:MI') AS hora_desde,
+            to_char(t.hora_hasta,'HH24:MI') AS hora_hasta,
+            COALESCE(r.ocupado, 0)::int AS ocupado,
+            COALESCE(r.reservas, 0)::int AS reservas,
+            (bd.id IS NOT NULL OR bt.id IS NOT NULL) AS bloqueado,
+            COALESCE(bd.motivo, bt.motivo) AS motivo_bloqueo
+       FROM dias
+       JOIN t ON EXTRACT(isodow FROM dias.fecha)::smallint = ANY(t.dias)
+       LEFT JOIN LATERAL (
+         SELECT sum(personas)::int AS ocupado, count(*)::int AS reservas
+           FROM contenido.reserva rr
+          WHERE rr.negocio_id=$1 AND rr.turno_id=t.id AND rr.fecha=dias.fecha
+            AND rr.estado IN ('solicitada','confirmada','cumplida')) r ON true
+       LEFT JOIN contenido.bloqueo bd
+         ON bd.negocio_id=$1 AND bd.fecha=dias.fecha AND bd.turno_id IS NULL
+       LEFT JOIN contenido.bloqueo bt
+         ON bt.negocio_id=$1 AND bt.fecha=dias.fecha AND bt.turno_id=t.id
+      ORDER BY dias.fecha, t.orden, t.hora_desde`, [negocioId, desde, hasta]);
+  return rows;
+}
+
+// ── Reservas ──────────────────────────────────────────────────────────────────
+async function getReservas(negocioId, { desde, hasta, estado } = {}) {
+  const params = [negocioId];
+  let filtro = '';
+  if (desde && hasta) { params.push(desde, hasta); filtro += ` AND r.fecha BETWEEN $2::date AND $3::date`; }
+  if (estado) { params.push(estado); filtro += ` AND r.estado = $${params.length}`; }
+  const { rows } = await pool.query(
+    `SELECT r.id, r.fecha::text, to_char(r.hora,'HH24:MI') AS hora, r.personas, r.estado, r.canal,
+            r.notas, r.agente_id, r.ref_externa, r.creado_en,
+            r.turno_id, t.nombre AS turno,
+            r.cliente_id, c.nombre AS cliente, c.telefono, c.email
+       FROM contenido.reserva r
+       JOIN contenido.turno t ON t.id = r.turno_id
+       JOIN contenido.cliente c ON c.id = r.cliente_id
+      WHERE r.negocio_id=$1${filtro}
+      ORDER BY r.fecha DESC, r.hora DESC`, params);
+  return rows;
+}
+
+// Identificar al cliente: si el teléfono ya existe en ESTE negocio se reusa, si no se crea.
+// Nunca se busca fuera del negocio — las bases no se cruzan.
+async function _resolverCliente(cli, negocioId, d) {
+  if (d.cliente_id) {
+    const { rows: [c] } = await cli.query(
+      'SELECT id FROM contenido.cliente WHERE id=$1 AND negocio_id=$2', [d.cliente_id, negocioId]);
+    if (!c) { const e = new Error('cliente ajeno'); e.code = 'cliente_invalido'; throw e; }
+    return c.id;
+  }
+  const nombre = String(d.cliente_nombre || '').trim() || null;
+  const numero = String(d.cliente_telefono || '').trim() || null;
+  const norm = numero ? (tel.clave(numero) || null) : null;
+  if (!nombre && !norm) { const e = new Error('sin cliente'); e.code = 'sin_cliente'; throw e; }
+  if (norm) {
+    const { rows: [c] } = await cli.query(
+      'SELECT id FROM contenido.cliente WHERE negocio_id=$1 AND telefono_norm=$2', [negocioId, norm]);
+    if (c) {
+      if (nombre) await cli.query(
+        'UPDATE contenido.cliente SET nombre=COALESCE(nombre,$2) WHERE id=$1', [c.id, nombre]);
+      return c.id;
+    }
+  }
+  const { rows: [n] } = await cli.query(
+    `INSERT INTO contenido.cliente (negocio_id, nombre, telefono, telefono_norm, email, origen)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+    [negocioId, nombre, numero, norm, String(d.cliente_email || '').trim().toLowerCase() || null,
+     ['whatsapp','landing','agente'].includes(d.canal) ? d.canal : 'carga']);
+  return n.id;
+}
+
+async function crearReserva(negocioId, d) {
+  const cfg = await getConfigReservas(negocioId);
+  const personas = +d.personas || 0;
+  if (personas < cfg.personas_min || personas > cfg.personas_max) {
+    const e = new Error('personas fuera de rango'); e.code = 'personas_fuera'; e.detalle = cfg; throw e;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha || '')) { const e = new Error('fecha'); e.code = 'fecha_invalida'; throw e; }
+  if (!/^\d{1,2}:\d{2}$/.test(d.hora || '')) { const e = new Error('hora'); e.code = 'hora_invalida'; throw e; }
+
+  // Una reserva creada por un agente externo entra como SOLICITADA, nunca confirmada, salvo que
+  // el negocio active auto_confirmar. Es el principio de la plataforma —nada sale sin visto
+  // humano— aplicado del lado operativo. Ver core/planes/V2.md.
+  const canal = ['panel','whatsapp','landing','agente'].includes(d.canal) ? d.canal : 'panel';
+  const estado = (canal === 'agente' && !cfg.auto_confirmar) ? 'solicitada'
+               : (canal === 'panel' ? 'confirmada' : 'solicitada');
+
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+
+    // El lock serializa las altas del MISMO turno y día. Sin esto, dos pedidos simultáneos leen
+    // la misma ocupación, los dos concluyen que entran, y la mesa queda duplicada. Es exactamente
+    // el modo de falla que separa este grupo del de comunicación.
+    await cli.query('SELECT pg_advisory_xact_lock(hashtext($1))',
+      [`reserva|${negocioId}|${d.turno_id}|${d.fecha}`]);
+
+    const { rows: [t] } = await cli.query(
+      `SELECT id, nombre, capacidad, dias, to_char(hora_desde,'HH24:MI') AS hora_desde,
+              to_char(hora_hasta,'HH24:MI') AS hora_hasta, activo
+         FROM contenido.turno WHERE id=$1 AND negocio_id=$2`, [d.turno_id, negocioId]);
+    if (!t || !t.activo) { const e = new Error('turno'); e.code = 'turno_invalido'; throw e; }
+
+    // ¿El turno corre ese día de la semana?
+    const { rows: [dw] } = await cli.query(`SELECT EXTRACT(isodow FROM $1::date)::int AS d`, [d.fecha]);
+    if (!t.dias.includes(dw.d)) { const e = new Error('día'); e.code = 'turno_no_aplica'; throw e; }
+
+    // La hora tiene que caer dentro de la ventana del turno.
+    const hhmm = d.hora.padStart(5, '0');
+    if (hhmm < t.hora_desde || hhmm >= t.hora_hasta) {
+      const e = new Error('hora fuera del turno'); e.code = 'hora_fuera'; e.detalle = t; throw e;
+    }
+
+    // Anticipación, en hora local: mínima (no reservar para dentro de un rato) y máxima.
+    const { rows: [v] } = await cli.query(
+      `SELECT (($1::date + $2::time) AT TIME ZONE $3) AS cuando,
+              now() + ($4 || ' hours')::interval AS piso,
+              now() + ($5 || ' days')::interval  AS techo`,
+      [d.fecha, hhmm, TZ, String(cfg.anticipacion_min_horas), String(cfg.anticipacion_max_dias)]);
+    if (v.cuando < v.piso) { const e = new Error('muy sobre la hora'); e.code = 'muy_pronto'; e.detalle = cfg; throw e; }
+    if (v.cuando > v.techo) { const e = new Error('demasiado lejos'); e.code = 'muy_lejos'; e.detalle = cfg; throw e; }
+
+    // Bloqueos: día entero o ese turno.
+    const { rows: [b] } = await cli.query(
+      `SELECT motivo FROM contenido.bloqueo
+        WHERE negocio_id=$1 AND fecha=$2::date AND (turno_id IS NULL OR turno_id=$3) LIMIT 1`,
+      [negocioId, d.fecha, d.turno_id]);
+    if (b) { const e = new Error('bloqueado'); e.code = 'bloqueado'; e.detalle = b.motivo; throw e; }
+
+    // Capacidad, ya bajo lock.
+    const { rows: [o] } = await cli.query(
+      `SELECT COALESCE(sum(personas),0)::int AS ocupado FROM contenido.reserva
+        WHERE negocio_id=$1 AND turno_id=$2 AND fecha=$3::date
+          AND estado IN ('solicitada','confirmada','cumplida')`,
+      [negocioId, d.turno_id, d.fecha]);
+    const libre = t.capacidad - o.ocupado;
+    if (personas > libre) {
+      const e = new Error('sin lugar'); e.code = 'sin_lugar';
+      e.detalle = { capacidad: t.capacidad, ocupado: o.ocupado, libre }; throw e;
+    }
+
+    const clienteId = await _resolverCliente(cli, negocioId, d);
+    const { rows: [r] } = await cli.query(
+      `INSERT INTO contenido.reserva
+         (negocio_id, cliente_id, turno_id, fecha, hora, personas, estado, canal, agente_id, notas, ref_externa)
+       VALUES ($1,$2,$3,$4::date,$5::time,$6,$7,$8,$9,$10,$11) RETURNING id`,
+      [negocioId, clienteId, d.turno_id, d.fecha, hhmm, personas, estado, canal,
+       String(d.agente_id || '').trim() || null, String(d.notas || '').trim() || null,
+       String(d.ref_externa || '').trim() || null]);
+
+    await cli.query('COMMIT');
+    return { ok: true, id: r.id, estado, libre: libre - personas };
+  } catch (e) {
+    await cli.query('ROLLBACK'); throw e;
+  } finally { cli.release(); }
+}
+
+const ESTADOS_RESERVA = ['solicitada','confirmada','cancelada','cumplida','no_show'];
+async function cambiarEstadoReserva(negocioId, id, estado) {
+  if (!ESTADOS_RESERVA.includes(estado)) { const e = new Error('estado'); e.code = 'estado_invalido'; throw e; }
+  // Pasar de cancelada a activa devolvería lugar que quizá ya se dio: se rehace la reserva.
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.reserva SET estado=$3 WHERE id=$1 AND negocio_id=$2
+       AND NOT (estado='cancelada' AND $3 IN ('solicitada','confirmada'))`,
+    [id, negocioId, estado]);
+  return { ok: rowCount > 0 };
 }
 
 // --- Identidad estructurada (v2.0 / F1) --------------------------------------------------
@@ -1776,6 +2090,9 @@ module.exports = {
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
   getClientes, crearCliente, actualizarCliente, borrarCliente, exportarClientes, borrarTodosLosClientes,
+  getConfigReservas, guardarConfigReservas, getTurnos, guardarTurno, borrarTurno,
+  getBloqueos, crearBloqueo, borrarBloqueo,
+  getDisponibilidad, getReservas, crearReserva, cambiarEstadoReserva,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente, getVerificacion,

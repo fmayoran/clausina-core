@@ -30,7 +30,8 @@
       { id: 'biblioteca',label: 'Biblioteca',        icon: 'images',      href: 'biblioteca' },
     ],
     'Operación': [
-      { id: 'clientes',  label: 'Clientes',          icon: 'users-round', href: 'clientes' },
+      { id: 'clientes',  label: 'Clientes',          icon: 'users-round',    href: 'clientes' },
+      { id: 'reservas',  label: 'Reservas',          icon: 'calendar-check', href: 'reservas' },
     ],
     // Fuera de las secciones de negocio: es la cuenta de quien está mirando, no del negocio activo.
     Vos: [
@@ -176,7 +177,7 @@
 
   // Grisa en el menú las capacidades que la negocio activo tiene deshabilitadas (siguen visibles:
   // se habilitan desde el panel del proyecto). nav id -> capacidad.
-  var NAV_CAP = { instagram: 'instagram', pauta: 'pauta', avisos: 'pantalla', landing: 'web', clientes: 'clientes' };
+  var NAV_CAP = { instagram: 'instagram', pauta: 'pauta', avisos: 'pantalla', landing: 'web', clientes: 'clientes', reservas: 'reservas' };
   // Secciones que son de la plataforma, no de un negocio: sólo el admin las ve.
   // 'inicio' es el tablero de la agencia (consume /api/agencia, /api/maquinas, alta de negocios):
   // para un usuario de negocio no tiene nada, así que además lo mandamos a la home de SU negocio.
