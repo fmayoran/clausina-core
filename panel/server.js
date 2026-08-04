@@ -701,6 +701,56 @@ app.post('/api/capacidades/:cap', soloAdmin, async (req, res) => {
   } catch (e) { console.error('capacidad-set', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 
+// --- Clientes (v2.0 / F3) ---------------------------------------------------------------
+// Todo pasa por req.negocioId, que el middleware ya validó contra los permisos del usuario:
+// no hay forma de leer ni tocar la base de otro negocio desde acá.
+app.get('/api/clientes', async (req, res) => {
+  try { res.json(await db.getClientes(req.negocioId, { q: req.query.q, limit: req.query.limit, offset: req.query.offset })); }
+  catch (e) { console.error('clientes', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/clientes', async (req, res) => {
+  try { res.json(await db.crearCliente(req.negocioId, req.body || {})); }
+  catch (e) {
+    if (e.code === 'tel_repetido' || e.code === 'sin_datos') return res.status(409).json({ ok: false, error: e.code });
+    console.error('crear cliente', e.message); res.status(500).json({ ok: false, error: 'db' });
+  }
+});
+app.put('/api/clientes/:id', async (req, res) => {
+  try {
+    const r = await db.actualizarCliente(req.negocioId, req.params.id, req.body || {});
+    res.status(r.ok ? 200 : 404).json(r);
+  } catch (e) {
+    if (e.code === 'tel_repetido' || e.code === 'sin_datos') return res.status(409).json({ ok: false, error: e.code });
+    console.error('actualizar cliente', e.message); res.status(500).json({ ok: false, error: 'db' });
+  }
+});
+app.delete('/api/clientes/:id', async (req, res) => {
+  try {
+    const r = await db.borrarCliente(req.negocioId, req.params.id);
+    res.status(r.ok ? 200 : 404).json(r);
+  } catch (e) { console.error('borrar cliente', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+// Exportar: contracara de "los datos son del negocio". Cualquiera que vea el negocio puede
+// llevarse su base; no es una operación privilegiada, es un derecho del dueño del dato.
+app.get('/api/clientes/exportar', async (req, res) => {
+  try {
+    const csv = await db.exportarClientes(req.negocioId);
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', `attachment; filename="clientes-${req.negocio || 'negocio'}.csv"`);
+    res.send(csv);
+  } catch (e) { console.error('exportar clientes', e.message); res.status(500).json({ error: 'db' }); }
+});
+// Borrado en bloque (el negocio se va). Solo admin y con confirmación explícita del slug:
+// un borrado de toda la base de un cliente no puede depender de un solo clic.
+app.post('/api/clientes/borrar-todo', soloAdmin, async (req, res) => {
+  try {
+    if (String((req.body || {}).confirmar || '') !== req.negocio) {
+      return res.status(400).json({ ok: false, error: 'confirmacion_invalida' });
+    }
+    res.json(await db.borrarTodosLosClientes(req.negocioId));
+  } catch (e) { console.error('borrar todos los clientes', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+
 // Perfil se absorbió dentro de Identidad (v2.0 / F2). El archivo perfil.html sigue en disco pero
 // ya no se navega: esto evita que un enlace viejo o un favorito caigan en una página huérfana.
 app.get('/perfil', (req, res) => res.redirect(301, '/identidad'));

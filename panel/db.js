@@ -235,6 +235,7 @@ const CAPS = [
   { id: 'pantalla',  grupo: 'comunicacion', label: 'Avisos en pantalla', icon: 'megaphone',         href: 'avisos',    desc: 'Avisos para la pantalla de calle' },
   { id: 'web',       grupo: 'comunicacion', label: 'Web / Landing',      icon: 'globe',             href: 'landing',   desc: 'Sitio del negocio' },
   { id: 'grafica',   grupo: 'comunicacion', label: 'Gráfica',            icon: 'layout-template',   href: 'grafica',   desc: 'Folletos, afiches y vía pública', depende: ['estilo'] },
+  { id: 'clientes',  grupo: 'operacion',    label: 'Clientes',           icon: 'users-round',       href: 'clientes',  desc: 'Base de clientes del negocio' },
 ];
 const GRUPOS_CAP = [
   { id: 'identidad',    label: 'Identidad',   desc: 'Quién es el negocio' },
@@ -260,6 +261,10 @@ function evaluarCap(cap, d, cfg) {
   } else if (cap.id === 'web') {
     if (!d.dominio_web) faltan.push('dominio');
     if (!cfg.modo) faltan.push('modo (administrada o referencia)');
+  } else if (cap.id === 'clientes') {
+    // Decisión de Fer: la fuente de verdad se declara por capacidad y por negocio. Sin
+    // declararla, ClaUsina podría terminar compitiendo con el sistema que el cliente ya usa.
+    if (!cfg.fuente_verdad) faltan.push('fuente de verdad (ClaUsina o sistema del negocio)');
   }
   // 'pantalla' no requiere config extra: la pantalla es un recurso del sistema.
   return { configurada: faltan.length === 0, faltan };
@@ -740,6 +745,108 @@ async function setLogo(negocioId, url) {
     [negocioId, url]);
   _negociosAt = 0;   // el logo se cachea en la lista de marcas
   return true;
+}
+
+// --- Clientes (v2.0 / F3) ----------------------------------------------------------------
+// Los datos son DEL NEGOCIO; ClaUsina los procesa. Todo va scopeado por negocio_id: no hay
+// una sola consulta acá que pueda cruzar datos entre negocios, y eso es a propósito.
+const ORIGENES = ['whatsapp', 'landing', 'carga', 'agente', 'importacion'];
+
+async function getClientes(negocioId, { q, limit = 200, offset = 0 } = {}) {
+  const params = [negocioId];
+  let filtro = '';
+  if (q && String(q).trim()) {
+    const t = '%' + String(q).trim().toLowerCase() + '%';
+    params.push(t, tel.clave(q) || ' ');
+    filtro = ` AND (lower(coalesce(nombre,'')) LIKE $2 OR lower(coalesce(email,'')) LIKE $2
+                    OR coalesce(telefono,'') LIKE $2 OR telefono_norm = $3)`;
+  }
+  params.push(Math.min(+limit || 200, 1000), Math.max(+offset || 0, 0));
+  const { rows } = await pool.query(
+    `SELECT id, nombre, telefono, telefono_norm, email, notas, origen,
+            consentimiento, consentimiento_en, ref_externa, creado_en, actualizado_en
+       FROM contenido.cliente WHERE negocio_id=$1${filtro}
+      ORDER BY creado_en DESC LIMIT $${params.length - 1} OFFSET $${params.length}`, params);
+  const { rows: [c] } = await pool.query(
+    `SELECT count(*)::int AS total,
+            count(*) FILTER (WHERE consentimiento)::int AS con_consentimiento
+       FROM contenido.cliente WHERE negocio_id=$1`, [negocioId]);
+  return { clientes: rows, total: c.total, con_consentimiento: c.con_consentimiento };
+}
+
+function _datosCliente(d) {
+  const nn = s => (s != null && String(s).trim() !== '') ? String(s).trim() : null;
+  const tel = nn(d.telefono);
+  return {
+    nombre: nn(d.nombre),
+    telefono: tel,
+    telefono_norm: tel ? (tel.clave(tel) || null) : null,
+    email: nn(d.email) ? nn(d.email).toLowerCase() : null,
+    notas: nn(d.notas),
+    origen: ORIGENES.includes(d.origen) ? d.origen : 'carga',
+    consentimiento: !!d.consentimiento,
+    ref_externa: nn(d.ref_externa),
+  };
+}
+
+async function crearCliente(negocioId, d) {
+  const c = _datosCliente(d);
+  if (!c.nombre && !c.telefono_norm && !c.email) { const e = new Error('sin datos'); e.code = 'sin_datos'; throw e; }
+  try {
+    const { rows: [r] } = await pool.query(
+      `INSERT INTO contenido.cliente
+         (negocio_id, nombre, telefono, telefono_norm, email, notas, origen, consentimiento, ref_externa)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+      [negocioId, c.nombre, c.telefono, c.telefono_norm, c.email, c.notas, c.origen, c.consentimiento, c.ref_externa]);
+    return { ok: true, id: r.id };
+  } catch (e) {
+    if (e.code === '23505') { const x = new Error('teléfono repetido'); x.code = 'tel_repetido'; throw x; }
+    throw e;
+  }
+}
+
+async function actualizarCliente(negocioId, id, d) {
+  const c = _datosCliente(d);
+  if (!c.nombre && !c.telefono_norm && !c.email) { const e = new Error('sin datos'); e.code = 'sin_datos'; throw e; }
+  try {
+    // El negocio_id va en el WHERE, no sólo el id: sin eso, conocer un uuid ajeno alcanzaría.
+    const { rowCount } = await pool.query(
+      `UPDATE contenido.cliente SET nombre=$3, telefono=$4, telefono_norm=$5, email=$6,
+              notas=$7, origen=$8, consentimiento=$9, ref_externa=$10
+        WHERE id=$2 AND negocio_id=$1`,
+      [negocioId, id, c.nombre, c.telefono, c.telefono_norm, c.email, c.notas, c.origen, c.consentimiento, c.ref_externa]);
+    return { ok: rowCount > 0 };
+  } catch (e) {
+    if (e.code === '23505') { const x = new Error('teléfono repetido'); x.code = 'tel_repetido'; throw x; }
+    throw e;
+  }
+}
+
+async function borrarCliente(negocioId, id) {
+  const { rowCount } = await pool.query(
+    'DELETE FROM contenido.cliente WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
+  return { ok: rowCount > 0 };
+}
+
+// Exportar y borrar en bloque: son la contracara de "los datos son del negocio". Si un negocio
+// se va, se lleva su base y ClaUsina la borra. Tienen que existir desde el día uno.
+async function exportarClientes(negocioId) {
+  const { rows } = await pool.query(
+    `SELECT nombre, telefono, email, notas, origen, consentimiento, consentimiento_en, creado_en
+       FROM contenido.cliente WHERE negocio_id=$1 ORDER BY creado_en`, [negocioId]);
+  const esc = v => {
+    if (v == null) return '';
+    const s = v instanceof Date ? v.toISOString() : String(v);
+    return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const cols = ['nombre','telefono','email','notas','origen','consentimiento','consentimiento_en','creado_en'];
+  // Con BOM para que Excel en español no rompa los acentos.
+  return '﻿' + [cols.join(','), ...rows.map(r => cols.map(c => esc(r[c])).join(','))].join('\n');
+}
+
+async function borrarTodosLosClientes(negocioId) {
+  const { rowCount } = await pool.query('DELETE FROM contenido.cliente WHERE negocio_id=$1', [negocioId]);
+  return { ok: true, borrados: rowCount };
 }
 
 // --- Identidad estructurada (v2.0 / F1) --------------------------------------------------
@@ -1667,6 +1774,7 @@ module.exports = {
   completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
+  getClientes, crearCliente, actualizarCliente, borrarCliente, exportarClientes, borrarTodosLosClientes,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente, getVerificacion,
