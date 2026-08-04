@@ -392,7 +392,9 @@ let SEL_ATTR = new Set(), SEL_MOM = new Set();
 let REVISADO = null;
 
 const $ = id => document.getElementById(id);
-const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+// Propia y no la de panel.js: aquella no escapa comillas, y acá se interpola dentro de
+// atributos HTML (value="..."), donde una comilla sin escapar rompe el markup.
+const escapar = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const lista = s => String(s || '').split(',').map(x => x.trim()).filter(Boolean);
 
@@ -414,13 +416,13 @@ function aplicables() {
 
 function pintarChips() {
   $('momentos').innerHTML = MOMENTOS.map(([c, n]) =>
-    `<button type="button" class="chip${SEL_MOM.has(c) ? ' on' : ''}" data-mom="${c}">${esc(n)}</button>`).join('');
+    `<button type="button" class="chip${SEL_MOM.has(c) ? ' on' : ''}" data-mom="${c}">${escapar(n)}</button>`).join('');
   const visibles = aplicables();
   const grupos = {};
   visibles.forEach(a => { (grupos[a.grupo] = grupos[a.grupo] || []).push(a); });
   $('atributos').innerHTML = Object.keys(grupos).map(g =>
-    `<div class="gtit">${esc(g)}</div><div class="chips">` +
-    grupos[g].map(a => `<button type="button" class="chip${SEL_ATTR.has(a.codigo) ? ' on' : ''}" data-attr="${esc(a.codigo)}">${esc(a.nombre)}</button>`).join('') +
+    `<div class="gtit">${escapar(g)}</div><div class="chips">` +
+    grupos[g].map(a => `<button type="button" class="chip${SEL_ATTR.has(a.codigo) ? ' on' : ''}" data-attr="${escapar(a.codigo)}">${escapar(a.nombre)}</button>`).join('') +
     `</div>`).join('');
   const ocultos = CAT.atributos.length - visibles.length;
   $('attr-nota').textContent = $('f-act').value
@@ -455,12 +457,12 @@ function filaSede(s, i) {
     <button class="iconbtn quitar" type="button" onclick="quitarSede(${i})" title="Quitar sede" aria-label="Quitar sede">
       <i data-lucide="trash-2" class="w-4 h-4"></i></button>
     <div class="grid2">
-      <div><label>Nombre</label><input type="text" data-s="${i}" data-k="nombre" value="${esc(s.nombre)}" placeholder="Casa central"></div>
-      <div><label>Dirección</label><input type="text" data-s="${i}" data-k="direccion" value="${esc(s.direccion)}" placeholder="Av. Valentín Vergara 3100"></div>
-      <div><label>Localidad</label><input type="text" data-s="${i}" data-k="localidad" value="${esc(s.localidad)}" placeholder="Ranelagh"></div>
-      <div><label>Partido</label><input type="text" data-s="${i}" data-k="partido" value="${esc(s.partido)}" placeholder="Berazategui"></div>
-      <div><label>Provincia</label><input type="text" data-s="${i}" data-k="provincia" value="${esc(s.provincia)}" placeholder="Buenos Aires"></div>
-      <div><label>Teléfono</label><input type="text" data-s="${i}" data-k="telefono" value="${esc(s.telefono)}"></div>
+      <div><label>Nombre</label><input type="text" data-s="${i}" data-k="nombre" value="${escapar(s.nombre)}" placeholder="Casa central"></div>
+      <div><label>Dirección</label><input type="text" data-s="${i}" data-k="direccion" value="${escapar(s.direccion)}" placeholder="Av. Valentín Vergara 3100"></div>
+      <div><label>Localidad</label><input type="text" data-s="${i}" data-k="localidad" value="${escapar(s.localidad)}" placeholder="Ranelagh"></div>
+      <div><label>Partido</label><input type="text" data-s="${i}" data-k="partido" value="${escapar(s.partido)}" placeholder="Berazategui"></div>
+      <div><label>Provincia</label><input type="text" data-s="${i}" data-k="provincia" value="${escapar(s.provincia)}" placeholder="Buenos Aires"></div>
+      <div><label>Teléfono</label><input type="text" data-s="${i}" data-k="telefono" value="${escapar(s.telefono)}"></div>
     </div>
     <div class="coords">
       <span class="cval" id="cv-${i}">${s.lat != null && s.lon != null
@@ -506,15 +508,15 @@ async function geocodificar(i) {
     const r = await fetch('api/geocodificar?q=' + encodeURIComponent(q));
     const j = await r.json();
     if (!r.ok || !j.resultados || !j.resultados.length) {
-      caja.innerHTML = '<span class="gerr">Sin resultados para “' + esc(q) + '”.</span>'; return;
+      caja.innerHTML = '<span class="gerr">Sin resultados para “' + escapar(q) + '”.</span>'; return;
     }
     // Si hubo que aflojar la búsqueda (la dirección es una esquina, por ejemplo), decirlo:
     // no es lo mismo el número exacto que la cuadra.
     const aviso = j.precision && j.precision !== 'exacta'
-      ? `<span class="gmut">Sin coincidencia exacta. Buscado como “${esc(j.consulta)}” (${esc(j.precision)}).</span>` : '';
+      ? `<span class="gmut">Sin coincidencia exacta. Buscado como “${escapar(j.consulta)}” (${escapar(j.precision)}).</span>` : '';
     caja.innerHTML = aviso + j.resultados.map((x, k) =>
       `<button type="button" class="gopt" onclick="usarCoord(${i},${k})">
-         <b>${Number(x.lat).toFixed(5)}, ${Number(x.lon).toFixed(5)}</b> · ${esc(x.nombre)}</button>`).join('');
+         <b>${Number(x.lat).toFixed(5)}, ${Number(x.lon).toFixed(5)}</b> · ${escapar(x.nombre)}</button>`).join('');
     GEO[i] = j.resultados;
   } catch (e) { caja.innerHTML = '<span class="gerr">No se pudo consultar el mapa.</span>'; }
 }
@@ -538,7 +540,7 @@ async function cargarFicha() {
     const [rc, ri] = await Promise.all([fetch('api/identidad/catalogos'), fetch('api/identidad')]);
     CAT = await rc.json();
     $('f-act').innerHTML = '<option value="">— sin definir —</option>' +
-      CAT.actividades.map(a => `<option value="${a.id}">${esc(a.grupo)} · ${esc(a.nombre)}</option>`).join('');
+      CAT.actividades.map(a => `<option value="${a.id}">${escapar(a.grupo)} · ${escapar(a.nombre)}</option>`).join('');
 
     const { identidad: d, sedes } = await ri.json();
     SEDES = normSedes(sedes);
@@ -675,10 +677,10 @@ function filaContacto(c) {
   const d = document.createElement('div');
   d.className = 'cfila';
   d.innerHTML = `
-    <input class="c-nombre" placeholder="Nombre" value="${esc(c.nombre || '')}">
-    <input class="c-rol" placeholder="Rol" list="roles" value="${esc(c.rol || '')}">
-    <input class="c-wa" placeholder="WhatsApp" value="${esc(c.whatsapp || '')}">
-    <input class="c-mail" placeholder="Email" value="${esc(c.email || '')}">
+    <input class="c-nombre" placeholder="Nombre" value="${escapar(c.nombre || '')}">
+    <input class="c-rol" placeholder="Rol" list="roles" value="${escapar(c.rol || '')}">
+    <input class="c-wa" placeholder="WhatsApp" value="${escapar(c.whatsapp || '')}">
+    <input class="c-mail" placeholder="Email" value="${escapar(c.email || '')}">
     <button type="button" class="cdel" title="Quitar contacto" onclick="this.parentNode.remove()">×</button>`;
   return d;
 }
