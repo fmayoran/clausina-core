@@ -701,6 +701,21 @@ app.post('/api/capacidades/:cap', soloAdmin, async (req, res) => {
   } catch (e) { console.error('capacidad-set', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 
+// Identidad estructurada (v2.0 / F1). Los catálogos son públicos dentro del panel; la ficha va
+// scopeada por negocio como todo el resto (el middleware ya resolvió req.negocioId).
+app.get('/api/identidad/catalogos', async (req, res) => {
+  try { res.json(await db.getCatalogosIdentidad()); }
+  catch (e) { console.error('identidad-catalogos', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.get('/api/identidad', async (req, res) => {
+  try { res.json(await db.getIdentidad(req.negocioId)); }
+  catch (e) { console.error('identidad', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.put('/api/identidad', async (req, res) => {
+  try { res.json(await db.guardarIdentidad(req.negocioId, req.body || {}, req.usuario && req.usuario.id)); }
+  catch (e) { console.error('guardar identidad', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+
 app.get('/api/perfil', async (req, res) => {
   try { res.json(await db.getPerfil(req.negocioId)); }
   catch (e) { console.error('perfil', e.message); res.status(500).json({ error: 'db' }); }

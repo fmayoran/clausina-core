@@ -23,6 +23,7 @@
       { id: 'landing',   label: 'Landing',           icon: 'globe',       href: 'landing' },
       { id: 'pauta',     label: 'Pauta',             icon: 'badge-dollar-sign', href: 'pauta' },
       { id: 'biblioteca',label: 'Biblioteca',        icon: 'images',      href: 'biblioteca' },
+      { id: 'identidad', label: 'Identidad',         icon: 'id-card',     href: 'identidad' },
       { id: 'perfil',    label: 'Perfil',            icon: 'settings-2',  href: 'perfil' },
     ],
     // Fuera de las secciones de negocio: es la cuenta de quien está mirando, no del negocio activo.

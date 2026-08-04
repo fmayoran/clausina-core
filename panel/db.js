@@ -695,7 +695,7 @@ async function guardarPerfil(negocioId, d) {
     [negocioId, nn(d.ig_handle), nn(d.dominio_web), nn(d.ig_user_id), nn(d.telegram_chat_id), nn(d.email), nn(d.whatsapp)]);
   if (typeof d.prefijo === 'string') {
     const pf = d.prefijo.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
-    if (pf) { await pool.query('UPDATE contenido.negocios SET prefijo=$2 WHERE id=$1', [proyectoId, pf]); _negociosAt = 0; }
+    if (pf) { await pool.query('UPDATE contenido.negocios SET prefijo=$2 WHERE id=$1', [negocioId, pf]); _negociosAt = 0; }
   }
   if (d.gestion === 'integral' || d.gestion === 'parcial') {
     await pool.query('UPDATE contenido.negocios SET gestion=$2 WHERE id=$1', [negocioId, d.gestion]);
@@ -732,6 +732,136 @@ async function setLogo(negocioId, url) {
     [negocioId, url]);
   _negociosAt = 0;   // el logo se cachea en la lista de marcas
   return true;
+}
+
+// --- Identidad estructurada (v2.0 / F1) --------------------------------------------------
+// La OTRA cara de la identidad: `negocio_perfil` guarda la narrativa (brief, estilo) que lee el
+// creativo; esto guarda los HECHOS que puede consultar una máquina. Ver core/planes/V2.md.
+// `revisado_en` en NULL significa "propuesta sin confirmar por una persona".
+
+// Catálogos (actividades y atributos): son estáticos, se cachean como la lista de negocios.
+let _catIdent = null, _catIdentAt = 0;
+async function getCatalogosIdentidad() {
+  if (!_catIdent || Date.now() - _catIdentAt > 300000) {
+    const { rows: actividades } = await pool.query(
+      `SELECT a.id, a.codigo, a.nombre, p.codigo AS grupo_codigo, p.nombre AS grupo
+         FROM contenido.actividad a JOIN contenido.actividad p ON p.id = a.padre_id
+        WHERE a.activa AND p.activa
+        ORDER BY p.orden, a.orden`);
+    const { rows: atributos } = await pool.query(
+      `SELECT codigo, nombre, grupo FROM contenido.atributo ORDER BY grupo, orden`);
+    _catIdent = { actividades, atributos }; _catIdentAt = Date.now();
+  }
+  return _catIdent;
+}
+
+async function getIdentidad(negocioId) {
+  const { rows: [i] } = await pool.query(
+    `SELECT ni.*, a.codigo AS actividad_codigo, a.nombre AS actividad_nombre
+       FROM contenido.negocio_identidad ni
+       LEFT JOIN contenido.actividad a ON a.id = ni.actividad_id
+      WHERE ni.negocio_id=$1`, [negocioId]);
+  const { rows: sedes } = await pool.query(
+    `SELECT id, nombre, direccion, localidad, partido, provincia, pais, lat, lon, telefono, principal
+       FROM contenido.negocio_sede WHERE negocio_id=$1 ORDER BY principal DESC, orden, creado_en`,
+    [negocioId]);
+  return { identidad: i || null, sedes };
+}
+
+async function guardarIdentidad(negocioId, d, usuarioId) {
+  const nn = s => (s != null && String(s).trim() !== '') ? String(s).trim() : null;
+  const num = v => (v === '' || v == null || isNaN(Number(v))) ? null : Number(v);
+  const zonaModo = ['radio', 'localidades', 'nacional'].includes(d.zona_modo) ? d.zona_modo : 'radio';
+  const unidad = ['persona', 'orden', 'mes', 'hora', 'clase'].includes(d.ticket_unidad) ? d.ticket_unidad : null;
+
+  // El ticket al revés es error de carga, no dato: se corrige acá y no lo rebota la restricción.
+  let tMin = num(d.ticket_min), tMax = num(d.ticket_max);
+  if (tMin != null && tMax != null && tMin > tMax) [tMin, tMax] = [tMax, tMin];
+
+  // Los atributos se validan contra el catálogo: lo que no está, no entra (si no, el filtro miente).
+  const { atributos: catAttrs } = await getCatalogosIdentidad();
+  const validos = new Set(catAttrs.map(a => a.codigo));
+  const atributos = [...new Set((Array.isArray(d.atributos) ? d.atributos : []).filter(a => validos.has(a)))];
+
+  const localidades = (Array.isArray(d.zona_localidades) ? d.zona_localidades : [])
+    .map(s => String(s).trim()).filter(Boolean).slice(0, 60);
+
+  const sedes = (Array.isArray(d.sedes) ? d.sedes : [])
+    .map(s => ({
+      id: nn(s.id),
+      nombre: nn(s.nombre), direccion: nn(s.direccion), localidad: nn(s.localidad),
+      partido: nn(s.partido), provincia: nn(s.provincia), pais: nn(s.pais) || 'AR',
+      lat: num(s.lat), lon: num(s.lon), telefono: nn(s.telefono), principal: !!s.principal,
+    }))
+    .filter(s => s.direccion || s.localidad || s.nombre);   // una sede vacía no es una sede
+  // Una sola principal: gana la primera marcada, y si ninguna lo está, la primera de la lista.
+  let vistaPrincipal = false;
+  for (const s of sedes) {
+    if (s.principal && !vistaPrincipal) vistaPrincipal = true;
+    else s.principal = false;
+  }
+  if (sedes.length && !vistaPrincipal) sedes[0].principal = true;
+
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    await cli.query(`
+      INSERT INTO contenido.negocio_identidad
+        (negocio_id, actividad_id, zona_modo, zona_km, zona_localidades,
+         ticket_min, ticket_max, moneda, ticket_unidad, publico, atributos, horarios, actualizado_en)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8,'ARS'),$9,
+              COALESCE($10::jsonb,'{}'::jsonb),$11,COALESCE($12::jsonb,'{}'::jsonb), now())
+      ON CONFLICT (negocio_id) DO UPDATE SET
+        actividad_id=$2, zona_modo=$3, zona_km=$4, zona_localidades=$5,
+        ticket_min=$6, ticket_max=$7, moneda=COALESCE($8,'ARS'), ticket_unidad=$9,
+        publico=COALESCE($10::jsonb,'{}'::jsonb), atributos=$11,
+        horarios=COALESCE($12::jsonb,'{}'::jsonb), actualizado_en=now()`,
+      [negocioId, num(d.actividad_id), zonaModo, zonaModo === 'radio' ? num(d.zona_km) : null,
+       localidades, tMin, tMax, nn(d.moneda), unidad,
+       d.publico ? JSON.stringify(d.publico) : null, atributos,
+       d.horarios ? JSON.stringify(d.horarios) : null]);
+
+    // Confirmar la ficha es un acto explícito del usuario, no un efecto de guardar.
+    if (d.revisado === true) {
+      await cli.query(`UPDATE contenido.negocio_identidad SET revisado_en=now(), revisado_por=$2
+                        WHERE negocio_id=$1`, [negocioId, usuarioId || null]);
+    } else if (d.revisado === false) {
+      await cli.query(`UPDATE contenido.negocio_identidad SET revisado_en=NULL, revisado_por=NULL
+                        WHERE negocio_id=$1`, [negocioId]);
+    }
+
+    // Sedes: se conservan los ids. En F4 una reserva va a apuntar a una sede; si el id cambiara
+    // en cada guardado, la reserva quedaría colgada en silencio.
+    const conservar = sedes.map(s => s.id).filter(Boolean);
+    await cli.query(
+      `DELETE FROM contenido.negocio_sede WHERE negocio_id=$1 AND NOT (id = ANY($2::uuid[]))`,
+      [negocioId, conservar]);
+    // Bajar todas antes de subir la nueva: el índice único de sede principal se verifica fila por
+    // fila, así que un estado intermedio con dos principales aborta la transacción.
+    await cli.query('UPDATE contenido.negocio_sede SET principal=false WHERE negocio_id=$1', [negocioId]);
+    for (let i = 0; i < sedes.length; i++) {
+      const s = sedes[i];
+      const cols = [negocioId, s.nombre, s.direccion, s.localidad, s.partido, s.provincia,
+                    s.pais, s.lat, s.lon, s.telefono, s.principal, i];
+      if (s.id) {
+        await cli.query(
+          `UPDATE contenido.negocio_sede SET nombre=$2, direccion=$3, localidad=$4, partido=$5,
+             provincia=$6, pais=$7, lat=$8, lon=$9, telefono=$10, principal=$11, orden=$12
+            WHERE id=$13 AND negocio_id=$1`, [...cols, s.id]);
+      } else {
+        await cli.query(
+          `INSERT INTO contenido.negocio_sede
+             (negocio_id, nombre, direccion, localidad, partido, provincia, pais, lat, lon, telefono, principal, orden)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, cols);
+      }
+    }
+    await cli.query('COMMIT');
+  } catch (e) {
+    await cli.query('ROLLBACK'); throw e;
+  } finally {
+    cli.release();
+  }
+  return { ok: true, ...(await getIdentidad(negocioId)) };
 }
 
 // Piezas con su revisión vigente + media principal (para el board por estado). Scopeado por marca.
@@ -1485,6 +1615,7 @@ module.exports = {
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
   completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
+  getIdentidad, guardarIdentidad, getCatalogosIdentidad,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio,
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente, getVerificacion,
