@@ -270,3 +270,10 @@ header .marcasel:hover{border-color:var(--fire);}
 .cfgfld .cfghint{font-family:'JetBrains Mono',monospace;font-size:.56rem;color:var(--ash);
   text-transform:none;letter-spacing:0;}
 .cfgsep{border-top:1px solid var(--line);padding-top:12px;margin-top:4px;}
+/* Barra de acciones de la página (el header propio lo oculta shell.js). */
+.pgacts{display:flex;justify-content:flex-end;gap:8px;margin:0 0 14px;}
+.pgacts .ibtn{font-family:'JetBrains Mono',monospace;font-size:.66rem;text-transform:uppercase;
+  letter-spacing:.06em;padding:7px 14px;border-radius:7px;border:1px solid var(--line);
+  background:transparent;color:var(--ash);cursor:pointer;text-decoration:none;display:inline-flex;
+  align-items:center;gap:7px;}
+.pgacts .ibtn:hover{color:var(--white);border-color:var(--ember,#CCF24D);}
