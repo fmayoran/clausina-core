@@ -278,7 +278,7 @@ async function getCapacidades(negocioId) {
     const fila = byId[c.id] || { habilitada: false, config: {} };
     const cfg = fila.config || {};
     const ev = evaluarCap(c, d || {}, cfg);
-    return { id: c.id, label: c.label, icon: c.icon, href: c.href, desc: c.desc,
+    return { id: c.id, grupo: c.grupo, label: c.label, icon: c.icon, href: c.href, desc: c.desc,
              depende: c.depende || [], habilitada: !!fila.habilitada, config: cfg, ...ev };
   });
 }
