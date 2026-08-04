@@ -763,9 +763,15 @@ async function getClientes(negocioId, { q, limit = 200, offset = 0 } = {}) {
   let filtro = '';
   if (q && String(q).trim()) {
     const t = '%' + String(q).trim().toLowerCase() + '%';
-    params.push(t, tel.clave(q) || ' ');
+    params.push(t);
+    // La rama por teléfono normalizado sólo se agrega si la consulta PARECE un teléfono. Antes
+    // iba siempre, con un centinela para "no es un teléfono"; eso obliga a inventar un valor que
+    // no matchee nada y es justo donde se coló un byte NUL que rompía toda la búsqueda por texto.
+    const clave = tel.clave(q);
+    let porTel = '';
+    if (clave) { params.push(clave); porTel = ` OR telefono_norm = $${params.length}`; }
     filtro = ` AND (lower(coalesce(nombre,'')) LIKE $2 OR lower(coalesce(email,'')) LIKE $2
-                    OR coalesce(telefono,'') LIKE $2 OR telefono_norm = $3)`;
+                    OR coalesce(telefono,'') LIKE $2${porTel})`;
   }
   params.push(Math.min(+limit || 200, 1000), Math.max(+offset || 0, 0));
   const { rows } = await pool.query(
