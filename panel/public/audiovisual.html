@@ -143,7 +143,7 @@ async function cargar(){
     pantallas=await r.json();   // cada pantalla ya trae su programa activo (con avisos)
     document.getElementById('n-pa').textContent=pantallas.length||'';
     document.getElementById('screens').innerHTML = pantallas.length ? pantallas.map(card).join('') : '<div class="empty">— sin pantallas; agregá la primera —</div>';
-    const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR');
+    const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR',{hour12:false});
   }catch(e){}
 }
 function card(p){

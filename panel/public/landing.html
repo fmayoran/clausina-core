@@ -73,7 +73,7 @@ async function load(){
   try{
     const r=await fetch('api/landing'); if(r.status===401){location.href='login';return;}
     const items=await r.json();
-    const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR');
+    const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR',{hour12:false});
     // Firma de lo que importa para el render. Si no cambió, NO redibujamos:
     // así el <iframe> del preview no se recarga y el scroll no salta al tope.
     const sig=JSON.stringify(items.map(c=>[c.id,c.estado,c.preview_url,c.requerimiento]));

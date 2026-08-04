@@ -1,6 +1,7 @@
 // Lógica compartida del panel (home / instagram / avisos).
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const fecha = s => { if(!s) return ''; const d=new Date(s); return d.toLocaleDateString('es-AR',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}); };
+// hour12:false explícito: es-AR sin eso devuelve 12 h con "p. m.".
+const fecha = s => { if(!s) return ''; const d=new Date(s); return d.toLocaleDateString('es-AR',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit',hour12:false}); };
 const pad4 = n => String(n).padStart(4,'0');
 let PREFIJO='CF';   // prefijo del código del negocio activo (badge de piezas)
 const cod = n => (PREFIJO||'CF')+'-'+pad4(n);
@@ -305,7 +306,7 @@ function renderStatus(rows){
   parts.push(`<span class="it" title="${wTip}">${_dot(wColor)}Workers (1): <b>${wTxt}</b></span>`);
   sb.innerHTML = parts.join('');
 }
-function setUpd(){ const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR'); }
+function setUpd(){ const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR',{hour12:false}); }
 
 /* ---------- Acciones sobre piezas (canal-neutrales; el backend ramifica) ---------- */
 async function aprobar(id, btn, colaboradores){

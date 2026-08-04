@@ -70,10 +70,9 @@
   .celda .num{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--u-mut);}
   .celda.hoy .num{color:var(--u-acc);font-weight:600;}
   .minis{display:flex;flex-direction:column;gap:3px;margin-top:auto;}
-  .mini{height:5px;border-radius:3px;background:var(--u-line);position:relative;overflow:hidden;}
-  .mini i{position:absolute;inset:0 auto 0 0;display:block;}
-  /* Verde con lugar, ámbar apretado, coral lleno. Gris rayado = bloqueado o ya pasó. */
-  .mini i.ok{background:var(--u-ok);} .mini i.medio{background:var(--u-medio);} .mini i.lleno{background:var(--u-mal);}
+  /* Igual que la barra grande: fondo verde = disponible, relleno coral = ocupado. */
+  .mini{height:5px;border-radius:3px;background:var(--u-ok);position:relative;overflow:hidden;}
+  .mini i{position:absolute;inset:0 auto 0 0;display:block;background:var(--u-mal);}
   .mini.off{background:repeating-linear-gradient(45deg,var(--u-line),var(--u-line) 2px,transparent 2px,transparent 5px);}
   .leyenda{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;font-family:'JetBrains Mono',monospace;
            font-size:.58rem;color:var(--u-mut);align-items:center;}
@@ -94,10 +93,11 @@
   .turno:first-of-type{border-top:0;}
   .tnom{font-family:'Inter Tight',sans-serif;font-weight:600;font-size:.9rem;min-width:100px;}
   .thora{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--u-mut);min-width:96px;}
-  .barra{flex:1;min-width:120px;height:7px;border-radius:99px;background:var(--u-bg);
+  /* Dos colores: el fondo es lo DISPONIBLE (verde) y la parte pintada lo OCUPADO (coral).
+     Así de un vistazo se ve cuánto queda, no sólo cuánto se vendió. */
+  .barra{flex:1;min-width:120px;height:7px;border-radius:99px;background:var(--u-ok);
          border:1px solid var(--u-line);overflow:hidden;}
-  .barra i{display:block;height:100%;background:var(--u-acc);}
-  .barra i.lleno{background:var(--u-mal);}
+  .barra i{display:block;height:100%;background:var(--u-mal);}
   .tcup{font-family:'JetBrains Mono',monospace;font-size:.68rem;min-width:74px;text-align:right;color:var(--u-mut);}
   .tcup b{color:var(--u-fg);}
   .tbloq{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-medio);}
@@ -151,6 +151,11 @@
   .fp-d.off:hover{background:none;}
   .fp-d.hoy{outline:1px solid var(--u-mut);}
   .fp-d.sel{background:var(--u-acc);color:var(--u-accfg);font-weight:700;}
+  /* ── Campo de hora en 24 h ────────────────────────────────────────────
+     Misma razón que el de fecha: <input type="time"> se renderiza según el idioma del NAVEGADOR
+     y en inglés muestra AM/PM. Este es un texto que sólo acepta y devuelve HH:MM. */
+  .hora24{letter-spacing:.06em;font-family:'JetBrains Mono',monospace !important;}
+  .hora24.mal{border-color:var(--u-mal);}
   /* ── Autocompletar de cliente ── */
   .ac{position:relative;}
   .ac-pop{display:none;position:absolute;z-index:60;top:calc(100% + 4px);left:0;right:0;
@@ -223,9 +228,8 @@
       <div class="dow-fila mes" id="dows"></div>
       <div class="mes" id="mes"></div>
       <div class="leyenda">
-        <span><b style="background:var(--u-ok)"></b> con lugar</span>
-        <span><b style="background:var(--u-medio)"></b> más del 70%</span>
-        <span><b style="background:var(--u-mal)"></b> completo</span>
+        <span><b style="background:var(--u-ok)"></b> disponible</span>
+        <span><b style="background:var(--u-mal)"></b> ocupado</span>
         <span><b class="mini off" style="height:5px"></b> bloqueado o pasado</span>
       </div>
       <div class="detalle" id="detalle"></div>
@@ -358,8 +362,14 @@
       <div><label for="t-nombre">Nombre</label><input type="text" id="t-nombre" placeholder="Noche"></div>
       <div><label for="t-cap">Capacidad</label><input type="number" id="t-cap" min="1" value="40">
         <div class="hint" id="hint-cap">en personas</div></div>
-      <div><label for="t-desde">Desde</label><input type="time" id="t-desde" value="20:00"></div>
-      <div><label for="t-hasta">Hasta</label><input type="time" id="t-hasta" value="23:59"></div>
+      <div><label for="t-desde">Desde</label>
+        <input type="text" class="hora24" id="t-desde" value="20:00" inputmode="numeric"
+               maxlength="5" placeholder="HH:MM" autocomplete="off">
+        <div class="hint">24 h. Ej.: 20:00</div></div>
+      <div><label for="t-hasta">Hasta</label>
+        <input type="text" class="hora24" id="t-hasta" value="23:59" inputmode="numeric"
+               maxlength="5" placeholder="HH:MM" autocomplete="off">
+        <div class="hint">24 h. Ej.: 23:59</div></div>
     </div>
     <div><label for="t-max">Máximo por reserva</label>
       <input type="number" id="t-max" min="1" placeholder="">
@@ -468,6 +478,28 @@ function CampoFecha(cont, opts) {
 }
 let FD_RESERVA = null, FD_BLOQUEO = null;
 
+/* ═══════ Campo de hora en 24 h ═══════ */
+// Acepta lo que la gente escribe de verdad —"8", "830", "8:30", "20:00"— y devuelve siempre
+// HH:MM. Devuelve null si no hay forma de interpretarlo.
+function normalizarHora(txt) {
+  const d = String(txt || '').replace(/[^0-9]/g, '');
+  if (!d.length) return null;
+  let h, m;
+  if (d.length <= 2) { h = +d; m = 0; }
+  else if (d.length === 3) { h = +d.slice(0, 1); m = +d.slice(1); }
+  else { h = +d.slice(0, 2); m = +d.slice(2, 4); }
+  if (!(h >= 0 && h <= 23) || !(m >= 0 && m <= 59)) return null;
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+}
+document.querySelectorAll('.hora24').forEach(el => {
+  el.addEventListener('blur', () => {
+    const v = normalizarHora(el.value);
+    if (v) { el.value = v; el.classList.remove('mal'); }
+    else if (el.value.trim()) el.classList.add('mal');
+  });
+  el.addEventListener('input', () => el.classList.remove('mal'));
+});
+
 /* ═══════ Autocompletar de cliente ═══════ */
 // Buscar en la base del negocio antes de crear uno nuevo: el mismo cliente cargado dos veces con
 // el nombre escrito distinto es la forma más común de ensuciar una base.
@@ -538,11 +570,8 @@ function yaPaso(fecha, horaDesde) {
   return ini <= limite;
 }
 
-function claseOcup(t, f) {
-  if (t.bloqueado || yaPaso(f, t.hora_desde)) return null;      // rayado
-  const pct = t.ocupado / t.capacidad;
-  return pct >= 1 ? 'lleno' : (pct > 0.7 ? 'medio' : 'ok');
-}
+// Devuelve false si el turno no se puede reservar (bloqueado o pasado): esa barra va rayada.
+function reservable(t, f) { return !t.bloqueado && !yaPaso(f, t.hora_desde); }
 
 function pintarMes() {
   const porDia = {};
@@ -563,11 +592,11 @@ function pintarMes() {
     const f = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const ts = porDia[f] || [];
     const minis = ts.map(t => {
-      const cls = claseOcup(t, f);
-      if (!cls) return `<span class="mini off" title="${t.bloqueado ? 'Bloqueado' : 'Ya pasó'}"></span>`;
+      if (!reservable(t, f)) return `<span class="mini off" title="${t.bloqueado ? 'Bloqueado' : 'Ya pasó'}"></span>`;
       const pct = Math.min(100, Math.round(t.ocupado / t.capacidad * 100));
-      return `<span class="mini" title="${escapar(t.nombre)}: ${t.ocupado}/${t.capacidad}">` +
-             `<i class="${cls}" style="width:${Math.max(pct, 4)}%"></i></span>`;
+      const libre = t.capacidad - t.ocupado;
+      return `<span class="mini" title="${escapar(t.nombre)}: ${t.ocupado} ocupado, ${libre} libre de ${t.capacidad}">` +
+             `<i style="width:${pct}%"></i></span>`;
     }).join('');
     celdas.push(`<button class="celda${f === hoy() ? ' hoy' : ''}${f === SEL ? ' sel' : ''}" onclick="verDia('${f}')">
       <span class="num">${d}</span><span class="minis">${minis}</span></button>`);
@@ -595,13 +624,14 @@ function pintarDetalle() {
       const lleno = t.ocupado >= t.capacidad;
       const pasado = yaPaso(SEL, t.hora_desde);
       const cerrado = lleno || pasado || t.bloqueado;
+      const libre = t.capacidad - t.ocupado;
       return `<div class="turno">
         <span class="tnom">${escapar(t.nombre)}</span>
         <span class="thora">${t.hora_desde}–${t.hora_hasta}</span>
         ${t.bloqueado
           ? `<span class="tbloq">bloqueado${t.motivo_bloqueo ? ' · ' + escapar(t.motivo_bloqueo) : ''}</span>`
-          : `<span class="barra"><i class="${lleno ? 'lleno' : ''}" style="width:${pct}%"></i></span>
-             <span class="tcup"><b>${t.ocupado}</b>/${t.capacidad}</span>`}
+          : `<span class="barra" title="${t.ocupado} ocupado · ${libre} disponible"><i style="width:${pct}%"></i></span>
+             <span class="tcup"><b>${libre}</b> libre</span>`}
         <button class="btn2 chico" onclick="abrirReserva('${SEL}','${t.turno_id}')"
           ${cerrado ? `disabled title="${t.bloqueado ? 'Bloqueado' : (lleno ? 'Sin lugar' : 'Ya pasó')}"` : ''}>Reservar</button>
       </div>`;
@@ -816,6 +846,7 @@ function abrirTurno(id) {
   $('hint-tmax').textContent = `Vacío = hereda el máximo general (${CFG.cantidad_max} ${unidad().plur}).`;
   $('t-desde').value = t ? t.hora_desde : '20:00';
   $('t-hasta').value = t ? t.hora_hasta : '23:59';
+  $('t-desde').classList.remove('mal'); $('t-hasta').classList.remove('mal');
   $('t-activo').checked = t ? t.activo : true;
   T_DIAS = new Set(t ? t.dias : [1,2,3,4,5,6,7]);
   pintarDiasChips();
@@ -826,9 +857,17 @@ function cerrarTurno() { $('ov-turno').classList.remove('on'); }
 async function guardarTurno() {
   const id = $('t-id').value, err = $('err-turno'), btn = $('btn-turno');
   err.textContent = ''; btn.disabled = true;
+  const desde = normalizarHora($('t-desde').value), hasta = normalizarHora($('t-hasta').value);
+  if (!desde || !hasta) {
+    err.textContent = 'Revisá el horario: se escribe en 24 h, como 20:00.';
+    $('t-desde').classList.toggle('mal', !desde);
+    $('t-hasta').classList.toggle('mal', !hasta);
+    btn.disabled = false; return;
+  }
+  $('t-desde').value = desde; $('t-hasta').value = hasta;
   const body = { nombre: $('t-nombre').value, capacidad: +$('t-cap').value,
     cantidad_max: $('t-max').value, dias: [...T_DIAS],
-    hora_desde: $('t-desde').value, hora_hasta: $('t-hasta').value,
+    hora_desde: desde, hora_hasta: hasta,
     activo: $('t-activo').checked };
   try {
     const r = await fetch('api/reservas/turnos' + (id ? '/' + id : ''),

@@ -302,7 +302,7 @@ async function cargar(){
     if(rm.status===401||ra.status===401){ location.href='login'; return; }
     const data=await rm.json(); const marcas=await ra.json();
     setConsole(data.pipeline,data.procesos||[],data.landing||{}); setFlow(data.pipeline); setVitals(data.procesos||[]); setBrands(marcas);
-    const t='actualizado '+new Date().toLocaleTimeString('es-AR');
+    const t='actualizado '+new Date().toLocaleTimeString('es-AR',{hour12:false});
     document.getElementById('upd').textContent=t; document.getElementById('foot-upd').textContent='· '+t;
     lucide.createIcons();
   }catch(e){ offline(); }
@@ -364,7 +364,7 @@ setInterval(cargar,20000);
   const col={ok:'#CCF24D',fallo:'#FF6A45',aviso:'#E0A458'};
   const fallos=chks.filter(c=>c.estado==='fallo').length;
   const avisos=chks.filter(c=>c.estado==='aviso').length;
-  document.getElementById('ver-cuando').textContent = d.cuando ? ('· última: '+new Date(d.cuando).toLocaleString('es-AR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})) : '';
+  document.getElementById('ver-cuando').textContent = d.cuando ? ('· última: '+new Date(d.cuando).toLocaleString('es-AR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false})) : '';
   box.innerHTML =
     `<div class="mono text-[11px] mb-3" style="color:${fallos?col.fallo:(avisos?col.aviso:col.ok)}">`
     + (fallos? `${fallos} problema(s) que requieren tu atención` : (avisos? `${avisos} aviso(s)` : 'todo sano'))
