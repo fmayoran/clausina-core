@@ -105,6 +105,33 @@
   .tcup b{color:var(--u-fg);}
   .tbloq{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-medio);}
   .vacio{font-family:'JetBrains Mono',monospace;font-size:.64rem;color:var(--u-mut);padding:6px 0;}
+  /* Selector de vista: mes / semana / día */
+  .vistas{display:inline-flex;border:1px solid var(--u-line);border-radius:8px;overflow:hidden;}
+  .vbtn{border:0;background:none;color:var(--u-mut);font-family:'JetBrains Mono',monospace;
+        font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;padding:7px 13px;cursor:pointer;}
+  .vbtn:hover{color:var(--u-fg);}
+  .vbtn.on{background:var(--u-acc);color:var(--u-accfg);}
+  /* Reservas dentro de un turno */
+  .resv{display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 8px 0;}
+  .rchip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--u-line);
+         border-radius:999px;padding:4px 11px;background:none;cursor:pointer;
+         font-family:'Inter',sans-serif;font-size:.78rem;color:var(--u-fg);transition:.13s;}
+  .rchip:hover{border-color:var(--u-acc);}
+  .rchip .cant{font-family:'JetBrains Mono',monospace;font-size:.64rem;color:var(--u-mut);}
+  .rchip .pto{width:6px;height:6px;border-radius:50%;flex:0 0 auto;}
+  .rchip.s-solicitada .pto{background:var(--u-mal);}
+  .rchip.s-confirmada .pto{background:var(--u-ok);}
+  .rchip.s-cumplida .pto{background:var(--u-mut);}
+  .rchip.s-cancelada{opacity:.5;text-decoration:line-through;}
+  .rchip.s-cancelada .pto{background:var(--u-mut);}
+  .rchip.s-no_show .pto{background:var(--u-medio);}
+  .sinres{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--u-mut);
+          opacity:.7;padding:2px 0 8px;}
+  /* Ficha del detalle */
+  .ficha{display:grid;grid-template-columns:auto 1fr;gap:9px 16px;margin-top:16px;}
+  .ficha dt{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.1em;
+            text-transform:uppercase;color:var(--u-mut);padding-top:2px;}
+  .ficha dd{margin:0;font-size:.92rem;}
   /* ── Tablas ── */
   .mtx{width:100%;border-collapse:separate;border-spacing:0;min-width:720px;}
   .mtx th,.mtx td{padding:11px 12px;text-align:left;border-bottom:1px solid var(--u-line);vertical-align:middle;}
@@ -222,18 +249,25 @@
     <!-- ══════════ CALENDARIO ══════════ -->
     <div class="pane on" id="p-cal">
       <div class="mescab">
-        <button class="btn2 chico" onclick="mover(-1)" title="Mes anterior">←</button>
+        <button class="btn2 chico" onclick="mover(-1)" id="nav-ant" title="Anterior">←</button>
         <span class="mesnom" id="mesnom"></span>
-        <button class="btn2 chico" onclick="mover(1)" title="Mes siguiente">→</button>
+        <button class="btn2 chico" onclick="mover(1)" id="nav-sig" title="Siguiente">→</button>
         <button class="btn2 chico" onclick="irHoy()">Hoy</button>
+        <span class="vistas" id="vistas">
+          <button class="vbtn on" data-vista="mes">Mes</button>
+          <button class="vbtn" data-vista="semana">Semana</button>
+          <button class="vbtn" data-vista="dia">Día</button>
+        </span>
         <button class="btn" style="margin-left:auto" onclick="abrirReserva()">Nueva reserva</button>
       </div>
-      <div class="dow-fila mes" id="dows"></div>
-      <div class="mes" id="mes"></div>
-      <div class="leyenda">
-        <span><b style="background:var(--u-ok)"></b> disponible</span>
-        <span><b style="background:var(--u-mal)"></b> ocupado</span>
-        <span><b class="mini off" style="height:5px"></b> bloqueado o pasado</span>
+      <div id="grilla">
+        <div class="dow-fila mes" id="dows"></div>
+        <div class="mes" id="mes"></div>
+        <div class="leyenda">
+          <span><b style="background:var(--u-ok)"></b> disponible</span>
+          <span><b style="background:var(--u-mal)"></b> ocupado</span>
+          <span><b class="mini off" style="height:5px"></b> bloqueado o pasado</span>
+        </div>
       </div>
       <div class="detalle" id="detalle"></div>
     </div>
@@ -356,6 +390,15 @@
   </div>
 </div>
 
+<!-- Detalle de una reserva -->
+<div class="ov" id="ov-det" onclick="if(event.target===this)cerrarDetalle()">
+  <div class="dlg">
+    <h2 class="display font-bold text-lg tracking-tight">Reserva</h2>
+    <div id="det-cuerpo"></div>
+    <div class="flex gap-2 mt-5 flex-wrap" id="det-acciones"></div>
+  </div>
+</div>
+
 <!-- Turno -->
 <div class="ov" id="ov-turno" onclick="if(event.target===this)cerrarTurno()">
   <div class="dlg">
@@ -411,6 +454,11 @@ const $ = id => document.getElementById(id);
 const escapar = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const hoy = () => new Date().toISOString().slice(0, 10);
+// Marca de tiempo en 24 h. Propia y no la de panel.js: esta página no carga panel.js y no vale
+// la pena traerlo entero para formatear una fecha.
+const cuando = s => { if (!s) return ''; const d = new Date(s);
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) + ' ' +
+         d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }); };
 const sumar = (iso, n) => new Date(Date.parse(iso + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
 // Fecha ISO -> texto local, sin que el huso corra el día.
 const fechaTxt = iso => new Date(iso + 'T12:00:00').toLocaleDateString('es-AR',
@@ -547,19 +595,41 @@ document.addEventListener('click', e => {
   if (!document.getElementById('ac-cliente').contains(e.target)) acCerrar();
 });
 
-/* ═══════ Calendario mensual ═══════ */
-// La vista es un mes completo para ver de un pantallazo cómo viene la ocupación: cada día muestra
-// una barrita por turno, y el detalle del día elegido se abre abajo.
-let MES = null, SEL = null;
+/* ═══════ Calendario: mes / semana / día ═══════ */
+// Las tres vistas comparten el mismo renderizador de días: cambian cuántos días se muestran y
+// cómo se navega. La vista mes agrega arriba la grilla compacta para el pantallazo rápido.
+let MES = null, SEL = null, VISTA = 'mes';
+let RESV = {};   // reservas indexadas por `fecha|turno_id`
 
 const primerDia = iso => iso.slice(0, 8) + '01';
+const lunesDe = iso => { const d = new Date(iso + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() || 7) - 1)); return d.toISOString().slice(0, 10); };
 function moverMes(iso, n) {
-  const d = new Date(iso + 'T12:00:00Z');
-  d.setUTCMonth(d.getUTCMonth() + n, 1);
+  const d = new Date(iso + 'T12:00:00Z'); d.setUTCMonth(d.getUTCMonth() + n, 1);
   return d.toISOString().slice(0, 10);
 }
-function mover(n) { MES = moverMes(MES, n); SEL = null; cargarCal(); }
+// Qué rango pide cada vista, y sobre qué se navega.
+function rangoVista() {
+  if (VISTA === 'dia') return { desde: SEL, hasta: SEL };
+  if (VISTA === 'semana') { const l = lunesDe(SEL); return { desde: l, hasta: sumar(l, 6) }; }
+  const y = +MES.slice(0, 4), m = +MES.slice(5, 7);
+  return { desde: MES, hasta: new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10) };
+}
+function mover(n) {
+  if (VISTA === 'dia') SEL = sumar(SEL, n);
+  else if (VISTA === 'semana') SEL = sumar(lunesDe(SEL), n * 7);
+  else { MES = moverMes(MES, n); SEL = null; }
+  cargarCal();
+}
 function irHoy() { MES = primerDia(hoy()); SEL = hoy(); cargarCal(); }
+document.getElementById('vistas').addEventListener('click', e => {
+  const b = e.target.closest('.vbtn'); if (!b) return;
+  VISTA = b.dataset.vista;
+  document.querySelectorAll('.vbtn').forEach(x => x.classList.toggle('on', x === b));
+  if (!SEL) SEL = hoy();
+  if (VISTA === 'mes') MES = primerDia(SEL);
+  cargarCal();
+});
 
 // Un turno cuya ventana ya pasó no se puede reservar: ofrecer el botón y que reviente al
 // apretarlo es peor que no ofrecerlo. Misma regla que aplica el backend.
@@ -572,85 +642,153 @@ function yaPaso(fecha, horaDesde) {
   const ini = new Date(); ini.setHours(hh, mm, 0, 0);
   return ini <= limite;
 }
-
 // Devuelve false si el turno no se puede reservar (bloqueado o pasado): esa barra va rayada.
 function reservable(t, f) { return !t.bloqueado && !yaPaso(f, t.hora_desde); }
 
-function pintarMes() {
+/* ── Grilla del mes (sólo en la vista mes) ── */
+function pintarGrilla() {
   const porDia = {};
   DISP.forEach(t => { (porDia[t.fecha] = porDia[t.fecha] || []).push(t); });
-
-  document.getElementById('dows').innerHTML =
-    DIAS.map(([, l]) => `<div class="dow">${l}</div>`).join('');
+  $('dows').innerHTML = DIAS.map(([, l]) => `<div class="dow">${l}</div>`).join('');
   const y = +MES.slice(0, 4), m = +MES.slice(5, 7);
-  const nomMes = new Date(MES + 'T12:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-  document.getElementById('mesnom').textContent = nomMes;
-
-  const primero = new Date(Date.UTC(y, m - 1, 1));
-  const arranque = (primero.getUTCDay() || 7) - 1;              // lunes = 0
+  const arranque = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() || 7) - 1;
   const dias = new Date(Date.UTC(y, m, 0)).getUTCDate();
   const celdas = [];
   for (let i = 0; i < arranque; i++) celdas.push('<div class="celda otro"></div>');
   for (let d = 1; d <= dias; d++) {
     const f = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const ts = porDia[f] || [];
-    const minis = ts.map(t => {
+    const minis = (porDia[f] || []).map(t => {
       if (!reservable(t, f)) return `<span class="mini off" title="${t.bloqueado ? 'Bloqueado' : 'Ya pasó'}"></span>`;
       const pct = Math.min(100, Math.round(t.ocupado / t.capacidad * 100));
-      const libre = t.capacidad - t.ocupado;
-      return `<span class="mini" title="${escapar(t.nombre)}: ${t.ocupado} ocupado, ${libre} libre de ${t.capacidad}">` +
+      return `<span class="mini" title="${escapar(t.nombre)}: ${t.ocupado} ocupado, ${t.capacidad - t.ocupado} libre de ${t.capacidad}">` +
              `<i style="width:${pct}%"></i></span>`;
     }).join('');
     celdas.push(`<button class="celda${f === hoy() ? ' hoy' : ''}${f === SEL ? ' sel' : ''}" onclick="verDia('${f}')">
       <span class="num">${d}</span><span class="minis">${minis}</span></button>`);
   }
-  document.getElementById('mes').innerHTML = celdas.join('');
-  pintarDetalle();
+  $('mes').innerHTML = celdas.join('');
+}
+function verDia(f) { SEL = f; pintarGrilla(); pintarDias(); }
+
+/* ── Días con sus turnos y sus reservas (las tres vistas) ── */
+function chipsDe(fecha, turnoId) {
+  const rs = RESV[fecha + '|' + turnoId] || [];
+  if (!rs.length) return '<div class="sinres">sin reservas</div>';
+  return '<div class="resv">' + rs.map(r =>
+    `<button class="rchip s-${r.estado}" onclick="verReserva('${r.id}')"
+       title="${escapar(ESTADOS[r.estado] || r.estado)}"><span class="pto"></span>` +
+    `${escapar(r.cliente) || 'sin nombre'}<span class="cant">${r.cantidad}</span></button>`).join('') + '</div>';
 }
 
-function verDia(f) { SEL = f; pintarMes(); }
-
-function pintarDetalle() {
-  const caja = document.getElementById('detalle');
-  if (!SEL) { caja.innerHTML = '<div class="vacio">Elegí un día para ver sus turnos.</div>'; return; }
-  const ts = DISP.filter(t => t.fecha === SEL);
+function tarjetaDia(f) {
+  const ts = DISP.filter(t => t.fecha === f);
   if (!ts.length) {
-    caja.innerHTML = `<div class="dia"><div class="diahead"><span class="difecha">${escapar(fechaTxt(SEL))}</span></div>
+    return `<div class="dia"><div class="diahead"><span class="difecha">${escapar(fechaTxt(f))}</span>
+      ${f === hoy() ? '<span class="disem">hoy</span>' : ''}</div>
       <div class="vacio">Ningún turno corre este día.</div></div>`;
-    return;
   }
-  caja.innerHTML = `<div class="dia${SEL === hoy() ? ' hoy' : ''}">
-    <div class="diahead"><span class="difecha">${escapar(fechaTxt(SEL))}</span>
-      ${SEL === hoy() ? '<span class="disem">hoy</span>' : ''}</div>
+  return `<div class="dia${f === hoy() ? ' hoy' : ''}">
+    <div class="diahead"><span class="difecha">${escapar(fechaTxt(f))}</span>
+      ${f === hoy() ? '<span class="disem">hoy</span>' : ''}</div>
     ${ts.map(t => {
       const pct = Math.min(100, Math.round(t.ocupado / t.capacidad * 100));
       const lleno = t.ocupado >= t.capacidad;
-      const pasado = yaPaso(SEL, t.hora_desde);
-      const cerrado = lleno || pasado || t.bloqueado;
+      const cerrado = lleno || yaPaso(f, t.hora_desde) || t.bloqueado;
       const libre = t.capacidad - t.ocupado;
       return `<div class="turno">
-        <span class="tnom">${escapar(t.nombre)}</span>
-        <span class="thora">${t.hora_desde}–${t.hora_hasta}</span>
-        ${t.bloqueado
-          ? `<span class="tbloq">bloqueado${t.motivo_bloqueo ? ' · ' + escapar(t.motivo_bloqueo) : ''}</span>`
-          : `<span class="barra" title="${t.ocupado} ocupado · ${libre} disponible"><i style="width:${pct}%"></i></span>
-             <span class="tcup"><b>${libre}</b> libre</span>`}
-        <button class="btn2 chico" onclick="abrirReserva('${SEL}','${t.turno_id}')"
-          ${cerrado ? `disabled title="${t.bloqueado ? 'Bloqueado' : (lleno ? 'Sin lugar' : 'Ya pasó')}"` : ''}>Reservar</button>
-      </div>`;
+          <span class="tnom">${escapar(t.nombre)}</span>
+          <span class="thora">${t.hora_desde}–${t.hora_hasta}</span>
+          ${t.bloqueado
+            ? `<span class="tbloq">bloqueado${t.motivo_bloqueo ? ' · ' + escapar(t.motivo_bloqueo) : ''}</span>`
+            : `<span class="barra" title="${t.ocupado} ocupado · ${libre} disponible"><i style="width:${pct}%"></i></span>
+               <span class="tcup"><b>${libre}</b> libre</span>`}
+          <button class="btn2 chico" onclick="abrirReserva('${f}','${t.turno_id}')"
+            ${cerrado ? `disabled title="${t.bloqueado ? 'Bloqueado' : (lleno ? 'Sin lugar' : 'Ya pasó')}"` : ''}>Reservar</button>
+        </div>
+        ${chipsDe(f, t.turno_id)}`;
     }).join('')}
   </div>`;
 }
 
+function pintarDias() {
+  const caja = $('detalle');
+  const { desde, hasta } = rangoVista();
+  let fechas;
+  if (VISTA === 'mes') {
+    if (!SEL) { caja.innerHTML = '<div class="vacio">Elegí un día para ver sus turnos y reservas.</div>'; return; }
+    fechas = [SEL];
+  } else {
+    fechas = [];
+    for (let f = desde; f <= hasta; f = sumar(f, 1)) fechas.push(f);
+  }
+  caja.innerHTML = fechas.map(tarjetaDia).join('');
+}
+
+function pintarTitulo() {
+  const { desde, hasta } = rangoVista();
+  if (VISTA === 'dia') $('mesnom').textContent = fechaTxt(desde);
+  else if (VISTA === 'semana') $('mesnom').textContent = `${fechaTxt(desde)} — ${fechaTxt(hasta)}`;
+  else $('mesnom').textContent = new Date(MES + 'T12:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+}
+
 async function cargarCal() {
-  const y = +MES.slice(0, 4), m = +MES.slice(5, 7);
-  const hasta = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+  const { desde, hasta } = rangoVista();
+  $('grilla').style.display = VISTA === 'mes' ? '' : 'none';
+  pintarTitulo();
   try {
-    const r = await fetch(`api/reservas/disponibilidad?desde=${MES}&hasta=${hasta}`);
-    const d = await r.json();
-    DISP = d.dias || [];
-    pintarMes();
-  } catch (e) { document.getElementById('mes').innerHTML = '<div class="vacio">Error al cargar.</div>'; }
+    // Disponibilidad y reservas del mismo rango: así los chips salen sin un pedido por turno.
+    const [rd, rr] = await Promise.all([
+      fetch(`api/reservas/disponibilidad?desde=${desde}&hasta=${hasta}`),
+      fetch(`api/reservas?desde=${desde}&hasta=${hasta}`),
+    ]);
+    DISP = (await rd.json()).dias || [];
+    RESV = {};
+    ((await rr.json()).reservas || []).forEach(r => {
+      const k = r.fecha + '|' + r.turno_id;
+      (RESV[k] = RESV[k] || []).push(r);
+    });
+    if (VISTA === 'mes') pintarGrilla();
+    pintarDias();
+  } catch (e) { $('detalle').innerHTML = '<div class="vacio">Error al cargar.</div>'; }
+}
+
+/* ── Detalle de una reserva ── */
+function reservaPorId(id) {
+  for (const k in RESV) { const r = RESV[k].find(x => x.id === id); if (r) return r; }
+  return null;
+}
+function verReserva(id) {
+  const r = reservaPorId(id); if (!r) return;
+  const fila = (t, v) => v ? `<dt>${t}</dt><dd>${v}</dd>` : '';
+  $('det-cuerpo').innerHTML = `<dl class="ficha">
+    ${fila('Cliente', escapar(r.cliente) || '<span class="mono2">sin nombre</span>')}
+    ${fila('Teléfono', escapar(r.telefono))}
+    ${fila('Email', escapar(r.email))}
+    ${fila('Cuándo', escapar(fechaTxt(r.fecha)) + ' · ' + escapar(r.turno) + ' ' + r.hora_desde + '–' + r.hora_hasta)}
+    ${fila('Cantidad', r.cantidad + ' ' + (r.cantidad === 1 ? unidad().sing : unidad().plur))}
+    ${fila('Estado', escapar(ESTADOS[r.estado] || r.estado))}
+    ${fila('Canal', escapar(r.canal) + (r.agente_id ? ' · ' + escapar(r.agente_id) : ''))}
+    ${fila('Notas', escapar(r.notas))}
+    ${fila('Referencia externa', escapar(r.ref_externa))}
+    ${fila('Cargada', cuando(r.creado_en))}
+  </dl>`;
+  const acc = [];
+  if (r.estado === 'solicitada') acc.push(`<button class="btn" onclick="estadoDesdeDetalle('${r.id}','confirmada')">Confirmar</button>`);
+  if (r.estado === 'confirmada') acc.push(`<button class="btn" onclick="estadoDesdeDetalle('${r.id}','cumplida')">Marcar cumplida</button>`);
+  if (r.estado === 'confirmada') acc.push(`<button class="btn2" onclick="estadoDesdeDetalle('${r.id}','no_show')">No se presentó</button>`);
+  if (['solicitada','confirmada'].includes(r.estado)) acc.push(`<button class="btn2 mal" onclick="estadoDesdeDetalle('${r.id}','cancelada')">Cancelar</button>`);
+  acc.push('<button class="btn2" onclick="cerrarDetalle()">Cerrar</button>');
+  $('det-acciones').innerHTML = acc.join('');
+  $('ov-det').classList.add('on');
+}
+function cerrarDetalle() { $('ov-det').classList.remove('on'); }
+async function estadoDesdeDetalle(id, e) {
+  if (e === 'cancelada' && !confirm('¿Cancelar esta reserva? Libera el lugar.')) return;
+  try {
+    await fetch(`api/reservas/${id}/estado`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: e }) });
+    cerrarDetalle(); cargarCal();
+  } catch (_) {}
 }
 
 /* ═══════ Lista ═══════ */
