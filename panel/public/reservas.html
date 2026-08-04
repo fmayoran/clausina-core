@@ -305,6 +305,20 @@ document.getElementById('tabs').addEventListener('click', e => {
 function mover(n) { DESDE = sumar(DESDE, n); cargarCal(); }
 function irHoy() { DESDE = hoy(); cargarCal(); }
 
+// Un turno cuya ventana ya pasó no se puede reservar: ofrecer el botón y que reviente al
+// apretarlo es peor que no ofrecerlo. Se compara contra la hora local del navegador más la
+// anticipación mínima, que es la misma regla que aplica el backend.
+function yaPaso(fecha, horaHasta) {
+  const hoyISO = hoy();
+  if (fecha < hoyISO) return true;
+  if (fecha > hoyISO) return false;
+  const ahora = new Date();
+  const limite = new Date(ahora.getTime() + (CFG.anticipacion_min_horas || 0) * 3600e3);
+  const [hh, mm] = horaHasta.split(':').map(Number);
+  const fin = new Date(ahora); fin.setHours(hh, mm, 0, 0);
+  return fin <= limite;
+}
+
 function pintarCal() {
   const porDia = {};
   DISP.forEach(t => { (porDia[t.fecha] = porDia[t.fecha] || []).push(t); });
@@ -324,6 +338,8 @@ function pintarCal() {
       ${ts.map(t => {
         const pct = Math.min(100, Math.round(t.ocupado / t.capacidad * 100));
         const lleno = t.ocupado >= t.capacidad;
+        const pasado = yaPaso(f, t.hora_hasta);
+        const cerrado = lleno || pasado;
         return `<div class="turno">
           <span class="tnom">${escapar(t.nombre)}</span>
           <span class="thora">${t.hora_desde}–${t.hora_hasta}</span>
@@ -332,7 +348,7 @@ function pintarCal() {
             : `<span class="barra"><i class="${lleno ? 'lleno' : ''}" style="width:${pct}%"></i></span>
                <span class="tcup"><b>${t.ocupado}</b>/${t.capacidad}</span>
                <button class="btn2 chico" onclick="abrirReserva('${f}','${t.turno_id}')"
-                 ${lleno ? 'disabled title="Sin lugar"' : ''}>Reservar</button>`}
+                 ${cerrado ? `disabled title="${lleno ? 'Sin lugar' : 'Ya pasó'}"` : ''}>Reservar</button>`}
         </div>`;
       }).join('')}
     </div>`;
@@ -444,6 +460,9 @@ async function guardarReserva() {
     else {
       let m = ERR_RES[j.error] || 'No se pudo crear la reserva.';
       if (j.error === 'sin_lugar' && j.detalle) m += ` Quedan ${j.detalle.libre} lugar(es).`;
+      if (j.error === 'muy_pronto' && j.detalle) m += ` Este negocio pide ${j.detalle.anticipacion_min_horas} h.`;
+      if (j.error === 'muy_lejos' && j.detalle) m += ` El máximo es ${j.detalle.anticipacion_max_dias} días.`;
+      if (j.error === 'personas_fuera' && j.detalle) m += ` Entre ${j.detalle.personas_min} y ${j.detalle.personas_max}.`;
       err.textContent = m;
     }
   } catch (e) { err.textContent = 'Error de conexión.'; }
