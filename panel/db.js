@@ -225,13 +225,21 @@ async function getPerfil(negocioId) {
 // No toda marca usa toda la plataforma. Estado = flag explícito (habilitada) + configuración
 // VERIFICADA contra la config real (no se guarda, así el flag no puede mentir).
 // Siempre activas (no son capacidades): identidad, brief, biblioteca.
+// v2.0: cada capacidad pertenece a uno de los tres grupos (identidad / comunicacion / operacion).
+// El grupo vive acá y no en la base a propósito: el catálogo ya tiene lógica asociada
+// (evaluarCap, dependencias) y partirlo entre base y código lo empeoraría. Ver core/planes/V2.md.
 const CAPS = [
-  { id: 'estilo',    label: 'Estilo de marca',    icon: 'palette',           href: 'estilo',    desc: 'Sistema de diseño e identidad visual' },
-  { id: 'instagram', label: 'Instagram',          icon: 'instagram',         href: 'instagram', desc: 'Publicaciones del feed' },
-  { id: 'pauta',     label: 'Pauta Instagram',    icon: 'badge-dollar-sign', href: 'pauta',     desc: 'Publicidad y pauta (Meta Ads)', depende: ['instagram'] },
-  { id: 'pantalla',  label: 'Avisos en pantalla', icon: 'megaphone',         href: 'avisos',    desc: 'Avisos para la pantalla de calle' },
-  { id: 'web',       label: 'Web / Landing',      icon: 'globe',             href: 'landing',   desc: 'Sitio del negocio' },
-  { id: 'grafica',   label: 'Gráfica',            icon: 'layout-template',   href: 'grafica',   desc: 'Folletos, afiches y vía pública', depende: ['estilo'] },
+  { id: 'estilo',    grupo: 'identidad',    label: 'Estilo de marca',    icon: 'palette',           href: 'identidad#estilo', desc: 'Sistema de diseño e identidad visual' },
+  { id: 'instagram', grupo: 'comunicacion', label: 'Instagram',          icon: 'instagram',         href: 'instagram', desc: 'Publicaciones del feed' },
+  { id: 'pauta',     grupo: 'comunicacion', label: 'Pauta Instagram',    icon: 'badge-dollar-sign', href: 'pauta',     desc: 'Publicidad y pauta (Meta Ads)', depende: ['instagram'] },
+  { id: 'pantalla',  grupo: 'comunicacion', label: 'Avisos en pantalla', icon: 'megaphone',         href: 'avisos',    desc: 'Avisos para la pantalla de calle' },
+  { id: 'web',       grupo: 'comunicacion', label: 'Web / Landing',      icon: 'globe',             href: 'landing',   desc: 'Sitio del negocio' },
+  { id: 'grafica',   grupo: 'comunicacion', label: 'Gráfica',            icon: 'layout-template',   href: 'grafica',   desc: 'Folletos, afiches y vía pública', depende: ['estilo'] },
+];
+const GRUPOS_CAP = [
+  { id: 'identidad',    label: 'Identidad',   desc: 'Quién es el negocio' },
+  { id: 'comunicacion', label: 'Comunicación',desc: 'Cómo habla' },
+  { id: 'operacion',    label: 'Operación',   desc: 'Qué puede hacer por un cliente' },
 ];
 
 function evaluarCap(cap, d, cfg) {
@@ -1659,7 +1667,7 @@ module.exports = {
   completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
-  getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio,
+  getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente, getVerificacion,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,

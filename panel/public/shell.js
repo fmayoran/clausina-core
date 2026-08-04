@@ -10,12 +10,17 @@
       { id: 'maquinas',     label: 'Sala de máquinas',  icon: 'gauge',            href: 'maquinas' },
       { id: 'negocios',     label: 'Negocios',          icon: 'boxes',            href: 'negocios' },
       { id: 'pantallas',    label: 'Pantallas',         icon: 'monitor',          href: 'audiovisual' },
-      { id: 'estilo',       label: 'Estilo',            icon: 'palette',          href: 'estilo' },
+      { id: 'estilo',       label: 'Sistema de diseño', icon: 'palette',          href: 'estilo' },
       { id: 'arquitectura', label: 'Arquitectura',      icon: 'git-fork',         href: 'arquitectura' },
       { id: 'usuarios',     label: 'Usuarios',          icon: 'users',            href: 'usuarios' },
       { id: 'rubros',       label: 'Rubros y atributos',icon: 'tags',             href: 'rubros' },
     ],
-    'Negocio activo': [
+    // v2.0: el negocio activo se ordena en tres grupos con ritmos de cambio distintos.
+    // 'Operación' (clientes, reservas, productos, órdenes) aparece cuando tenga contenido, en F3.
+    Identidad: [
+      { id: 'identidad', label: 'Identidad',         icon: 'id-card',     href: 'identidad' },
+    ],
+    'Comunicación': [
       { id: 'propuestas', label: 'Propuestas',       icon: 'lightbulb',   href: 'propuestas' },
       { id: 'cola',      label: 'Cola y aprobación', icon: 'inbox',       href: 'proyecto' },
       { id: 'instagram', label: 'Instagram',         icon: 'instagram',   href: 'instagram' },
@@ -24,8 +29,6 @@
       { id: 'landing',   label: 'Landing',           icon: 'globe',       href: 'landing' },
       { id: 'pauta',     label: 'Pauta',             icon: 'badge-dollar-sign', href: 'pauta' },
       { id: 'biblioteca',label: 'Biblioteca',        icon: 'images',      href: 'biblioteca' },
-      { id: 'identidad', label: 'Identidad',         icon: 'id-card',     href: 'identidad' },
-      { id: 'perfil',    label: 'Perfil',            icon: 'settings-2',  href: 'perfil' },
     ],
     // Fuera de las secciones de negocio: es la cuenta de quien está mirando, no del negocio activo.
     Vos: [
@@ -50,6 +53,8 @@
     return out;
   }
 
+  // Secciones que pertenecen al negocio activo (y no a la plataforma): definen el breadcrumb.
+  var SECS_NEGOCIO = ['Identidad', 'Comunicación', 'Operación'];
   function labelOf(id){ for(var s in NAV){ for(var i=0;i<NAV[s].length;i++) if(NAV[s][i].id===id) return NAV[s][i].label; } return ''; }
   function sectionOf(id){ for(var s in NAV){ for(var i=0;i<NAV[s].length;i++) if(NAV[s][i].id===id) return s; } return ''; }
   // Breadcrumb contextual: Inicio › Marca › Página. La Marca enlaza al proyecto (home de la marca).
@@ -60,7 +65,7 @@
     var S='<span class="mono text-[11px] text-pmut dark:text-mut opacity-50">/</span>';
     var CUR='mono text-[11px] text-pfg dark:text-fg';
     var out='<nav class="flex items-center flex-wrap gap-2 mb-6"><a class="'+L+'" href=".">Inicio</a>';
-    if(sectionOf(active)==='Negocio activo'){
+    if(SECS_NEGOCIO.indexOf(sectionOf(active))>=0){
       if(active==='cola'){ out+=S+'<span class="'+CUR+'" id="cr-marca">negocio</span>'; }
       else { out+=S+'<a class="'+L+'" href="proyecto" id="cr-marca">negocio</a>'+S+'<span class="'+CUR+'">'+lab+'</span>'; }
     } else {

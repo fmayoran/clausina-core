@@ -11,27 +11,40 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tw.css">
 <style>
-  /* Tokens locales espejados de tw.css, igual que en usuarios.html: el acento en claro es el
-     verde oliva del sistema (#4d6800), no el lima, que sólo funciona sobre fondo oscuro. */
+  /* Tokens locales espejados de tw.css: el acento en claro es el verde oliva del sistema
+     (#4d6800), no el lima, que sólo funciona sobre fondo oscuro. */
   :root{--u-surf:#FFFFFF;--u-bg:#F7F5F1;--u-line:#DEDDD3;--u-fg:#0c0c0a;--u-mut:#5A616A;
         --u-acc:#4d6800;--u-accfg:#FFFFFF;--u-ok:#4d6800;--u-mal:#C4442A;--u-medio:#8A6410;}
   .dark{--u-surf:#12151A;--u-bg:#0c0c0a;--u-line:#20242B;--u-fg:#F5F2EC;--u-mut:#8A8F98;
         --u-acc:#CCF24D;--u-accfg:#0c0c0a;--u-ok:#7BC96F;--u-mal:#FF6B4A;--u-medio:#E8A33D;}
   label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.12em;
         text-transform:uppercase;color:var(--u-mut);margin:0 0 6px;}
-  input[type=text],input[type=number],select,textarea{width:100%;background:var(--u-bg);border:1px solid var(--u-line);
-        border-radius:8px;padding:9px 11px;font-family:'Inter',sans-serif;font-size:.95rem;color:var(--u-fg);outline:none;}
+  input[type=text],input[type=password],input[type=number],select,textarea{width:100%;background:var(--u-bg);
+        border:1px solid var(--u-line);border-radius:8px;padding:9px 11px;font-family:'Inter',sans-serif;
+        font-size:.95rem;color:var(--u-fg);outline:none;}
+  textarea{min-height:220px;resize:vertical;font-family:'JetBrains Mono',monospace;font-size:.8rem;line-height:1.6;}
   input:focus,select:focus,textarea:focus{border-color:var(--u-acc);}
-  /* En oscuro el placeholder por defecto se lee casi como un valor cargado, y acá la diferencia
-     importa: el ticket vacío es información (nadie declaró precios), no un campo que ya está lleno. */
-  input::placeholder{color:var(--u-mut);opacity:.45;font-style:italic;}
+  input::placeholder,textarea::placeholder{color:var(--u-mut);opacity:.45;font-style:italic;}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
   @media(max-width:760px){.grid2,.grid3{grid-template-columns:1fr;}}
+  .full{grid-column:1/-1;}
   .sec{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;
        color:var(--u-mut);border-bottom:1px solid var(--u-line);padding-bottom:8px;margin:0 0 18px;}
   .card2{background:var(--u-surf);border:1px solid var(--u-line);border-radius:16px;padding:24px;margin-bottom:18px;}
-  /* Chips: se usan para atributos y momentos. Prendido = borde y texto en el acento. */
+  .hint{font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--u-mut);
+        text-transform:none;letter-spacing:0;margin-top:5px;}
+  label .hint{display:inline;margin:0;}
+  /* Solapas: una sola página de Identidad, cinco caras. */
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--u-line);margin-bottom:22px;}
+  .tab{font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;
+       padding:10px 15px;border:0;background:none;color:var(--u-mut);cursor:pointer;border-bottom:2px solid transparent;
+       margin-bottom:-1px;transition:.15s;}
+  .tab:hover{color:var(--u-fg);}
+  .tab.on{color:var(--u-acc);border-bottom-color:var(--u-acc);}
+  .tab .badge{display:inline-block;width:6px;height:6px;border-radius:50%;margin-left:7px;vertical-align:middle;}
+  .tab .badge.no{background:var(--u-mal);} .tab .badge.si{background:var(--u-ok);}
+  .pane{display:none;} .pane.on{display:block;}
   .chips{display:flex;flex-wrap:wrap;gap:8px;}
   .chip{font-family:'JetBrains Mono',monospace;font-size:.66rem;padding:6px 12px;border-radius:999px;
         border:1px solid var(--u-line);color:var(--u-mut);cursor:pointer;user-select:none;transition:.15s;background:none;}
@@ -51,22 +64,22 @@
   .btn2{background:none;border:1px solid var(--u-line);color:var(--u-mut);border-radius:8px;
         padding:10px 20px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
   .btn2:hover{color:var(--u-fg);border-color:var(--u-fg);}
+  .btn2.chico{padding:5px 12px;font-size:.72rem;}
+  .btn.busy::before{content:"";display:inline-block;width:9px;height:9px;margin-right:7px;border-radius:50%;
+        border:2px solid currentColor;border-top-color:transparent;animation:sp 1s linear infinite;vertical-align:baseline;}
+  @keyframes sp{to{transform:rotate(360deg)}}
   .pill{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:.62rem;
         padding:4px 10px;border-radius:999px;border:1px solid currentColor;white-space:nowrap;}
   /* Convención del panel: coral mientras falta algo, verde cuando terminó. */
   .p-pend{color:var(--u-mal);} .p-ok{color:var(--u-ok);}
-  .bar{position:sticky;bottom:0;background:linear-gradient(transparent,var(--u-bg) 42%);
-       padding:18px 0 6px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:4px;}
   .msg{font-family:'JetBrains Mono',monospace;font-size:.68rem;min-height:1em;}
   .msg.mal{color:var(--u-mal);} .msg.bien{color:var(--u-ok);}
-  .hint{font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--u-mut);
-        text-transform:none;letter-spacing:0;margin-top:5px;}
   .oculto{display:none;}
   .coords{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px;
           font-family:'JetBrains Mono',monospace;font-size:.66rem;}
   .cval{color:var(--u-mut);}
   .cmapa{color:var(--u-acc);text-decoration:none;border-bottom:1px solid currentColor;}
-  .btn2.chico{padding:5px 12px;font-size:.72rem;}
   .geores{display:flex;flex-direction:column;gap:5px;margin-top:9px;}
   .gopt{text-align:left;background:var(--u-bg);border:1px solid var(--u-line);border-radius:8px;
         padding:7px 11px;font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-mut);cursor:pointer;}
@@ -74,132 +87,301 @@
   .gopt b{color:var(--u-fg);}
   .gmut{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-mut);}
   .gerr{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-mal);}
+  /* Contactos */
+  .cfila{display:grid;grid-template-columns:1.1fr .9fr .9fr 1.2fr 30px;gap:7px;margin-bottom:7px;align-items:center;}
+  @media(max-width:760px){.cfila{grid-template-columns:1fr 1fr;}}
+  .cfila input{padding:7px 9px;font-size:.86rem;}
+  .cdel{background:none;border:1px solid var(--u-line);color:var(--u-mut);border-radius:7px;
+        height:32px;cursor:pointer;font-size:1rem;line-height:1;}
+  .cdel:hover{color:var(--u-mal);border-color:var(--u-mal);}
+  /* Generación (estilo y manual) */
+  .genbox{border:1px solid var(--u-line);border-radius:12px;padding:16px;margin-bottom:18px;background:var(--u-bg);}
+  .genrow{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;}
+  .gentt{font-family:'Inter Tight',sans-serif;font-weight:600;font-size:.95rem;}
+  .gensub{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-mut);margin-top:3px;max-width:56ch;}
+  /* Vista previa del estilo */
+  .est-block{margin-top:18px;}
+  .est-h{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.12em;text-transform:uppercase;
+         color:var(--u-mut);margin-bottom:9px;}
+  .est-empty{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--u-mut);}
+  .est-logos{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch;}
+  .est-tile{display:flex;align-items:center;justify-content:center;border:1px solid var(--u-line);
+            border-radius:11px;padding:16px 22px;background:var(--u-bg);min-width:90px;}
+  .est-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+  .est-sw{display:flex;align-items:center;gap:9px;}
+  .est-sw .chip{width:26px;height:26px;border-radius:7px;border:1px solid var(--u-line);padding:0;cursor:default;}
+  .est-sw .lab{font-family:'JetBrains Mono',monospace;font-size:.56rem;color:var(--u-mut);}
+  .est-sw .lab b{display:block;color:var(--u-fg);text-transform:uppercase;letter-spacing:.05em;font-weight:400;font-size:.62rem;}
+  .est-type{display:flex;flex-direction:column;gap:9px;}
+  .est-trow{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--u-line);padding-bottom:9px;}
+  .est-trow .rol{font-family:'JetBrains Mono',monospace;font-size:.56rem;color:var(--u-mut);width:60px;flex:0 0 auto;}
+  .est-trow .sam{flex:1;font-size:1.05rem;color:var(--u-fg);}
+  .est-trow .fn{font-family:'JetBrains Mono',monospace;font-size:.56rem;color:var(--u-mut);}
+  .est-voz{display:flex;gap:8px;flex-wrap:wrap;}
+  .est-voz span{font-family:'JetBrains Mono',monospace;font-size:.62rem;border:1px solid var(--u-line);
+                border-radius:999px;padding:4px 11px;color:var(--u-mut);}
+  .est-link{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;
+            font-size:.62rem;color:var(--u-acc);text-decoration:none;margin-top:12px;}
+  /* Toast (panel.js) */
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;
+         pointer-events:none;background:var(--u-surf);border:1px solid var(--u-line);color:var(--u-fg);
+         border-radius:10px;padding:11px 18px;font-family:'JetBrains Mono',monospace;font-size:.7rem;
+         z-index:200;transition:.2s;box-shadow:0 10px 30px rgba(0,0,0,.25);}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #toast.err{border-color:var(--u-mal);color:var(--u-mal);}
 </style>
 </head>
 <body class="bg-paper text-pfg dark:bg-ink dark:text-fg transition-colors">
 <div class="shell">
   <main class="px-6 md:px-9 py-8 min-w-0" style="max-width:1000px;">
-    <div class="flex items-baseline gap-3 mb-1">
+    <div id="toast"></div>
+    <div class="flex items-baseline gap-3 mb-1 flex-wrap">
       <h1 class="display font-bold text-xl tracking-tight">Identidad</h1>
       <span class="pill" id="estado">cargando…</span>
+      <span class="mono text-[11px] text-pmut dark:text-mut ml-auto" id="upd2"></span>
     </div>
-    <p class="mono text-[11px] text-pmut dark:text-mut mb-7" style="max-width:70ch;line-height:1.6;">
-      Los <b>hechos</b> del negocio, en formato consultable. El brief y el estilo —la narrativa que
-      usa el creativo— siguen en <a href="perfil" class="acc-text">Perfil</a>. Esta ficha es la que
-      después permite filtrar, segmentar y que un agente externo encuentre al negocio.
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-6" style="max-width:74ch;line-height:1.6;">
+      Todo lo que define al negocio, en un solo lugar. La <b>ficha</b> son los hechos en formato
+      consultable —los lee una máquina—; el <b>brief</b> y el <b>estilo</b> son la narrativa que lee
+      el creativo. Son dos caras de lo mismo y conviene mantenerlas de acuerdo.
     </p>
 
-    <div class="card2">
-      <div class="sec">Actividad</div>
-      <div class="grid2">
-        <div>
-          <label for="f-act">Rubro</label>
-          <select id="f-act" onchange="cambioRubro()"><option value="">— sin definir —</option></select>
-          <div class="hint">Lista cerrada a propósito: dos parrillas tienen que quedar clasificadas igual.
-            El rubro define qué atributos se ofrecen más abajo.</div>
+    <div class="tabs" id="tabs">
+      <button class="tab on" data-pane="ficha">Ficha</button>
+      <button class="tab" data-pane="marca">Marca y contacto<span class="badge" id="b-marca"></span></button>
+      <button class="tab" data-pane="brief">Brief<span class="badge" id="b-brief"></span></button>
+      <button class="tab" data-pane="estilo">Estilo<span class="badge" id="b-estilo"></span></button>
+      <button class="tab" data-pane="redes">Redes<span class="badge" id="b-redes"></span></button>
+    </div>
+
+    <!-- ══════════ FICHA (estructurada) ══════════ -->
+    <div class="pane on" id="p-ficha">
+      <div class="card2">
+        <div class="sec">Actividad</div>
+        <div class="grid2">
+          <div>
+            <label for="f-act">Rubro</label>
+            <select id="f-act" onchange="cambioRubro()"><option value="">— sin definir —</option></select>
+            <div class="hint">Lista cerrada a propósito: dos parrillas tienen que quedar clasificadas
+              igual. El rubro define qué atributos se ofrecen más abajo.</div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="card2">
-      <div class="sec">Sedes</div>
-      <div id="sedes"></div>
-      <button class="btn2" onclick="agregarSede()" type="button">Agregar sede</button>
-    </div>
+      <div class="card2">
+        <div class="sec">Sedes</div>
+        <div id="sedes"></div>
+        <button class="btn2" onclick="agregarSede()" type="button">Agregar sede</button>
+      </div>
 
-    <div class="card2">
-      <div class="sec">Zona de influencia</div>
-      <div class="grid2">
-        <div>
-          <label for="f-zmodo">Cómo se define</label>
-          <select id="f-zmodo" onchange="pintarZona()">
-            <option value="radio">Radio desde la sede</option>
-            <option value="localidades">Lista de localidades</option>
-            <option value="nacional">Todo el país</option>
-          </select>
-        </div>
-        <div id="z-radio">
-          <label for="f-zkm">Radio (km)</label>
-          <input type="number" id="f-zkm" min="1" max="500" placeholder="10">
-        </div>
-        <div id="z-loc" class="oculto" style="grid-column:1/-1;">
-          <label for="f-zloc">Localidades</label>
-          <input type="text" id="f-zloc" placeholder="Ranelagh, Berazategui, Hudson">
-          <div class="hint">Separadas por coma.</div>
+      <div class="card2">
+        <div class="sec">Zona de influencia</div>
+        <div class="grid2">
+          <div>
+            <label for="f-zmodo">Cómo se define</label>
+            <select id="f-zmodo" onchange="pintarZona()">
+              <option value="radio">Radio desde la sede</option>
+              <option value="localidades">Lista de localidades</option>
+              <option value="nacional">Todo el país</option>
+            </select>
+          </div>
+          <div id="z-radio">
+            <label for="f-zkm">Radio (km)</label>
+            <input type="number" id="f-zkm" min="1" max="500" placeholder="10">
+            <div class="hint">Necesita coordenadas en la sede para poder resolverse.</div>
+          </div>
+          <div id="z-loc" class="oculto full">
+            <label for="f-zloc">Localidades</label>
+            <input type="text" id="f-zloc" placeholder="Ranelagh, Berazategui, Hudson">
+            <div class="hint">Separadas por coma.</div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="card2">
-      <div class="sec">Ticket</div>
-      <div class="grid3">
-        <div>
-          <label for="f-tmin">Desde</label>
-          <input type="number" id="f-tmin" min="0" step="100" placeholder="30000">
+      <div class="card2">
+        <div class="sec">Ticket</div>
+        <div class="grid3">
+          <div><label for="f-tmin">Desde</label><input type="number" id="f-tmin" min="0" step="100" placeholder="30000"></div>
+          <div><label for="f-tmax">Hasta</label><input type="number" id="f-tmax" min="0" step="100" placeholder="50000"></div>
+          <div>
+            <label for="f-tuni">Por</label>
+            <select id="f-tuni">
+              <option value="">— sin definir —</option>
+              <option value="persona">Persona</option>
+              <option value="orden">Orden / compra</option>
+              <option value="hora">Hora</option>
+              <option value="clase">Clase</option>
+              <option value="mes">Mes</option>
+            </select>
+          </div>
         </div>
-        <div>
-          <label for="f-tmax">Hasta</label>
-          <input type="number" id="f-tmax" min="0" step="100" placeholder="50000">
+        <div class="hint">Se puede dejar vacío: un municipio o una agencia no tienen ticket.</div>
+      </div>
+
+      <div class="card2">
+        <div class="sec">Público</div>
+        <div class="grid3">
+          <div><label for="f-edad1">Edad desde</label><input type="number" id="f-edad1" min="0" max="120" placeholder="25"></div>
+          <div><label for="f-edad2">Edad hasta</label><input type="number" id="f-edad2" min="0" max="120" placeholder="55"></div>
         </div>
-        <div>
-          <label for="f-tuni">Por</label>
-          <select id="f-tuni">
-            <option value="">— sin definir —</option>
-            <option value="persona">Persona</option>
-            <option value="orden">Orden / compra</option>
-            <option value="hora">Hora</option>
-            <option value="clase">Clase</option>
-            <option value="mes">Mes</option>
-          </select>
+        <div class="gtit" style="margin-top:18px;">Momento</div>
+        <div class="chips" id="momentos"></div>
+        <div class="hint">Lista cerrada: "de noche" tiene que ser filtrable.</div>
+        <div style="margin-top:18px;">
+          <label for="f-int">Intereses</label>
+          <input type="text" id="f-int" placeholder="fútbol, familia, after office">
+          <div class="hint">Texto libre, separado por coma. Lo usa el creativo, no el filtro.</div>
         </div>
       </div>
-      <div class="hint">Se puede dejar vacío: un municipio o una agencia no tienen ticket.</div>
+
+      <div class="card2">
+        <div class="sec">Atributos</div>
+        <div id="atributos"></div>
+        <div class="hint" id="attr-nota" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="bar">
+        <button class="btn" id="btn-guardar" onclick="guardarFicha()">Guardar ficha</button>
+        <button class="btn2" id="btn-conf" onclick="guardarFicha(true)">Guardar y confirmar</button>
+        <span class="msg" id="msg"></span>
+      </div>
+      <p class="mono text-[11px] text-pmut dark:text-mut mt-3" style="max-width:70ch;line-height:1.6;">
+        Confirmar marca la ficha como revisada por una persona. Mientras no lo esté, se trata como
+        una propuesta y no se expone hacia afuera.
+      </p>
     </div>
 
-    <div class="card2">
-      <div class="sec">Público</div>
-      <div class="grid3">
-        <div>
-          <label for="f-edad1">Edad desde</label>
-          <input type="number" id="f-edad1" min="0" max="120" placeholder="25">
-        </div>
-        <div>
-          <label for="f-edad2">Edad hasta</label>
-          <input type="number" id="f-edad2" min="0" max="120" placeholder="55">
+    <!-- ══════════ MARCA Y CONTACTO ══════════ -->
+    <div class="pane" id="p-marca">
+      <div class="card2">
+        <div class="sec">Marca</div>
+        <div class="grid2">
+          <div><label for="nombre">Negocio</label><input type="text" id="nombre"></div>
+          <div><label for="slogan">Slogan</label><input type="text" id="slogan"></div>
+          <div class="full">
+            <label for="logo">Logo <span class="hint">— subí el archivo, o pegá una URL</span></label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span id="logoBox" style="display:none;width:42px;height:42px;flex:0 0 auto;border-radius:8px;background:var(--u-bg);border:1px solid var(--u-line);overflow:hidden;position:relative;"><img id="logoPrev" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:5px;"></span>
+              <input type="text" id="logo" style="flex:1;">
+              <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" style="display:none;" onchange="subirLogo(this)">
+              <button type="button" class="btn2" id="logoBtn" onclick="document.getElementById('logoFile').click()">Subir…</button>
+            </div>
+          </div>
+          <div><label for="dominio_web">Web <span class="hint">— dominio</span></label><input type="text" id="dominio_web" placeholder="marca.ar"></div>
+          <div><label for="email">Email <span class="hint">— del negocio</span></label><input type="text" id="email" placeholder="hola@marca.ar"></div>
+          <div><label for="whatsapp">WhatsApp</label><input type="text" id="whatsapp" placeholder="+54 9 11 ..."></div>
+          <div><label for="telegram_chat_id">Telegram chat ID</label><input type="text" id="telegram_chat_id"></div>
+          <div><label for="prefijo">Prefijo de código <span class="hint">— ej. CF-0260</span></label><input type="text" id="prefijo" maxlength="4" placeholder="CF" style="text-transform:uppercase"></div>
+          <div>
+            <label for="gestion">Rol de ClaUsina <span class="hint">— agrupa el negocio en el inicio</span></label>
+            <select id="gestion">
+              <option value="integral">Gestión integral — la manejamos completa</option>
+              <option value="parcial">Gestión parcial — rol secundario</option>
+            </select>
+          </div>
         </div>
       </div>
-      <div class="gtit" style="margin-top:18px;">Momento</div>
-      <div class="chips" id="momentos"></div>
-      <div class="hint">Lista cerrada: "de noche" tiene que ser filtrable.</div>
-      <div style="margin-top:18px;">
-        <label for="f-int">Intereses</label>
-        <input type="text" id="f-int" placeholder="fútbol, familia, after office">
-        <div class="hint">Texto libre, separado por coma. Lo usa el creativo, no el filtro.</div>
+
+      <div class="card2">
+        <div class="sec">Contactos <span style="text-transform:none;letter-spacing:0;">— quién es quién del lado del cliente</span></div>
+        <div id="contactos"></div>
+        <button type="button" class="btn2" style="margin-top:10px" onclick="addContacto()">Agregar contacto</button>
       </div>
+
+      <div class="bar"><button class="btn" onclick="guardarPerfil()">Guardar</button></div>
     </div>
 
-    <div class="card2">
-      <div class="sec">Atributos</div>
-      <div id="atributos"></div>
-      <div class="hint" id="attr-nota" style="margin-top:14px;"></div>
+    <!-- ══════════ BRIEF ══════════ -->
+    <div class="pane" id="p-brief">
+      <div class="card2">
+        <div class="sec">Brief — contexto para el creativo</div>
+        <label for="brief_md">Contexto <span class="hint">— propuesta de valor, tono, público, lineamientos visuales, hacer/evitar, productos, datos clave</span></label>
+        <textarea id="brief_md" style="min-height:420px;"></textarea>
+        <div class="hint">Es la narrativa. Los mismos hechos, en formato consultable, van en la solapa Ficha.</div>
+      </div>
+      <div class="bar"><button class="btn" onclick="guardarPerfil()">Guardar</button></div>
     </div>
 
-    <div class="bar">
-      <button class="btn" id="btn-guardar" onclick="guardar()">Guardar</button>
-      <button class="btn2" id="btn-conf" onclick="guardar(true)">Guardar y confirmar ficha</button>
-      <span class="msg" id="msg"></span>
+    <!-- ══════════ ESTILO ══════════ -->
+    <div class="pane" id="p-estilo">
+      <div class="card2">
+        <div class="sec">Estilo de marca</div>
+        <div class="genbox" id="gen-estilo">
+          <div class="genrow">
+            <div>
+              <div class="gentt">Generar con el creativo</div>
+              <div class="gensub" id="gen-estilo-sub">Documenta el sistema de diseño a partir del brief, lo publicado y el Instagram del negocio.</div>
+            </div>
+            <button class="btn" id="gen-estilo-btn" onclick="generarEstilo()">Generar estilo</button>
+          </div>
+          <div class="genrow" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--u-line)">
+            <div>
+              <div class="gentt">Manual de marca</div>
+              <div class="gensub" id="gen-manual-sub">Necesita el estilo completo. Genera un manual en HTML (online) y PDF.</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+              <a class="btn2 chico" id="gen-manual-html" style="display:none" target="_blank" rel="noopener">Ver online</a>
+              <a class="btn2 chico" id="gen-manual-pdf" style="display:none" target="_blank" rel="noopener">PDF</a>
+              <button class="btn" id="gen-manual-btn" onclick="generarManual()" disabled>Generar manual</button>
+            </div>
+          </div>
+        </div>
+        <label for="estilo_md">Sistema de diseño <span class="hint">— markdown: tokens, tipografía, logo, layout, voz. Es la fuente de verdad; el creativo lo baja a la cápsula como ESTILO.md.</span></label>
+        <textarea id="estilo_md" style="min-height:340px;"></textarea>
+      </div>
+      <div class="card2">
+        <div class="sec">Vista previa</div>
+        <div id="estilo-marca"><div class="est-empty">cargando…</div></div>
+      </div>
+      <div class="bar"><button class="btn" onclick="guardarPerfil()">Guardar</button></div>
     </div>
-    <p class="mono text-[11px] text-pmut dark:text-mut" style="max-width:70ch;line-height:1.6;">
-      Confirmar marca la ficha como revisada por una persona. Mientras no lo esté, se trata como
-      una propuesta y no se expone hacia afuera.
-    </p>
+
+    <!-- ══════════ REDES ══════════ -->
+    <div class="pane" id="p-redes">
+      <div class="card2">
+        <div class="sec">Instagram</div>
+        <div class="grid2">
+          <div><label for="ig_handle">Cuenta <span class="hint">— con @</span></label><input type="text" id="ig_handle" placeholder="@cuenta"></div>
+          <div><label for="ig_user_id">IG User ID</label><input type="text" id="ig_user_id"></div>
+          <div class="full"><label for="ig_token">Token de Instagram <span class="hint">— se guarda cifrado; no se muestra</span></label><input type="password" id="ig_token" autocomplete="off" placeholder="pegá el token"></div>
+        </div>
+      </div>
+      <div class="card2">
+        <div class="sec">Meta Ads <span style="text-transform:none;letter-spacing:0;">— publicidad en Instagram (opcional)</span></div>
+        <div class="grid2">
+          <div><label for="meta_ads_account_id">Ad Account ID <span class="hint">— solo el número</span></label><input type="text" id="meta_ads_account_id" placeholder="2233685384046448"></div>
+          <div><label for="meta_ads_page_id">Page ID <span class="hint">— Página de Facebook</span></label><input type="text" id="meta_ads_page_id"></div>
+          <div><label for="meta_ads_ig_id">IG account ID (ads)</label><input type="text" id="meta_ads_ig_id"></div>
+          <div><label for="meta_ads_token">Token de Meta Ads <span class="hint">— se guarda cifrado; no se muestra</span></label><input type="password" id="meta_ads_token" autocomplete="off" placeholder="pegá el token"></div>
+        </div>
+      </div>
+      <div class="bar"><button class="btn" onclick="guardarPerfil()">Guardar</button></div>
+      <p class="mono text-[11px] text-pmut dark:text-mut mt-3" style="max-width:70ch;line-height:1.6;">
+        Estrictamente esto es configuración de los canales, no identidad. Vive acá porque es
+        donde se cargaba hasta ahora; cuando las capacidades tengan su propia configuración,
+        se muda con Instagram y Pauta.
+      </p>
+    </div>
   </main>
 </div>
 
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 <script src="shell.js"></script>
 <script>ClausinaShell({active:'identidad'})</script>
+<script src="panel.js"></script>
 <script>
+/* ═══════════ Solapas ═══════════ */
+document.getElementById('tabs').addEventListener('click', e => {
+  const b = e.target.closest('.tab'); if (!b) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t === b));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + b.dataset.pane));
+  try { location.hash = b.dataset.pane; } catch (_) {}
+});
+function irASolapa(n) {
+  const b = document.querySelector('.tab[data-pane="' + n + '"]'); if (b) b.click();
+}
+
+/* ═══════════ Ficha estructurada ═══════════ */
 const MOMENTOS = [
   ['manana','Mañana'], ['mediodia','Mediodía'], ['tarde','Tarde'],
   ['noche','Noche'], ['semana','Días de semana'], ['finde','Fin de semana'],
@@ -258,9 +440,10 @@ function cambioRubro() {
     $('attr-nota').textContent = 'Se quitaron por el cambio de rubro: ' + nom.join(', ') + '.';
   }
 }
+
 // Un solo listener para todos los chips: se repintan seguido y así no quedan handlers colgados.
 document.addEventListener('click', e => {
-  const b = e.target.closest('.chip'); if (!b) return;
+  const b = e.target.closest('.chip[data-attr], .chip[data-mom]'); if (!b) return;
   const set = b.dataset.attr ? SEL_ATTR : SEL_MOM;
   const key = b.dataset.attr || b.dataset.mom; if (!key) return;
   set.has(key) ? set.delete(key) : set.add(key);
@@ -293,6 +476,23 @@ function filaSede(s, i) {
     </label>
   </div>`;
 }
+function pintarSedes() {
+  $('sedes').innerHTML = SEDES.map(filaSede).join('') ||
+    '<p class="mono text-[11px] text-pmut dark:text-mut" style="margin-bottom:14px;">Sin sedes cargadas.</p>';
+  if (window.lucide) lucide.createIcons();
+}
+// Los inputs de sede escriben directo en el modelo: repintar en cada tecla perdería el foco.
+$('sedes').addEventListener('input', e => {
+  const t = e.target; if (!t.dataset || t.dataset.s === undefined) return;
+  SEDES[+t.dataset.s][t.dataset.k] = t.value;
+});
+function agregarSede() {
+  SEDES.push({ id: null, nombre: '', direccion: '', localidad: '', partido: '',
+               provincia: '', telefono: '', principal: SEDES.length === 0 });
+  pintarSedes();
+}
+function quitarSede(i) { SEDES.splice(i, 1); if (SEDES.length && !SEDES.some(s => s.principal)) SEDES[0].principal = true; pintarSedes(); }
+function marcarPrincipal(i) { SEDES.forEach((s, j) => s.principal = (i === j)); }
 
 // Geocodificar es una PROPUESTA: se muestran los candidatos y una persona elige. Nada se guarda
 // solo — la sede equivocada mandaría a los clientes a otra dirección.
@@ -323,23 +523,6 @@ function usarCoord(i, k) {
   SEDES[i].lat = x.lat; SEDES[i].lon = x.lon;
   pintarSedes();
 }
-function pintarSedes() {
-  $('sedes').innerHTML = SEDES.map(filaSede).join('') ||
-    '<p class="mono text-[11px] text-pmut dark:text-mut" style="margin-bottom:14px;">Sin sedes cargadas.</p>';
-  if (window.lucide) lucide.createIcons();
-}
-// Los inputs de sede escriben directo en el modelo: repintar en cada tecla perdería el foco.
-$('sedes').addEventListener('input', e => {
-  const t = e.target; if (!t.dataset || t.dataset.s === undefined) return;
-  SEDES[+t.dataset.s][t.dataset.k] = t.value;
-});
-function agregarSede() {
-  SEDES.push({ id: null, nombre: '', direccion: '', localidad: '', partido: '',
-               provincia: '', telefono: '', principal: SEDES.length === 0 });
-  pintarSedes();
-}
-function quitarSede(i) { SEDES.splice(i, 1); if (SEDES.length && !SEDES.some(s => s.principal)) SEDES[0].principal = true; pintarSedes(); }
-function marcarPrincipal(i) { SEDES.forEach((s, j) => s.principal = (i === j)); }
 
 function pintarEstado() {
   const e = $('estado');
@@ -347,7 +530,10 @@ function pintarEstado() {
   e.textContent = REVISADO ? 'ficha confirmada' : 'propuesta sin confirmar';
 }
 
-async function cargar() {
+const normSedes = ss => (ss || []).map(s => ({ ...s, nombre: s.nombre || '', direccion: s.direccion || '',
+  localidad: s.localidad || '', partido: s.partido || '', provincia: s.provincia || '', telefono: s.telefono || '' }));
+
+async function cargarFicha() {
   try {
     const [rc, ri] = await Promise.all([fetch('api/identidad/catalogos'), fetch('api/identidad')]);
     CAT = await rc.json();
@@ -355,8 +541,7 @@ async function cargar() {
       CAT.actividades.map(a => `<option value="${a.id}">${esc(a.grupo)} · ${esc(a.nombre)}</option>`).join('');
 
     const { identidad: d, sedes } = await ri.json();
-    SEDES = (sedes || []).map(s => ({ ...s, nombre: s.nombre || '', direccion: s.direccion || '',
-      localidad: s.localidad || '', partido: s.partido || '', provincia: s.provincia || '', telefono: s.telefono || '' }));
+    SEDES = normSedes(sedes);
     if (d) {
       $('f-act').value = d.actividad_id || '';
       $('f-zmodo').value = d.zona_modo || 'radio';
@@ -380,7 +565,7 @@ async function cargar() {
   }
 }
 
-async function guardar(confirmar) {
+async function guardarFicha(confirmar) {
   const msg = $('msg'), b1 = $('btn-guardar'), b2 = $('btn-conf');
   msg.className = 'msg'; msg.textContent = 'guardando…';
   b1.disabled = b2.disabled = true;
@@ -407,8 +592,7 @@ async function guardar(confirmar) {
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
     const j = await r.json();
     if (r.ok && j.ok) {
-      SEDES = (j.sedes || []).map(s => ({ ...s, nombre: s.nombre || '', direccion: s.direccion || '',
-        localidad: s.localidad || '', partido: s.partido || '', provincia: s.provincia || '', telefono: s.telefono || '' }));
+      SEDES = normSedes(j.sedes);
       REVISADO = j.identidad && j.identidad.revisado_en;
       pintarSedes(); pintarEstado();
       msg.className = 'msg bien'; msg.textContent = confirmar ? 'ficha confirmada' : 'guardado';
@@ -418,7 +602,198 @@ async function guardar(confirmar) {
   b1.disabled = b2.disabled = false;
 }
 
-cargar();
+/* ═══════════ Perfil: marca, brief, estilo, redes ═══════════ */
+const CAMPOS = ['nombre','slogan','ig_handle','dominio_web','email','whatsapp','ig_user_id',
+                'telegram_chat_id','logo','brief_md','estilo_md',
+                'meta_ads_account_id','meta_ads_page_id','meta_ads_ig_id'];
+function fval(id) { const e = $(id); return e ? String(e.value || '').trim() : ''; }
+
+// Punto en la solapa: coral si falta algo, verde si está. Misma convención que el resto del panel.
+function marcarSolapas() {
+  const set = (id, ok) => { const b = $('b-' + id); if (b) b.className = 'badge ' + (ok ? 'si' : 'no'); };
+  set('marca', !!fval('nombre') && !!fval('slogan'));
+  set('redes', !!fval('ig_handle'));
+  set('brief', fval('brief_md').length > 20);
+  set('estilo', fval('estilo_md').length > 20);
+}
+
+async function cargarPerfil() {
+  try {
+    const r = await fetch('api/perfil'); if (r.status === 401) { location.href = 'login'; return; }
+    const p = await r.json();
+    CAMPOS.forEach(c => { const el = $(c); if (el) el.value = p[c] || ''; });
+    // Tokens: write-only, nunca se muestran. Placeholder según si están configurados.
+    const tk = $('meta_ads_token'); if (tk) { tk.value = ''; tk.placeholder = p.meta_ads_token_set ? '•••••••• configurado (vacío = no cambia)' : 'pegá el token'; }
+    const it = $('ig_token'); if (it) { it.value = ''; it.placeholder = p.ig_token_set ? '•••••••• configurado (vacío = no cambia)' : 'pegá el token'; }
+    mostrarLogo(p.logo || '');
+    const g = $('gestion'); if (g) g.value = p.gestion || 'integral';
+    const pf = $('prefijo'); if (pf) pf.value = p.prefijo || '';
+    try { renderContactos(await fetch('api/contactos').then(r => r.json())); } catch (_) { renderContactos([]); }
+    $('upd2').textContent = p.actualizado_en ? ('Última edición: ' + fecha(p.actualizado_en)) : 'Sin cargar todavía';
+    marcarSolapas();
+  } catch (e) {}
+}
+
+async function guardarPerfil() {
+  const body = {}; CAMPOS.forEach(c => { const el = $(c); if (el) body[c] = el.value; });
+  const g = $('gestion'); if (g) body.gestion = g.value;
+  const pf = $('prefijo'); if (pf) body.prefijo = pf.value;
+  const tk = fval('meta_ads_token'); if (tk) body.meta_ads_token = tk;   // solo si escribió uno nuevo
+  const it = fval('ig_token'); if (it) body.ig_token = it;
+  try {
+    const d = await fetch('api/perfil', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body) }).then(r => r.json());
+    if (d.ok) await fetch('api/contactos', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contactos: leerContactos() }) });
+    toast(d.ok ? 'Guardado' : (d.error === 'no_enc_key' ? 'Falta configurar APP_ENC_KEY en el panel' : 'No se pudo guardar'), !d.ok);
+    if (d.ok) cargarPerfil();
+  } catch (e) { toast('Error de conexión', true); }
+}
+
+function mostrarLogo(v) {
+  const box = $('logoBox'), img = $('logoPrev');
+  if (v && /^https?:\/\//.test(v)) { img.src = v; box.style.display = 'inline-block'; }
+  else { img.removeAttribute('src'); box.style.display = 'none'; }
+}
+async function subirLogo(input) {
+  const file = input.files && input.files[0]; if (!file) return;
+  const btn = $('logoBtn'); const txt = btn.textContent; btn.textContent = 'Subiendo…'; btn.disabled = true;
+  try {
+    const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+    const d = await fetch('api/perfil/logo', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dataUrl }) }).then(r => r.json());
+    if (d && d.ok) { $('logo').value = d.url; mostrarLogo(d.url); toast('Logo subido'); }
+    else { toast(d && d.error === 'muy_grande' ? 'Imagen muy grande (máx 5MB)' : 'No se pudo subir el logo', true); }
+  } catch (e) { toast('Error de conexión', true); }
+  finally { btn.textContent = txt; btn.disabled = false; input.value = ''; }
+}
+
+/* --- Contactos del negocio (dueño, community manager, pauta…) --- */
+const ROLES = ['Dueño','Community manager','Responsable de pauta','Administración','Otro'];
+function filaContacto(c) {
+  c = c || {};
+  const d = document.createElement('div');
+  d.className = 'cfila';
+  d.innerHTML = `
+    <input class="c-nombre" placeholder="Nombre" value="${esc(c.nombre || '')}">
+    <input class="c-rol" placeholder="Rol" list="roles" value="${esc(c.rol || '')}">
+    <input class="c-wa" placeholder="WhatsApp" value="${esc(c.whatsapp || '')}">
+    <input class="c-mail" placeholder="Email" value="${esc(c.email || '')}">
+    <button type="button" class="cdel" title="Quitar contacto" onclick="this.parentNode.remove()">×</button>`;
+  return d;
+}
+function renderContactos(lista) {
+  const cont = $('contactos'); if (!cont) return;
+  cont.innerHTML = '';
+  (lista || []).forEach(c => cont.appendChild(filaContacto(c)));
+  if (!$('roles')) {
+    const dl = document.createElement('datalist'); dl.id = 'roles';
+    dl.innerHTML = ROLES.map(r => `<option value="${r}">`).join('');
+    document.body.appendChild(dl);
+  }
+}
+function addContacto() { $('contactos').appendChild(filaContacto()); }
+function leerContactos() {
+  return [...document.querySelectorAll('#contactos .cfila')].map(f => ({
+    nombre: f.querySelector('.c-nombre').value,
+    rol: f.querySelector('.c-rol').value,
+    whatsapp: f.querySelector('.c-wa').value,
+    email: f.querySelector('.c-mail').value,
+  })).filter(c => c.nombre.trim());   // sin nombre no es contacto
+}
+
+/* --- Vista previa del estilo (piloto ClaUsina; a futuro, una por negocio) --- */
+const BRAND_STYLE = {
+  clausina: {
+    paleta: [
+      { n:'Lima', hex:'#CCF24D', uso:'acción / marca' },
+      { n:'Coral', hex:'#FF6A45', uso:'vivo / alerta' },
+      { n:'Ink', hex:'#0A0B0D', uso:'fondo' },
+      { n:'Surface', hex:'#111317', uso:'tarjetas' },
+      { n:'Tiza', hex:'#ECEEF0', uso:'texto' },
+    ],
+    tipos: [
+      { rol:'Display', fn:'Inter Tight', sam:'ClaUsina', ff:"'Inter Tight',sans-serif", fw:700 },
+      { rol:'Cuerpo', fn:'Inter', sam:'Comunicación con motor propio.', ff:"'Inter',sans-serif", fw:400 },
+      { rol:'Datos', fn:'JetBrains Mono', sam:'0123456789 · live', ff:"'JetBrains Mono',monospace", fw:400 },
+    ],
+    voz: ['Directo','Técnico, no frío','Soporte, no protagonista'],
+  }
+};
+function uSvg(stroke, dot) {
+  if (dot) return '<svg viewBox="0 0 28 34" width="26" height="32" fill="none"><path id="epA" d="M5 5 V19 a9 9 0 0 0 18 0 V5" stroke="' + stroke + '" stroke-width="3.4" stroke-linecap="round"/><circle r="2.2" fill="#CCF24D"><animateMotion dur="2.6s" repeatCount="indefinite" rotate="auto"><mpath href="#epA"/></animateMotion></circle></svg>';
+  return '<svg viewBox="0 0 28 34" width="26" height="32" fill="none"><path d="M5 5 V19 a9 9 0 0 0 18 0 V5" stroke="' + stroke + '" stroke-width="3.4" stroke-linecap="round"/></svg>';
+}
+function renderEstilo(slug) {
+  const box = $('estilo-marca'); if (!box) return;
+  const s = BRAND_STYLE[slug];
+  if (!s) { box.innerHTML = '<div class="est-empty">El estilo de este negocio todavía no está definido. ClaUsina es el piloto; el resto lo desarrollamos cuando le toque.</div>'; return; }
+  const sw = s.paleta.map(c => `<div class="est-sw"><div class="chip" style="background:${c.hex}"></div><div class="lab"><b>${c.n}</b><span>${c.hex} · ${c.uso}</span></div></div>`).join('');
+  const tp = s.tipos.map(t => `<div class="est-trow"><span class="rol">${t.rol}</span><span class="sam" style="font-family:${t.ff};font-weight:${t.fw}">${t.sam}</span><span class="fn">${t.fn}</span></div>`).join('');
+  const vz = s.voz.map(v => `<span>${v}</span>`).join('');
+  box.innerHTML = `
+    <div class="est-block" style="margin-top:0"><div class="est-h">Logo</div><div class="est-logos">
+      <div class="est-tile" style="color:var(--u-fg)">${uSvg('currentColor', true)}</div>
+      <div class="est-tile" style="color:var(--u-fg)"><span style="font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1.4rem;display:flex;align-items:center;gap:8px">${uSvg('currentColor', false)}<span>ClaUsina<span style="color:#CCF24D">.</span></span></span></div>
+      <div class="est-tile" style="background:#CCF24D">${uSvg('#0A0B0D', false)}</div>
+      <a class="est-link" href="logo" style="align-self:center">&rarr; kit completo</a>
+    </div></div>
+    <div class="est-block"><div class="est-h">Paleta</div><div class="est-grid">${sw}</div></div>
+    <div class="est-block"><div class="est-h">Tipografía</div><div class="est-type">${tp}</div></div>
+    <div class="est-block"><div class="est-h">Voz</div><div class="est-voz">${vz}</div></div>
+    <a class="est-link" href="estilo">&rarr; Ver el sistema de diseño de ClaUsina</a>`;
+}
+
+/* --- Generación de estilo y manual por el creativo (jobs asíncronos, con polling) --- */
+let _genPoll = null;
+async function cargarGeneracion() {
+  let g; try { g = await fetch('api/generacion').then(r => r.json()); } catch (_) { return; }
+  const eb = $('gen-estilo-btn'), es = $('gen-estilo-sub');
+  if (g.estilo.enCurso) { eb.className = 'btn busy'; eb.textContent = 'Generando…'; eb.disabled = true;
+    es.textContent = 'El creativo está documentando el estilo… (unos minutos)'; }
+  else { eb.className = 'btn'; eb.disabled = false;
+    eb.textContent = g.estilo.hecho ? 'Regenerar estilo' : 'Generar estilo';
+    es.textContent = g.estilo.error ? g.estilo.error
+      : 'Documenta el sistema de diseño a partir del brief, lo publicado y el Instagram del negocio.'; }
+  const mb = $('gen-manual-btn'), ms = $('gen-manual-sub');
+  const mh = $('gen-manual-html'), mp = $('gen-manual-pdf');
+  mh.style.display = g.manual.html_url ? '' : 'none'; if (g.manual.html_url) mh.href = g.manual.html_url;
+  mp.style.display = g.manual.pdf_url ? '' : 'none';  if (g.manual.pdf_url) mp.href = g.manual.pdf_url;
+  if (g.manual.enCurso) { mb.className = 'btn busy'; mb.textContent = 'Generando…'; mb.disabled = true;
+    ms.textContent = 'Armando el manual (HTML + PDF)…'; }
+  else if (!g.estilo.hecho) { mb.className = 'btn'; mb.disabled = true; mb.textContent = 'Generar manual';
+    ms.textContent = 'Necesita el estilo completo primero.'; }
+  else { mb.className = 'btn'; mb.disabled = false;
+    mb.textContent = g.manual.html_url ? 'Regenerar manual' : 'Generar manual';
+    ms.textContent = g.manual.error ? g.manual.error
+      : (g.manual.generado_en ? ('Última versión: ' + fecha(g.manual.generado_en)) : 'Genera un manual en HTML (online) y PDF.'); }
+  // Si algo está en curso, seguimos consultando; si no, refrescamos (estilo_md nuevo).
+  const activo = g.estilo.enCurso || g.manual.enCurso;
+  if (activo && !_genPoll) { _genPoll = setInterval(cargarGeneracion, 5000); }
+  if (!activo && _genPoll) { clearInterval(_genPoll); _genPoll = null; cargarPerfil(); }
+}
+async function generarEstilo() {
+  const b = $('gen-estilo-btn'); b.className = 'btn busy'; b.disabled = true; b.textContent = 'Generando…';
+  try { const d = await fetch('api/estilo/generar', { method: 'POST' }).then(r => r.json());
+    if (!d.ok) toast(d.error === 'ya_en_curso' ? 'Ya hay una generación en curso' : 'No se pudo iniciar', true);
+  } catch (e) { toast('Error de conexión', true); }
+  cargarGeneracion();
+}
+async function generarManual() {
+  const b = $('gen-manual-btn'); b.className = 'btn busy'; b.disabled = true; b.textContent = 'Generando…';
+  try { const d = await fetch('api/manual/generar', { method: 'POST' }).then(r => r.json());
+    if (!d.ok) toast(d.error === 'falta_estilo' ? 'Completá el estilo primero' : (d.error === 'ya_en_curso' ? 'Ya hay una generación en curso' : 'No se pudo iniciar'), true);
+  } catch (e) { toast('Error de conexión', true); }
+  cargarGeneracion();
+}
+
+/* ═══════════ Arranque ═══════════ */
+cargarFicha();
+cargarPerfil();
+cargarGeneracion();
+fetch('api/negocios').then(r => r.ok ? r.json() : null).then(d => renderEstilo(d && d.activa)).catch(() => renderEstilo(null));
+// Enlaces directos: identidad#brief, identidad#estilo…
+if (location.hash) irASolapa(location.hash.slice(1));
 </script>
 </body>
 </html>

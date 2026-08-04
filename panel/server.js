@@ -701,6 +701,10 @@ app.post('/api/capacidades/:cap', soloAdmin, async (req, res) => {
   } catch (e) { console.error('capacidad-set', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 
+// Perfil se absorbió dentro de Identidad (v2.0 / F2). El archivo perfil.html sigue en disco pero
+// ya no se navega: esto evita que un enlace viejo o un favorito caigan en una página huérfana.
+app.get('/perfil', (req, res) => res.redirect(301, '/identidad'));
+
 // Identidad estructurada (v2.0 / F1). Los catálogos son públicos dentro del panel; la ficha va
 // scopeada por negocio como todo el resto (el middleware ya resolvió req.negocioId).
 app.get('/api/identidad/catalogos', async (req, res) => {
