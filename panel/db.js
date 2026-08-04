@@ -776,11 +776,12 @@ async function getClientes(negocioId, { q, limit = 200, offset = 0 } = {}) {
 
 function _datosCliente(d) {
   const nn = s => (s != null && String(s).trim() !== '') ? String(s).trim() : null;
-  const tel = nn(d.telefono);
+  // OJO: no llamarla `tel` — tapa al módulo telefono.js, que se importa con ese nombre.
+  const numero = nn(d.telefono);
   return {
     nombre: nn(d.nombre),
-    telefono: tel,
-    telefono_norm: tel ? (tel.clave(tel) || null) : null,
+    telefono: numero,
+    telefono_norm: numero ? (tel.clave(numero) || null) : null,
     email: nn(d.email) ? nn(d.email).toLowerCase() : null,
     notas: nn(d.notas),
     origen: ORIGENES.includes(d.origen) ? d.origen : 'carga',
