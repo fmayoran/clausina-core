@@ -308,7 +308,11 @@ async function geocodificar(i) {
     if (!r.ok || !j.resultados || !j.resultados.length) {
       caja.innerHTML = '<span class="gerr">Sin resultados para “' + esc(q) + '”.</span>'; return;
     }
-    caja.innerHTML = j.resultados.map((x, k) =>
+    // Si hubo que aflojar la búsqueda (la dirección es una esquina, por ejemplo), decirlo:
+    // no es lo mismo el número exacto que la cuadra.
+    const aviso = j.precision && j.precision !== 'exacta'
+      ? `<span class="gmut">Sin coincidencia exacta. Buscado como “${esc(j.consulta)}” (${esc(j.precision)}).</span>` : '';
+    caja.innerHTML = aviso + j.resultados.map((x, k) =>
       `<button type="button" class="gopt" onclick="usarCoord(${i},${k})">
          <b>${Number(x.lat).toFixed(5)}, ${Number(x.lon).toFixed(5)}</b> · ${esc(x.nombre)}</button>`).join('');
     GEO[i] = j.resultados;

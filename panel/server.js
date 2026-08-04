@@ -731,23 +731,56 @@ app.put('/api/identidad/atributo-mapeo', soloAdmin, async (req, res) => {
 // pide User-Agent identificable y un pedido por segundo — se cumple porque lo dispara una persona
 // apretando un botón, de a una sede. El resultado NO se guarda solo: se propone y alguien confirma.
 let _geoUltimo = 0;
-app.get('/api/geocodificar', async (req, res) => {
-  const q = String(req.query.q || '').trim();
-  if (q.length < 5) return res.status(400).json({ error: 'consulta_corta' });
+
+// Muchas direcciones reales son ESQUINAS ("Av. Valentín Vergara 3200 y Calle 32", "Robles 6414
+// esq. Las Flores") y Nominatim no las parsea: devuelve cero resultados. En vez de rendirse, se
+// prueban variantes cada vez menos precisas y se etiqueta cada resultado con la que lo encontró,
+// para que quien elige sepa si está mirando el número exacto o sólo la cuadra.
+function variantesGeo(q) {
+  const partes = q.split(',').map(s => s.trim()).filter(Boolean);
+  const calle = partes[0] || '';
+  const resto = partes.slice(1);
+  const vs = [{ q, precision: 'exacta' }];
+  const sinEsquina = calle.replace(/\s+(y|esq\.?|esquina)\s+.*$/i, '').trim();
+  if (sinEsquina && sinEsquina !== calle) {
+    vs.push({ q: [sinEsquina, ...resto].join(', '), precision: 'sin la esquina' });
+  }
+  const sinNumero = sinEsquina.replace(/\s*\d[\d/.-]*\s*$/, '').trim();
+  if (sinNumero && sinNumero !== sinEsquina) {
+    vs.push({ q: [sinNumero, ...resto].join(', '), precision: 'calle, sin altura' });
+  }
+  if (resto.length) vs.push({ q: resto.join(', '), precision: 'solo la localidad' });
+  return vs;
+}
+
+async function pedirNominatim(q) {
   const espera = 1100 - (Date.now() - _geoUltimo);
   if (espera > 0) await new Promise(r => setTimeout(r, espera));
   _geoUltimo = Date.now();
+  const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=ar&q='
+    + encodeURIComponent(q);
+  const r = await fetch(url, { headers: { 'User-Agent': 'ClaUsina/1.0 (panel.clausina.ar)' } });
+  if (!r.ok) throw new Error('nominatim ' + r.status);
+  return await r.json();
+}
+
+app.get('/api/geocodificar', async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (q.length < 5) return res.status(400).json({ error: 'consulta_corta' });
   try {
-    const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&countrycodes=ar&q='
-      + encodeURIComponent(q);
-    const r = await fetch(url, { headers: { 'User-Agent': 'ClaUsina/1.0 (panel.clausina.ar)' } });
-    if (!r.ok) return res.status(502).json({ error: 'geocodificador' });
-    const datos = await r.json();
-    res.json({
-      resultados: (datos || []).map(d => ({
-        nombre: d.display_name, lat: Number(d.lat), lon: Number(d.lon), tipo: d.type,
-      })),
-    });
+    for (const v of variantesGeo(q)) {
+      const datos = await pedirNominatim(v.q);
+      if (datos && datos.length) {
+        return res.json({
+          consulta: v.q, precision: v.precision,
+          resultados: datos.map(d => ({
+            nombre: d.display_name, lat: Number(d.lat), lon: Number(d.lon),
+            tipo: d.type, precision: v.precision,
+          })),
+        });
+      }
+    }
+    res.json({ resultados: [] });
   } catch (e) { console.error('geocodificar', e.message); res.status(502).json({ error: 'geocodificador' }); }
 });
 
