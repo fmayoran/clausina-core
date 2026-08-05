@@ -103,6 +103,31 @@ LIVE, calidad, nombre visible, webhook apuntando a ClaUsina, **cuenta suscripta 
 estado de las plantillas. Cada punto salió de una trampa real de las que están más arriba — el
 webhook figura validado en verde aunque falte la suscripción, y ninguna avisa por la otra.
 
+### Cortafuego, el primer negocio con número propio (05/08/2026)
+
+| Qué | Valor |
+|---|---|
+| Número | **+54 9 11 7261-9610** · nombre visible `cortafuego.ar` |
+| Id del número | `1302397302949753` |
+| Cuenta (WABA) | `1002128032447490` — dueña: portafolio `cortafuego.ar` |
+| App | **Cortafuego** (`1715760772940180`), no la de ClaUsina |
+| Token | usuario del sistema `cortafuego-bot`, cifrado en el perfil |
+
+**Por qué la app es la de Cortafuego y no la de ClaUsina.** El camino correcto era **Socios**:
+Cortafuego le comparte su cuenta al portafolio de ClaUsina (`1357666785901841`) y un solo token
+administra todas las cuentas. Meta lo rechazó con "no se pueden asignar activos", casi con
+seguridad porque **ClaUsina todavía no está verificada como negocio** — el mismo pendiente del CUIT.
+
+La salida fue agregarle el producto WhatsApp a la app del propio Cortafuego y generar el token ahí.
+
+**La consecuencia, que hay que tener presente:** ese número **puede enviar pero no recibir**. El
+webhook valida la firma de Meta con el secreto de la app de ClaUsina, y lo que entre por la app de
+Cortafuego viene firmado con otro. Alcanza para los avisos —que es lo que bloqueaba F6— pero no
+para que un cliente le responda al negocio.
+
+**Cuando salga la verificación de ClaUsina hay que migrar a Socios.** El trabajo hecho no se tira:
+sólo cambia de dónde sale el token, y ahí se resuelve también lo de recibir.
+
 ### Error a no repetir
 
 Las primeras plantillas (`reserva_nueva`, `reserva_confirmada`) se crearon en el **WABA de
