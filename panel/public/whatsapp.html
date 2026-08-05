@@ -85,9 +85,12 @@
         <div><label for="f-waba">Id de la cuenta (WABA)</label>
           <input type="text" id="f-waba" autocomplete="off" placeholder="2556110741526425">
           <div class="hint">En la misma pantalla. Hace falta porque las <b>plantillas son por cuenta</b>, no por número.</div></div>
-        <div class="full"><label for="f-token">Token</label>
+        <div><label for="f-token">Token</label>
           <input type="password" id="f-token" autocomplete="off">
           <div class="hint">De un usuario del sistema, para que no venza. Se guarda cifrado y no vuelve a mostrarse.</div></div>
+        <div><label for="f-secret">Secreto de la app</label>
+          <input type="password" id="f-secret" autocomplete="off">
+          <div class="hint">Sólo hace falta para <b>recibir</b>. Los webhooks de esa app vienen firmados con este secreto, no con el de ClaUsina.</div></div>
       </div>
       <div class="bar" style="margin-top:18px;">
         <button class="btn" onclick="guardar()">Guardar</button>
@@ -126,6 +129,8 @@ async function cargar() {
     $('f-waba').value = d.wa_waba_id || '';
     $('f-token').value = '';
     $('f-token').placeholder = d.token_set ? '•••••••• cargado (vacío = no cambia)' : 'pegá el token';
+    $('f-secret').value = '';
+    $('f-secret').placeholder = d.secret_set ? '•••••••• cargado (vacío = no cambia)' : 'sólo para recibir';
     $('btn-borrar').disabled = !d.token_set;
     $('sub').textContent = d.wa_phone_id
       ? (d.token_set ? 'configurado' : 'falta el token') : 'sin configurar';
@@ -138,7 +143,7 @@ async function guardar() {
     const r = await fetch('api/whatsapp/config', { method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ wa_phone_id: $('f-phone').value, wa_waba_id: $('f-waba').value,
-                             wa_token: $('f-token').value }) });
+                             wa_token: $('f-token').value, wa_app_secret: $('f-secret').value }) });
     const j = await r.json();
     if (r.ok && j.ok) { m.className = 'msg bien'; m.textContent = 'guardado';
       setTimeout(() => { m.textContent = ''; }, 2500); cargar(); }

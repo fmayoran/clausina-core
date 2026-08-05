@@ -1215,10 +1215,12 @@ async function cambiarEstadoReserva(negocioId, id, estado) {
 
 async function getWhatsappNegocio(negocioId, conToken = false) {
   const { rows: [r] } = await pool.query(
-    `SELECT wa_phone_id, wa_waba_id, (wa_token_enc IS NOT NULL) AS token_set, wa_token_enc
+    `SELECT wa_phone_id, wa_waba_id, (wa_token_enc IS NOT NULL) AS token_set, wa_token_enc,
+            (wa_app_secret_enc IS NOT NULL) AS secret_set
        FROM contenido.negocio_perfil WHERE negocio_id=$1`, [negocioId]);
   if (!r) return null;
-  const out = { wa_phone_id: r.wa_phone_id, wa_waba_id: r.wa_waba_id, token_set: r.token_set };
+  const out = { wa_phone_id: r.wa_phone_id, wa_waba_id: r.wa_waba_id, token_set: r.token_set,
+                secret_set: r.secret_set };
   // El token sólo sale de acá cuando lo pide el motor para usarlo; nunca hacia el navegador.
   if (conToken && r.wa_token_enc) {
     try { out.token = cryptoAds.decrypt(r.wa_token_enc); } catch (e) { out.token = null; }
@@ -1228,11 +1230,12 @@ async function getWhatsappNegocio(negocioId, conToken = false) {
 
 async function guardarWhatsappNegocio(negocioId, d) {
   const nn = s => (s != null && String(s).trim() !== '') ? String(s).trim() : null;
-  const tok = nn(d.wa_token);
-  let enc = null;
-  if (tok) {
+  const tok = nn(d.wa_token), sec = nn(d.wa_app_secret);
+  let enc = null, secEnc = null;
+  if (tok || sec) {
     if (!cryptoAds.hasKey()) { const e = new Error('APP_ENC_KEY no configurada'); e.code = 'no_enc_key'; throw e; }
-    enc = cryptoAds.encrypt(tok);
+    if (tok) enc = cryptoAds.encrypt(tok);
+    if (sec) secEnc = cryptoAds.encrypt(sec);
   }
   await pool.query(
     `INSERT INTO contenido.negocio_perfil (negocio_id, wa_phone_id, wa_waba_id, actualizado_en)
@@ -1242,9 +1245,36 @@ async function guardarWhatsappNegocio(negocioId, d) {
   // Vacío = no se toca: si no, editar el id borraría el token sin querer.
   if (enc) await pool.query(
     'UPDATE contenido.negocio_perfil SET wa_token_enc=$2 WHERE negocio_id=$1', [negocioId, enc]);
+  if (secEnc) await pool.query(
+    'UPDATE contenido.negocio_perfil SET wa_app_secret_enc=$2 WHERE negocio_id=$1', [negocioId, secEnc]);
   if (d.borrar_token === true) await pool.query(
-    'UPDATE contenido.negocio_perfil SET wa_token_enc=NULL WHERE negocio_id=$1', [negocioId]);
+    'UPDATE contenido.negocio_perfil SET wa_token_enc=NULL, wa_app_secret_enc=NULL WHERE negocio_id=$1', [negocioId]);
   return { ok: true, ...(await getWhatsappNegocio(negocioId)) };
+}
+
+// Los secretos de app de los negocios que tienen WhatsApp propio. El webhook los necesita para
+// validar la firma: cada app firma con el suyo, y el del panel sólo sirve para el de ClaUsina.
+// Se cachean un minuto — llega un webhook por mensaje y no vale descifrar en cada uno.
+let _secretos = null, _secretosAt = 0;
+async function secretosWhatsapp() {
+  if (_secretos && Date.now() - _secretosAt < 60000) return _secretos;
+  const { rows } = await pool.query(
+    `SELECT wa_app_secret_enc FROM contenido.negocio_perfil WHERE wa_app_secret_enc IS NOT NULL`);
+  const out = [];
+  for (const r of rows) {
+    try { out.push(cryptoAds.decrypt(r.wa_app_secret_enc)); } catch (e) { /* uno roto no rompe el resto */ }
+  }
+  _secretos = out; _secretosAt = Date.now();
+  return out;
+}
+
+// Qué negocio es dueño de un número, para saber a quién le llegó el mensaje.
+async function negocioPorPhoneId(phoneId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT p.id, p.slug, p.nombre FROM contenido.negocios p
+       JOIN contenido.negocio_perfil pp ON pp.negocio_id = p.id
+      WHERE pp.wa_phone_id = $1`, [String(phoneId || '')]);
+  return r || null;
 }
 
 // Las plantillas que la plataforma necesita para avisar. Si falta alguna, el aviso no sale.
@@ -2515,6 +2545,7 @@ module.exports = {
   crearLink, getLinks, setLinkActivo, getPiezasParaAccion,
   destinatariosAviso, datosParaAviso,
   getWhatsappNegocio, guardarWhatsappNegocio, verificarWhatsappNegocio, PLANTILLAS_RESERVA,
+  secretosWhatsapp, negocioPorPhoneId,
   negocioPublico, disponibilidadPublica, registrarApertura, marcarCompletado, linkDeApertura,
   ofertaLanding, guardarQueExponeLanding,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,

@@ -27,13 +27,21 @@ const configurado = () => !!(TOKEN && PHONE_ID);
  * Sin APP_SECRET configurado devuelve `true`: durante el alta el secreto todavía no existe y
  * bloquear todo dejaría imposible completar la configuración. Apenas se carga, empieza a exigir.
  */
-function firmaValida(rawBody, header) {
-  if (!APP_SECRET) return true;
-  const esperado = 'sha256=' + crypto.createHmac('sha256', APP_SECRET).update(rawBody).digest('hex');
-  const a = Buffer.from(String(header || ''));
-  const b = Buffer.from(esperado);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+function firmaValida(rawBody, header, secretos = null) {
+  // Cada app de Meta firma con SU secreto. El del panel sirve para el número de ClaUsina; los
+  // números propios de los negocios cuelgan de otras apps, así que se prueba contra todos los
+  // secretos conocidos. Son unos pocos HMAC y sólo corre una vez por mensaje entrante.
+  const candidatos = [APP_SECRET, ...(secretos || [])].filter(Boolean);
+  if (!candidatos.length) return true;   // durante el alta el secreto todavía no existe
+  if (!header) return false;
+  const esperado = Buffer.from(String(header));
+  for (const sec of candidatos) {
+    const calc = Buffer.from('sha256=' + crypto.createHmac('sha256', sec).update(rawBody).digest('hex'));
+    if (calc.length === esperado.length && crypto.timingSafeEqual(calc, esperado)) return true;
+  }
+  return false;
 }
+
 
 /** Aplana el webhook de Meta, que viene con tres niveles de anidamiento. */
 function leerMensajes(cuerpo) {
@@ -45,6 +53,10 @@ function leerMensajes(cuerpo) {
         out.push({
           mensaje_id: m.id,
           wa_id: m.from,
+          // A QUÉ número le escribieron. Con un solo número no hacía falta; con uno por negocio
+          // es lo que distingue al operador que le habla a ClaUsina del cliente que le habla a
+          // su restaurante.
+          phone_number_id: (v.metadata || {}).phone_number_id || null,
           tipo: m.type,
           // El texto puede venir de un mensaje suelto o del botón que tocaron.
           texto: (m.text && m.text.body)

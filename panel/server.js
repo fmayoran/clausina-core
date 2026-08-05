@@ -83,7 +83,11 @@ app.get('/webhook/whatsapp', (req, res) => {
 
 app.post('/webhook/whatsapp', express.raw({ type: '*/*', limit: '2mb' }), async (req, res) => {
   const crudo = Buffer.isBuffer(req.body) ? req.body : Buffer.from('');
-  if (!wa.firmaValida(crudo, req.headers['x-hub-signature-256'])) return res.sendStatus(403);
+  // Cada app firma con su secreto: el del panel para el número de ClaUsina, y el de cada negocio
+  // para el suyo. Se prueban todos antes de rechazar.
+  let secretos = [];
+  try { secretos = await db.secretosWhatsapp(); } catch (e) { console.error('secretos wa', e.message); }
+  if (!wa.firmaValida(crudo, req.headers['x-hub-signature-256'], secretos)) return res.sendStatus(403);
   // Contestamos YA: si tardamos, Meta reintenta y el mismo mensaje llega varias veces.
   res.sendStatus(200);
 
@@ -93,6 +97,21 @@ app.post('/webhook/whatsapp', express.raw({ type: '*/*', limit: '2mb' }), async 
   for (const m of wa.leerMensajes(cuerpo)) {
     try {
       if (await db.whatsappYaVisto(m.mensaje_id)) continue;   // reintento de Meta
+
+      // ¿A qué número escribieron? Si es el de un negocio, del otro lado hay un CLIENTE FINAL, no
+      // un operador: contestarle con el mensaje del panel sería desconcertante. Por ahora se
+      // registra y no se responde; interpretar lo que pide es un paso posterior.
+      const negocio = m.phone_number_id ? await db.negocioPorPhoneId(m.phone_number_id) : null;
+      if (negocio) {
+        await db.logWhatsapp({
+          direccion: 'entrante', wa_id: m.wa_id, usuario_id: null,
+          mensaje_id: m.mensaje_id, tipo: m.tipo, texto: m.texto, crudo: m.crudo,
+          estado: 'cliente_de_negocio',
+        });
+        console.log(`whatsapp: mensaje para ${negocio.slug} de ${m.wa_id} — registrado, sin responder`);
+        continue;
+      }
+
       const u = await db.getUsuarioPorWhatsapp(m.wa_id);
       await db.logWhatsapp({
         direccion: 'entrante', wa_id: m.wa_id, usuario_id: u && u.id,
