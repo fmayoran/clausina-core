@@ -192,6 +192,19 @@ app.get('/api/publico/:slug', async (req, res) => {
   } catch (e) { console.error('publico', e.message); res.status(500).json({ error: 'error' }); }
 });
 
+// Lo que consulta una LANDING (otro dominio) para saber si tiene que mostrar el botón.
+// Con CORS abierto sólo para este endpoint: es información pública y la pide un origen distinto.
+app.get('/api/publico/:slug/landing', async (req, res) => {
+  if (!limite(req, res, 300, 60e3)) return;
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Cache-Control', 'public, max-age=300');
+  try {
+    const o = await db.ofertaLanding(String(req.params.slug));
+    if (o.reservas) o.reservas.url = `${req.protocol}://${req.get('host')}${o.reservas.url}`;
+    res.json(o);
+  } catch (e) { console.error('landing', e.message); res.status(500).json({ error: 'error' }); }
+});
+
 app.get('/api/publico/:slug/disponibilidad', async (req, res) => {
   if (!limite(req, res, 120, 60e3)) return;
   try {
@@ -850,6 +863,14 @@ app.delete('/api/reservas/turnos/:id', async (req, res) => {
     const r = await db.borrarTurno(req.negocioId, req.params.id);
     res.status(r.ok ? 200 : 404).json(r);
   } catch (e) { resError(res, e, 'borrar turno'); }
+});
+
+app.put('/api/landing/expone', async (req, res) => {
+  try { res.json(await db.guardarQueExponeLanding(req.negocioId, req.body || {})); }
+  catch (e) {
+    if (e.code === 'sin_landing') return res.status(409).json({ ok: false, error: e.code });
+    console.error('landing expone', e.message); res.status(500).json({ ok: false, error: 'db' });
+  }
 });
 
 // --- Enlaces de acción (v2.0 / F5) -------------------------------------------------------

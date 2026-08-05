@@ -1278,9 +1278,11 @@ async function setLinkActivo(negocioId, id, activo) {
 // El silencio es no: nadie queda expuesto por olvido.
 async function negocioPublico(slug) {
   const { rows: [n] } = await pool.query(
-    `SELECT p.id, p.slug, p.nombre, pp.slogan, pp.logo, nc.config
+    `SELECT p.id, p.slug, p.nombre, pp.slogan, pp.logo, pp.logo_claro, p.dominio_web,
+            nc.config, COALESCE(ni.marca, '{}'::jsonb) AS marca
        FROM contenido.negocios p
        LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id = p.id
+       LEFT JOIN contenido.negocio_identidad ni ON ni.negocio_id = p.id
        JOIN contenido.negocio_capacidad nc ON nc.negocio_id = p.id AND nc.capacidad = 'reservas'
       WHERE p.slug = $1 AND p.activo AND nc.habilitada`, [slug]);
   if (!n || !(n.config || {}).publico) return null;
@@ -1289,11 +1291,52 @@ async function negocioPublico(slug) {
       WHERE negocio_id=$1 ORDER BY principal DESC, orden LIMIT 1`, [n.id]);
   const cfg = { ...CFG_RESERVAS, ...(n.config || {}) };
   return {
-    id: n.id, slug: n.slug, nombre: n.nombre, slogan: n.slogan, logo: n.logo,
+    id: n.id, slug: n.slug, nombre: n.nombre, slogan: n.slogan,
+    logo: n.logo, logo_claro: n.logo_claro, web: n.dominio_web,
     sede: sede || null,
+    // Tokens visuales: lo que hace que la página no se vea de ClaUsina sino del negocio.
+    // Vacío = paleta de la plataforma, que es un default digno y no un error.
+    marca: n.marca || {},
     // Sólo lo que hace falta para reservar. Nada de fuente_verdad ni de auto_confirmar.
     unidad: cfg.unidad, cantidad_min: cfg.cantidad_min, cantidad_max: cfg.cantidad_max,
     anticipacion_max_dias: cfg.anticipacion_max_dias, anticipacion_min_horas: cfg.anticipacion_min_horas,
+  };
+}
+
+// Qué cuelga la landing. Habilitar o no una capacidad es estructural (solo admin); QUÉ OFRECE
+// la landing es una decisión operativa del negocio, así que tiene su propia puerta.
+async function guardarQueExponeLanding(negocioId, d) {
+  const validas = ['reservas'];
+  const expone = [...new Set((Array.isArray(d.expone) ? d.expone : []).filter(x => validas.includes(x)))];
+  const { rows: [w] } = await pool.query(
+    `SELECT config FROM contenido.negocio_capacidad WHERE negocio_id=$1 AND capacidad='web'`, [negocioId]);
+  if (!w) { const e = new Error('sin landing'); e.code = 'sin_landing'; throw e; }
+  const cfg = { ...(w.config || {}), expone };
+  const etq = String(d.etiqueta_reservas || '').trim().slice(0, 40);
+  if (etq) cfg.etiqueta_reservas = etq; else delete cfg.etiqueta_reservas;
+  await pool.query(
+    `UPDATE contenido.negocio_capacidad SET config=$2::jsonb, actualizado_en=now()
+      WHERE negocio_id=$1 AND capacidad='web'`, [negocioId, JSON.stringify(cfg)]);
+  return { ok: true, config: cfg };
+}
+
+// Lo que necesita una landing para colgarse la capacidad: si está ofrecida y con qué rótulo.
+// Es la única consulta que una cápsula externa hace contra el motor, así que es deliberadamente
+// chica y no expone nada más.
+async function ofertaLanding(slug) {
+  const { rows: [w] } = await pool.query(
+    `SELECT nc.config FROM contenido.negocio_capacidad nc
+       JOIN contenido.negocios p ON p.id = nc.negocio_id
+      WHERE p.slug=$1 AND p.activo AND nc.capacidad='web' AND nc.habilitada`, [slug]);
+  const expone = ((w && w.config && w.config.expone) || []);
+  if (!expone.includes('reservas')) return { reservas: null };
+  const n = await negocioPublico(slug);          // respeta el opt-in público
+  if (!n) return { reservas: null };
+  return {
+    reservas: {
+      url: `/r/${n.slug}`,
+      etiqueta: (w.config.etiqueta_reservas || 'Reservar').slice(0, 40),
+    },
   };
 }
 
@@ -2282,6 +2325,7 @@ module.exports = {
   getDisponibilidad, getReservas, crearReserva, cambiarEstadoReserva,
   crearLink, getLinks, setLinkActivo, getPiezasParaAccion,
   negocioPublico, disponibilidadPublica, registrarApertura, marcarCompletado, linkDeApertura,
+  ofertaLanding, guardarQueExponeLanding,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente, getVerificacion,

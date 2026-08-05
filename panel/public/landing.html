@@ -30,6 +30,17 @@
   .muted{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--ash);}
   .muted.ok{color:#5ec27a;} .muted.no{color:var(--fire);}
   .prev{border:1px solid var(--line);border-radius:7px;overflow:hidden;background:#000;margin-bottom:10px;}
+  .cuelga{border:1px solid var(--line);border-radius:9px;background:#0c0c0a;padding:15px 16px;margin-bottom:20px;}
+  .cuelga-t{font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);margin-bottom:11px;}
+  .cuelga-l{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--chalk);font-size:.95rem;}
+  .cuelga-l input{width:auto;}
+  .cuelga-h{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--ash);margin-top:7px;line-height:1.6;}
+  .cuelga-etq{display:flex;gap:9px;align-items:center;margin-top:12px;}
+  .cuelga-etq input{background:#0c0c0a;border:1px solid var(--line);border-radius:6px;color:var(--white);
+    font-family:'Barlow Condensed',sans-serif;font-size:1rem;padding:8px 11px;outline:none;width:190px;}
+  .cuelga-snip{margin-top:12px;}
+  .cuelga-snip pre{background:#080806;border:1px solid var(--line);border-radius:7px;padding:11px 13px;
+    overflow:auto;font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--chalk);margin:6px 0 0;line-height:1.55;}
   .prev iframe{width:100%;height:520px;border:0;display:block;}
   .acts{display:flex;gap:8px;flex-wrap:wrap;}
   .ibtn{background:transparent;border:1px solid var(--line);color:var(--ash);font-family:'IBM Plex Mono',monospace;font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;padding:7px 13px;border-radius:5px;cursor:pointer;text-decoration:none;display:inline-block;}
@@ -59,6 +70,21 @@
       <textarea id="req" placeholder="Ej: cambiá el color de los botones, agregá una sección de horarios, achicá el título…"></textarea>
       <button onclick="pedir()">Pedir cambio</button>
     </div>
+    <!-- Qué capacidades cuelga la landing (v2.0 / F5b). Sólo aparece si el negocio las tiene. -->
+    <div class="cuelga" id="cuelga" style="display:none;">
+      <div class="cuelga-t">Qué ofrece la landing</div>
+      <label class="cuelga-l">
+        <input type="checkbox" id="w-reservas" onchange="guardarCuelga()">
+        <span>Ofrecer <b>reservas</b> desde la landing</span>
+      </label>
+      <div class="cuelga-h" id="cuelga-h"></div>
+      <div class="cuelga-etq" id="cuelga-etq" style="display:none;">
+        <input type="text" id="w-etq" placeholder="Reservar" maxlength="40" onchange="guardarCuelga()">
+        <span class="muted">rótulo del botón</span>
+      </div>
+      <div class="cuelga-snip" id="cuelga-snip" style="display:none;"></div>
+    </div>
+
     <div id="lista"><div class="empty">Cargando…</div></div>
   </div>
 </main></div>
@@ -129,6 +155,59 @@ async function rechazar(id){
     toast(d.ok?'Mandado a ajustar':'No se pudo',!d.ok); load();
   }catch(e){ toast('Error de conexión',true); }
 }
+
+// ── Qué cuelga la landing (v2.0 / F5b) ──────────────────────────────────────
+// La cápsula de la landing es OTRO repo y OTRO deploy: desde acá no se le puede agregar el botón.
+// Lo que sí se puede es declarar la oferta y darle el fragmento para pegarlo, que consulta al
+// motor y se dibuja solo — así, si mañana se apaga la opción, el botón desaparece sin tocar el sitio.
+let CAPS = null, WEBCFG = {};
+async function cargarCuelga(){
+  try{
+    CAPS = await fetch('api/capacidades').then(r=>r.json());
+    const web = CAPS.find(c=>c.id==='web'), res = CAPS.find(c=>c.id==='reservas');
+    if(!web || !web.habilitada) return;                    // sin landing no hay dónde colgar
+    document.getElementById('cuelga').style.display='';
+    WEBCFG = web.config || {};
+    const expone = WEBCFG.expone || [];
+    const chk = document.getElementById('w-reservas');
+    chk.checked = expone.includes('reservas');
+    chk.disabled = !(res && res.habilitada);
+    document.getElementById('w-etq').value = WEBCFG.etiqueta_reservas || '';
+    document.getElementById('cuelga-h').innerHTML = !(res && res.habilitada)
+      ? 'Este negocio no tiene la capacidad de reservas habilitada.'
+      : (!(res.config||{}).publico
+          ? 'Las reservas están habilitadas pero <b>no abiertas al público</b>: activalo en Reservas → Configuración, si no el botón lleva a una página que no reserva.'
+          : 'Si lo destildás, el botón desaparece de la landing sin tocar el sitio.');
+    pintarSnippet();
+  }catch(e){}
+}
+function pintarSnippet(){
+  const on = document.getElementById('w-reservas').checked;
+  document.getElementById('cuelga-etq').style.display = on ? '' : 'none';
+  const box = document.getElementById('cuelga-snip');
+  box.style.display = on ? '' : 'none';
+  if(!on) return;
+  const slug = SLUG_ACTIVO;
+  box.innerHTML = '<span class="muted">Fragmento para pegar en la landing (una sola vez):</span>' +
+    '<pre>' + esc(`<div id="cu-reservar"></div>
+<script>fetch('${location.origin}/api/publico/${slug}/landing')
+  .then(r=>r.json()).then(d=>{ if(!d.reservas) return;
+    document.getElementById('cu-reservar').innerHTML =
+      '<a class="btn-reservar" href="'+d.reservas.url+'">'+d.reservas.etiqueta+'</a>'; });<\/script>`) + '</pre>';
+}
+async function guardarCuelga(){
+  const on = document.getElementById('w-reservas').checked;
+  const expone = on ? ['reservas'] : [];
+  try{
+    const d = await fetch('api/landing/expone',{method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({expone, etiqueta_reservas: document.getElementById('w-etq').value})}).then(r=>r.json());
+    toast(d.ok?'Guardado':'No se pudo guardar', !d.ok);
+    if(d.ok) cargarCuelga();
+  }catch(e){ toast('Error de conexión', true); }
+}
+let SLUG_ACTIVO = '';
+fetch('api/negocios').then(r=>r.json()).then(d=>{ SLUG_ACTIVO = d.activa || ''; cargarCuelga(); }).catch(()=>{});
+
 load(); setInterval(load,6000);
 </script>
 </body>
