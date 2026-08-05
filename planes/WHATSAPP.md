@@ -56,6 +56,60 @@ Variables en el env del panel: `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_
 - **El webhook va antes de `express.json`**: la firma se calcula sobre el cuerpo crudo y, si el
   parser lo toca primero, ya no se pueden reconstruir los bytes.
 
+## Un número por negocio (decidido el 05/08/2026)
+
+El diseño original —**un solo número de ClaUsina** hablando con todos— sirve para la conversación
+con el **operador** y no para la conversación con el **cliente final**. Son dos cosas distintas y
+se separan:
+
+| Conversación | Número | Estado |
+|---|---|---|
+| ClaUsina ↔ operador del negocio | el de ClaUsina (+54 9 11 7261-3604) | andando |
+| Negocio ↔ su cliente final | **uno propio por negocio** | en alta |
+
+**Por qué, en dos hechos que se pueden verificar contra la API:**
+
+1. **La calificación de calidad es por número** (`quality_rating` en el objeto del teléfono). Con
+   un número compartido, un negocio que junta reportes o bloqueos **se lleva puestos a todos los
+   demás**. Es el único de los problemas que no tiene arreglo posterior.
+2. **El nombre visible es por número** (`verified_name`). Un comensal que reservó en un asador
+   recibiría un mensaje de "ClaUsina", una empresa de la que nunca oyó hablar — que es justo lo
+   que hace que la gente reporte, y lo que baja la calificación del punto 1.
+
+Y un tercero que apareció al construirlo: **las plantillas son por cuenta (WABA), no por número**.
+Por eso hace falta guardar el WABA además del id del número.
+
+### El costo que hay que plantearle al negocio ANTES
+
+Un número en Cloud API **no puede usarse al mismo tiempo en la app de WhatsApp Business**. Si el
+negocio migra su número, su gente deja de poder contestar desde el celular: todo pasa a entrar por
+ClaUsina. Para un local donde alguien atiende desde el mostrador eso es un cambio de operación, no
+una configuración. Tres de los ocho negocios ya tienen número propio (Ardora Sport, Formación
+Independiente, Ibitat).
+
+### Cómo se configura
+
+Capacidad **WhatsApp** (grupo Comunicación), pantalla propia. `negocio_perfil.wa_phone_id` y
+`wa_waba_id` en claro, `wa_token_enc` cifrado y write-only — la regla de secretos de siempre.
+
+**Al cliente final sólo se le escribe desde el número de su negocio.** Si el negocio no tiene el
+suyo cargado, el aviso no sale: mandarle un mensaje de "ClaUsina" a un comensal es la forma más
+rápida de que lo reporte.
+
+### El diagnóstico
+
+La pantalla trae un verificador que comprueba **lo que la interfaz de Meta no dice**: token, modo
+LIVE, calidad, nombre visible, webhook apuntando a ClaUsina, **cuenta suscripta a la app** y
+estado de las plantillas. Cada punto salió de una trampa real de las que están más arriba — el
+webhook figura validado en verde aunque falte la suscripción, y ninguna avisa por la otra.
+
+### Error a no repetir
+
+Las primeras plantillas (`reserva_nueva`, `reserva_confirmada`) se crearon en el **WABA de
+prueba**, porque era el id que había a mano. El número de producción vive en otro WABA, y como las
+plantillas son por cuenta, **no sirven**. Quedaron ahí inertes: el token no tiene permiso para
+borrarlas. Hay que rehacerlas en el WABA de producción de cada negocio.
+
 ## Pendientes
 
 1. **Interpretar requerimientos.** Hoy la respuesta sólo confirma identidad y qué negocios
