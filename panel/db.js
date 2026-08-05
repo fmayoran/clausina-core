@@ -1274,8 +1274,10 @@ async function verificarWhatsappNegocio(negocioId) {
     } catch (e) { return { error: e.message }; }
   };
 
-  // 1) El token llega al número
-  const num = await pedir(cfg.wa_phone_id);
+  // 1) El token llega al número. Los campos van explícitos: el juego por defecto NO trae
+  // account_mode ni name_status, y sin pedirlos los chequeos salen "sin dato".
+  const num = await pedir(`${cfg.wa_phone_id}?fields=display_phone_number,verified_name,` +
+    `quality_rating,account_mode,name_status,code_verification_status,platform_type,webhook_configuration`);
   if (num.error) {
     add('token', 'El token alcanza el número', 'mal', num.error);
     return { ok: false, chequeos };
