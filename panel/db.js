@@ -1202,6 +1202,38 @@ async function cambiarEstadoReserva(negocioId, id, estado) {
   return { ok: rowCount > 0 };
 }
 
+// --- Avisos de reserva (v2.0 / F5c) -------------------------------------------------------
+// A quién avisarle cuando entra una reserva: los usuarios activos de ESE negocio que tengan
+// WhatsApp cargado. Sin destinatarios no se avisa a nadie, y eso queda registrado en el job.
+async function destinatariosAviso(negocioId) {
+  const { rows } = await pool.query(
+    `SELECT DISTINCT u.id, u.nombre, u.whatsapp
+       FROM contenido.usuario u
+       JOIN contenido.usuario_negocio un ON un.usuario_id = u.id
+      WHERE un.negocio_id = $1 AND u.activo AND coalesce(u.whatsapp,'') <> ''`, [negocioId]);
+  return rows;
+}
+
+// Los datos que necesita un aviso, ya legibles. Se arma acá y no en el server para que la SQL
+// siga viviendo en un solo lugar.
+async function datosParaAviso(reservaId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT r.id, r.fecha::text, r.cantidad, r.estado, r.negocio_id,
+            COALESCE(t.nombre_publico, t.nombre) AS turno,
+            to_char(t.hora_desde,'HH24:MI') AS hora_desde,
+            c.nombre AS cliente, c.telefono AS cliente_telefono,
+            n.nombre AS negocio,
+            COALESCE(nc.config->>'unidad','personas') AS unidad
+       FROM contenido.reserva r
+       JOIN contenido.turno t ON t.id = r.turno_id
+       JOIN contenido.cliente c ON c.id = r.cliente_id
+       JOIN contenido.negocios n ON n.id = r.negocio_id
+       LEFT JOIN contenido.negocio_capacidad nc
+         ON nc.negocio_id = r.negocio_id AND nc.capacidad = 'reservas'
+      WHERE r.id = $1`, [reservaId]);
+  return r || null;
+}
+
 // --- Puente del call to action (v2.0 / F5) ----------------------------------------------
 // Una pieza lleva una acción; la acción vive en un enlace corto; lo que pasa con ese enlace queda
 // atribuido. Es lo que permite decir "este posteo generó siete reservas".
@@ -2330,6 +2362,7 @@ module.exports = {
   getBloqueos, crearBloqueo, borrarBloqueo,
   getDisponibilidad, getReservas, crearReserva, cambiarEstadoReserva,
   crearLink, getLinks, setLinkActivo, getPiezasParaAccion,
+  destinatariosAviso, datosParaAviso,
   negocioPublico, disponibilidadPublica, registrarApertura, marcarCompletado, linkDeApertura,
   ofertaLanding, guardarQueExponeLanding,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,

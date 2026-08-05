@@ -240,6 +240,8 @@ app.post('/api/publico/:slug/reserva', async (req, res) => {
       canal: 'landing', link_id: linkId,
     });
     if (click) await db.marcarCompletado(click, r.id);
+    // Después de responder: el visitante no tiene que esperar a que Meta conteste.
+    setImmediate(() => avisarReserva(r.id, 'negocio'));
     // Hacia afuera no se devuelve cuánto quedó libre: es información del negocio.
     res.json({ ok: true, estado: r.estado });
   } catch (e) {
@@ -820,6 +822,41 @@ app.post('/api/capacidades/:cap', soloAdmin, async (req, res) => {
   } catch (e) { console.error('capacidad-set', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 
+// --- Avisos de reserva por WhatsApp (v2.0 / F5c) ------------------------------------------
+// NUNCA en el camino crítico: la reserva ya está tomada cuando esto corre. Si WhatsApp falla, se
+// registra y se sigue — perder el aviso es molesto, perder la reserva es grave.
+const DIAS_SEM = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function cuandoLegible(fecha, turno, hora) {
+  const d = new Date(fecha + 'T12:00:00');
+  return `${DIAS_SEM[d.getDay()]} ${d.getDate()} de ${MESES[d.getMonth()]}, ${turno} ${hora}`;
+}
+const UNI_PLUR = { personas:'personas', cubiertos:'cubiertos', canchas:'canchas',
+                   mesas:'mesas', lugares:'lugares', cupos:'cupos' };
+
+async function avisarReserva(reservaId, quien) {
+  try {
+    const r = await db.datosParaAviso(reservaId);
+    if (!r) return;
+    const cuando = cuandoLegible(r.fecha, r.turno, r.hora_desde);
+    const cantidad = `${r.cantidad} ${UNI_PLUR[r.unidad] || 'personas'}`;
+    let envios = [];
+    if (quien === 'negocio') {
+      const dest = await db.destinatariosAviso(r.negocio_id);
+      envios = dest.map(u => wa.enviarPlantilla(u.whatsapp, 'reserva_nueva',
+        [r.negocio, r.cliente || 'sin nombre', cuando, cantidad]));
+    } else if (quien === 'cliente' && r.cliente_telefono) {
+      envios = [wa.enviarPlantilla(r.cliente_telefono, 'reserva_confirmada',
+        [r.negocio, cuando, cantidad])];
+    }
+    if (!envios.length) { console.log(`aviso ${quien} reserva ${reservaId}: sin destinatarios`); return; }
+    const res = await Promise.all(envios);
+    const fallas = res.filter(x => !x.ok).map(x => x.motivo);
+    console.log(`aviso ${quien} reserva ${reservaId}: ${res.filter(x => x.ok).length}/${res.length} enviados` +
+      (fallas.length ? ` — fallas: ${fallas.join(' | ')}` : ''));
+  } catch (e) { console.error('avisarReserva', e.message); }
+}
+
 // --- Reservas (v2.0 / F4) ---------------------------------------------------------------
 const RES_ERR = new Set(['cantidad_fuera','fecha_invalida','turno_invalido',
   'turno_no_aplica','muy_pronto','muy_lejos','bloqueado','sin_lugar','sin_cliente',
@@ -923,7 +960,11 @@ app.post('/api/reservas', async (req, res) => {
 });
 app.post('/api/reservas/:id/estado', async (req, res) => {
   try {
-    const r = await db.cambiarEstadoReserva(req.negocioId, req.params.id, (req.body || {}).estado);
+    const estado = (req.body || {}).estado;
+    const r = await db.cambiarEstadoReserva(req.negocioId, req.params.id, estado);
+    // Al cliente se le avisa sólo cuando su pedido pasa a confirmado: es la respuesta que
+    // está esperando. Los otros cambios de estado son internos del negocio.
+    if (r.ok && estado === 'confirmada') setImmediate(() => avisarReserva(req.params.id, 'cliente'));
     res.status(r.ok ? 200 : 409).json(r);
   } catch (e) { resError(res, e, 'estado reserva'); }
 });

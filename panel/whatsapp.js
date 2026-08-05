@@ -84,4 +84,35 @@ async function enviarTexto(a, texto) {
   }
 }
 
-module.exports = { configurado, firmaValida, leerMensajes, enviarTexto, VERIFY };
+// Plantilla: es la ÚNICA forma de escribirle a alguien fuera de la ventana de 24 h, y es el caso
+// de todo aviso que inicia la plataforma. Meta las revisa una por una; si todavía no aprobó la
+// que se pide, la API devuelve el error y acá se informa sin romper nada.
+async function enviarPlantilla(a, nombre, params, idioma = 'es_AR') {
+  if (!configurado()) return { ok: false, motivo: 'sin_configurar' };
+  try {
+    const r = await fetch(`${API}/${PHONE_ID}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: String(a).replace(/\D+/g, ''),
+        type: 'template',
+        template: {
+          name: nombre,
+          language: { code: idioma },
+          components: (params && params.length)
+            ? [{ type: 'body', parameters: params.map(t => ({ type: 'text', text: String(t).slice(0, 200) })) }]
+            : [],
+        },
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, motivo: (d.error && d.error.message) || `HTTP ${r.status}` };
+    return { ok: true, id: d.messages && d.messages[0] && d.messages[0].id };
+  } catch (e) {
+    return { ok: false, motivo: e.message };
+  }
+}
+
+module.exports = { configurado, firmaValida, leerMensajes, enviarTexto, enviarPlantilla, VERIFY };
