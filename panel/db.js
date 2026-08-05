@@ -1289,10 +1289,13 @@ async function verificarWhatsappNegocio(negocioId) {
   add('modo', 'Número en producción', num.account_mode === 'LIVE' ? 'ok' : 'mal',
       num.account_mode === 'LIVE' ? 'LIVE' : `account_mode = ${num.account_mode || 'desconocido'}`);
 
-  // 3) Calidad: es POR NÚMERO, y es la razón de tener uno por negocio
+  // 3) Calidad: es POR NÚMERO, y es la razón de tener uno por negocio.
+  // UNKNOWN no es un problema: es lo que devuelve un número que todavía no mandó suficientes
+  // mensajes como para que Meta lo califique. Marcarlo en rojo sería mentir.
   const q = num.quality_rating;
-  add('calidad', 'Calificación de calidad', q === 'GREEN' ? 'ok' : (q === 'YELLOW' ? 'aviso' : 'mal'),
-      q || 'sin dato');
+  add('calidad', 'Calificación de calidad',
+      q === 'GREEN' ? 'ok' : (q === 'RED' ? 'mal' : 'aviso'),
+      q === 'UNKNOWN' ? 'todavía sin calificar — el número no mandó mensajes' : (q || 'sin dato'));
 
   // 4) Nombre visible: es lo que ve el cliente
   const ns = num.name_status;
@@ -1301,10 +1304,12 @@ async function verificarWhatsappNegocio(negocioId) {
       `${num.verified_name || '—'} (${ns || 'sin dato'})`);
 
   // 5) El webhook apunta acá. Sin esto no llega ni una respuesta.
+  // 5) El webhook sólo hace falta para RECIBIR. Un número que sólo manda avisos funciona sin
+  // él, así que su ausencia es una limitación a decir, no una falla que rompe nada.
   const hook = (num.webhook_configuration || {}).application || '';
-  add('webhook', 'Webhook apuntando a ClaUsina',
-      /panel\.clausina\.ar\/webhook\/whatsapp/.test(hook) ? 'ok' : 'mal',
-      hook || 'sin configurar');
+  add('webhook', 'Recibe respuestas',
+      /panel\.clausina\.ar\/webhook\/whatsapp/.test(hook) ? 'ok' : 'aviso',
+      hook || 'sin webhook — el número puede enviar avisos pero no recibir respuestas');
 
   if (!cfg.wa_waba_id) {
     add('waba', 'Cuenta (WABA) cargada', 'falta', 'Sin el WABA no se pueden mirar las plantillas.');
@@ -1318,10 +1323,11 @@ async function verificarWhatsappNegocio(negocioId) {
     add('waba', 'Cuenta revisada por Meta',
         waba.account_review_status === 'APPROVED' ? 'ok' : 'aviso',
         `${waba.name || ''} · ${waba.account_review_status || 'sin dato'}`);
-    add('verificacion', 'Negocio verificado',
-        waba.business_verification_status === 'verified' ? 'ok' : 'aviso',
-        waba.business_verification_status === 'verified' ? 'verificado'
-          : 'sin verificar — tope de 250 conversaciones iniciadas cada 24 h');
+    const bv = waba.business_verification_status;
+    add('verificacion', 'Negocio verificado', bv === 'verified' ? 'ok' : 'aviso',
+        bv === 'verified' ? 'verificado'
+          : (bv === 'pending' ? 'en trámite — mientras tanto, tope de 250 conversaciones iniciadas cada 24 h'
+                              : 'sin verificar — tope de 250 conversaciones iniciadas cada 24 h'));
   }
 
   // 7) LA TRAMPA: la cuenta suscripta a nuestra app. El webhook puede figurar en verde igual.
