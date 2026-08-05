@@ -822,6 +822,23 @@ app.post('/api/capacidades/:cap', soloAdmin, async (req, res) => {
   } catch (e) { console.error('capacidad-set', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 
+// --- WhatsApp del negocio (v2.0 / F5d) ----------------------------------------------------
+app.get('/api/whatsapp/config', async (req, res) => {
+  try { res.json(await db.getWhatsappNegocio(req.negocioId) || {}); }
+  catch (e) { console.error('wa config', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.put('/api/whatsapp/config', async (req, res) => {
+  try { res.json(await db.guardarWhatsappNegocio(req.negocioId, req.body || {})); }
+  catch (e) {
+    if (e.code === 'no_enc_key') return res.status(409).json({ ok: false, error: e.code });
+    console.error('wa guardar', e.message); res.status(500).json({ ok: false, error: 'db' });
+  }
+});
+app.post('/api/whatsapp/verificar', async (req, res) => {
+  try { res.json(await db.verificarWhatsappNegocio(req.negocioId)); }
+  catch (e) { console.error('wa verificar', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 // --- Avisos de reserva por WhatsApp (v2.0 / F5c) ------------------------------------------
 // NUNCA en el camino crítico: la reserva ya está tomada cuando esto corre. Si WhatsApp falla, se
 // registra y se sigue — perder el aviso es molesto, perder la reserva es grave.
@@ -846,8 +863,16 @@ async function avisarReserva(reservaId, quien) {
       envios = dest.map(u => wa.enviarPlantilla(u.whatsapp, 'reserva_nueva',
         [r.negocio, r.cliente || 'sin nombre', cuando, cantidad]));
     } else if (quien === 'cliente' && r.cliente_telefono) {
+      // Al cliente final se le escribe desde el número DEL NEGOCIO: tiene que ver el nombre del
+      // lugar donde reservó. Si el negocio todavía no tiene el suyo, no se le escribe — mandarle
+      // un mensaje de "ClaUsina" a un comensal es la forma más rápida de que lo reporte.
+      const cfg = await db.getWhatsappNegocio(r.negocio_id, true);
+      if (!cfg || !cfg.wa_phone_id || !cfg.token) {
+        console.log(`aviso cliente reserva ${reservaId}: el negocio no tiene WhatsApp propio`);
+        return;
+      }
       envios = [wa.enviarPlantilla(r.cliente_telefono, 'reserva_confirmada',
-        [r.negocio, cuando, cantidad])];
+        [r.negocio, cuando, cantidad], 'es_AR', { phone_id: cfg.wa_phone_id, token: cfg.token })];
     }
     if (!envios.length) { console.log(`aviso ${quien} reserva ${reservaId}: sin destinatarios`); return; }
     const res = await Promise.all(envios);

@@ -23,6 +23,7 @@
       { id: 'propuestas', label: 'Propuestas',       icon: 'lightbulb',   href: 'propuestas' },
       { id: 'cola',      label: 'Cola y aprobación', icon: 'inbox',       href: 'proyecto' },
       { id: 'instagram', label: 'Instagram',         icon: 'instagram',   href: 'instagram' },
+      { id: 'whatsapp',  label: 'WhatsApp',          icon: 'message-circle', href: 'whatsapp' },
       { id: 'avisos',    label: 'Avisos',            icon: 'megaphone',   href: 'avisos' },
       { id: 'grafica',   label: 'Gráfica',          icon: 'layout-template', href: 'grafica' },
       { id: 'landing',   label: 'Landing',           icon: 'globe',       href: 'landing' },
@@ -177,7 +178,7 @@
 
   // Grisa en el menú las capacidades que la negocio activo tiene deshabilitadas (siguen visibles:
   // se habilitan desde el panel del proyecto). nav id -> capacidad.
-  var NAV_CAP = { instagram: 'instagram', pauta: 'pauta', avisos: 'pantalla', landing: 'web', clientes: 'clientes', reservas: 'reservas' };
+  var NAV_CAP = { instagram: 'instagram', pauta: 'pauta', avisos: 'pantalla', landing: 'web', clientes: 'clientes', reservas: 'reservas', whatsapp: 'whatsapp' };
   // Secciones que son de la plataforma, no de un negocio: sólo el admin las ve.
   // 'inicio' es el tablero de la agencia (consume /api/agencia, /api/maquinas, alta de negocios):
   // para un usuario de negocio no tiene nada, así que además lo mandamos a la home de SU negocio.

@@ -234,6 +234,7 @@ const CAPS = [
   { id: 'pauta',     grupo: 'comunicacion', label: 'Pauta Instagram',    icon: 'badge-dollar-sign', href: 'pauta',     desc: 'Publicidad y pauta (Meta Ads)', depende: ['instagram'] },
   { id: 'pantalla',  grupo: 'comunicacion', label: 'Avisos en pantalla', icon: 'megaphone',         href: 'avisos',    desc: 'Avisos para la pantalla de calle' },
   { id: 'web',       grupo: 'comunicacion', label: 'Web / Landing',      icon: 'globe',             href: 'landing',   desc: 'Sitio del negocio' },
+  { id: 'whatsapp',  grupo: 'comunicacion', label: 'WhatsApp',            icon: 'message-circle',    href: 'whatsapp',  desc: 'Número propio del negocio para hablar con sus clientes' },
   { id: 'grafica',   grupo: 'comunicacion', label: 'Gráfica',            icon: 'layout-template',   href: 'grafica',   desc: 'Folletos, afiches y vía pública', depende: ['estilo'] },
   { id: 'clientes',  grupo: 'operacion',    label: 'Clientes',           icon: 'users-round',       href: 'clientes',  desc: 'Base de clientes del negocio' },
   { id: 'reservas',  grupo: 'operacion',    label: 'Reservas',           icon: 'calendar-check',    href: 'reservas',  desc: 'Turnos, disponibilidad y reservas', depende: ['clientes'] },
@@ -266,6 +267,11 @@ function evaluarCap(cap, d, cfg) {
     if (!cfg.fuente_verdad) faltan.push('fuente de verdad (ClaUsina o sistema del negocio)');
     // Sin al menos un turno activo el módulo no puede aceptar nada: es config, no un detalle.
     if (!d.turnos_activos) faltan.push('al menos un turno activo');
+  } else if (cap.id === 'whatsapp') {
+    if (!d.wa_phone_id) faltan.push('id del número');
+    // Sin el WABA no se pueden mirar las plantillas, que son por cuenta y no por número.
+    if (!d.wa_waba_id) faltan.push('id de la cuenta (WABA)');
+    if (!d.wa_token_enc) faltan.push('token');
   } else if (cap.id === 'clientes') {
     // Decisión de Fer: la fuente de verdad se declara por capacidad y por negocio. Sin
     // declararla, ClaUsina podría terminar compitiendo con el sistema que el cliente ya usa.
@@ -279,6 +285,7 @@ async function getCapacidades(negocioId) {
   const { rows: [d] } = await pool.query(
     `SELECT p.ig_handle, p.ig_user_id, p.dominio_web, pp.estilo_md, pp.ig_token_enc,
             pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id, pp.meta_ads_token_enc,
+            pp.wa_phone_id, pp.wa_waba_id, pp.wa_token_enc,
             (SELECT count(*) FROM contenido.turno t WHERE t.negocio_id=p.id AND t.activo)::int AS turnos_activos
        FROM contenido.negocios p LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id
       WHERE p.id=$1`, [negocioId]);
@@ -1200,6 +1207,142 @@ async function cambiarEstadoReserva(negocioId, id, estado) {
        AND NOT (estado='cancelada' AND $3 IN ('solicitada','confirmada'))`,
     [id, negocioId, estado]);
   return { ok: rowCount > 0 };
+}
+
+// --- WhatsApp propio del negocio (v2.0 / F5d) ---------------------------------------------
+// El número con el que el negocio le habla a SUS clientes. El de ClaUsina queda para hablar con
+// el operador. Ver core/planes/WHATSAPP.md.
+
+async function getWhatsappNegocio(negocioId, conToken = false) {
+  const { rows: [r] } = await pool.query(
+    `SELECT wa_phone_id, wa_waba_id, (wa_token_enc IS NOT NULL) AS token_set, wa_token_enc
+       FROM contenido.negocio_perfil WHERE negocio_id=$1`, [negocioId]);
+  if (!r) return null;
+  const out = { wa_phone_id: r.wa_phone_id, wa_waba_id: r.wa_waba_id, token_set: r.token_set };
+  // El token sólo sale de acá cuando lo pide el motor para usarlo; nunca hacia el navegador.
+  if (conToken && r.wa_token_enc) {
+    try { out.token = cryptoAds.decrypt(r.wa_token_enc); } catch (e) { out.token = null; }
+  }
+  return out;
+}
+
+async function guardarWhatsappNegocio(negocioId, d) {
+  const nn = s => (s != null && String(s).trim() !== '') ? String(s).trim() : null;
+  const tok = nn(d.wa_token);
+  let enc = null;
+  if (tok) {
+    if (!cryptoAds.hasKey()) { const e = new Error('APP_ENC_KEY no configurada'); e.code = 'no_enc_key'; throw e; }
+    enc = cryptoAds.encrypt(tok);
+  }
+  await pool.query(
+    `INSERT INTO contenido.negocio_perfil (negocio_id, wa_phone_id, wa_waba_id, actualizado_en)
+     VALUES ($1,$2,$3, now())
+     ON CONFLICT (negocio_id) DO UPDATE SET wa_phone_id=$2, wa_waba_id=$3, actualizado_en=now()`,
+    [negocioId, nn(d.wa_phone_id), nn(d.wa_waba_id)]);
+  // Vacío = no se toca: si no, editar el id borraría el token sin querer.
+  if (enc) await pool.query(
+    'UPDATE contenido.negocio_perfil SET wa_token_enc=$2 WHERE negocio_id=$1', [negocioId, enc]);
+  if (d.borrar_token === true) await pool.query(
+    'UPDATE contenido.negocio_perfil SET wa_token_enc=NULL WHERE negocio_id=$1', [negocioId]);
+  return { ok: true, ...(await getWhatsappNegocio(negocioId)) };
+}
+
+// Las plantillas que la plataforma necesita para avisar. Si falta alguna, el aviso no sale.
+const PLANTILLAS_RESERVA = ['reserva_nueva', 'reserva_confirmada'];
+
+// Diagnóstico: ¿está operativo y bien configurado?
+// Cada punto de acá salió de una trampa real documentada en WHATSAPP.md: el webhook figura
+// validado con luz verde aunque falten las suscripciones, y ninguna avisa por la otra.
+async function verificarWhatsappNegocio(negocioId) {
+  const cfg = await getWhatsappNegocio(negocioId, true);
+  const chequeos = [];
+  const add = (id, titulo, estado, detalle) => chequeos.push({ id, titulo, estado, detalle });
+
+  if (!cfg || !cfg.wa_phone_id || !cfg.token) {
+    add('config', 'Configuración cargada', 'falta',
+        'Faltan el id del número o el token. Cargalos arriba.');
+    return { ok: false, chequeos };
+  }
+
+  const API = 'https://graph.facebook.com/v21.0';
+  const pedir = async (ruta) => {
+    try {
+      const r = await fetch(`${API}/${ruta}${ruta.includes('?') ? '&' : '?'}access_token=${cfg.token}`,
+        { signal: AbortSignal.timeout(12000) });
+      const j = await r.json().catch(() => ({}));
+      return j.error ? { error: j.error.message } : j;
+    } catch (e) { return { error: e.message }; }
+  };
+
+  // 1) El token llega al número
+  const num = await pedir(cfg.wa_phone_id);
+  if (num.error) {
+    add('token', 'El token alcanza el número', 'mal', num.error);
+    return { ok: false, chequeos };
+  }
+  add('token', 'El token alcanza el número', 'ok',
+      `${num.display_phone_number} · ${num.verified_name}`);
+
+  // 2) En producción, no en un sandbox
+  add('modo', 'Número en producción', num.account_mode === 'LIVE' ? 'ok' : 'mal',
+      num.account_mode === 'LIVE' ? 'LIVE' : `account_mode = ${num.account_mode || 'desconocido'}`);
+
+  // 3) Calidad: es POR NÚMERO, y es la razón de tener uno por negocio
+  const q = num.quality_rating;
+  add('calidad', 'Calificación de calidad', q === 'GREEN' ? 'ok' : (q === 'YELLOW' ? 'aviso' : 'mal'),
+      q || 'sin dato');
+
+  // 4) Nombre visible: es lo que ve el cliente
+  const ns = num.name_status;
+  add('nombre', 'Nombre visible aprobado',
+      ['APPROVED', 'AVAILABLE_WITHOUT_REVIEW'].includes(ns) ? 'ok' : 'aviso',
+      `${num.verified_name || '—'} (${ns || 'sin dato'})`);
+
+  // 5) El webhook apunta acá. Sin esto no llega ni una respuesta.
+  const hook = (num.webhook_configuration || {}).application || '';
+  add('webhook', 'Webhook apuntando a ClaUsina',
+      /panel\.clausina\.ar\/webhook\/whatsapp/.test(hook) ? 'ok' : 'mal',
+      hook || 'sin configurar');
+
+  if (!cfg.wa_waba_id) {
+    add('waba', 'Cuenta (WABA) cargada', 'falta', 'Sin el WABA no se pueden mirar las plantillas.');
+    return { ok: chequeos.every(c => c.estado === 'ok'), chequeos };
+  }
+
+  // 6) La cuenta: revisión y verificación del negocio
+  const waba = await pedir(`${cfg.wa_waba_id}?fields=name,account_review_status,business_verification_status`);
+  if (waba.error) add('waba', 'La cuenta responde', 'mal', waba.error);
+  else {
+    add('waba', 'Cuenta revisada por Meta',
+        waba.account_review_status === 'APPROVED' ? 'ok' : 'aviso',
+        `${waba.name || ''} · ${waba.account_review_status || 'sin dato'}`);
+    add('verificacion', 'Negocio verificado',
+        waba.business_verification_status === 'verified' ? 'ok' : 'aviso',
+        waba.business_verification_status === 'verified' ? 'verificado'
+          : 'sin verificar — tope de 250 conversaciones iniciadas cada 24 h');
+  }
+
+  // 7) LA TRAMPA: la cuenta suscripta a nuestra app. El webhook puede figurar en verde igual.
+  const subs = await pedir(`${cfg.wa_waba_id}/subscribed_apps`);
+  const apps = (subs.data || []).map(x => (x.whatsapp_business_api_data || {}).link || (x.whatsapp_business_api_data || {}).name || '');
+  add('suscripcion', 'La cuenta está suscripta a la app',
+      subs.error ? 'mal' : (apps.length ? 'ok' : 'mal'),
+      subs.error || (apps.length ? apps.join(', ') : 'ninguna app suscripta — no van a llegar los mensajes'));
+
+  // 8) Las plantillas que hacen falta, y en qué estado están
+  const tpl = await pedir(`${cfg.wa_waba_id}/message_templates?limit=100`);
+  if (tpl.error) add('plantillas', 'Plantillas de aviso', 'mal', tpl.error);
+  else {
+    const porNombre = {};
+    (tpl.data || []).forEach(t => { porNombre[t.name] = t.status; });
+    const detalle = PLANTILLAS_RESERVA.map(n => `${n}: ${porNombre[n] || 'no existe'}`).join(' · ');
+    const todas = PLANTILLAS_RESERVA.every(n => porNombre[n] === 'APPROVED');
+    const alguna = PLANTILLAS_RESERVA.some(n => porNombre[n]);
+    add('plantillas', 'Plantillas de aviso aprobadas',
+        todas ? 'ok' : (alguna ? 'aviso' : 'falta'), detalle);
+  }
+
+  return { ok: chequeos.every(c => c.estado === 'ok'), chequeos };
 }
 
 // --- Avisos de reserva (v2.0 / F5c) -------------------------------------------------------
@@ -2363,6 +2506,7 @@ module.exports = {
   getDisponibilidad, getReservas, crearReserva, cambiarEstadoReserva,
   crearLink, getLinks, setLinkActivo, getPiezasParaAccion,
   destinatariosAviso, datosParaAviso,
+  getWhatsappNegocio, guardarWhatsappNegocio, verificarWhatsappNegocio, PLANTILLAS_RESERVA,
   negocioPublico, disponibilidadPublica, registrarApertura, marcarCompletado, linkDeApertura,
   ofertaLanding, guardarQueExponeLanding,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,

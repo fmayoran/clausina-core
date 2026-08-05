@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — WhatsApp</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="fonts/clausina-icono-180.png">
+<script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
+<style>
+  :root{--u-surf:#FFFFFF;--u-bg:#F7F5F1;--u-line:#DEDDD3;--u-fg:#0c0c0a;--u-mut:#5A616A;
+        --u-acc:#4d6800;--u-accfg:#FFFFFF;--u-ok:#4d6800;--u-mal:#C4442A;--u-medio:#8A6410;}
+  .dark{--u-surf:#12151A;--u-bg:#0c0c0a;--u-line:#20242B;--u-fg:#F5F2EC;--u-mut:#8A8F98;
+        --u-acc:#CCF24D;--u-accfg:#0c0c0a;--u-ok:#7BC96F;--u-mal:#FF6B4A;--u-medio:#E8A33D;}
+  label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--u-mut);margin:0 0 6px;}
+  input[type=text],input[type=password]{width:100%;background:var(--u-bg);border:1px solid var(--u-line);
+        border-radius:8px;padding:9px 11px;font-family:'Inter',sans-serif;font-size:.95rem;color:var(--u-fg);outline:none;}
+  input:focus{border-color:var(--u-acc);}
+  .card2{background:var(--u-surf);border:1px solid var(--u-line);border-radius:16px;padding:24px;margin-bottom:18px;}
+  .sec{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;
+       color:var(--u-mut);border-bottom:1px solid var(--u-line);padding-bottom:8px;margin:0 0 18px;
+       display:flex;align-items:center;gap:10px;}
+  .sec .der{margin-left:auto;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr;}}
+  .full{grid-column:1/-1;}
+  .hint{font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--u-mut);
+        text-transform:none;letter-spacing:0;margin-top:5px;line-height:1.6;}
+  .btn{background:var(--u-acc);color:var(--u-accfg);border:none;border-radius:8px;font-weight:700;
+       padding:10px 20px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .btn2{background:none;border:1px solid var(--u-line);color:var(--u-mut);border-radius:8px;
+        padding:10px 20px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
+  .btn2:hover{color:var(--u-fg);border-color:var(--u-fg);}
+  .btn2:disabled{opacity:.4;cursor:default;}
+  .msg{font-family:'JetBrains Mono',monospace;font-size:.68rem;min-height:1em;}
+  .msg.bien{color:var(--u-ok);} .msg.mal{color:var(--u-mal);}
+  .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px;}
+  /* Diagnóstico: coral lo que falta, ámbar lo que anda pero conviene mirar, verde lo que está. */
+  .chk{display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid var(--u-line);}
+  .chk:last-child{border-bottom:0;}
+  .chk .pto{width:9px;height:9px;border-radius:50%;flex:0 0 auto;margin-top:6px;}
+  .chk.ok .pto{background:var(--u-ok);} .chk.aviso .pto{background:var(--u-medio);}
+  .chk.mal .pto,.chk.falta .pto{background:var(--u-mal);}
+  .chk .tit{font-size:.92rem;}
+  .chk .det{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-mut);margin-top:3px;
+            word-break:break-word;}
+  .chk.mal .det,.chk.falta .det{color:var(--u-mal);}
+  .aviso{border:1px solid var(--u-line);border-left:3px solid var(--u-medio);border-radius:10px;
+         padding:13px 16px;margin-bottom:18px;font-family:'JetBrains Mono',monospace;
+         font-size:.66rem;line-height:1.7;color:var(--u-mut);}
+  .aviso b{color:var(--u-fg);}
+</style>
+</head>
+<body class="bg-paper text-pfg dark:bg-ink dark:text-fg transition-colors">
+<div class="shell">
+  <main class="px-6 md:px-9 py-8 min-w-0" style="max-width:900px;">
+    <div class="flex items-baseline gap-3 mb-1 flex-wrap">
+      <h1 class="display font-bold text-xl tracking-tight">WhatsApp</h1>
+      <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
+    </div>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-6" style="max-width:76ch;line-height:1.6;">
+      El número con el que <b>este negocio</b> le habla a sus clientes. Es propio y no compartido:
+      la calificación de calidad y el nombre visible son por número, así que un número por negocio
+      evita que el descuido de uno arrastre a los demás, y el cliente ve el nombre del lugar
+      donde reservó.
+    </p>
+
+    <div class="aviso">
+      El número de <b>ClaUsina</b> (+54 9 11 7261-3604) sigue siendo el de la conversación con
+      <b>vos</b>: avisos de piezas por aprobar, alertas. Esto de acá es otra cosa — el canal
+      del negocio con <b>sus</b> clientes.
+    </div>
+
+    <div class="card2">
+      <div class="sec">Número del negocio</div>
+      <div class="grid2">
+        <div><label for="f-phone">Id del número</label>
+          <input type="text" id="f-phone" autocomplete="off" placeholder="1313380011860470">
+          <div class="hint">Meta Business Suite → WhatsApp Manager → el número → "Identificador del número de teléfono"</div></div>
+        <div><label for="f-waba">Id de la cuenta (WABA)</label>
+          <input type="text" id="f-waba" autocomplete="off" placeholder="2556110741526425">
+          <div class="hint">En la misma pantalla. Hace falta porque las <b>plantillas son por cuenta</b>, no por número.</div></div>
+        <div class="full"><label for="f-token">Token</label>
+          <input type="password" id="f-token" autocomplete="off">
+          <div class="hint">De un usuario del sistema, para que no venza. Se guarda cifrado y no vuelve a mostrarse.</div></div>
+      </div>
+      <div class="bar" style="margin-top:18px;">
+        <button class="btn" onclick="guardar()">Guardar</button>
+        <button class="btn2" id="btn-borrar" onclick="borrarToken()">Borrar el token</button>
+        <span class="msg" id="msg"></span>
+      </div>
+    </div>
+
+    <div class="card2">
+      <div class="sec">Diagnóstico
+        <button class="btn2 der" id="btn-ver" onclick="verificar()">Verificar ahora</button>
+      </div>
+      <div id="diag">
+        <p class="mono text-[11px] text-pmut dark:text-mut">
+          Corré la verificación para ver si el número está operativo. Comprueba lo que la pantalla
+          de Meta no dice: el webhook puede figurar en verde y aun así faltar la suscripción de la
+          cuenta a la app, y ninguna de las dos avisa por la otra.
+        </p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="shell.js"></script>
+<script>ClausinaShell({active:'whatsapp',cap:'whatsapp'})</script>
+<script>
+const $ = id => document.getElementById(id);
+const escapar = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+async function cargar() {
+  try {
+    const d = await fetch('api/whatsapp/config').then(r => r.json());
+    $('f-phone').value = d.wa_phone_id || '';
+    $('f-waba').value = d.wa_waba_id || '';
+    $('f-token').value = '';
+    $('f-token').placeholder = d.token_set ? '•••••••• cargado (vacío = no cambia)' : 'pegá el token';
+    $('btn-borrar').disabled = !d.token_set;
+    $('sub').textContent = d.wa_phone_id
+      ? (d.token_set ? 'configurado' : 'falta el token') : 'sin configurar';
+  } catch (e) { $('sub').textContent = 'error al cargar'; }
+}
+
+async function guardar() {
+  const m = $('msg'); m.className = 'msg'; m.textContent = 'guardando…';
+  try {
+    const r = await fetch('api/whatsapp/config', { method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wa_phone_id: $('f-phone').value, wa_waba_id: $('f-waba').value,
+                             wa_token: $('f-token').value }) });
+    const j = await r.json();
+    if (r.ok && j.ok) { m.className = 'msg bien'; m.textContent = 'guardado';
+      setTimeout(() => { m.textContent = ''; }, 2500); cargar(); }
+    else { m.className = 'msg mal';
+      m.textContent = j.error === 'no_enc_key' ? 'Falta APP_ENC_KEY en el panel' : 'no se pudo guardar'; }
+  } catch (e) { m.className = 'msg mal'; m.textContent = 'error de conexión'; }
+}
+
+async function borrarToken() {
+  if (!confirm('¿Borrar el token guardado? El negocio deja de poder escribirle a sus clientes.')) return;
+  try {
+    await fetch('api/whatsapp/config', { method: 'PUT',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+        wa_phone_id: $('f-phone').value, wa_waba_id: $('f-waba').value, borrar_token: true }) });
+    cargar();
+  } catch (e) {}
+}
+
+async function verificar() {
+  const b = $('btn-ver'); b.disabled = true; b.textContent = 'Verificando…';
+  $('diag').innerHTML = '<p class="mono text-[11px] text-pmut dark:text-mut">Consultando a Meta…</p>';
+  try {
+    const d = await fetch('api/whatsapp/verificar', { method: 'POST' }).then(r => r.json());
+    const cs = d.chequeos || [];
+    $('diag').innerHTML = cs.length
+      ? cs.map(c => `<div class="chk ${escapar(c.estado)}">
+          <span class="pto"></span>
+          <span><span class="tit">${escapar(c.titulo)}</span>
+            <div class="det">${escapar(c.detalle)}</div></span>
+        </div>`).join('')
+      : '<p class="mono text-[11px]">Sin resultados.</p>';
+    $('sub').textContent = d.ok ? 'operativo' : 'con observaciones';
+  } catch (e) {
+    $('diag').innerHTML = '<p class="mono text-[11px]" style="color:var(--u-mal)">No se pudo verificar.</p>';
+  }
+  b.disabled = false; b.textContent = 'Verificar ahora';
+}
+
+cargar();
+</script>
+</body>
+</html>

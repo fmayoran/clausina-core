@@ -87,12 +87,17 @@ async function enviarTexto(a, texto) {
 // Plantilla: es la ÚNICA forma de escribirle a alguien fuera de la ventana de 24 h, y es el caso
 // de todo aviso que inicia la plataforma. Meta las revisa una por una; si todavía no aprobó la
 // que se pide, la API devuelve el error y acá se informa sin romper nada.
-async function enviarPlantilla(a, nombre, params, idioma = 'es_AR') {
-  if (!configurado()) return { ok: false, motivo: 'sin_configurar' };
+// `cfg` permite mandar desde el número DEL NEGOCIO en vez del de la plataforma. Se usa para
+// escribirle al cliente final: el comensal tiene que ver el nombre del lugar donde reservó, no
+// el de ClaUsina. Sin cfg sale por el número de ClaUsina, que es el canal con el operador.
+async function enviarPlantilla(a, nombre, params, idioma = 'es_AR', cfg = null) {
+  const phone = (cfg && cfg.phone_id) || PHONE_ID;
+  const token = (cfg && cfg.token) || TOKEN;
+  if (!phone || !token) return { ok: false, motivo: 'sin_configurar' };
   try {
-    const r = await fetch(`${API}/${PHONE_ID}/messages`, {
+    const r = await fetch(`${API}/${phone}/messages`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messaging_product: 'whatsapp',
         to: String(a).replace(/\D+/g, ''),
