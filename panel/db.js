@@ -933,7 +933,8 @@ async function guardarConfigReservas(negocioId, d, esAdmin) {
 // ── Turnos ────────────────────────────────────────────────────────────────────
 async function getTurnos(negocioId) {
   const { rows } = await pool.query(
-    `SELECT id, nombre, capacidad, cantidad_max, dias, to_char(hora_desde,'HH24:MI') AS hora_desde,
+    `SELECT id, nombre, nombre_publico, capacidad, cantidad_max, dias,
+            to_char(hora_desde,'HH24:MI') AS hora_desde,
             to_char(hora_hasta,'HH24:MI') AS hora_hasta, activo, orden
        FROM contenido.turno WHERE negocio_id=$1 ORDER BY orden, hora_desde`, [negocioId]);
   return rows;
@@ -954,18 +955,20 @@ async function guardarTurno(negocioId, id, d) {
   // general cambia, los turnos que no lo pisaron siguen al día sin tocarlos.
   const maxPropio = (d.cantidad_max === '' || d.cantidad_max == null || +d.cantidad_max <= 0)
     ? null : Math.min(Math.round(+d.cantidad_max), 100000);
+  // El público es una descripción y puede repetirse; vacío = se usa la clave interna.
+  const publico = String(d.nombre_publico || '').trim() || null;
   const args = [negocioId, nombre, capacidad, dias, d.hora_desde, d.hora_hasta,
-                d.activo === false ? false : true, +d.orden || 0, maxPropio];
+                d.activo === false ? false : true, +d.orden || 0, maxPropio, publico];
   if (id) {
     const { rowCount } = await pool.query(
       `UPDATE contenido.turno SET nombre=$2, capacidad=$3, dias=$4::smallint[], hora_desde=$5::time,
-              hora_hasta=$6::time, activo=$7, orden=$8, cantidad_max=$9
-        WHERE id=$10 AND negocio_id=$1`, [...args, id]);
+              hora_hasta=$6::time, activo=$7, orden=$8, cantidad_max=$9, nombre_publico=$10
+        WHERE id=$11 AND negocio_id=$1`, [...args, id]);
     return { ok: rowCount > 0 };
   }
   const { rows: [r] } = await pool.query(
-    `INSERT INTO contenido.turno (negocio_id, nombre, capacidad, dias, hora_desde, hora_hasta, activo, orden, cantidad_max)
-     VALUES ($1,$2,$3,$4::smallint[],$5::time,$6::time,$7,$8,$9) RETURNING id`, args);
+    `INSERT INTO contenido.turno (negocio_id, nombre, capacidad, dias, hora_desde, hora_hasta, activo, orden, cantidad_max, nombre_publico)
+     VALUES ($1,$2,$3,$4::smallint[],$5::time,$6::time,$7,$8,$9,$10) RETURNING id`, args);
   return { ok: true, id: r.id };
 }
 
@@ -1022,7 +1025,7 @@ async function getDisponibilidad(negocioId, desde, hasta) {
   const { rows } = await pool.query(
     `WITH dias AS (SELECT d::date AS fecha FROM generate_series($2::date, $3::date, '1 day') d),
           t AS (SELECT * FROM contenido.turno WHERE negocio_id=$1 AND activo)
-     SELECT dias.fecha::text, t.id AS turno_id, t.nombre, t.capacidad, t.orden,
+     SELECT dias.fecha::text, t.id AS turno_id, t.nombre, t.nombre_publico, t.capacidad, t.orden,
             to_char(t.hora_desde,'HH24:MI') AS hora_desde,
             to_char(t.hora_hasta,'HH24:MI') AS hora_hasta,
             COALESCE(r.ocupado, 0)::int AS ocupado,
@@ -1359,7 +1362,10 @@ async function disponibilidadPublica(negocioId, desde, hasta) {
       return inicio >= piso && inicio <= techo;
     })
     .map(d => ({
-      fecha: d.fecha, turno_id: d.turno_id, nombre: d.nombre,
+      fecha: d.fecha, turno_id: d.turno_id,
+      // El nombre interno es una clave para el negocio ("Noche F. Semana T1"): afuera va la
+      // descripción. Y no se manda la capacidad, sólo el tope que aplica a esta reserva.
+      nombre: d.nombre_publico || d.nombre,
       hora_desde: d.hora_desde, hora_hasta: d.hora_hasta,
       libre: Math.max(0, d.capacidad - d.ocupado),
     }))

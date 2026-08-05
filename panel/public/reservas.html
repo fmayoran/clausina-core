@@ -442,7 +442,8 @@
     <h2 class="display font-bold text-lg tracking-tight" id="t-tit">Nuevo turno</h2>
     <input type="hidden" id="t-id">
     <div class="grid2">
-      <div><label for="t-nombre">Nombre</label><input type="text" id="t-nombre" placeholder="Noche"></div>
+      <div><label for="t-nombre">Nombre interno</label><input type="text" id="t-nombre" placeholder="Noche F. Semana T1">
+        <div class="hint">Cómo lo identificás vos. No lo ve el cliente.</div></div>
       <div><label for="t-cap">Capacidad</label><input type="number" id="t-cap" min="1" value="40">
         <div class="hint" id="hint-cap">en personas</div></div>
       <div><label for="t-desde">Desde</label>
@@ -454,6 +455,9 @@
                maxlength="5" placeholder="HH:MM" autocomplete="off">
         <div class="hint">24 h. Ej.: 23:59</div></div>
     </div>
+    <div style="margin-top:14px;"><label for="t-pub">Nombre para el cliente</label>
+      <input type="text" id="t-pub" placeholder="Noche, primer turno">
+      <div class="hint">Es lo que se ve en la página de reserva. Puede repetirse entre turnos.</div></div>
     <div><label for="t-max">Máximo por reserva</label>
       <input type="number" id="t-max" min="1" placeholder="">
       <div class="hint" id="hint-tmax">Vacío = hereda el máximo general.</div></div>
@@ -1071,9 +1075,9 @@ $('t-dias').addEventListener('click', e => {
 });
 function pintarTurnos() {
   $('turnos').innerHTML = TURNOS.length ? `<table class="mtx">
-    <thead><tr><th>Nombre</th><th>Horario</th><th>Días</th><th>Capacidad</th><th>Máx/reserva</th><th>Estado</th><th></th></tr></thead>
+    <thead><tr><th>Nombre / público</th><th>Horario</th><th>Días</th><th>Capacidad</th><th>Máx/reserva</th><th>Estado</th><th></th></tr></thead>
     <tbody>${TURNOS.map(t => `<tr>
-      <td>${escapar(t.nombre)}</td>
+      <td>${escapar(t.nombre)}${t.nombre_publico ? `<div class="lurl">${escapar(t.nombre_publico)}</div>` : ''}</td>
       <td class="mono2">${t.hora_desde}–${t.hora_hasta}</td>
       <td class="mono2">${DIAS.filter(([n]) => t.dias.includes(n)).map(([, l]) => l).join(' ')}</td>
       <td class="mono2">${t.capacidad}</td>
@@ -1095,6 +1099,7 @@ function abrirTurno(id) {
   $('t-id').value = t ? t.id : '';
   $('t-nombre').value = t ? t.nombre : '';
   $('t-cap').value = t ? t.capacidad : 40;
+  $('t-pub').value = t ? (t.nombre_publico || '') : '';
   $('t-max').value = t && t.cantidad_max ? t.cantidad_max : '';
   $('t-max').placeholder = String(CFG.cantidad_max || '');
   $('hint-tmax').textContent = `Vacío = hereda el máximo general (${CFG.cantidad_max} ${unidad().plur}).`;
@@ -1119,7 +1124,8 @@ async function guardarTurno() {
     btn.disabled = false; return;
   }
   $('t-desde').value = desde; $('t-hasta').value = hasta;
-  const body = { nombre: $('t-nombre').value, capacidad: +$('t-cap').value,
+  const body = { nombre: $('t-nombre').value, nombre_publico: $('t-pub').value,
+    capacidad: +$('t-cap').value,
     cantidad_max: $('t-max').value, dias: [...T_DIAS],
     hora_desde: desde, hora_hasta: hasta,
     activo: $('t-activo').checked };

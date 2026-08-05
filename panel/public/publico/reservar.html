@@ -81,8 +81,13 @@
             color:var(--ok);display:grid;place-items:center;margin:0 auto 16px;font-size:1.6rem;}
   .ok h2{font-family:var(--f-tit);font-size:1.2rem;margin:0 0 8px;}
   .ok p{color:var(--mut);font-size:.92rem;margin:0;}
+  /* La dirección va al final: para reservar no hace falta, y arriba empujaba el formulario. */
+  .sede{font-family:var(--f-mono);font-size:.66rem;color:var(--mut);margin:26px 0 0;text-align:center;line-height:1.7;}
+  .volver{display:block;text-align:center;margin-top:20px;font-family:var(--f-mono);font-size:.66rem;
+          color:var(--mut);text-decoration:none;}
+  .volver:hover{color:var(--fg);}
   .pie{text-align:center;font-family:var(--f-mono);font-size:.56rem;
-       color:var(--mut);opacity:.65;margin-top:30px;}
+       color:var(--mut);opacity:.65;margin-top:26px;}
   .pie a{color:inherit;}
 </style>
 </head>
@@ -95,7 +100,6 @@
       <p class="slogan oculto" id="slogan"></p>
     </div>
   </div>
-  <div class="sede oculto" id="sede"></div>
 
   <div id="form">
     <div class="card">
@@ -141,6 +145,8 @@
     </div>
   </div>
 
+  <div class="sede oculto" id="sede"></div>
+  <a class="volver oculto" id="volver">← Volver</a>
   <div class="pie">Reservas gestionadas con <a href="https://clausina.ar" target="_blank" rel="noopener">ClaUsina</a></div>
 </div>
 
@@ -181,10 +187,11 @@ function pintarTurnos() {
     TURNO = null; actualizar(); return;
   }
   if (!TURNO || !ts.some(t => t.turno_id === TURNO)) TURNO = ts[0].turno_id;
+  // Sin capacidad ni ocupación: al cliente le alcanza con que el turno esté ofrecido — los que
+  // no tienen lugar ya vienen filtrados. Cuánto queda es información del negocio.
   $('turnos').innerHTML = ts.map(t => `
     <button class="tbtn${t.turno_id === TURNO ? ' on' : ''}" onclick="elegirTurno('${t.turno_id}')">
       <span><b>${esc(t.nombre)}</b><br><span class="h">${t.hora_desde}–${t.hora_hasta}</span></span>
-      <span class="q">${t.libre} ${plural(t.libre)}</span>
     </button>`).join('');
   actualizar();
 }
@@ -192,10 +199,12 @@ function elegirTurno(id) { TURNO = id; pintarTurnos(); }
 
 function actualizar() {
   const t = TURNOS.find(x => x.fecha === FECHA && x.turno_id === TURNO);
+  // El tope real considera lo que queda en el turno, pero no se dice cuánto queda: si el turno
+  // está casi lleno, el número se ve al intentar reservar, no antes.
   const tope = Math.min(NEG.cantidad_max, t ? t.libre : NEG.cantidad_max);
+  $('cantidad').max = tope;
   $('lbl-cant').textContent = 'Cantidad · ' + plural(2);
-  $('nota').textContent = t
-    ? `Hasta ${tope} ${plural(tope)} por reserva. La reserva ocupa el turno completo.` : '';
+  $('nota').textContent = t ? 'La reserva ocupa el turno completo.' : '';
   $('enviar').disabled = !TURNO;
 }
 
@@ -215,9 +224,12 @@ async function enviar() {
     if (r.ok && j.ok) {
       $('form').classList.add('oculto');
       $('listo').classList.remove('oculto');
+      // Sin aviso automático todavía, así que la promesa se mantiene chica: se dice qué pasó,
+      // no por qué canal ni cuándo va a llegar la respuesta. Cuando el aviso por WhatsApp esté
+      // andando, acá se dice explícitamente que llega por ahí.
       $('ok-txt').textContent = j.estado === 'confirmada'
         ? 'Tu reserva quedó confirmada. Te esperamos.'
-        : 'Recibimos tu pedido. El negocio lo confirma y te avisa.';
+        : 'Recibimos tu pedido y ya lo tiene el negocio. Queda pendiente de confirmación.';
       if (j.estado !== 'confirmada') $('ok-tit').textContent = 'Reserva pedida';
       window.scrollTo(0, 0);
       return;
@@ -281,6 +293,16 @@ async function cargar() {
       $('logo').src = src;
       if (NEG.marca && Object.keys(NEG.marca).length) $('logo').classList.add('propio');
       $('logo').classList.remove('oculto');
+    }
+    // Volver: primero a quien nos trajo, si es otro sitio; si no, a la web del negocio.
+    const ref = document.referrer && !document.referrer.includes(location.host) ? document.referrer : '';
+    const destino = ref || (NEG.web ? (/^https?:/.test(NEG.web) ? NEG.web : 'https://' + NEG.web) : '');
+    if (destino) {
+      const v = $('volver');
+      v.href = destino;
+      try { v.textContent = '← Volver a ' + new URL(destino).hostname.replace(/^www\./, ''); }
+      catch (_) { v.textContent = '← Volver'; }
+      v.classList.remove('oculto');
     }
     if (NEG.sede) {
       const s = [NEG.sede.direccion, NEG.sede.localidad, NEG.sede.partido].filter(Boolean).join(' · ');
