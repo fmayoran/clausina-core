@@ -200,7 +200,10 @@ app.get('/api/publico/:slug/landing', async (req, res) => {
   res.set('Cache-Control', 'public, max-age=300');
   try {
     const o = await db.ofertaLanding(String(req.params.slug));
-    if (o.reservas) o.reservas.url = `${req.protocol}://${req.get('host')}${o.reservas.url}`;
+    // req.protocol dice http detrás del proxy: hay que mirar el encabezado. Una landing en
+    // https que incruste un enlace http lo ve bloqueado por contenido mixto.
+    const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+    if (o.reservas) o.reservas.url = `${proto}://${req.get('host')}${o.reservas.url}`;
     res.json(o);
   } catch (e) { console.error('landing', e.message); res.status(500).json({ error: 'error' }); }
 });
