@@ -430,6 +430,12 @@ async function seguirVoz(negocio, mensaje) {
   if (!i) return void await elegirDia(cfg, negocio, waId, '');
   if (i.intencion !== 'reserva') return void await recibirConsulta(cfg, negocio, waId, texto, canal);
 
+  // Pidió un día concreto que no está en la agenda. Sin esto se le muestra una lista que empieza
+  // semanas después y se lee como "no hay lugar", cuando puede ser que el local esté cerrado.
+  if (!i.fecha && i.fecha_pedida) {
+    await decir(cfg, waId, `Para ${i.fecha_pedida} no tengo disponibilidad.`, negocio.id);
+  }
+
   // Lo entendido entra al MISMO flujo que los botones: `avanzar` decide qué falta y lo pregunta.
   // Si el día que pidió no está disponible se le ofrece la lista, pero la cantidad y el nombre que
   // sí dijo se conservan — que un dato no sirva no es razón para tirar los otros.

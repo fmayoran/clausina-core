@@ -30,6 +30,9 @@ Reglas:
   de hoy y contra la lista, que ya viene ordenada de la más cercana a la más lejana.
 - Si menciona un momento del día ("al mediodía", "a la noche", "temprano"), elegí el turno de esa
   fecha cuyo horario corresponda. Si hay varios posibles y no queda claro, dejá turno_id en null.
+- fecha_pedida: el día que pidió, tal como lo dijo ("el próximo sábado", "el 25 de diciembre"),
+  AUNQUE no esté en la lista. Va en null sólo si no mencionó ningún día. Sirve para poder
+  decirle que ese día no hay, en vez de mostrarle otros sin explicar por qué.
 - La cantidad es cuánta gente va, no cuántas mesas ni la hora. "Somos cuatro" es 4.
 - El nombre es el del cliente si lo dice. No lo inventes ni lo deduzcas del audio.
 - Todo dato que no esté dicho con claridad va en null. Preguntar es barato; asumir mal, no.
@@ -46,10 +49,13 @@ function esquema(opciones) {
       intencion: { type: 'string', enum: ['reserva', 'otra'] },
       fecha:     { anyOf: [{ type: 'string', enum: fechas }, { type: 'null' }] },
       turno_id:  { anyOf: [{ type: 'string', enum: turnos }, { type: 'null' }] },
+      // Libre a propósito: es lo que la persona dijo, no un valor de la agenda. Es el único
+      // campo que puede describir un día que NO existe, y para eso está.
+      fecha_pedida: { anyOf: [{ type: 'string' }, { type: 'null' }] },
       cantidad:  { anyOf: [{ type: 'integer' }, { type: 'null' }] },
       nombre:    { anyOf: [{ type: 'string' }, { type: 'null' }] },
     },
-    required: ['intencion', 'fecha', 'turno_id', 'cantidad', 'nombre'],
+    required: ['intencion', 'fecha', 'turno_id', 'fecha_pedida', 'cantidad', 'nombre'],
     additionalProperties: false,
   };
 }
@@ -97,8 +103,12 @@ async function interpretar(texto, { opciones, hoy, unidad, cantidadMin, cantidad
 function validar(c, { opciones, cantidadMin, cantidadMax }) {
   if (!c || typeof c !== 'object') return null;
   const r = { intencion: c.intencion === 'reserva' ? 'reserva' : 'otra',
-              fecha: null, turno_id: null, cantidad: null, nombre: null };
+              fecha: null, turno_id: null, fecha_pedida: null, cantidad: null, nombre: null };
   if (r.intencion === 'otra') return r;
+
+  // No se valida contra nada: es texto de la persona y sólo se usa para repetírselo.
+  const ped = String(c.fecha_pedida || '').trim();
+  if (ped && ped.length <= 60) r.fecha_pedida = ped;
 
   const delDia = opciones.filter(o => o.fecha === c.fecha);
   if (delDia.length) r.fecha = c.fecha;
