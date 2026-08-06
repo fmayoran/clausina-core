@@ -70,6 +70,13 @@
   .btn{width:100%;background:var(--acc);color:var(--accfg);border:0;border-radius:11px;
        font-family:var(--f-tit);font-weight:700;font-size:1rem;padding:14px;cursor:pointer;}
   .btn:disabled{opacity:.45;cursor:default;}
+  .invit .codfila{display:flex;gap:8px;align-items:center;}
+  .invit .codfila input{flex:1;min-width:0;text-transform:uppercase;letter-spacing:.14em;
+                        font-family:ui-monospace,monospace;}
+  .invit .codfila .btn2{white-space:nowrap;}
+  .codmsg{margin-top:9px;font-size:.86rem;line-height:1.5;min-height:1.2em;}
+  .codmsg.si{color:#3d8b40;} .codmsg.no{color:#c4442a;}
+  .invit.aplicada .codfila{display:none;}
   .chk{display:flex;gap:10px;align-items:flex-start;margin-top:14px;cursor:pointer;
        font-size:.84rem;color:var(--mut);text-transform:none;letter-spacing:0;}
   .chk input{width:auto;margin-top:3px;}
@@ -102,6 +109,21 @@
   </div>
 
   <div id="form">
+    <!-- Arriba de todo y antes del formulario: si alguien llegó con una invitación, eso es lo
+         que lo trajo. Enterarse de que el código no sirve DESPUÉS de cargar todo es la peor
+         versión posible de esta pantalla. -->
+    <div class="card invit oculto" id="invit">
+      <div class="fila">
+        <label for="cod">¿Tenés un código de invitación?</label>
+        <div class="codfila">
+          <input type="text" id="cod" inputmode="latin" autocapitalize="characters"
+                 autocomplete="off" spellcheck="false" placeholder="ABC-123" maxlength="9">
+          <button class="btn2" id="b-cod" onclick="validarCodigo()">Validar</button>
+        </div>
+        <div class="codmsg" id="codmsg"></div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="fila">
         <label>Elegí el día</label>
@@ -158,6 +180,9 @@ const UNI = { personas:['persona','personas'], cubiertos:['cubierto','cubiertos'
               lugares:['lugar','lugares'], cupos:['cupo','cupos'] };
 const DOW = ['dom','lun','mar','mié','jue','vie','sáb'];
 let NEG = null, TURNOS = [], FECHA = null, TURNO = null;
+// El código validado. Se manda con la reserva sólo si pasó por validarCodigo(): mandar uno a
+// medio escribir haría fallar la reserva entera por un campo opcional.
+let INVITACION = null;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
@@ -216,6 +241,8 @@ async function enviar() {
     cliente_nombre: $('nom').value, cliente_telefono: $('tel').value,
     notas: $('notas').value, consentimiento: $('cons').checked,
     web: $('web').value, click: CLICK,
+    // Sólo se manda si quedó validado: mandar uno a medio escribir haría fallar la reserva entera.
+    invitacion: INVITACION || undefined,
   };
   try {
     const r = await fetch(`/api/publico/${encodeURIComponent(SLUG)}/reserva`, {
@@ -242,6 +269,15 @@ async function enviar() {
       bloqueado: 'Ese día no está disponible.',
       sin_cliente: 'Necesitamos tu nombre y tu teléfono.',
       turno_no_aplica: 'Ese turno no corre ese día.',
+      inv_agotada: 'Esa invitación ya se usó.',
+      inv_vencida: 'Esa invitación ya venció.',
+      inv_anulada: 'Esa invitación fue dada de baja.',
+      inv_ajena: 'Esa invitación ya está en uso por otra persona.',
+      inv_dia: 'La invitación no aplica al día que elegiste.',
+      inv_turno: 'La invitación no aplica a ese turno.',
+      inv_cantidad: 'La invitación no aplica para esa cantidad.',
+      inv_no_existe: 'No encuentro ese código de invitación.',
+      inv_forma: 'Ese código de invitación no es válido.',
       demasiados_intentos: 'Demasiados intentos. Probá en un rato.',
     }[j.error] || 'No pudimos tomar la reserva. Probá de nuevo.';
     if (j.error === 'sin_lugar') cargar();
@@ -273,6 +309,43 @@ function aplicarMarca(m) {
   }
 }
 
+/**
+ * Valida el código contra el servidor y muestra QUÉ da. Se hace antes de pedir nada más: un
+ * código que falla al final, después de que la persona eligió día, turno y cargó sus datos, la
+ * deja con la sensación de haber perdido el tiempo — y probablemente sin reservar.
+ */
+async function validarCodigo() {
+  const campo = $('cod'), msg = $('codmsg'), boton = $('b-cod');
+  const codigo = campo.value.trim().toUpperCase();
+  if (!codigo) { msg.className = 'codmsg'; msg.textContent = ''; INVITACION = null; return; }
+  msg.className = 'codmsg'; msg.textContent = 'verificando…'; boton.disabled = true;
+  try {
+    const r = await fetch(`/api/publico/${encodeURIComponent(SLUG)}/invitacion/` +
+                          encodeURIComponent(codigo));
+    const j = await r.json();
+    if (!r.ok || !j.ok) {
+      INVITACION = null;
+      msg.className = 'codmsg no';
+      msg.textContent = j.mensaje || 'No pude verificar ese código.';
+      return;
+    }
+    INVITACION = codigo;
+    msg.className = 'codmsg si';
+    // Se dice lo que da y, si tiene condiciones, cuáles: enterarse al reservar de que no aplica
+    // ese día es el mismo problema corrido de lugar.
+    const c = j.condiciones || {};
+    const partes = [];
+    if ((c.dias || []).length) partes.push('sólo ' + c.dias.map(d => DIAS_CORTOS[d]).join(', '));
+    if (c.cantidad_max) partes.push('hasta ' + c.cantidad_max);
+    msg.textContent = '✓ ' + j.texto + (partes.length ? ' — ' + partes.join(' · ') : '') +
+      (j.vence_en ? ' · vence el ' + String(j.vence_en).slice(0, 10).split('-').reverse().join('/') : '');
+    $('invit').classList.add('aplicada');
+  } catch (e) {
+    INVITACION = null; msg.className = 'codmsg no'; msg.textContent = 'No pude verificar ese código.';
+  } finally { boton.disabled = false; }
+}
+const DIAS_CORTOS = { 1:'lunes', 2:'martes', 3:'miércoles', 4:'jueves', 5:'viernes', 6:'sábados', 7:'domingos' };
+
 async function cargar() {
   try {
     const [rn, rd] = await Promise.all([
@@ -294,6 +367,12 @@ async function cargar() {
       if (NEG.marca && Object.keys(NEG.marca).length) $('logo').classList.add('propio');
       $('logo').classList.remove('oculto');
     }
+    // El bloque del código se muestra siempre: cualquiera puede haber recibido una invitación
+    // por otro lado. Si vino por /i/<codigo>, ya llega cargado y validado solo.
+    $('invit').classList.remove('oculto');
+    const traido = new URLSearchParams(location.search).get('inv');
+    if (traido) { $('cod').value = traido.toUpperCase(); validarCodigo(); }
+
     // Volver: primero a quien nos trajo, si es otro sitio; si no, a la web del negocio.
     const ref = document.referrer && !document.referrer.includes(location.host) ? document.referrer : '';
     const destino = ref || (NEG.web ? (/^https?:/.test(NEG.web) ? NEG.web : 'https://' + NEG.web) : '');

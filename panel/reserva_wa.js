@@ -16,6 +16,7 @@ const wa = require('./whatsapp');
 const db = require('./db');
 const voz = require('./voz');
 const faq = require('./faq');
+const inv = require('./invitaciones');
 
 const DOW = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -119,16 +120,32 @@ async function atender(negocio, mensaje) {
   }
 
   const paso = conv ? conv.paso : null;
-  const datos = conv ? (conv.datos || {}) : {};
+  let datos = conv ? (conv.datos || {}) : {};
+
+  // Un código puede aparecer en cualquier mensaje: al saludar, en medio del flujo o pegado al
+  // final de una frase. Se detecta siempre y se guarda; pedirlo en un paso fijo obligaría a la
+  // persona a acordarse de cuándo decirlo.
+  const codigo = inv.buscarEnTexto(entrada);
+  if (codigo && codigo !== datos.invitacion) {
+    const r = await db.consultarInvitacion(codigo, negocio.id).catch(() => null);
+    if (r && r.ok) {
+      datos = { ...datos, invitacion: codigo };
+      if (paso) await db.setConversacion(negocio.id, waId, paso, datos);
+      await decir(cfg, waId, `Tomé tu invitación: ${r.texto}. Seguimos con la reserva.`, negocio.id);
+    } else if (r) {
+      // Se avisa y se sigue: que el código no sirva no es razón para no dejar reservar.
+      await decir(cfg, waId, `${r.mensaje} Igual podemos seguir con la reserva.`, negocio.id);
+    }
+  }
 
   try {
     if (!paso) {
       // Si el primer mensaje ya es una pregunta que el negocio tiene contestada, se contesta y
       // recién después se ofrece el menú: hacerlo al revés obliga a repetir la pregunta.
       if (await responderFaq(cfg, negocio, waId, entrada, canal)) {
-        return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil) || true;
+        return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil, datos) || true;
       }
-      return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil);
+      return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil, datos);
     }
     // "Otra consulta": lo que sigue va al inbox para que lo lea una persona.
     if (paso === 'consulta') return await recibirConsulta(cfg, negocio, waId, entrada, canal);
@@ -154,8 +171,10 @@ async function atender(negocio, mensaje) {
   return false;
 }
 
-async function saludar(cfg, negocio, waId, canal, ofreceReservas, perfil) {
-  await db.setConversacion(negocio.id, waId, 'ofrecido', {});
+async function saludar(cfg, negocio, waId, canal, ofreceReservas, perfil, datos = {}) {
+  // Se arranca con lo que ya se sepa: un código detectado en el PRIMER mensaje no tiene todavía
+  // conversación donde guardarse, y sin esto se perdía justo ahí.
+  await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
   // El saludo lo escribe el negocio en el configurador; si no puso nada, se arma uno.
   // Si WhatsApp nos da el nombre del perfil, se usa el primero para que no suene a máquina.
   // El nombre con el que lo conoce el NEGOCIO gana sobre el del perfil de WhatsApp: el perfil lo
@@ -236,7 +255,8 @@ async function elegirDia(cfg, negocio, waId, entrada, datos = {}) {
   // Se conserva lo ya sabido: la fecha y el turno se descartan porque son justamente lo que se
   // está por elegir, pero la cantidad y el nombre siguen valiendo.
   await db.setConversacion(negocio.id, waId, 'dia',
-    { cantidad: datos.cantidad, nombre: datos.nombre, pedir_nombre: datos.pedir_nombre });
+    { cantidad: datos.cantidad, nombre: datos.nombre, pedir_nombre: datos.pedir_nombre,
+      invitacion: datos.invitacion });
   const filas = fechas.map(f => ({ id: 'd:' + f, titulo: dia(f) }));
   await decirOpciones(cfg, waId, '¿Para qué día?', filas.map(f => f.titulo), negocio.id,
     () => wa.enviarLista(waId, '¿Para qué día?', 'Ver días', filas, cfg));
@@ -329,7 +349,8 @@ async function avanzar(cfg, negocio, waId, datos) {
   const t = (await db.disponibilidadPublica(negocio.id, datos.fecha, datos.fecha))
     .find(o => o.turno_id === datos.turno_id);
   const resumen = `${dia(datos.fecha)}${t ? `, ${t.nombre} ${t.hora_desde}` : ''}\n` +
-                  `${datos.cantidad} ${plural(cfgRes.unidad, datos.cantidad)}\nA nombre de ${datos.nombre}`;
+                  `${datos.cantidad} ${plural(cfgRes.unidad, datos.cantidad)}\nA nombre de ${datos.nombre}` +
+                  (datos.invitacion ? `\nCon tu invitación ${inv.bonito(datos.invitacion)}` : '');
   await db.setConversacion(negocio.id, waId, 'confirmar_voz', datos);
   const texto = `Entendí esto:\n\n${resumen}\n\n¿Lo confirmo?`;
   const bot = [{ id: 'ok_voz', titulo: 'Sí, confirmá' }, { id: 'cambiar_voz', titulo: 'Cambiar algo' }];
@@ -340,6 +361,13 @@ async function avanzar(cfg, negocio, waId, datos) {
 }
 
 const ERRORES = {
+  inv_agotada:  'Esa invitación ya se usó. Escribime "reservar" y la hacemos sin ella.',
+  inv_vencida:  'Esa invitación ya venció. Escribime "reservar" y la hacemos sin ella.',
+  inv_anulada:  'Esa invitación fue dada de baja. Escribime "reservar" y la hacemos sin ella.',
+  inv_ajena:    'Esa invitación ya está en uso por otra persona.',
+  inv_dia:      'La invitación no aplica a ese día. Escribime "reservar" y elegimos otro.',
+  inv_turno:    'La invitación no aplica a ese turno. Escribime "reservar" y elegimos otro.',
+  inv_cantidad: 'La invitación no aplica para esa cantidad. Escribime "reservar" y lo vemos.',
   sin_lugar: 'Justo se ocupó ese turno. Escribime "reservar" y buscamos otro.',
   cantidad_fuera: 'Esa cantidad no entra en una sola reserva. Escribime "reservar" y lo vemos.',
   muy_pronto: 'Falta muy poco para ese turno. Escribime "reservar" y elegimos otro.',
@@ -358,6 +386,7 @@ async function confirmar(cfg, negocio, waId, entrada, datos) {
     r = await db.crearReserva(negocio.id, {
       turno_id: datos.turno_id, fecha: datos.fecha, cantidad: datos.cantidad,
       cliente_nombre: nombre, cliente_telefono: waId, canal: 'whatsapp',
+      invitacion_codigo: datos.invitacion || null,
       // Si ya se lo identificó, se manda el id: _resolverCliente lo valida contra el negocio y
       // se ahorra la búsqueda por teléfono.
       cliente_id: datos.cliente_id || null,
@@ -377,9 +406,12 @@ async function confirmar(cfg, negocio, waId, entrada, datos) {
 
   // Acá se ve la ventaja del canal: el cliente escribió primero, así que esta confirmación sale
   // sin plantilla y en el momento.
+  // Se repite el beneficio en la confirmación: es lo que la persona va a mostrar al llegar, y
+  // tenerlo por escrito en el chat evita la discusión en la mesa.
+  const conInv = r.invitacion ? `\nInvitación aplicada: ${r.invitacion.texto}` : '';
   await decir(cfg, waId, r.estado === 'confirmada'
-    ? `¡Listo! Reserva confirmada en ${negocio.nombre}.\n\n${cuando}\n${cant}\nA nombre de ${nombre}\n\nTe esperamos.`
-    : `Anotado. Tu pedido quedó registrado en ${negocio.nombre}.\n\n${cuando}\n${cant}\nA nombre de ${nombre}\n\nQueda pendiente de confirmación; te aviso por acá.`,
+    ? `¡Listo! Reserva confirmada en ${negocio.nombre}.\n\n${cuando}\n${cant}\nA nombre de ${nombre}${conInv}\n\nTe esperamos.`
+    : `Anotado. Tu pedido quedó registrado en ${negocio.nombre}.\n\n${cuando}\n${cant}\nA nombre de ${nombre}${conInv}\n\nQueda pendiente de confirmación; te aviso por acá.`,
     negocio.id);
   return true;
 }
@@ -440,6 +472,17 @@ async function seguirVoz(negocio, mensaje) {
   const hasta = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
   const opciones = await db.disponibilidadPublica(negocio.id, hoy, hasta);
 
+  // El código puede venir dictado en el propio audio.
+  let invitacion = null;
+  const codigo = inv.buscarEnTexto(texto);
+  if (codigo) {
+    const c = await db.consultarInvitacion(codigo, negocio.id).catch(() => null);
+    if (c && c.ok) {
+      invitacion = codigo;
+      await decir(cfg, waId, `Tomé tu invitación: ${c.texto}.`, negocio.id);
+    } else if (c) await decir(cfg, waId, `${c.mensaje} Igual seguimos con la reserva.`, negocio.id);
+  }
+
   const i = await voz.interpretar(texto, {
     opciones, hoy, unidad: cfgRes.unidad,
     cantidadMin: cfgRes.cantidad_min, cantidadMax: cfgRes.cantidad_max,
@@ -464,7 +507,7 @@ async function seguirVoz(negocio, mensaje) {
   // Si el día que pidió no está disponible se le ofrece la lista, pero la cantidad y el nombre que
   // sí dijo se conservan — que un dato no sirva no es razón para tirar los otros.
   await avanzar(cfg, negocio, waId,
-    { fecha: i.fecha, turno_id: i.turno_id, cantidad: i.cantidad, nombre: i.nombre });
+    { fecha: i.fecha, turno_id: i.turno_id, cantidad: i.cantidad, nombre: i.nombre, invitacion });
 }
 
 const SI = /^(s[ií]|dale|ok|oka?y|confirm[oá]|listo|correcto|exacto|perfecto)\b/i;

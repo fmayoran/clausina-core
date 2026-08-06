@@ -221,6 +221,21 @@ app.get('/a/:token', async (req, res) => {
   } catch (e) { console.error('link', e.message); res.status(500).send('Error'); }
 });
 
+// El enlace de una invitación. Resuelve solo a qué negocio pertenece: por eso el código es único
+// en toda la plataforma y no por negocio — quien lo abre no tiene por qué saberlo.
+app.get('/i/:codigo', async (req, res) => {
+  if (!limite(req, res, 60, 60e3)) return;
+  try {
+    const r = await db.consultarInvitacion(String(req.params.codigo));
+    // Un código inválido no manda a un 404 seco: se abre igual la página de reservas del negocio
+    // si se puede saber cuál es, y ahí se explica qué pasó. Perder una reserva porque el código
+    // venció es peor que el descuento.
+    if (!r.ok && !r.invitacion) return res.status(404).send('Ese código de invitación no existe.');
+    const inv = r.invitacion;
+    res.redirect(`/r/${inv.negocio_slug}?inv=${encodeURIComponent(inv.codigo)}`);
+  } catch (e) { console.error('invitacion link', e.message); res.status(500).send('Error'); }
+});
+
 // La página pública de reservas de un negocio.
 app.get('/r/:slug', async (req, res) => {
   if (!limite(req, res, 120, 60e3)) return;
@@ -257,6 +272,22 @@ app.get('/api/publico/:slug/landing', async (req, res) => {
   } catch (e) { console.error('landing', e.message); res.status(500).json({ error: 'error' }); }
 });
 
+// Qué da un código, para mostrarlo antes de pedir fecha, turno y datos. Validar recién al final,
+// después de que la persona cargó todo, es la peor versión posible de esto.
+app.get('/api/publico/:slug/invitacion/:codigo', async (req, res) => {
+  if (!limite(req, res, 30, 60e3)) return;
+  try {
+    const n = await db.negocioPublico(String(req.params.slug));
+    if (!n) return res.status(404).json({ error: 'no_disponible' });
+    const r = await db.consultarInvitacion(String(req.params.codigo), n.id);
+    // Hacia afuera va sólo lo que la persona necesita saber: qué le toca y hasta cuándo. Nada
+    // de a quién más se le mandó, cuántos usos lleva ni de qué campaña es.
+    if (!r.ok) return res.json({ ok: false, mensaje: r.mensaje });
+    res.json({ ok: true, texto: r.texto, vence_en: r.invitacion.vence_en,
+               condiciones: r.invitacion.condiciones || {} });
+  } catch (e) { console.error('inv publica', e.message); res.status(500).json({ error: 'error' }); }
+});
+
 app.get('/api/publico/:slug/disponibilidad', async (req, res) => {
   if (!limite(req, res, 120, 60e3)) return;
   try {
@@ -287,6 +318,7 @@ app.post('/api/publico/:slug/reserva', async (req, res) => {
       cliente_email: b.cliente_email, notas: b.notas,
       consentimiento: b.consentimiento === true,
       canal: 'landing', link_id: linkId,
+      invitacion_codigo: String(b.invitacion || '').trim() || null,
     });
     if (click) await db.marcarCompletado(click, r.id);
     // Después de responder: el visitante no tiene que esperar a que Meta conteste.
@@ -296,7 +328,9 @@ app.post('/api/publico/:slug/reserva', async (req, res) => {
   } catch (e) {
     // NO se usa resError acá: adjunta `detalle`, que en varios errores es la config entera del
     // negocio (fuente de verdad, auto-confirmar). Hacia afuera va sólo el código.
-    if (RES_ERR.has(e.code)) return res.status(409).json({ ok: false, error: e.code });
+    if (RES_ERR.has(e.code) || String(e.code || '').startsWith('inv_')) {
+      return res.status(409).json({ ok: false, error: e.code });
+    }
     console.error('reserva publica', e.message);
     res.status(500).json({ ok: false, error: 'error' });
   }
@@ -1138,6 +1172,19 @@ app.post('/api/reservas', async (req, res) => {
   try { res.json(await db.crearReserva(req.negocioId, req.body || {})); }
   catch (e) { resError(res, e, 'crear reserva'); }
 });
+// Marcar que la invitación se aplicó de verdad. Lo hace una persona del salón: es el segundo
+// momento —el de la cuenta— que ClaUsina no puede ver y por eso alguien tiene que confirmarlo.
+app.post('/api/reservas/:id/invitacion', async (req, res) => {
+  try {
+    const u = await db.invitacionDeReserva(req.params.id);
+    if (!u) return res.status(404).json({ ok: false, mensaje: 'Esa reserva no tiene invitación.' });
+    res.json(await db.cerrarUso(req.negocioId, u.uso_id, (req.body || {}).estado, (req.body || {}).notas));
+  } catch (e) {
+    if (e.code === 'estado_invalido') return res.status(400).json({ ok: false });
+    console.error('uso invitacion', e.message); res.status(500).json({ ok: false });
+  }
+});
+
 app.post('/api/reservas/:id/estado', async (req, res) => {
   try {
     const estado = (req.body || {}).estado;

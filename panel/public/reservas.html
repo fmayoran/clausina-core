@@ -130,6 +130,7 @@
          border-radius:999px;padding:4px 11px;background:none;cursor:pointer;
          font-family:'Inter',sans-serif;font-size:.78rem;color:var(--u-fg);transition:.13s;}
   .rchip:hover{border-color:var(--u-acc);}
+  .rchip .inv{font-size:.8rem;line-height:1;filter:grayscale(.2);}
   .rchip .cant{font-family:'JetBrains Mono',monospace;font-size:.64rem;color:var(--u-mut);}
   .rchip .pto{width:6px;height:6px;border-radius:50%;flex:0 0 auto;}
   /* Pendiente con borde punteado y confirmada con borde lleno: un punto de 6 px es fácil de no
@@ -750,7 +751,11 @@ function chipsDe(fecha, turnoId) {
   return '<div class="resv">' + rs.map(r =>
     `<button class="rchip s-${r.estado}" onclick="verReserva('${r.id}')"
        title="${escapar(ESTADOS[r.estado] || r.estado)}"><span class="pto"></span>` +
-    `${escapar(r.cliente) || 'sin nombre'}<span class="cant">${r.cantidad}</span></button>`).join('') + '</div>';
+    `${escapar(r.cliente) || 'sin nombre'}<span class="cant">${r.cantidad}</span>` +
+    // Quien mira el día tiene que ver que hay un descuento SIN abrir la reserva: es lo que va a
+    // tener que aplicar en el mostrador.
+    (r.invitacion ? `<span class="inv" title="${escapar(r.invitacion.texto)}">🎟</span>` : '') +
+    `</button>`).join('') + '</div>';
 }
 
 function tarjetaDia(f) {
@@ -847,8 +852,15 @@ function verReserva(id) {
     ${fila('Notas', escapar(r.notas))}
     ${fila('Referencia externa', escapar(r.ref_externa))}
     ${fila('Cargada', cuando(r.creado_en))}
+    ${r.invitacion ? `<dt>Invitación</dt><dd><b>${escapar(r.invitacion.texto)}</b>
+        <span class="mono2">· ${escapar(r.invitacion.codigo)} · ${escapar(EST_USO[r.invitacion.estado] || r.invitacion.estado)}</span></dd>` : ''}
   </dl>`;
   const acc = [];
+  // El consumo es un acto aparte del estado de la reserva: la persona vino y el descuento se
+  // aplicó de verdad. ClaUsina no lo puede saber sola, así que alguien lo dice.
+  if (r.invitacion && r.invitacion.estado === 'tomada') {
+    acc.push(`<button class="btn" onclick="usarInvitacion('${r.id}')">Apliqué la invitación</button>`);
+  }
   if (r.estado === 'solicitada') acc.push(`<button class="btn" onclick="estadoDesdeDetalle('${r.id}','confirmada')">Confirmar</button>`);
   if (r.estado === 'confirmada') acc.push(`<button class="btn" onclick="estadoDesdeDetalle('${r.id}','cumplida')">Marcar cumplida</button>`);
   if (r.estado === 'confirmada') acc.push(`<button class="btn2" onclick="estadoDesdeDetalle('${r.id}','no_show')">No se presentó</button>`);
@@ -857,6 +869,17 @@ function verReserva(id) {
   $('det-acciones').innerHTML = acc.join('');
   $('ov-det').classList.add('on');
 }
+const EST_USO = { tomada:'sin aplicar', consumida:'aplicada', liberada:'liberada', perdida:'perdida' };
+
+async function usarInvitacion(id) {
+  try {
+    const r = await fetch(`api/reservas/${id}/invitacion`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: 'consumida' }) });
+    if (!r.ok) { alert('No se pudo marcar.'); return; }
+    cerrarDetalle(); cargarCal();
+  } catch (e) { alert('Error de conexión.'); }
+}
+
 function cerrarDetalle() { $('ov-det').classList.remove('on'); }
 async function estadoDesdeDetalle(id, e) {
   if (e === 'cancelada' && !confirm('¿Cancelar esta reserva? Libera el lugar.')) return;

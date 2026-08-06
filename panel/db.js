@@ -1117,13 +1117,29 @@ async function getReservas(negocioId, { desde, hasta, estado } = {}) {
             r.notas, r.agente_id, r.ref_externa, r.creado_en,
             r.turno_id, t.nombre AS turno,
             to_char(t.hora_desde,'HH24:MI') AS hora_desde, to_char(t.hora_hasta,'HH24:MI') AS hora_hasta,
-            r.cliente_id, c.nombre AS cliente, c.telefono, c.email
+            r.cliente_id, c.nombre AS cliente, c.telefono, c.email,
+            -- La invitación viaja con la reserva: quien mira la lista del día tiene que ver el
+            -- beneficio SIN abrir nada, porque es lo que va a tener que aplicar en el mostrador.
+            iu.id AS uso_id, iu.estado AS invitacion_estado, i.codigo AS invitacion_codigo,
+            bf.nombre AS invitacion_nombre, bf.tipo AS invitacion_tipo, bf.valor AS invitacion_valor
        FROM contenido.reserva r
+       LEFT JOIN contenido.invitacion_uso iu ON iu.reserva_id = r.id
+       LEFT JOIN contenido.invitacion i ON i.id = iu.invitacion_id
+       LEFT JOIN contenido.beneficio bf ON bf.id = i.beneficio_id
        JOIN contenido.turno t ON t.id = r.turno_id
        JOIN contenido.cliente c ON c.id = r.cliente_id
       WHERE r.negocio_id=$1${filtro}
       ORDER BY r.fecha DESC, t.hora_desde DESC`, params);
-  return rows;
+  // El texto del beneficio se arma acá y no en la pantalla: la lista, el detalle y el mensaje de
+  // WhatsApp tienen que decir exactamente lo mismo.
+  return rows.map(r => ({
+    ...r,
+    invitacion: r.invitacion_codigo ? {
+      uso_id: r.uso_id, estado: r.invitacion_estado, codigo: r.invitacion_codigo,
+      nombre: r.invitacion_nombre,
+      texto: textoBeneficio({ tipo: r.invitacion_tipo, valor: r.invitacion_valor }),
+    } : null,
+  }));
 }
 
 /**
