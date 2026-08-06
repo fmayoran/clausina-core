@@ -65,6 +65,8 @@ function leerMensajes(cuerpo) {
           phone_number_id: (v.metadata || {}).phone_number_id || null,
           perfil: perfiles[m.from] || null,
           tipo: m.type,
+          // Audio y voz llegan como un id de media: el archivo se baja aparte, con el token.
+          media_id: (m.audio && m.audio.id) || (m.voice && m.voice.id) || null,
           // El texto puede venir de un mensaje suelto o del botón que tocaron.
           texto: (m.text && m.text.body)
             || (m.button && m.button.text)

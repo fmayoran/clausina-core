@@ -115,6 +115,22 @@ def det_campania():
     return jobs
 
 
+def det_voz():
+    # Notas de voz de WhatsApp sin transcribir. La marca de "pedida" la pone el propio script al
+    # arrancar: si se marcara acá y el job fallara, el audio quedaría sin transcribir para siempre.
+    jobs = []
+    for row in _lines("SELECT m.id||'|'||n.slug FROM contenido.whatsapp_mensaje m "
+                      "JOIN contenido.negocios n ON n.id=m.negocio_id "
+                      "WHERE m.tipo='audio' AND m.texto IS NULL "
+                      "AND m.media_id IS NOT NULL AND NOT m.transcripcion_pedida "
+                      "ORDER BY m.creado_en LIMIT 20"):
+        mid, slug = row.split('|', 1)
+        if mid:
+            jobs.append({"tipo": "voz", "negocio_slug": slug,
+                         "payload": {"mensaje_id": mid}, "lock_key": f"voz:{mid}"})
+    return jobs
+
+
 def det_marca_capsula():
     # La cápsula deriva de la DB: aplicar pedidos de scaffold/archivar (un job por pedido).
     jobs = []
@@ -246,6 +262,7 @@ DETECTORS = {
     "secrets_sync": det_secrets_sync,
     "marca_capsula": det_marca_capsula,
     "descubrimiento": det_descubrimiento,
+    "voz": det_voz,
     "marca_gen": det_marca_gen,
     "grafica": det_grafica,
 }

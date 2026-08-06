@@ -39,3 +39,17 @@ def decrypt(blob: str) -> str:
     iv = bytes.fromhex(parts[1])
     ct = bytes.fromhex(parts[2])
     return AESGCM(_key()).decrypt(iv, ct, None).decode("utf-8")
+
+
+# Entrada por línea de comandos, para los scripts de shell que necesitan un secreto de la base
+# (voz_job.sh, por ejemplo). El texto va por stdout y nada más, para poder capturarlo directo.
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) < 3 or sys.argv[1] not in ("encrypt", "decrypt"):
+        print("uso: ads_crypto.py encrypt|decrypt <valor>", file=sys.stderr)
+        sys.exit(2)
+    try:
+        sys.stdout.write(encrypt(sys.argv[2]) if sys.argv[1] == "encrypt" else decrypt(sys.argv[2]))
+    except Exception as e:
+        print(f"error: {e}", file=sys.stderr)
+        sys.exit(1)

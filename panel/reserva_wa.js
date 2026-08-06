@@ -60,6 +60,16 @@ async function atender(negocio, mensaje) {
   const ofreceReservas = canal.ofrece.includes('reservas') && await db.reservasPorWhatsapp(negocio.id);
   if (!ofreceReservas && !canal.inbox) return false;
 
+  // Una nota de voz no trae texto: se transcribe aparte, en el host. Por ahora se acusa recibo
+  // para que nadie quede esperando, y el texto aparece en el inbox cuando el worker termina.
+  // Interpretarla y avanzar el flujo con eso es el paso siguiente.
+  if (mensaje.tipo === 'audio' && !String(mensaje.texto || '').trim()) {
+    await decir(cfg, waId,
+      'Recibí tu audio. Por ahora lo estamos escuchando nosotros: si querés avanzar más rápido, ' +
+      'escribime "reservar".', negocio.id);
+    return true;
+  }
+
   const entrada = String(mensaje.accion || mensaje.texto || '').trim();
   const conv = await db.getConversacion(negocio.id, waId);
 

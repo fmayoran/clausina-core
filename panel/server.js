@@ -124,6 +124,7 @@ app.post('/webhook/whatsapp', express.raw({ type: '*/*', limit: '2mb' }), async 
         await db.logWhatsapp({
           direccion: 'entrante', wa_id: m.wa_id, usuario_id: null, negocio_id: negocio.id,
           mensaje_id: m.mensaje_id, tipo: m.tipo, texto: m.texto, crudo: m.crudo,
+          media_id: m.media_id,
           estado: atendido ? 'atendido_bot' : 'cliente_de_negocio',
         });
         if (!atendido) console.log(`whatsapp: mensaje para ${negocio.slug} de ${m.wa_id} — registrado, sin responder`);
