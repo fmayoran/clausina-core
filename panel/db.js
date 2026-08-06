@@ -88,15 +88,16 @@ async function completarPerfil(id, { nombre, whatsapp, cargo }) {
 }
 
 /** Registra un mensaje de WhatsApp. Best-effort: la bitácora nunca puede tumbar el webhook. */
-async function logWhatsapp({ direccion, wa_id, usuario_id, mensaje_id, tipo, texto, crudo, estado }) {
+async function logWhatsapp({ direccion, wa_id, usuario_id, mensaje_id, tipo, texto, crudo, estado, negocio_id }) {
   try {
     await pool.query(
       `INSERT INTO contenido.whatsapp_mensaje
-         (direccion, wa_id, usuario_id, mensaje_id, tipo, texto, crudo, estado)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         (direccion, wa_id, usuario_id, mensaje_id, tipo, texto, crudo, estado, negocio_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        ON CONFLICT DO NOTHING`,
       [direccion, wa_id || null, usuario_id || null, mensaje_id || null,
-       tipo || null, texto || null, crudo ? JSON.stringify(crudo) : null, estado || null]);
+       tipo || null, texto || null, crudo ? JSON.stringify(crudo) : null, estado || null,
+       negocio_id || null]);
     return true;
   } catch (e) { console.error('log whatsapp', e.message); return false; }
 }
@@ -1239,6 +1240,99 @@ async function cambiarEstadoReserva(negocioId, id, estado) {
        AND NOT (estado='cancelada' AND $3 IN ('solicitada','confirmada'))`,
     [id, negocioId, estado]);
   return { ok: rowCount > 0 };
+}
+
+// --- El canal de WhatsApp como producto (v2.0 / F5f) --------------------------------------
+// El número deja de ser una configuración técnica: el negocio decide cómo saluda el bot y qué
+// operaciones ofrece. Lo que no encaja en ninguna operación cae en el inbox, para que lo lea
+// una persona — un cliente que pregunta algo distinto no puede quedar sin respuesta.
+
+// Qué puede ofrecer el bot hoy. Se amplía a medida que haya capacidades conversacionales:
+// la lista NO es "todas las capacidades del negocio", es "las que el bot sabe atender".
+const CAPS_BOT = [
+  { id: 'reservas', label: 'Reservar', desc: 'Tomar una reserva paso a paso' },
+];
+
+const CFG_CANAL = {
+  saludo: '',            // vacío = se arma uno con el nombre del negocio
+  ofrece: ['reservas'],
+  inbox: true,           // guardar lo que no encaja para que lo lea una persona
+};
+
+async function getCanalWhatsapp(negocioId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT config FROM contenido.negocio_capacidad
+      WHERE negocio_id=$1 AND capacidad='whatsapp'`, [negocioId]);
+  const cfg = { ...CFG_CANAL, ...((r && r.config) || {}) };
+  // Sólo se ofrece lo que el bot sabe hacer Y el negocio tiene habilitado.
+  const { rows: caps } = await pool.query(
+    `SELECT capacidad FROM contenido.negocio_capacidad
+      WHERE negocio_id=$1 AND habilitada`, [negocioId]);
+  const tiene = new Set(caps.map(c => c.capacidad));
+  cfg.ofrece = (cfg.ofrece || []).filter(x => CAPS_BOT.some(c => c.id === x) && tiene.has(x));
+  return cfg;
+}
+
+async function guardarCanalWhatsapp(negocioId, d) {
+  const actual = await getCanalWhatsapp(negocioId);
+  const cfg = {
+    ...actual,
+    saludo: String(d.saludo || '').trim().slice(0, 600),
+    ofrece: [...new Set((Array.isArray(d.ofrece) ? d.ofrece : [])
+      .filter(x => CAPS_BOT.some(c => c.id === x)))],
+    inbox: d.inbox !== false,
+  };
+  await pool.query(
+    `INSERT INTO contenido.negocio_capacidad (negocio_id, capacidad, habilitada, config, actualizado_en)
+     VALUES ($1,'whatsapp',
+             COALESCE((SELECT habilitada FROM contenido.negocio_capacidad
+                        WHERE negocio_id=$1 AND capacidad='whatsapp'), false),
+             $2::jsonb, now())
+     ON CONFLICT (negocio_id, capacidad) DO UPDATE SET config=$2::jsonb, actualizado_en=now()`,
+    [negocioId, JSON.stringify(cfg)]);
+  return { ok: true, config: await getCanalWhatsapp(negocioId) };
+}
+
+// --- Inbox --------------------------------------------------------------------------------
+// Conversaciones del negocio, con lo pendiente arriba. La ventana de 24 h importa: pasada, no se
+// puede contestar libre y hay que decirlo antes de que alguien escriba una respuesta que no sale.
+async function getInbox(negocioId) {
+  const { rows } = await pool.query(
+    `SELECT m.wa_id,
+            max(m.creado_en) AS ultimo,
+            max(m.creado_en) FILTER (WHERE m.direccion='entrante') AS ultimo_entrante,
+            count(*) FILTER (WHERE m.direccion='entrante' AND NOT m.atendido)::int AS pendientes,
+            (array_agg(m.texto ORDER BY m.creado_en DESC) FILTER (WHERE m.texto IS NOT NULL))[1] AS ultimo_texto,
+            (SELECT c.nombre FROM contenido.cliente c
+              WHERE c.negocio_id=$1 AND c.telefono_norm = right(regexp_replace(m.wa_id,'\D','','g'), 10)
+              LIMIT 1) AS cliente
+       FROM contenido.whatsapp_mensaje m
+      WHERE m.negocio_id=$1
+      GROUP BY m.wa_id
+      ORDER BY max(m.creado_en) DESC
+      LIMIT 100`, [negocioId]);
+  return rows.map(r => ({
+    ...r,
+    // La ventana la abre el cliente al escribir y dura 24 h. Fuera de ella sólo van plantillas.
+    ventana_abierta: !!r.ultimo_entrante && (Date.now() - new Date(r.ultimo_entrante).getTime()) < 24 * 3600e3,
+  }));
+}
+
+async function getConversacionInbox(negocioId, waId) {
+  const { rows } = await pool.query(
+    `SELECT id, direccion, tipo, texto, estado, atendido, creado_en
+       FROM contenido.whatsapp_mensaje
+      WHERE negocio_id=$1 AND wa_id=$2
+      ORDER BY creado_en LIMIT 200`, [negocioId, waId]);
+  return rows;
+}
+
+async function marcarAtendido(negocioId, waId) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.whatsapp_mensaje SET atendido=true
+      WHERE negocio_id=$1 AND wa_id=$2 AND direccion='entrante' AND NOT atendido`,
+    [negocioId, waId]);
+  return { ok: true, marcados: rowCount };
 }
 
 // --- Conversación de reserva por WhatsApp (v2.0 / F5e) ------------------------------------
@@ -2633,6 +2727,7 @@ module.exports = {
   getWhatsappNegocio, guardarWhatsappNegocio, verificarWhatsappNegocio, PLANTILLAS_RESERVA,
   secretoDeNumero, negocioPorPhoneId,
   getConversacion, setConversacion, borrarConversacion, podarConversaciones, reservasPorWhatsapp,
+  CAPS_BOT, getCanalWhatsapp, guardarCanalWhatsapp, getInbox, getConversacionInbox, marcarAtendido,
   negocioPublico, disponibilidadPublica, registrarApertura, marcarCompletado, linkDeApertura,
   ofertaLanding, guardarQueExponeLanding,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,

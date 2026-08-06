@@ -54,6 +54,54 @@
          padding:13px 16px;margin-bottom:18px;font-family:'JetBrains Mono',monospace;
          font-size:.66rem;line-height:1.7;color:var(--u-mut);}
   .aviso b{color:var(--u-fg);}
+  textarea{width:100%;background:var(--u-bg);border:1px solid var(--u-line);border-radius:8px;
+    padding:9px 11px;font-family:'Inter',sans-serif;font-size:.95rem;color:var(--u-fg);outline:none;resize:vertical;}
+  textarea:focus{border-color:var(--u-acc);}
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--u-line);margin-bottom:22px;}
+  .tab{font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;
+       padding:10px 15px;border:0;background:none;color:var(--u-mut);cursor:pointer;
+       border-bottom:2px solid transparent;margin-bottom:-1px;transition:.15s;}
+  .tab:hover{color:var(--u-fg);}
+  .tab.on{color:var(--u-acc);border-bottom-color:var(--u-acc);}
+  .tab .badge{display:inline-block;min-width:17px;height:17px;line-height:17px;border-radius:9px;
+    margin-left:7px;font-size:.58rem;background:var(--u-mal);color:#fff;padding:0 5px;vertical-align:middle;}
+  .tab .badge:empty{display:none;}
+  .pane{display:none;} .pane.on{display:block;}
+  .chk{display:flex;align-items:flex-start;gap:9px;text-transform:none;letter-spacing:0;
+    font-size:.88rem;color:var(--u-fg);cursor:pointer;}
+  .chk input{width:auto;margin-top:3px;}
+  .capf{display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid var(--u-line);}
+  .capf:last-child{border-bottom:0;}
+  .capf input{width:auto;margin-top:4px;}
+  .capf .n{font-size:.94rem;} .capf .d{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--u-mut);}
+  .capf.off{opacity:.45;}
+  /* Inbox: lista de conversaciones a la izquierda, el hilo a la derecha. */
+  .inbox{display:grid;grid-template-columns:270px 1fr;gap:16px;align-items:start;}
+  @media(max-width:800px){.inbox{grid-template-columns:1fr;}}
+  .convs{background:var(--u-surf);border:1px solid var(--u-line);border-radius:14px;overflow:hidden;max-height:70vh;overflow-y:auto;}
+  .conv{display:block;width:100%;text-align:left;border:0;background:none;cursor:pointer;
+    padding:12px 14px;border-bottom:1px solid var(--u-line);color:var(--u-fg);}
+  .conv:last-child{border-bottom:0;}
+  .conv:hover{background:rgba(127,127,127,.06);}
+  .conv.on{background:color-mix(in srgb,var(--u-acc) 12%,transparent);}
+  .conv .q{display:flex;align-items:center;gap:7px;font-size:.9rem;}
+  .conv .pend{width:7px;height:7px;border-radius:50%;background:var(--u-mal);flex:0 0 auto;}
+  .conv .u{font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--u-mut);
+    margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .chat{background:var(--u-surf);border:1px solid var(--u-line);border-radius:14px;padding:16px;
+    min-height:320px;display:flex;flex-direction:column;}
+  .hilo{flex:1;overflow-y:auto;max-height:52vh;display:flex;flex-direction:column;gap:8px;}
+  .msj{max-width:78%;padding:8px 12px;border-radius:12px;font-size:.9rem;line-height:1.5;white-space:pre-wrap;}
+  .msj.entrante{align-self:flex-start;background:var(--u-bg);border:1px solid var(--u-line);}
+  .msj.saliente{align-self:flex-end;background:color-mix(in srgb,var(--u-acc) 16%,transparent);
+    border:1px solid color-mix(in srgb,var(--u-acc) 40%,transparent);}
+  .msj .h{display:block;font-family:'JetBrains Mono',monospace;font-size:.54rem;color:var(--u-mut);margin-top:4px;}
+  .responder{display:flex;gap:8px;margin-top:14px;align-items:flex-end;}
+  .responder textarea{min-height:44px;}
+  .cerrada{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-medio);
+    border:1px solid var(--u-line);border-left:3px solid var(--u-medio);border-radius:9px;
+    padding:10px 12px;margin-top:14px;line-height:1.6;}
+  .vacio{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--u-mut);margin:auto;}
 </style>
 </head>
 <body class="bg-paper text-pfg dark:bg-ink dark:text-fg transition-colors">
@@ -70,6 +118,14 @@
       donde reservó.
     </p>
 
+    <div class="tabs" id="tabs">
+      <button class="tab on" data-pane="num">Número</button>
+      <button class="tab" data-pane="bot">Asistente</button>
+      <button class="tab" data-pane="inbox">Inbox<span class="badge" id="b-inbox"></span></button>
+    </div>
+
+    <!-- ══════════ NÚMERO ══════════ -->
+    <div class="pane on" id="p-num">
     <div class="aviso">
       El número de <b>ClaUsina</b> (+54 9 11 7261-3604) sigue siendo el de la conversación con
       <b>vos</b>: avisos de piezas por aprobar, alertas. Esto de acá es otra cosa — el canal
@@ -109,6 +165,45 @@
           de Meta no dice: el webhook puede figurar en verde y aun así faltar la suscripción de la
           cuenta a la app, y ninguna de las dos avisa por la otra.
         </p>
+      </div>
+    </div>
+    </div>
+
+    <!-- ══════════ ASISTENTE ══════════ -->
+    <div class="pane" id="p-bot">
+      <div class="card2">
+        <div class="sec">Cómo saluda</div>
+        <label for="c-saludo">Primer mensaje</label>
+        <textarea id="c-saludo" rows="3" placeholder="Hola, soy el asistente de…"></textarea>
+        <div class="hint">Es lo primero que ve alguien que escribe por primera vez. Si lo dejás
+          vacío se arma uno con el nombre del negocio.</div>
+      </div>
+
+      <div class="card2">
+        <div class="sec">Qué puede hacer</div>
+        <div id="caps"></div>
+        <div class="hint" id="caps-nota" style="margin-top:12px;"></div>
+        <label class="chk" for="c-inbox" style="margin-top:18px;">
+          <input type="checkbox" id="c-inbox">
+          Ofrecer "Otra consulta" y guardar esos mensajes en el inbox
+        </label>
+        <div class="hint">Sin esto, quien pregunte algo que el asistente no sabe hacer queda sin
+          respuesta. Con esto, le avisa que lo van a contestar y el mensaje les llega a ustedes.</div>
+      </div>
+
+      <div class="bar">
+        <button class="btn" onclick="guardarCanal()">Guardar</button>
+        <span class="msg" id="msg-canal"></span>
+      </div>
+    </div>
+
+    <!-- ══════════ INBOX ══════════ -->
+    <div class="pane" id="p-inbox">
+      <div class="inbox">
+        <div class="convs" id="convs"></div>
+        <div class="chat" id="chat">
+          <div class="vacio">Elegí una conversación.</div>
+        </div>
       </div>
     </div>
   </main>
@@ -182,7 +277,125 @@ async function verificar() {
   b.disabled = false; b.textContent = 'Verificar ahora';
 }
 
+
+/* ═══════ Solapas ═══════ */
+document.getElementById('tabs').addEventListener('click', e => {
+  const b = e.target.closest('.tab'); if (!b) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t === b));
+  document.querySelectorAll('.pane').forEach(x => x.classList.toggle('on', x.id === 'p-' + b.dataset.pane));
+  if (b.dataset.pane === 'inbox') cargarInbox();
+});
+
+/* ═══════ Asistente ═══════ */
+let CANAL = {}, DISPONIBLES = [];
+async function cargarCanal() {
+  try {
+    const d = await fetch('api/whatsapp/canal').then(r => r.json());
+    CANAL = d.config || {}; DISPONIBLES = d.disponibles || [];
+    $('c-saludo').value = CANAL.saludo || '';
+    $('c-inbox').checked = CANAL.inbox !== false;
+    // Sólo se puede ofrecer lo que el bot sabe hacer Y el negocio tiene habilitado: si la
+    // capacidad está apagada, la casilla se ve pero no se puede marcar, y dice por qué.
+    const caps = await fetch('api/capacidades').then(r => r.json()).catch(() => []);
+    const activas = new Set((caps || []).filter(c => c.habilitada).map(c => c.id));
+    $('caps').innerHTML = DISPONIBLES.map(c => {
+      const ok = activas.has(c.id);
+      return `<label class="capf${ok ? '' : ' off'}">
+        <input type="checkbox" value="${escapar(c.id)}" ${CANAL.ofrece.includes(c.id) ? 'checked' : ''} ${ok ? '' : 'disabled'}>
+        <span><span class="n">${escapar(c.label)}</span>
+          <span class="d">${ok ? escapar(c.desc) : 'la capacidad está deshabilitada en este negocio'}</span></span>
+      </label>`;
+    }).join('');
+    $('caps-nota').textContent = 'Por ahora el asistente sabe tomar reservas. La lista crece a ' +
+      'medida que otras capacidades aprendan a atenderse por chat.';
+  } catch (e) {}
+}
+async function guardarCanal() {
+  const m = $('msg-canal'); m.className = 'msg'; m.textContent = 'guardando…';
+  const ofrece = [...document.querySelectorAll('#caps input:checked')].map(i => i.value);
+  try {
+    const r = await fetch('api/whatsapp/canal', { method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ saludo: $('c-saludo').value, ofrece, inbox: $('c-inbox').checked }) });
+    const j = await r.json();
+    if (r.ok && j.ok) { CANAL = j.config; m.className = 'msg bien'; m.textContent = 'guardado';
+      setTimeout(() => { m.textContent = ''; }, 2500); }
+    else { m.className = 'msg mal'; m.textContent = 'no se pudo guardar'; }
+  } catch (e) { m.className = 'msg mal'; m.textContent = 'error de conexión'; }
+}
+
+/* ═══════ Inbox ═══════ */
+let CONVS = [], ACTUAL = null;
+const cuando = s => { if (!s) return ''; const d = new Date(s);
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) + ' ' +
+         d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }); };
+
+async function cargarInbox() {
+  try {
+    const d = await fetch('api/whatsapp/inbox').then(r => r.json());
+    CONVS = d.conversaciones || [];
+    const pend = CONVS.filter(c => c.pendientes > 0).length;
+    $('b-inbox').textContent = pend || '';
+    $('convs').innerHTML = CONVS.length ? CONVS.map(c => `
+      <button class="conv${ACTUAL === c.wa_id ? ' on' : ''}" onclick="verConv('${escapar(c.wa_id)}')">
+        <span class="q">${c.pendientes ? '<span class="pend"></span>' : ''}
+          ${escapar(c.cliente || c.wa_id)}</span>
+        <span class="u">${escapar((c.ultimo_texto || '').slice(0, 40))} · ${cuando(c.ultimo)}</span>
+      </button>`).join('')
+      : '<div class="vacio" style="padding:20px">Sin conversaciones.</div>';
+    if (ACTUAL) verConv(ACTUAL, true);
+  } catch (e) {}
+}
+
+async function verConv(waId, silencioso) {
+  ACTUAL = waId;
+  if (!silencioso) document.querySelectorAll('.conv').forEach(b =>
+    b.classList.toggle('on', b.textContent.includes(waId) || false));
+  const c = CONVS.find(x => x.wa_id === waId) || {};
+  try {
+    const d = await fetch('api/whatsapp/inbox/' + encodeURIComponent(waId)).then(r => r.json());
+    const ms = d.mensajes || [];
+    $('chat').innerHTML = `
+      <div class="hilo" id="hilo">${ms.map(m => `
+        <div class="msj ${escapar(m.direccion)}">${escapar(m.texto || '(' + (m.tipo || 'sin texto') + ')')}
+          <span class="h">${cuando(m.creado_en)}</span></div>`).join('')}</div>
+      ${c.ventana_abierta
+        ? `<div class="responder">
+             <textarea id="resp" rows="2" placeholder="Escribí la respuesta…"></textarea>
+             <button class="btn" onclick="responder()">Enviar</button>
+           </div>
+           <span class="msg" id="msg-resp"></span>`
+        : `<div class="cerrada">Pasaron más de 24 h desde el último mensaje del cliente, así que
+             Meta no deja responder libremente. Hay que esperar a que vuelva a escribir, o usar
+             una plantilla aprobada.</div>`}`;
+    const h = document.getElementById('hilo'); if (h) h.scrollTop = h.scrollHeight;
+    if (c.pendientes) {
+      await fetch('api/whatsapp/inbox/' + encodeURIComponent(waId) + '/atendido', { method: 'POST' });
+      c.pendientes = 0;
+      const pend = CONVS.filter(x => x.pendientes > 0).length;
+      $('b-inbox').textContent = pend || '';
+      document.querySelectorAll('.conv .pend').forEach(() => {});
+    }
+  } catch (e) {}
+}
+
+async function responder() {
+  const t = $('resp'); const m = $('msg-resp');
+  const texto = t.value.trim(); if (!texto) return;
+  m.className = 'msg'; m.textContent = 'enviando…';
+  try {
+    const r = await fetch('api/whatsapp/inbox/' + encodeURIComponent(ACTUAL) + '/responder',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto }) });
+    const j = await r.json();
+    if (r.ok && j.ok) { t.value = ''; cargarInbox(); }
+    else { m.className = 'msg mal';
+      m.textContent = j.error === 'sin_numero' ? 'Falta configurar el número' : (j.detalle || 'no se pudo enviar'); }
+  } catch (e) { m.className = 'msg mal'; m.textContent = 'error de conexión'; }
+}
+
 cargar();
+cargarCanal();
+cargarInbox();
 </script>
 </body>
 </html>

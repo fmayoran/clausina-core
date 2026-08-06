@@ -122,9 +122,9 @@ app.post('/webhook/whatsapp', express.raw({ type: '*/*', limit: '2mb' }), async 
           console.error('reserva wa', e.message); return false;
         });
         await db.logWhatsapp({
-          direccion: 'entrante', wa_id: m.wa_id, usuario_id: null,
+          direccion: 'entrante', wa_id: m.wa_id, usuario_id: null, negocio_id: negocio.id,
           mensaje_id: m.mensaje_id, tipo: m.tipo, texto: m.texto, crudo: m.crudo,
-          estado: atendido ? 'atendido_reservas' : 'cliente_de_negocio',
+          estado: atendido ? 'atendido_bot' : 'cliente_de_negocio',
         });
         if (!atendido) console.log(`whatsapp: mensaje para ${negocio.slug} de ${m.wa_id} — registrado, sin responder`);
         continue;
@@ -874,6 +874,51 @@ app.put('/api/whatsapp/config', async (req, res) => {
 app.post('/api/whatsapp/verificar', async (req, res) => {
   try { res.json(await db.verificarWhatsappNegocio(req.negocioId)); }
   catch (e) { console.error('wa verificar', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+// --- Canal de WhatsApp: configurador e inbox (v2.0 / F5f) ---------------------------------
+app.get('/api/whatsapp/canal', async (req, res) => {
+  try {
+    res.json({ config: await db.getCanalWhatsapp(req.negocioId), disponibles: db.CAPS_BOT });
+  } catch (e) { console.error('wa canal', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.put('/api/whatsapp/canal', async (req, res) => {
+  try { res.json(await db.guardarCanalWhatsapp(req.negocioId, req.body || {})); }
+  catch (e) { console.error('wa canal guardar', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+
+app.get('/api/whatsapp/inbox', async (req, res) => {
+  try { res.json({ conversaciones: await db.getInbox(req.negocioId) }); }
+  catch (e) { console.error('wa inbox', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.get('/api/whatsapp/inbox/:waId', async (req, res) => {
+  try { res.json({ mensajes: await db.getConversacionInbox(req.negocioId, req.params.waId) }); }
+  catch (e) { console.error('wa conversacion', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/whatsapp/inbox/:waId/atendido', async (req, res) => {
+  try { res.json(await db.marcarAtendido(req.negocioId, req.params.waId)); }
+  catch (e) { console.error('wa atendido', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+// Responder a mano. Sólo funciona DENTRO de la ventana de 24 h; fuera de ella Meta exige
+// plantilla, y devolvemos el motivo para que la pantalla lo pueda decir.
+app.post('/api/whatsapp/inbox/:waId/responder', async (req, res) => {
+  try {
+    const texto = String((req.body || {}).texto || '').trim();
+    if (!texto) return res.status(400).json({ ok: false, error: 'sin_texto' });
+    const cfgWa = await db.getWhatsappNegocio(req.negocioId, true);
+    if (!cfgWa || !cfgWa.wa_phone_id || !cfgWa.token) {
+      return res.status(409).json({ ok: false, error: 'sin_numero' });
+    }
+    const r = await wa.enviarTexto(req.params.waId, texto,
+      { phone_id: cfgWa.wa_phone_id, token: cfgWa.token });
+    await db.logWhatsapp({
+      direccion: 'saliente', wa_id: req.params.waId, usuario_id: req.usuario.id,
+      negocio_id: req.negocioId, mensaje_id: r.id, tipo: 'text', texto,
+      estado: r.ok ? 'enviado' : 'error',
+    });
+    if (r.ok) await db.marcarAtendido(req.negocioId, req.params.waId);
+    res.status(r.ok ? 200 : 409).json(r.ok ? { ok: true } : { ok: false, error: 'envio', detalle: r.motivo });
+  } catch (e) { console.error('wa responder', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 
 // --- Avisos de reserva por WhatsApp (v2.0 / F5c) ------------------------------------------

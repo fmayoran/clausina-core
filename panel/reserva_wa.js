@@ -33,7 +33,16 @@ const cuantos = u => ((UNI[u] || UNI.personas)[2] === 'm' ? 'cuántos' : 'cuánt
 const SALIR = /^(cancelar|salir|basta|no|nada|chau|gracias)$/i;
 
 /** Mensajes cortos: en WhatsApp un párrafo largo no se lee. */
-async function decir(cfg, waId, texto) { return wa.enviarTexto(waId, texto, cfg); }
+async function decir(cfg, waId, texto, negocioId) {
+  const r = await wa.enviarTexto(waId, texto, cfg);
+  // Todo lo que dice el asistente queda en la bitácora: el inbox tiene que mostrar la
+  // conversación completa, no sólo la mitad que escribió el cliente.
+  if (negocioId) await db.logWhatsapp({
+    direccion: 'saliente', wa_id: waId, negocio_id: negocioId, mensaje_id: r.id,
+    tipo: 'text', texto, estado: r.ok ? 'enviado' : 'error',
+  }).catch(() => {});
+  return r;
+}
 
 /**
  * Procesa un mensaje entrante en el número de un negocio.
@@ -45,9 +54,11 @@ async function atender(negocio, mensaje) {
   if (!cfgWa || !cfgWa.wa_phone_id || !cfgWa.token) return false;
   const cfg = { phone_id: cfgWa.wa_phone_id, token: cfgWa.token };
 
-  // Si el negocio no tiene las reservas abiertas, no se ofrece nada: mejor no contestar que
-  // ofrecer algo que después no se puede cumplir.
-  if (!(await db.reservasPorWhatsapp(negocio.id))) return false;
+  // Qué ofrece el bot lo decide el negocio en el configurador. Si no ofrece nada y el inbox
+  // está apagado, no contesta: mejor callar que ofrecer algo que después no se puede cumplir.
+  const canal = await db.getCanalWhatsapp(negocio.id);
+  const ofreceReservas = canal.ofrece.includes('reservas') && await db.reservasPorWhatsapp(negocio.id);
+  if (!ofreceReservas && !canal.inbox) return false;
 
   const entrada = String(mensaje.accion || mensaje.texto || '').trim();
   const conv = await db.getConversacion(negocio.id, waId);
@@ -55,7 +66,7 @@ async function atender(negocio, mensaje) {
   // Salida en cualquier momento. Que se pueda cortar es parte de que no sea molesto.
   if (SALIR.test(entrada)) {
     await db.borrarConversacion(negocio.id, waId);
-    if (conv) await decir(cfg, waId, 'Listo, no reservé nada. Si querés, escribime cuando quieras.');
+    if (conv) await decir(cfg, waId, 'Listo, no reservé nada. Si querés, escribime cuando quieras.', negocio.id);
     return !!conv;
   }
 
@@ -63,8 +74,14 @@ async function atender(negocio, mensaje) {
   const datos = conv ? (conv.datos || {}) : {};
 
   try {
-    if (!paso) return await saludar(cfg, negocio, waId);
-    if (paso === 'ofrecido') return await elegirDia(cfg, negocio, waId, entrada);
+    if (!paso) return await saludar(cfg, negocio, waId, canal, ofreceReservas);
+    // "Otra consulta": lo que sigue va al inbox para que lo lea una persona.
+    if (paso === 'consulta') return await recibirConsulta(cfg, negocio, waId, mensaje);
+    if (paso === 'ofrecido') {
+      if (entrada === 'consulta') return await pedirConsulta(cfg, negocio, waId);
+      if (!ofreceReservas) return await recibirConsulta(cfg, negocio, waId, mensaje);
+      return await elegirDia(cfg, negocio, waId, entrada);
+    }
     if (paso === 'dia') return await elegirTurno(cfg, negocio, waId, entrada, datos);
     if (paso === 'turno') return await pedirCantidad(cfg, negocio, waId, entrada, datos);
     if (paso === 'cantidad') return await pedirNombre(cfg, negocio, waId, entrada, datos);
@@ -72,20 +89,42 @@ async function atender(negocio, mensaje) {
   } catch (e) {
     console.error('reserva wa', e.message);
     await db.borrarConversacion(negocio.id, waId);
-    await decir(cfg, waId, 'Perdón, se me complicó. Probá de nuevo escribiéndome "reservar".');
+    await decir(cfg, waId, 'Perdón, se me complicó. Probá de nuevo escribiéndome "reservar".', negocio.id);
     return true;
   }
   return false;
 }
 
-async function saludar(cfg, negocio, waId) {
+async function saludar(cfg, negocio, waId, canal, ofreceReservas) {
   await db.setConversacion(negocio.id, waId, 'ofrecido', {});
-  const r = await wa.enviarBotones(waId,
-    `Hola. Soy el asistente de ${negocio.nombre}. ¿Querés reservar?`,
-    [{ id: 'reservar', titulo: 'Reservar' }, { id: 'no', titulo: 'Ahora no' }], cfg);
+  // El saludo lo escribe el negocio en el configurador; si no puso nada, se arma uno.
+  const saludo = canal.saludo || `Hola. Soy el asistente de ${negocio.nombre}.`;
+  const botones = [];
+  if (ofreceReservas) botones.push({ id: 'reservar', titulo: 'Reservar' });
+  if (canal.inbox) botones.push({ id: 'consulta', titulo: 'Otra consulta' });
+  if (ofreceReservas) botones.push({ id: 'no', titulo: 'Ahora no' });
+
+  if (!botones.length) return false;
+  const r = await wa.enviarBotones(waId, `${saludo}\n\n¿En qué te puedo ayudar?`, botones, cfg);
   // Si los botones fallan (algún cliente viejo no los soporta), se sigue en texto plano.
-  if (!r.ok) await decir(cfg, waId, `Hola. Soy el asistente de ${negocio.nombre}. ` +
-    'Si querés reservar, escribime "reservar".');
+  if (!r.ok) await decir(cfg, waId, saludo + (ofreceReservas
+    ? '\n\nSi querés reservar, escribime "reservar". Si es otra cosa, contame y te respondemos.'
+    : '\n\nContame en qué te puedo ayudar y te respondemos a la brevedad.'), negocio.id);
+  return true;
+}
+
+// Consultas que no son una operación del bot: se guardan para que las lea una persona.
+async function pedirConsulta(cfg, negocio, waId) {
+  await db.setConversacion(negocio.id, waId, 'consulta', {});
+  await decir(cfg, waId, 'Contame en qué te puedo ayudar y te respondemos a la brevedad.', negocio.id);
+  return true;
+}
+
+async function recibirConsulta(cfg, negocio, waId, mensaje) {
+  await db.borrarConversacion(negocio.id, waId);
+  // El mensaje ya se guarda en la bitácora del webhook: acá sólo se acusa recibo. Prometer un
+  // plazo que no controlamos sería peor que no prometer nada.
+  await decir(cfg, waId, 'Gracias, ya le pasé tu mensaje al equipo. Te van a responder por acá.', negocio.id);
   return true;
 }
 
@@ -94,7 +133,7 @@ async function saludar(cfg, negocio, waId) {
 async function elegirDia(cfg, negocio, waId, entrada) {
   if (entrada === 'no') {
     await db.borrarConversacion(negocio.id, waId);
-    await decir(cfg, waId, 'Dale, cuando quieras. Acá estoy.');
+    await decir(cfg, waId, 'Dale, cuando quieras. Acá estoy.', negocio.id);
     return true;
   }
   const hoy = new Date().toISOString().slice(0, 10);
@@ -103,7 +142,7 @@ async function elegirDia(cfg, negocio, waId, entrada) {
   const fechas = [...new Set(turnos.map(t => t.fecha))].sort().slice(0, 10);
   if (!fechas.length) {
     await db.borrarConversacion(negocio.id, waId);
-    await decir(cfg, waId, 'Por ahora no tengo días disponibles. Probá más adelante.');
+    await decir(cfg, waId, 'Por ahora no tengo días disponibles. Probá más adelante.', negocio.id);
     return true;
   }
   await db.setConversacion(negocio.id, waId, 'dia', {});
@@ -114,10 +153,10 @@ async function elegirDia(cfg, negocio, waId, entrada) {
 
 async function elegirTurno(cfg, negocio, waId, entrada, datos) {
   const fecha = entrada.startsWith('d:') ? entrada.slice(2) : null;
-  if (!fecha) { await decir(cfg, waId, 'Elegí un día de la lista, por favor.'); return true; }
+  if (!fecha) { await decir(cfg, waId, 'Elegí un día de la lista, por favor.', negocio.id); return true; }
   const turnos = (await db.disponibilidadPublica(negocio.id, fecha, fecha));
   if (!turnos.length) {
-    await decir(cfg, waId, 'Ese día se quedó sin lugar. Escribime "reservar" y elegimos otro.');
+    await decir(cfg, waId, 'Ese día se quedó sin lugar. Escribime "reservar" y elegimos otro.', negocio.id);
     await db.borrarConversacion(negocio.id, waId);
     return true;
   }
@@ -130,10 +169,10 @@ async function elegirTurno(cfg, negocio, waId, entrada, datos) {
 
 async function pedirCantidad(cfg, negocio, waId, entrada, datos) {
   const turnoId = entrada.startsWith('t:') ? entrada.slice(2) : null;
-  if (!turnoId) { await decir(cfg, waId, 'Elegí un turno de la lista, por favor.'); return true; }
+  if (!turnoId) { await decir(cfg, waId, 'Elegí un turno de la lista, por favor.', negocio.id); return true; }
   const cfgRes = await db.getConfigReservas(negocio.id);
   await db.setConversacion(negocio.id, waId, 'cantidad', { ...datos, turno_id: turnoId });
-  await decir(cfg, waId, `¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}? Respondeme con un número.`);
+  await decir(cfg, waId, `¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}? Respondeme con un número.`, negocio.id);
   return true;
 }
 
@@ -141,11 +180,11 @@ async function pedirNombre(cfg, negocio, waId, entrada, datos) {
   const n = parseInt(String(entrada).replace(/\D+/g, ''), 10);
   const cfgRes = await db.getConfigReservas(negocio.id);
   if (!n || n < cfgRes.cantidad_min) {
-    await decir(cfg, waId, `Necesito un número. ¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}?`);
+    await decir(cfg, waId, `Necesito un número. ¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}?`, negocio.id);
     return true;
   }
   await db.setConversacion(negocio.id, waId, 'nombre', { ...datos, cantidad: n });
-  await decir(cfg, waId, '¿A nombre de quién?');
+  await decir(cfg, waId, '¿A nombre de quién?', negocio.id);
   return true;
 }
 
@@ -160,7 +199,7 @@ const ERRORES = {
 
 async function confirmar(cfg, negocio, waId, entrada, datos) {
   const nombre = String(entrada).trim().slice(0, 80);
-  if (!nombre) { await decir(cfg, waId, '¿A nombre de quién?'); return true; }
+  if (!nombre) { await decir(cfg, waId, '¿A nombre de quién?', negocio.id); return true; }
 
   let r;
   try {
@@ -171,7 +210,7 @@ async function confirmar(cfg, negocio, waId, entrada, datos) {
     });
   } catch (e) {
     await db.borrarConversacion(negocio.id, waId);
-    await decir(cfg, waId, ERRORES[e.code] || 'No pude tomar la reserva. Probá de nuevo más tarde.');
+    await decir(cfg, waId, ERRORES[e.code] || 'No pude tomar la reserva. Probá de nuevo más tarde.', negocio.id);
     return true;
   }
 
@@ -186,7 +225,8 @@ async function confirmar(cfg, negocio, waId, entrada, datos) {
   // sin plantilla y en el momento.
   await decir(cfg, waId, r.estado === 'confirmada'
     ? `¡Listo! Reserva confirmada en ${negocio.nombre}.\n\n${cuando}\n${cant}\nA nombre de ${nombre}\n\nTe esperamos.`
-    : `Anotado. Tu pedido quedó registrado en ${negocio.nombre}.\n\n${cuando}\n${cant}\nA nombre de ${nombre}\n\nQueda pendiente de confirmación; te aviso por acá.`);
+    : `Anotado. Tu pedido quedó registrado en ${negocio.nombre}.\n\n${cuando}\n${cant}\nA nombre de ${nombre}\n\nQueda pendiente de confirmación; te aviso por acá.`,
+    negocio.id);
   return true;
 }
 
