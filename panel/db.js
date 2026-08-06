@@ -1945,6 +1945,15 @@ async function verificarWhatsappNegocio(negocioId) {
   }
   add('token', 'El token alcanza el número', 'ok',
       `${num.display_phone_number} · ${num.verified_name}`);
+  // El número tal como lo ve un cliente lo sabe Meta, no nosotros: se guarda al verificar para
+  // poder mostrarlo (en el pase de una invitación, por ejemplo) sin volver a preguntarle.
+  if (num.display_phone_number) {
+    await pool.query(
+      `UPDATE contenido.negocio_capacidad
+          SET config = jsonb_set(COALESCE(config,'{}'::jsonb), '{numero}', to_jsonb($2::text))
+        WHERE negocio_id=$1 AND capacidad='whatsapp'`,
+      [negocioId, num.display_phone_number]).catch(() => {});
+  }
 
   // 2) En producción, no en un sandbox
   add('modo', 'Número en producción', num.account_mode === 'LIVE' ? 'ok' : 'mal',
@@ -2141,6 +2150,14 @@ async function negocioPublico(slug) {
     id: n.id, slug: n.slug, nombre: n.nombre, slogan: n.slogan,
     logo: n.logo, logo_claro: n.logo_claro, web: n.dominio_web,
     sede: sede || null,
+    // El número del asistente, si el negocio lo tiene andando: sirve para ofrecer el otro
+    // camino ("o escribinos") sin que nadie tenga que copiarlo a mano en ningún lado.
+    whatsapp: (await (async () => {
+      const { rows: [w] } = await pool.query(
+        `SELECT config->>'numero' AS n FROM contenido.negocio_capacidad
+          WHERE negocio_id=$1 AND capacidad='whatsapp' AND habilitada`, [n.id]);
+      return w ? w.n : null;
+    })()) || null,
     // Tokens visuales: lo que hace que la página no se vea de ClaUsina sino del negocio.
     // Vacío = paleta de la plataforma, que es un default digno y no un error.
     marca: n.marca || {},

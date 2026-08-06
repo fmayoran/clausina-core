@@ -261,6 +261,7 @@ app.get('/api/publico/pase/:codigo', async (req, res) => {
       negocio: i.negocio_nombre, negocio_slug: i.negocio_slug,
       // La marca y el logo salen del negocio: el pase es suyo, no de ClaUsina.
       logo: n ? n.logo : null, marca: n ? n.marca : null,
+      whatsapp: n ? n.whatsapp : null,
     });
   } catch (e) { console.error('pase', e.message); res.status(500).json({ ok: false }); }
 });

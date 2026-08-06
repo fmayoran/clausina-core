@@ -17,26 +17,30 @@
        min-height:100vh;display:grid;place-items:center;padding:26px 18px;}
   .pase{width:min(430px,100%);background:var(--c-suave);border:1px solid var(--c-linea);
         border-radius:20px;padding:30px 28px 26px;text-align:center;position:relative;overflow:hidden;}
-  .cab{display:flex;align-items:center;gap:11px;justify-content:center;margin-bottom:22px;}
-  .logo{height:38px;width:auto;border-radius:7px;}
-  .negocio{font-family:var(--f-tit);font-weight:800;font-size:1.02rem;letter-spacing:-.01em;}
+  .envoltorio{width:min(430px,100%);}
+  /* El logo manda: es lo primero y lo más grande, y trae el nombre adentro. */
+  .logo{max-height:78px;max-width:78%;width:auto;margin:0 auto 22px;display:block;}
+  .titulo{font-family:var(--f-tit);font-weight:800;font-size:1.62rem;line-height:1.1;
+          letter-spacing:-.01em;text-transform:uppercase;color:var(--c-acento);}
+  .beneficio{font-size:1.02rem;line-height:1.4;margin:10px 0 4px;color:var(--c-tinta);opacity:.92;}
   .rotulo{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.24em;
           text-transform:uppercase;opacity:.62;}
-  .beneficio{font-family:var(--f-tit);font-weight:800;font-size:1.72rem;line-height:1.15;
-             margin:16px 0 6px;color:var(--c-acento);}
-  .para{font-size:.94rem;opacity:.8;margin-bottom:22px;}
+  .para{font-size:.9rem;opacity:.75;margin-bottom:20px;}
+  .otra{font-family:'JetBrains Mono',monospace;font-size:.64rem;line-height:1.8;
+        opacity:.72;margin-top:13px;}
+  .otra a{color:inherit;}
   /* El código es lo que la persona va a dictar o tipear: es el elemento más grande después del
      beneficio, y con separación entre caracteres para que no se confunda al leerlo. */
   .codigo{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:2.05rem;
           letter-spacing:.16em;padding:15px 10px;border:1px dashed var(--c-linea);
-          border-radius:13px;margin-bottom:8px;}
+          border-radius:13px;margin:20px 0 8px;}
   .cond{font-family:'JetBrains Mono',monospace;font-size:.63rem;line-height:1.85;opacity:.72;
         margin-top:14px;}
   .cta{display:inline-block;margin-top:20px;background:var(--c-acento);color:var(--c-fondo);
        font-family:var(--f-tit);font-weight:700;text-decoration:none;padding:12px 26px;
        border-radius:11px;font-size:.98rem;}
   .pie{font-family:'JetBrains Mono',monospace;font-size:.56rem;opacity:.45;margin-top:20px;line-height:1.7;}
-  .acciones{display:flex;gap:9px;justify-content:center;margin-top:18px;flex-wrap:wrap;}
+  .acciones{display:flex;gap:9px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
   .acc{background:none;border:1px solid var(--c-linea);color:var(--c-tinta);opacity:.7;
        border-radius:9px;padding:8px 15px;cursor:pointer;font-family:var(--f-txt);font-size:.82rem;}
   .acc:hover{opacity:1;}
@@ -48,29 +52,34 @@
           margin:0;box-shadow:none;}
     .beneficio{color:#111;}
     .cta,.acciones{display:none !important;}
+    .titulo{color:#111;}
+    .envoltorio{width:100%;}
     .codigo{border-color:#999;}
     .pie{opacity:.7;}
   }
 </style>
 </head>
 <body>
+<div class="envoltorio">
 <div class="pase" id="pase" style="display:none">
-  <div class="cab">
-    <img class="logo" id="logo" alt="" style="display:none">
-    <div class="negocio" id="negocio"></div>
-  </div>
-  <div class="rotulo">Invitación</div>
+  <!-- El nombre del negocio no va como texto: ya está en el logo, y repetirlo lo ensucia. -->
+  <img class="logo" id="logo" alt="" style="display:none">
+  <div class="titulo">Invitación especial</div>
   <div class="beneficio" id="beneficio"></div>
   <div class="para" id="para" style="display:none"></div>
   <div class="codigo" id="codigo"></div>
   <div class="rotulo">Presentá este código al reservar</div>
   <div class="cond" id="cond"></div>
-  <a class="cta" id="cta" href="#">Reservar ahora</a>
-  <div class="acciones">
-    <button class="acc" onclick="window.print()">Imprimir</button>
-    <button class="acc" id="b-compartir" onclick="compartir()">Compartir</button>
-  </div>
+  <a class="cta" id="cta" href="#">Reservar aquí</a>
+  <div class="otra" id="otra" style="display:none"></div>
   <div class="pie" id="pie"></div>
+</div>
+<!-- Fuera de la tarjeta: son acciones de quien mira la pantalla, no parte de la invitación, y
+     al imprimir no tienen que salir. -->
+<div class="acciones" id="acciones" style="display:none">
+  <button class="acc" onclick="window.print()">Imprimir</button>
+  <button class="acc" id="b-compartir" onclick="compartir()">Compartir</button>
+</div>
 </div>
 <div class="mal" id="error" style="display:none"></div>
 
@@ -82,7 +91,7 @@ const fecha = iso => String(iso || '').slice(0, 10).split('-').reverse().join('/
 
 async function compartir() {
   const url = location.origin + '/i/' + COD;
-  const texto = $('beneficio').textContent + ' en ' + $('negocio').textContent +
+  const texto = 'Invitación especial: ' + $('beneficio').textContent +
                 '. Tu código: ' + $('codigo').textContent + '\n' + url;
   // navigator.share abre el menú del sistema (WhatsApp, mail, lo que haya). Donde no exista
   // —escritorio, casi siempre— se copia al portapapeles, que es el uso real de esta pantalla.
@@ -118,9 +127,10 @@ function marca(m) {
       return;
     }
     marca(j.marca);
-    document.title = 'Invitación · ' + j.negocio;
-    $('negocio').textContent = j.negocio;
-    if (j.logo) { $('logo').src = j.logo; $('logo').style.display = ''; }
+    document.title = 'Invitación especial · ' + j.negocio;
+    if (j.logo) { $('logo').src = j.logo; $('logo').alt = j.negocio; $('logo').style.display = ''; }
+    // Sin logo cargado el nombre tiene que aparecer igual, si no la tarjeta no dice de quién es.
+    else { $('titulo').textContent = j.negocio + ' te invita'; }
     $('beneficio').textContent = j.texto;
     if (j.etiqueta) { $('para').textContent = 'Para ' + j.etiqueta; $('para').style.display = ''; }
     $('codigo').textContent = j.codigo.replace(/^(.{3})(.{3})$/, '$1-$2');
@@ -135,7 +145,18 @@ function marca(m) {
     if (j.vence_en) l.push('Vence el ' + fecha(j.vence_en));
     if (j.usos_max > 1) l.push('Cupo: ' + j.usos_max + ' usos');
     $('cond').innerHTML = l.join('<br>');
-    $('pie').textContent = 'Sujeta a disponibilidad · El descuento se aplica al pagar';
+    // El otro camino: mucha gente prefiere escribir antes que llenar un formulario.
+    if (j.whatsapp) {
+      const wa = j.whatsapp.replace(/[^0-9]/g, '');
+      $('otra').innerHTML = 'o escribinos por WhatsApp a <a href="https://wa.me/' + wa +
+        '">' + j.whatsapp + '</a><br>y decinos tu código';
+      $('otra').style.display = '';
+    }
+    // El disclaimer que pidió Fer: la invitación se valida al llegar, no al reservar. Es la
+    // diferencia entre tomarla y consumirla, dicha en el único lugar donde la lee el invitado.
+    $('pie').textContent = 'Presentá esta invitación al llegar al local para validarla · ' +
+      'Sujeta a disponibilidad · El descuento se aplica al pagar';
+    $('acciones').style.display = '';
     $('pase').style.display = '';
   } catch (e) {
     $('error').style.display = '';

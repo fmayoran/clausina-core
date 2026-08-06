@@ -182,17 +182,35 @@ const DOW = ['dom','lun','mar','mié','jue','vie','sáb'];
 let NEG = null, TURNOS = [], FECHA = null, TURNO = null;
 // El código validado. Se manda con la reserva sólo si pasó por validarCodigo(): mandar uno a
 // medio escribir haría fallar la reserva entera por un campo opcional.
-let INVITACION = null;
+let INVITACION = null, INV_COND = null;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
   ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 const plural = n => (UNI[NEG.unidad] || UNI.personas)[n === 1 ? 0 : 1];
 
+/**
+ * Lo que la invitación deja elegir. Ofrecer un turno que la invitación no cubre y rechazarlo
+ * recién al reservar es el mismo error de "enterarse al final" que ya corregimos dos veces.
+ */
+function turnosPermitidos() {
+  if (!INV_COND) return TURNOS;
+  const c = INV_COND;
+  return TURNOS.filter(t => {
+    const iso = new Date(t.fecha + 'T12:00:00').getDay() || 7;
+    if ((c.dias || []).length && !c.dias.includes(iso)) return false;
+    if ((c.turnos || []).length && !c.turnos.includes(t.nombre)) return false;
+    return true;
+  });
+}
+
 function pintarDias() {
-  const fechas = [...new Set(TURNOS.map(t => t.fecha))].sort();
+  const DISP = turnosPermitidos();
+  const fechas = [...new Set(DISP.map(t => t.fecha))].sort();
   if (!fechas.length) {
-    $('dias').innerHTML = '<span class="nota">No hay días disponibles por ahora.</span>';
+    $('dias').innerHTML = '<span class="nota">' + (INV_COND
+      ? 'No hay días disponibles para tu invitación. Podés reservar sin ella.'
+      : 'No hay días disponibles por ahora.') + '</span>';
     return;
   }
   if (!FECHA || !fechas.includes(FECHA)) FECHA = fechas[0];
@@ -206,7 +224,7 @@ function pintarDias() {
 function elegirDia(f) { FECHA = f; TURNO = null; pintarDias(); }
 
 function pintarTurnos() {
-  const ts = TURNOS.filter(t => t.fecha === FECHA && t.libre > 0);
+  const ts = turnosPermitidos().filter(t => t.fecha === FECHA && t.libre > 0);
   if (!ts.length) {
     $('turnos').innerHTML = '<span class="nota">No queda lugar este día. Probá con otro.</span>';
     TURNO = null; actualizar(); return;
@@ -324,12 +342,16 @@ async function validarCodigo() {
                           encodeURIComponent(codigo));
     const j = await r.json();
     if (!r.ok || !j.ok) {
-      INVITACION = null;
+      INVITACION = null; INV_COND = null; pintarDias();
       msg.className = 'codmsg no';
       msg.textContent = j.mensaje || 'No pude verificar ese código.';
       return;
     }
     INVITACION = codigo;
+    // Las condiciones filtran días y turnos desde ya: la persona sólo ve lo que su invitación cubre.
+    INV_COND = j.condiciones || null;
+    FECHA = null; TURNO = null;
+    pintarDias();
     msg.className = 'codmsg si';
     // Se dice lo que da y, si tiene condiciones, cuáles: enterarse al reservar de que no aplica
     // ese día es el mismo problema corrido de lugar.
@@ -340,10 +362,19 @@ async function validarCodigo() {
     if (c.cantidad_max) partes.push('hasta ' + c.cantidad_max);
     msg.textContent = '✓ ' + j.texto + (partes.length ? ' — ' + partes.join(' · ') : '') +
       (j.vence_en ? ' · vence el ' + String(j.vence_en).slice(0, 10).split('-').reverse().join('/') : '');
+    // Se deja siempre una salida: alguien puede querer reservar otro día y pagar completo.
+    msg.innerHTML += ` <a href="#" onclick="quitarCodigo();return false;" ` +
+      `style="color:inherit;opacity:.75;text-decoration:underline">reservar sin la invitación</a>`;
     $('invit').classList.add('aplicada');
   } catch (e) {
     INVITACION = null; msg.className = 'codmsg no'; msg.textContent = 'No pude verificar ese código.';
   } finally { boton.disabled = false; }
+}
+function quitarCodigo() {
+  INVITACION = null; INV_COND = null;
+  $('cod').value = ''; $('codmsg').className = 'codmsg'; $('codmsg').textContent = '';
+  $('invit').classList.remove('aplicada');
+  FECHA = null; TURNO = null; pintarDias();
 }
 const DIAS_CORTOS = { 1:'lunes', 2:'martes', 3:'miércoles', 4:'jueves', 5:'viernes', 6:'sábados', 7:'domingos' };
 
