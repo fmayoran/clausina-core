@@ -129,12 +129,14 @@ function caraDorso(j) {
 const HUECA = '<div class="cara hueca"></div>';
 
 function pintar() {
-  const pieza = $('sel-frente').value;
+  // Vacío = lo que indicó el beneficio de cada invitación. El desplegable es para forzar otra,
+  // no para tener que elegirla cada vez.
+  const forzada = $('sel-frente').value;
   const porHoja = 4;
   let html = '';
   for (let i = 0; i < PASES.length; i += porHoja) {
     const tanda = PASES.slice(i, i + porHoja);
-    const frentes = tanda.map(j => caraFrente(j, pieza));
+    const frentes = tanda.map(j => caraFrente(j, forzada || j.frente));
     // EL DORSO VA ESPEJADO. Al imprimir a doble faz por el borde largo, la hoja gira sobre su eje
     // vertical: lo que estaba a la izquierda queda a la derecha. Sin intercambiar las columnas,
     // cada dorso cae detrás de OTRA tarjeta y la tirada entera se tira.
