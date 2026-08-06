@@ -900,54 +900,9 @@ app.put('/api/whatsapp/canal', async (req, res) => {
 app.post('/api/whatsapp/faq/sugerir', async (req, res) => {
   try {
     if (!faq.disponible()) return res.status(503).json({ error: 'sin_clave' });
-    res.json({ entradas: await faq.sugerir(await fichaNegocio(req.negocioId)) || [] });
+    res.json({ entradas: await faq.sugerir(await db.fichaNegocio(req.negocioId)) || [] });
   } catch (e) { console.error('faq sugerir', e.message); res.status(500).json({ error: 'ia' }); }
 });
-
-// Todo lo que la plataforma sabe del negocio, en texto plano. Es la materia prima de los
-// borradores: si un dato no está acá, la respuesta va a quedar vacía, y eso es lo correcto.
-const DIAS_ISO = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
-async function fichaNegocio(negocioId) {
-  const [perfil, ident, turnos, cfgRes, caps] = await Promise.all([
-    db.getPerfil(negocioId), db.getIdentidad(negocioId), db.getTurnos(negocioId),
-    db.getConfigReservas(negocioId), db.getCapacidades(negocioId),
-  ]);
-  const i = ident.identidad || {};
-  const L = [];
-  const poner = (k, v) => { if (v != null && String(v).trim() !== '') L.push(`${k}: ${v}`); };
-
-  poner('Nombre', perfil.nombre);
-  poner('Rubro', i.actividad_nombre);
-  poner('Slogan', perfil.slogan);
-  poner('Sitio web', perfil.dominio_web);
-  poner('Instagram', perfil.ig_handle);
-  poner('Atributos', (i.atributos || []).join(', '));
-  poner('Ticket promedio', i.ticket_min != null || i.ticket_max != null
-    ? `${i.ticket_min ?? '?'} a ${i.ticket_max ?? '?'} por ${i.ticket_unidad || 'persona'}` : null);
-
-  for (const s of ident.sedes || []) {
-    poner('Dirección', [s.direccion, s.localidad, s.partido, s.provincia].filter(Boolean).join(', '));
-    poner('Teléfono', s.telefono);
-  }
-
-  if (turnos.length) {
-    L.push('Horarios de atención (turnos con reserva):');
-    for (const t of turnos.filter(t => t.activo !== false)) {
-      L.push(`  - ${t.nombre_publico || t.nombre}: ${t.hora_desde} a ${t.hora_hasta}, ` +
-             `${(t.dias || []).map(d => DIAS_ISO[d]).filter(Boolean).join(', ')}`);
-    }
-    L.push('OJO: estos son los turnos que aceptan reserva. NO son necesariamente el horario ' +
-           'completo del local; si te preguntan por el horario general, no lo deduzcas de acá.');
-  }
-  if ((caps || []).some(c => c.id === 'reservas' && c.habilitada)) {
-    poner('Reservas', `sí, hasta ${cfgRes.cantidad_max} ${cfgRes.unidad} por reserva, ` +
-      `con ${cfgRes.anticipacion_min_horas} h de anticipación mínima y hasta ` +
-      `${cfgRes.anticipacion_max_dias} días antes. Tolerancia ${cfgRes.tolerancia_min} min.`);
-  }
-  // El brief es lo más rico que hay del negocio y lo escribió una persona: va entero al final.
-  if (perfil.brief_md) L.push('\nBrief del negocio:\n' + String(perfil.brief_md).slice(0, 6000));
-  return L.join('\n');
-}
 
 app.get('/api/whatsapp/inbox', async (req, res) => {
   try { res.json({ conversaciones: await db.getInbox(req.negocioId) }); }

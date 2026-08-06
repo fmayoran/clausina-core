@@ -1280,6 +1280,51 @@ const CFG_CANAL = {
   faq: [],               // [{p, r}] — respuestas que el negocio escribió y el bot repite TAL CUAL
 };
 
+// Todo lo que la plataforma sabe del negocio, en texto plano. Es la materia prima de los
+// borradores: si un dato no está acá, la respuesta va a quedar vacía, y eso es lo correcto.
+const DIAS_ISO = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+async function fichaNegocio(negocioId) {
+  const [perfil, ident, turnos, cfgRes, caps] = await Promise.all([
+    getPerfil(negocioId), getIdentidad(negocioId), getTurnos(negocioId),
+    getConfigReservas(negocioId), getCapacidades(negocioId),
+  ]);
+  const i = ident.identidad || {};
+  const L = [];
+  const poner = (k, v) => { if (v != null && String(v).trim() !== '') L.push(`${k}: ${v}`); };
+
+  poner('Nombre', perfil.nombre);
+  poner('Rubro', i.actividad_nombre);
+  poner('Slogan', perfil.slogan);
+  poner('Sitio web', perfil.dominio_web);
+  poner('Instagram', perfil.ig_handle);
+  poner('Atributos', (i.atributos || []).join(', '));
+  poner('Ticket promedio', i.ticket_min != null || i.ticket_max != null
+    ? `${i.ticket_min ?? '?'} a ${i.ticket_max ?? '?'} por ${i.ticket_unidad || 'persona'}` : null);
+
+  for (const s of ident.sedes || []) {
+    poner('Dirección', [s.direccion, s.localidad, s.partido, s.provincia].filter(Boolean).join(', '));
+    poner('Teléfono', s.telefono);
+  }
+
+  if (turnos.length) {
+    L.push('Horarios de atención (turnos con reserva):');
+    for (const t of turnos.filter(t => t.activo !== false)) {
+      L.push(`  - ${t.nombre_publico || t.nombre}: ${t.hora_desde} a ${t.hora_hasta}, ` +
+             `${(t.dias || []).map(d => DIAS_ISO[d]).filter(Boolean).join(', ')}`);
+    }
+    L.push('OJO: estos son los turnos que aceptan reserva. NO son necesariamente el horario ' +
+           'completo del local; si te preguntan por el horario general, no lo deduzcas de acá.');
+  }
+  if ((caps || []).some(c => c.id === 'reservas' && c.habilitada)) {
+    poner('Reservas', `sí, hasta ${cfgRes.cantidad_max} ${cfgRes.unidad} por reserva, ` +
+      `con ${cfgRes.anticipacion_min_horas} h de anticipación mínima y hasta ` +
+      `${cfgRes.anticipacion_max_dias} días antes. Tolerancia ${cfgRes.tolerancia_min} min.`);
+  }
+  // El brief es lo más rico que hay del negocio y lo escribió una persona: va entero al final.
+  if (perfil.brief_md) L.push('\nBrief del negocio:\n' + String(perfil.brief_md).slice(0, 6000));
+  return L.join('\n');
+}
+
 async function getCanalWhatsapp(negocioId) {
   const { rows: [r] } = await pool.query(
     `SELECT config FROM contenido.negocio_capacidad
@@ -2747,7 +2792,7 @@ async function health() {
 
 module.exports = {
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
-  completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, guardarToken, getUsuarioPorToken, consumirToken,
+  completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
   getClientes, crearCliente, actualizarCliente, borrarCliente, exportarClientes, borrarTodosLosClientes,
