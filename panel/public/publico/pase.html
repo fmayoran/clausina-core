@@ -86,7 +86,6 @@
 <script>
 const $ = id => document.getElementById(id);
 const COD = decodeURIComponent(location.pathname.split('/').pop() || '');
-const DIAS = { 1:'lunes', 2:'martes', 3:'miércoles', 4:'jueves', 5:'viernes', 6:'sábados', 7:'domingos' };
 const fecha = iso => String(iso || '').slice(0, 10).split('-').reverse().join('/');
 
 async function compartir() {
@@ -137,12 +136,7 @@ function marca(m) {
     $('cta').href = '/i/' + j.codigo;
 
     const c = j.condiciones || {};
-    const l = [];
-    if ((c.dias || []).length) l.push('Válida ' + c.dias.map(d => DIAS[d]).join(', '));
-    if ((c.franjas || []).length && c.franjas.length < 2) l.push('Sólo al ' + c.franjas[0].toLowerCase());
-    else if ((c.franjas || []).length) l.push('Mediodía y noche');
-    if (c.cantidad_min) l.push('Desde ' + c.cantidad_min + ' personas');
-    if (c.cantidad_max) l.push('Hasta ' + c.cantidad_max + ' personas');
+    const l = [...(c.frases || [])];
     if (j.vence_en) l.push('Vence el ' + fecha(j.vence_en));
     if (j.usos_max > 1) l.push('Cupo: ' + j.usos_max + ' usos');
     $('cond').innerHTML = l.join('<br>');

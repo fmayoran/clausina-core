@@ -14,7 +14,7 @@
   :root{--f-tit:'Inter Tight',sans-serif;--f-txt:'Inter',sans-serif;
         --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-linea:#2a2a33;}
   *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  body{background:#4a4a4a;font-family:var(--f-txt);}
+  body{background:#4a4a4a;font-family:var(--f-txt);overflow-x:hidden;}
   .cara{width:105mm;height:148mm;background:var(--c-fondo);color:var(--c-tinta);
         display:flex;flex-direction:column;align-items:center;justify-content:center;
         text-align:center;padding:11mm 9mm;position:relative;overflow:hidden;
@@ -47,6 +47,7 @@
   .ctrl{position:sticky;top:0;z-index:5;background:#17171b;color:#eee;padding:12px 16px;
         display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:.86rem;
         font-family:'JetBrains Mono',monospace;}
+  .ctrl select{max-width:min(260px,42vw);}
   .ctrl button,.ctrl select{background:none;border:1px solid #444;color:#eee;border-radius:7px;
         padding:7px 13px;cursor:pointer;font-family:inherit;font-size:.82rem;}
   .ctrl button.p{background:#CCF24D;color:#111;border-color:#CCF24D;font-weight:700;}
@@ -69,7 +70,6 @@
 const $ = id => document.getElementById(id);
 const CODIGOS = decodeURIComponent(location.pathname.split('/').pop() || '')
   .split(',').map(s => s.trim()).filter(Boolean);
-const DIAS = { 1:'lunes', 2:'martes', 3:'miércoles', 4:'jueves', 5:'viernes', 6:'sábados', 7:'domingos' };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
   ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 const fecha = iso => String(iso || '').slice(0, 10).split('-').reverse().join('/');
@@ -85,10 +85,7 @@ function marca(m) {
 }
 
 function condiciones(j) {
-  const c = j.condiciones || {}, l = [];
-  if ((c.dias || []).length && c.dias.length < 7) l.push('Válida ' + c.dias.map(d => DIAS[d]).join(', '));
-  if ((c.franjas || []).length === 1) l.push('Sólo al ' + c.franjas[0].toLowerCase());
-  if (c.cantidad_max) l.push('Hasta ' + c.cantidad_max + ' personas');
+  const l = [...((j.condiciones || {}).frases || [])];
   if (j.vence_en) l.push('Vence el ' + fecha(j.vence_en));
   return l.join('<br>');
 }

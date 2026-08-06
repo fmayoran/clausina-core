@@ -356,11 +356,7 @@ async function validarCodigo() {
     msg.className = 'codmsg si';
     // Se dice lo que da y, si tiene condiciones, cuáles: enterarse al reservar de que no aplica
     // ese día es el mismo problema corrido de lugar.
-    const c = j.condiciones || {};
-    const partes = [];
-    if ((c.dias || []).length) partes.push('sólo ' + c.dias.map(d => DIAS_CORTOS[d]).join(', '));
-    if ((c.franjas || []).length === 1) partes.push('sólo al ' + c.franjas[0].toLowerCase());
-    if (c.cantidad_max) partes.push('hasta ' + c.cantidad_max);
+    const partes = ((j.condiciones || {}).frases || []).map(f => f.replace(/^Válida /, ''));
     msg.textContent = '✓ ' + j.texto + (partes.length ? ' — ' + partes.join(' · ') : '') +
       (j.vence_en ? ' · vence el ' + String(j.vence_en).slice(0, 10).split('-').reverse().join('/') : '');
     // Se deja siempre una salida: alguien puede querer reservar otro día y pagar completo.
@@ -377,7 +373,6 @@ function quitarCodigo() {
   $('invit').classList.remove('aplicada');
   FECHA = null; TURNO = null; pintarDias();
 }
-const DIAS_CORTOS = { 1:'lunes', 2:'martes', 3:'miércoles', 4:'jueves', 5:'viernes', 6:'sábados', 7:'domingos' };
 
 async function cargar() {
   try {

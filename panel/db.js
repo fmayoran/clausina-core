@@ -1537,7 +1537,31 @@ async function condicionesLegibles(negocioId, cond) {
   const dias = ((c.dias || []).length ? c.dias.filter(x => corren.has(x)) : [...corren]).sort();
 
   return { dias, franjas, turno_ids: admitidos.map(t => t.id),
-           cantidad_min: c.cantidad_min || null, cantidad_max: c.cantidad_max || null };
+           cantidad_min: c.cantidad_min || null, cantidad_max: c.cantidad_max || null,
+           // Las frases se arman acá y no en cada pantalla: la tarjeta impresa, la página y el
+           // bot tienen que decir lo mismo, y "sólo al noche" escrito tres veces se corrige una.
+           frases: frasesCondicion(dias, franjas, c) };
+}
+
+const DIA_NOMBRE = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados', 'domingos'];
+// "al mediodía" pero "a la noche": la preposición cambia con el género y no hay forma de
+// escribirla una sola vez para las dos.
+const FRANJA_FRASE = { 'Mediodía': 'al mediodía', 'Noche': 'a la noche' };
+
+function frasesCondicion(dias, franjas, c) {
+  const f = [];
+  if (dias.length && dias.length < 7) {
+    // Días corridos se dicen "de lunes a viernes"; sueltos, enumerados. Una tarjeta impresa con
+    // "lunes, martes, miércoles, jueves, viernes" se lee peor y ocupa dos renglones.
+    const corrido = dias.every((d, i) => i === 0 || d === dias[i - 1] + 1);
+    f.push('Válida ' + (corrido && dias.length > 2
+      ? `de ${DIA_NOMBRE[dias[0]]} a ${DIA_NOMBRE[dias[dias.length - 1]].replace(/s$/, '')}`
+      : dias.map(d => DIA_NOMBRE[d]).join(', ')));
+  }
+  if (franjas.length === 1) f.push('Sólo ' + FRANJA_FRASE[franjas[0]]);
+  if (c.cantidad_min) f.push('Desde ' + c.cantidad_min + ' personas');
+  if (c.cantidad_max) f.push('Hasta ' + c.cantidad_max + ' personas');
+  return f;
 }
 
 /** Las condiciones del beneficio contra la reserva concreta. Devuelve el motivo, o null si entra. */
