@@ -81,6 +81,11 @@
            font-size:.58rem;color:var(--u-mut);align-items:center;}
   .leyenda span{display:inline-flex;align-items:center;gap:5px;}
   .leyenda b{width:16px;height:5px;border-radius:3px;display:inline-block;}
+  /* Las muestras de estado son la ficha real en chico: si la leyenda dibujara otra cosa,
+     habría que traducir mentalmente entre la leyenda y el calendario. */
+  .leyenda .leg{font-size:.58rem;padding:2px 8px;cursor:default;gap:5px;color:var(--u-mut);}
+  .leyenda .leg:hover{border-color:inherit;}
+  .leyenda .sep{width:1px;height:12px;background:var(--u-line);margin:0 2px;}
   .detalle{margin-top:18px;}
   /* ── Detalle del día ── */
   .navsem{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
@@ -119,7 +124,12 @@
   .rchip:hover{border-color:var(--u-acc);}
   .rchip .cant{font-family:'JetBrains Mono',monospace;font-size:.64rem;color:var(--u-mut);}
   .rchip .pto{width:6px;height:6px;border-radius:50%;flex:0 0 auto;}
+  /* Pendiente con borde punteado y confirmada con borde lleno: un punto de 6 px es fácil de no
+     ver, y si además es la única señal, quien no distingue rojo de verde no tiene ninguna.
+     Punteado = todavía no cerrado se entiende sin color y hasta impreso en blanco y negro. */
+  .rchip.s-solicitada{border-style:dashed;border-color:var(--u-mal);}
   .rchip.s-solicitada .pto{background:var(--u-mal);}
+  .rchip.s-confirmada{border-color:var(--u-ok);}
   .rchip.s-confirmada .pto{background:var(--u-ok);}
   .rchip.s-cumplida .pto{background:var(--u-mut);}
   .rchip.s-cancelada{opacity:.5;text-decoration:line-through;}
@@ -267,11 +277,17 @@
       <div id="grilla">
         <div class="dow-fila mes" id="dows"></div>
         <div class="mes" id="mes"></div>
-        <div class="leyenda">
-          <span><b style="background:var(--u-ok)"></b> disponible</span>
-          <span><b style="background:var(--u-mal)"></b> ocupado</span>
-          <span><b class="mini off" style="height:5px"></b> bloqueado o pasado</span>
-        </div>
+      </div>
+      <!-- Fuera de #grilla a propósito: #grilla sólo se muestra en la vista mensual, y las barras
+           de ocupación y las fichas de reserva están en las tres. Adentro, la leyenda desaparecía
+           justo en las vistas donde más se miran las reservas. -->
+      <div class="leyenda">
+        <span><b style="background:var(--u-ok)"></b> disponible</span>
+        <span><b style="background:var(--u-mal)"></b> ocupado</span>
+        <span><b class="mini off" style="height:5px"></b> bloqueado o pasado</span>
+        <span class="sep"></span>
+        <span class="rchip s-confirmada leg"><span class="pto"></span>confirmada</span>
+        <span class="rchip s-solicitada leg"><span class="pto"></span>pendiente</span>
       </div>
       <div class="detalle" id="detalle"></div>
     </div>
