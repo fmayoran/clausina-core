@@ -36,7 +36,11 @@ const SALIR = /^(cancelar|salir|basta|no|nada|chau|gracias)$/i;
 // SALIR pide la palabra sola y exacta. Alguien que escribe "cancela la reserva" no entra ahí, y
 // en el paso del nombre CUALQUIER texto se toma como nombre: pasó de verdad, y quedó una reserva
 // creada a partir de un pedido de cancelarla. Esto atrapa la frase, no sólo la palabra.
-const CANCELAR = /\b(cancel|anul|olvid[aá])/i;
+// Anclada al principio: "cancela la reserva" corta, pero "Ana Cancela" —que es un apellido real—
+// sigue siendo un nombre. De los dos errores posibles este es el lado correcto para equivocarse:
+// rechazar un nombre se arregla escribiéndolo de nuevo, tomar una cancelación como nombre deja
+// una reserva que nadie pidió.
+const CANCELAR = /^\s*(cancel|anul|olvid[aá])/i;
 
 /** Mensajes cortos: en WhatsApp un párrafo largo no se lee. */
 async function decir(cfg, waId, texto, negocioId) {
