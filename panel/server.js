@@ -116,6 +116,11 @@ app.post('/webhook/whatsapp', express.raw({ type: '*/*', limit: '2mb' }), async 
       // registra y no se responde; interpretar lo que pide es un paso posterior.
       const negocio = m.phone_number_id ? await db.negocioPorPhoneId(m.phone_number_id) : null;
       if (negocio) {
+        // La hora de RECEPCIÓN, tomada antes de contestar. El mensaje entrante se guarda después
+        // de que el asistente respondió —hace falta saber si lo atendió para el estado— y sin
+        // esto quedaba registrado DESPUÉS de su propia respuesta: el inbox mostraba la conversación
+        // al revés, con cada contestación arriba de la pregunta que la provocó.
+        const recibido = new Date();
         // Del otro lado hay un CLIENTE FINAL, no un operador. Si el negocio tiene las reservas
         // abiertas, el asistente lo atiende; si no, se registra y no se contesta — mejor callar
         // que ofrecer algo que después no se puede cumplir.
@@ -125,7 +130,7 @@ app.post('/webhook/whatsapp', express.raw({ type: '*/*', limit: '2mb' }), async 
         await db.logWhatsapp({
           direccion: 'entrante', wa_id: m.wa_id, usuario_id: null, negocio_id: negocio.id,
           mensaje_id: m.mensaje_id, tipo: m.tipo, texto: m.texto, crudo: m.crudo,
-          media_id: m.media_id,
+          media_id: m.media_id, creado_en: recibido,
           estado: atendido ? 'atendido_bot' : 'cliente_de_negocio',
         });
         // Nota de voz: la transcripción llega después, del worker del host. Se la espera SIN

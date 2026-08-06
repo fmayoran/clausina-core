@@ -88,16 +88,16 @@ async function completarPerfil(id, { nombre, whatsapp, cargo }) {
 }
 
 /** Registra un mensaje de WhatsApp. Best-effort: la bitácora nunca puede tumbar el webhook. */
-async function logWhatsapp({ direccion, wa_id, usuario_id, mensaje_id, tipo, texto, crudo, estado, negocio_id, media_id }) {
+async function logWhatsapp({ direccion, wa_id, usuario_id, mensaje_id, tipo, texto, crudo, estado, negocio_id, media_id, creado_en }) {
   try {
     await pool.query(
       `INSERT INTO contenido.whatsapp_mensaje
-         (direccion, wa_id, usuario_id, mensaje_id, tipo, texto, crudo, estado, negocio_id, media_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         (direccion, wa_id, usuario_id, mensaje_id, tipo, texto, crudo, estado, negocio_id, media_id, creado_en)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,COALESCE($11::timestamptz, now()))
        ON CONFLICT DO NOTHING`,
       [direccion, wa_id || null, usuario_id || null, mensaje_id || null,
        tipo || null, texto || null, crudo ? JSON.stringify(crudo) : null, estado || null,
-       negocio_id || null, media_id || null]);
+       negocio_id || null, media_id || null, creado_en || null]);
     return true;
   } catch (e) { console.error('log whatsapp', e.message); return false; }
 }

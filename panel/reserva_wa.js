@@ -33,6 +33,10 @@ const dia = iso => { const d = new Date(iso + 'T12:00:00'); return `${DOW[d.getD
 const plural = (u, n) => (UNI[u] || UNI.personas)[n === 1 ? 0 : 1];
 const cuantos = u => ((UNI[u] || UNI.personas)[2] === 'm' ? 'cuántos' : 'cuántas');
 const SALIR = /^(cancelar|salir|basta|no|nada|chau|gracias)$/i;
+// SALIR pide la palabra sola y exacta. Alguien que escribe "cancela la reserva" no entra ahí, y
+// en el paso del nombre CUALQUIER texto se toma como nombre: pasó de verdad, y quedó una reserva
+// creada a partir de un pedido de cancelarla. Esto atrapa la frase, no sólo la palabra.
+const CANCELAR = /\b(cancel|anul|olvid[aá])/i;
 
 /** Mensajes cortos: en WhatsApp un párrafo largo no se lee. */
 async function decir(cfg, waId, texto, negocioId) {
@@ -93,10 +97,21 @@ async function atender(negocio, mensaje) {
   const conv = await db.getConversacion(negocio.id, waId);
 
   // Salida en cualquier momento. Que se pueda cortar es parte de que no sea molesto.
-  if (SALIR.test(entrada)) {
+  if (SALIR.test(entrada) || CANCELAR.test(entrada)) {
     await db.borrarConversacion(negocio.id, waId);
-    if (conv) await decir(cfg, waId, 'Listo, no reservé nada. Si querés, escribime cuando quieras.', negocio.id);
-    return !!conv;
+    if (conv) {
+      await decir(cfg, waId, 'Listo, no reservé nada. Si querés, escribime cuando quieras.', negocio.id);
+      return true;
+    }
+    // Sin conversación abierta, "cancelá" habla de una reserva YA hecha. Cancelarla desde acá
+    // todavía no se sabe hacer, así que se dice y se deriva — mucho mejor que contestar con el
+    // menú de siempre, que se lee como si no hubiéramos entendido.
+    if (CANCELAR.test(entrada)) {
+      await decir(cfg, waId, 'Para cancelar o cambiar una reserva ya hecha te paso con el equipo. ' +
+        'Ya les avisé y te responden por acá.', negocio.id);
+      return true;
+    }
+    return false;
   }
 
   const paso = conv ? conv.paso : null;
@@ -433,7 +448,12 @@ async function seguirVoz(negocio, mensaje) {
   // Pidió un día concreto que no está en la agenda. Sin esto se le muestra una lista que empieza
   // semanas después y se lee como "no hay lugar", cuando puede ser que el local esté cerrado.
   if (!i.fecha && i.fecha_pedida) {
-    await decir(cfg, waId, `Para ${i.fecha_pedida} no tengo disponibilidad.`, negocio.id);
+    // Si el negocio cargó una respuesta que explica por qué no hay —está cerrado, reabre tal
+    // día—, se agrega. Decir sólo "no tengo disponibilidad" se lee como "está lleno", que es
+    // otra cosa y manda a la persona a buscar en otro lado.
+    const j = await faq.responder(`¿Están abiertos ${i.fecha_pedida}?`, canal.faq || []).catch(() => null);
+    const porque = j != null ? ' ' + canal.faq[j].r : '';
+    await decir(cfg, waId, `Para ${i.fecha_pedida} no tengo disponibilidad.` + porque, negocio.id);
   }
 
   // Lo entendido entra al MISMO flujo que los botones: `avanzar` decide qué falta y lo pregunta.
