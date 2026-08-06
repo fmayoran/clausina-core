@@ -1512,7 +1512,7 @@ async function piezasPublicadas(negocioId) {
     `SELECT pz.titulo_interno, pz.canal, m.url
        FROM contenido.piezas pz
        JOIN contenido.revisiones r ON r.id = pz.revision_vigente
-       JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1 AND m.tipo = 'imagen'
+       JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1 AND m.tipo = 'image'
       WHERE pz.negocio_id = $1 AND pz.estado = 'publicada'
       ORDER BY COALESCE(r.publicado_en, pz.actualizado_en) DESC LIMIT 40`, [negocioId]);
   return rows.map(r => ({ titulo: `${r.titulo_interno || 'sin título'} (${r.canal})`, url: r.url }));
