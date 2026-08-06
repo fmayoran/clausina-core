@@ -178,7 +178,7 @@ async function recibirConsulta(cfg, negocio, waId, texto, canal) {
 
 // Los días que se ofrecen salen de la MISMA disponibilidad que la página pública: ya viene
 // filtrada por anticipación, bloqueos y lugar libre.
-async function elegirDia(cfg, negocio, waId, entrada) {
+async function elegirDia(cfg, negocio, waId, entrada, datos = {}) {
   if (entrada === 'no') {
     await db.borrarConversacion(negocio.id, waId);
     await decir(cfg, waId, 'Dale, cuando quieras. Acá estoy.', negocio.id);
@@ -193,7 +193,9 @@ async function elegirDia(cfg, negocio, waId, entrada) {
     await decir(cfg, waId, 'Por ahora no tengo días disponibles. Probá más adelante.', negocio.id);
     return true;
   }
-  await db.setConversacion(negocio.id, waId, 'dia', {});
+  // Se conserva lo ya sabido: la fecha y el turno se descartan porque son justamente lo que se
+  // está por elegir, pero la cantidad y el nombre siguen valiendo.
+  await db.setConversacion(negocio.id, waId, 'dia', { cantidad: datos.cantidad, nombre: datos.nombre });
   await wa.enviarLista(waId, '¿Para qué día?', 'Ver días',
     fechas.map(f => ({ id: 'd:' + f, titulo: dia(f) })), cfg);
   return true;
@@ -224,13 +226,7 @@ async function topeDe(negocioId, fecha, turnoId) {
 async function pedirCantidad(cfg, negocio, waId, entrada, datos) {
   const turnoId = entrada.startsWith('t:') ? entrada.slice(2) : null;
   if (!turnoId) { await decir(cfg, waId, 'Elegí un turno de la lista, por favor.', negocio.id); return true; }
-  const cfgRes = await db.getConfigReservas(negocio.id);
-  await db.setConversacion(negocio.id, waId, 'cantidad', { ...datos, turno_id: turnoId });
-  // Decir el máximo ANTES evita el ida y vuelta de proponer un número que va a rebotar.
-  const tope = await topeDe(negocio.id, datos.fecha, turnoId);
-  await decir(cfg, waId, `¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}?` +
-    (tope ? ` Hasta ${tope}.` : '') + ' Respondeme con un número.', negocio.id);
-  return true;
+  return await avanzar(cfg, negocio, waId, { ...datos, turno_id: turnoId });
 }
 
 async function pedirNombre(cfg, negocio, waId, entrada, datos) {
@@ -240,18 +236,51 @@ async function pedirNombre(cfg, negocio, waId, entrada, datos) {
     await decir(cfg, waId, `Necesito un número. ¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}?`, negocio.id);
     return true;
   }
-  // Se rebota acá y con el número puesto, en vez de dejar que llegue hasta crearReserva y vuelva
-  // un error genérico después de haber pedido el nombre.
+  return await avanzar(cfg, negocio, waId, { ...datos, cantidad: n });
+}
+
+/**
+ * Decide cuál es la primera pregunta que falta y la hace. Es el único lugar que conoce el orden
+ * de los datos, así que da igual si vienen de un audio, de los botones o de una mezcla: lo que ya
+ * se sabe no se vuelve a preguntar.
+ */
+async function avanzar(cfg, negocio, waId, datos) {
+  if (!datos.fecha)    return await elegirDia(cfg, negocio, waId, '', datos);
+  if (!datos.turno_id) return await elegirTurno(cfg, negocio, waId, 'd:' + datos.fecha, datos);
+
+  const cfgRes = await db.getConfigReservas(negocio.id);
   const tope = await topeDe(negocio.id, datos.fecha, datos.turno_id);
-  if (tope && n > tope) {
-    await decir(cfg, waId, `Para ese turno puedo tomar hasta ${tope} ${plural(cfgRes.unidad, tope)} ` +
-      `en una reserva. ¿${cuantos(cfgRes.unidad).replace(/^./, c => c.toUpperCase())} entonces?`, negocio.id);
+
+  // Sin cantidad, o con una que no entra en este turno: se pregunta diciendo el máximo, así nadie
+  // propone un número que va a rebotar.
+  if (!datos.cantidad || (tope && datos.cantidad > tope)) {
+    const pasada = datos.cantidad && tope && datos.cantidad > tope ? datos.cantidad : null;
+    await db.setConversacion(negocio.id, waId, 'cantidad', { ...datos, cantidad: null });
+    await decir(cfg, waId, (pasada
+      ? `Para ese turno puedo tomar hasta ${tope} ${plural(cfgRes.unidad, tope)} en una reserva. `
+      : '') + `¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}?` +
+      (!pasada && tope ? ` Hasta ${tope}.` : '') + ' Respondeme con un número.', negocio.id);
     return true;
   }
-  await db.setConversacion(negocio.id, waId, 'nombre', { ...datos, cantidad: n });
+
   // Nombre Y apellido: es lo que queda en la base del negocio, y un nombre suelto no alcanza
   // para reconocer a alguien cuando llega.
-  await decir(cfg, waId, 'Por último, decime tu nombre y apellido, por favor.', negocio.id);
+  if (!datos.nombre) {
+    await db.setConversacion(negocio.id, waId, 'nombre', datos);
+    await decir(cfg, waId, 'Por último, decime tu nombre y apellido, por favor.', negocio.id);
+    return true;
+  }
+
+  // Están los cuatro datos: se muestra lo entendido y se pide un sí. Que el último paso siga
+  // siendo humano es la regla de la casa, y acá además protege de una transcripción torcida.
+  const t = (await db.disponibilidadPublica(negocio.id, datos.fecha, datos.fecha))
+    .find(o => o.turno_id === datos.turno_id);
+  const resumen = `${dia(datos.fecha)}${t ? `, ${t.nombre} ${t.hora_desde}` : ''}\n` +
+                  `${datos.cantidad} ${plural(cfgRes.unidad, datos.cantidad)}\nA nombre de ${datos.nombre}`;
+  await db.setConversacion(negocio.id, waId, 'confirmar_voz', datos);
+  const r = await wa.enviarBotones(waId, `Entendí esto:\n\n${resumen}\n\n¿Lo confirmo?`,
+    [{ id: 'ok_voz', titulo: 'Sí, confirmá' }, { id: 'cambiar_voz', titulo: 'Cambiar algo' }], cfg);
+  if (!r.ok) await decir(cfg, waId, `Entendí esto:\n\n${resumen}\n\nRespondeme "sí" para confirmarlo.`, negocio.id);
   return true;
 }
 
@@ -362,25 +391,11 @@ async function seguirVoz(negocio, mensaje) {
   if (!i) return void await elegirDia(cfg, negocio, waId, '');
   if (i.intencion !== 'reserva') return void await recibirConsulta(cfg, negocio, waId, texto, canal);
 
-  // Cada rama entra por el paso que ya existe, con una entrada armada — así la validación de
-  // disponibilidad, el rango de cantidad y el texto de las preguntas son exactamente los mismos
-  // que cuando el cliente escribe.
-  const d = { fecha: i.fecha, turno_id: i.turno_id };
-  if (!i.fecha)    return void await elegirDia(cfg, negocio, waId, '');
-  if (!i.turno_id) return void await elegirTurno(cfg, negocio, waId, 'd:' + i.fecha, {});
-  if (!i.cantidad) return void await pedirCantidad(cfg, negocio, waId, 't:' + i.turno_id, { fecha: i.fecha });
-  if (!i.nombre)   return void await pedirNombre(cfg, negocio, waId, String(i.cantidad), d);
-
-  // Están los cuatro datos: se muestra lo entendido y se pide un sí. Que el último paso siga
-  // siendo humano es la regla de la casa, y acá además protege de una transcripción torcida.
-  const t = opciones.find(o => o.turno_id === i.turno_id);
-  const resumen = `${dia(i.fecha)}${t ? `, ${t.nombre} ${t.hora_desde}` : ''}\n` +
-                  `${i.cantidad} ${plural(cfgRes.unidad, i.cantidad)}\nA nombre de ${i.nombre}`;
-  await db.setConversacion(negocio.id, waId, 'confirmar_voz',
-    { ...d, cantidad: i.cantidad, nombre: i.nombre });
-  const r = await wa.enviarBotones(waId, `Entendí esto:\n\n${resumen}\n\n¿Lo confirmo?`,
-    [{ id: 'ok_voz', titulo: 'Sí, confirmá' }, { id: 'cambiar_voz', titulo: 'Cambiar algo' }], cfg);
-  if (!r.ok) await decir(cfg, waId, `Entendí esto:\n\n${resumen}\n\nRespondeme "sí" para confirmarlo.`, negocio.id);
+  // Lo entendido entra al MISMO flujo que los botones: `avanzar` decide qué falta y lo pregunta.
+  // Si el día que pidió no está disponible se le ofrece la lista, pero la cantidad y el nombre que
+  // sí dijo se conservan — que un dato no sirva no es razón para tirar los otros.
+  await avanzar(cfg, negocio, waId,
+    { fecha: i.fecha, turno_id: i.turno_id, cantidad: i.cantidad, nombre: i.nombre });
 }
 
 const SI = /^(s[ií]|dale|ok|oka?y|confirm[oá]|listo|correcto|exacto|perfecto)\b/i;
