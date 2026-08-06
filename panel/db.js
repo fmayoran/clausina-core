@@ -1543,7 +1543,10 @@ async function condicionesLegibles(negocioId, cond) {
            frases: frasesCondicion(dias, franjas, c) };
 }
 
-const DIA_NOMBRE = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados', 'domingos'];
+// Dos listas y no una con .replace(/s$/): "viernes" es invariable y quitarle la s da "vierne".
+// Sólo sábado y domingo cambian de número, así que la regla no existe — hay que escribirlas.
+const DIA_PLURAL   = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábados', 'domingos'];
+const DIA_SINGULAR = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
 // "al mediodía" pero "a la noche": la preposición cambia con el género y no hay forma de
 // escribirla una sola vez para las dos.
 const FRANJA_FRASE = { 'Mediodía': 'al mediodía', 'Noche': 'a la noche' };
@@ -1555,8 +1558,8 @@ function frasesCondicion(dias, franjas, c) {
     // "lunes, martes, miércoles, jueves, viernes" se lee peor y ocupa dos renglones.
     const corrido = dias.every((d, i) => i === 0 || d === dias[i - 1] + 1);
     f.push('Válida ' + (corrido && dias.length > 2
-      ? `de ${DIA_NOMBRE[dias[0]]} a ${DIA_NOMBRE[dias[dias.length - 1]].replace(/s$/, '')}`
-      : dias.map(d => DIA_NOMBRE[d]).join(', ')));
+      ? `de ${DIA_SINGULAR[dias[0]]} a ${DIA_SINGULAR[dias[dias.length - 1]]}`
+      : dias.map(d => DIA_PLURAL[d]).join(', ')));
   }
   if (franjas.length === 1) f.push('Sólo ' + FRANJA_FRASE[franjas[0]]);
   if (c.cantidad_min) f.push('Desde ' + c.cantidad_min + ' personas');
