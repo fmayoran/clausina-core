@@ -112,8 +112,8 @@
       <div class="rounded-2xl border border-pline dark:border-line p-5" style="border-left:3px solid var(--u-mal);">
         <div class="mono text-[11px] mb-2" style="color:var(--u-mal);">BORRAR TODA LA BASE</div>
         <p class="mono text-[11px] text-pmut dark:text-mut mb-3" style="max-width:70ch;line-height:1.6;">
-          Para cuando el negocio se va y pide que ClaUsina borre sus datos. No se puede deshacer:
-          exportá primero.
+          Para cuando el negocio se va y pide que ClaUsina borre sus datos. Borra también
+          <b>sus reservas</b>, porque cuelgan de los clientes. No se puede deshacer: exportá primero.
         </p>
         <button class="btn2 mal" onclick="borrarTodo()">Borrar todos los clientes de este negocio</button>
       </div>
@@ -239,13 +239,26 @@ async function guardar() {
   btn.disabled = false;
 }
 
-async function borrar(id) {
+async function borrar(id, conReservas) {
   const c = CLIENTES.find(x => x.id === id);
-  if (!confirm(`¿Borrar a ${(c && c.nombre) || 'este cliente'}? No se puede deshacer.`)) return;
+  const quien = (c && c.nombre) || 'este cliente';
+  if (!conReservas && !confirm(`¿Borrar a ${quien}? No se puede deshacer.`)) return;
   try {
-    const r = await fetch('api/clientes/' + id, { method: 'DELETE' });
-    if (r.ok) cargar();
-  } catch (e) {}
+    const r = await fetch('api/clientes/' + id + (conReservas ? '?con_reservas=1' : ''), { method: 'DELETE' });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.ok) { cargar(); return; }
+    // Tiene reservas: se dice cuántas y se pregunta de nuevo. Antes esto fallaba EN SILENCIO —
+    // la pantalla no hacía nada y no había forma de saber por qué.
+    if (j.error === 'con_reservas') {
+      const n = (j.detalle && j.detalle.reservas) || 0;
+      if (confirm(`${quien} tiene ${n} reserva(s).\n\n` +
+                  'Si lo borrás, se borran también esas reservas. ¿Seguimos?')) {
+        return borrar(id, true);
+      }
+      return;
+    }
+    alert(r.status === 404 ? 'Ese cliente ya no existe.' : 'No se pudo borrar el cliente.');
+  } catch (e) { alert('Error de conexión.'); }
 }
 
 // Borrado en bloque: pide escribir el slug del negocio, igual que lo exige el backend.
@@ -258,8 +271,11 @@ async function borrarTodo() {
     const r = await fetch('api/clientes/borrar-todo', { method: 'POST',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmar: t }) });
     const j = await r.json();
-    if (r.ok && j.ok) { alert(`Se borraron ${j.borrados} cliente(s).`); cargar(); }
-    else alert('No se pudo borrar.');
+    if (r.ok && j.ok) {
+      alert(`Se borraron ${j.borrados} cliente(s)` +
+            (j.reservas ? ` y ${j.reservas} reserva(s).` : '.'));
+      cargar();
+    } else alert('No se pudo borrar.');
   } catch (e) { alert('Error de conexión.'); }
 }
 

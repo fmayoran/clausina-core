@@ -842,10 +842,32 @@ async function actualizarCliente(negocioId, id, d) {
   }
 }
 
-async function borrarCliente(negocioId, id) {
-  const { rowCount } = await pool.query(
-    'DELETE FROM contenido.cliente WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
-  return { ok: rowCount > 0 };
+// El cliente tiene ON DELETE RESTRICT desde reserva: borrar a alguien no puede hacer desaparecer
+// en silencio una reserva agendada. Pero eso no significa que no se pueda borrar nunca — significa
+// que hay que decirlo y que quien borra decida.
+async function borrarCliente(negocioId, id, conReservas = false) {
+  const { rows: [c] } = await pool.query(
+    `SELECT count(*)::int AS n FROM contenido.reserva
+      WHERE cliente_id=$1 AND negocio_id=$2`, [id, negocioId]);
+  if (c.n && !conReservas) {
+    const e = new Error('tiene reservas'); e.code = 'con_reservas'; e.detalle = { reservas: c.n }; throw e;
+  }
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    let reservas = 0;
+    if (c.n) {
+      const r = await cli.query(
+        'DELETE FROM contenido.reserva WHERE cliente_id=$1 AND negocio_id=$2', [id, negocioId]);
+      reservas = r.rowCount;
+    }
+    const { rowCount } = await cli.query(
+      'DELETE FROM contenido.cliente WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
+    await cli.query('COMMIT');
+    return { ok: rowCount > 0, reservas };
+  } catch (e) {
+    await cli.query('ROLLBACK'); throw e;
+  } finally { cli.release(); }
 }
 
 // Exportar y borrar en bloque: son la contracara de "los datos son del negocio". Si un negocio
@@ -864,9 +886,19 @@ async function exportarClientes(negocioId) {
   return '﻿' + [cols.join(','), ...rows.map(r => cols.map(c => esc(r[c])).join(','))].join('\n');
 }
 
+// El negocio se va y pide que borremos sus datos. Las reservas cuelgan de los clientes, así que
+// sin borrarlas primero la clave foránea rechaza todo y la promesa no se puede cumplir.
 async function borrarTodosLosClientes(negocioId) {
-  const { rowCount } = await pool.query('DELETE FROM contenido.cliente WHERE negocio_id=$1', [negocioId]);
-  return { ok: true, borrados: rowCount };
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    const r = await cli.query('DELETE FROM contenido.reserva WHERE negocio_id=$1', [negocioId]);
+    const c = await cli.query('DELETE FROM contenido.cliente WHERE negocio_id=$1', [negocioId]);
+    await cli.query('COMMIT');
+    return { ok: true, borrados: c.rowCount, reservas: r.rowCount };
+  } catch (e) {
+    await cli.query('ROLLBACK'); throw e;
+  } finally { cli.release(); }
 }
 
 // --- Reservas (v2.0 / F4) ----------------------------------------------------------------

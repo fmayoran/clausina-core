@@ -1056,9 +1056,13 @@ app.put('/api/clientes/:id', async (req, res) => {
 });
 app.delete('/api/clientes/:id', async (req, res) => {
   try {
-    const r = await db.borrarCliente(req.negocioId, req.params.id);
+    const r = await db.borrarCliente(req.negocioId, req.params.id, req.query.con_reservas === '1');
     res.status(r.ok ? 200 : 404).json(r);
-  } catch (e) { console.error('borrar cliente', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+  } catch (e) {
+    // Tiene reservas: no es un error del sistema, es una decisión que le toca a quien borra.
+    if (e.code === 'con_reservas') return res.status(409).json({ ok: false, error: e.code, detalle: e.detalle });
+    console.error('borrar cliente', e.message); res.status(500).json({ ok: false, error: 'db' });
+  }
 });
 // Exportar: contracara de "los datos son del negocio". Cualquiera que vea el negocio puede
 // llevarse su base; no es una operación privilegiada, es un derecho del dueño del dato.
