@@ -1349,14 +1349,22 @@ function textoBeneficio(b, unidad = 'personas') {
 
 async function getBeneficios(negocioId) {
   const { rows } = await pool.query(
-    `SELECT b.*, (SELECT count(*)::int FROM contenido.invitacion i WHERE i.beneficio_id=b.id) AS invitaciones,
+    `SELECT b.*, pz.canal AS frente_canal, pz.numero AS frente_numero, pz.titulo_interno AS frente_titulo,
+            (SELECT count(*)::int FROM contenido.invitacion i WHERE i.beneficio_id=b.id) AS invitaciones,
             (SELECT count(*)::int FROM contenido.invitacion_uso u
                WHERE u.invitacion_id IN (SELECT id FROM contenido.invitacion WHERE beneficio_id=b.id)
                  AND u.estado='consumida') AS consumidas
-       FROM contenido.beneficio b WHERE b.negocio_id=$1 ORDER BY b.activo DESC, b.creado_en DESC`,
+       FROM contenido.beneficio b
+       LEFT JOIN contenido.piezas pz ON pz.id = b.frente_pieza_id
+      WHERE b.negocio_id=$1 ORDER BY b.activo DESC, b.creado_en DESC`,
     [negocioId]);
-  return rows;
+  return rows.map(r => ({ ...r, frente: r.frente_numero ? codigoPieza(r.frente_canal, r.frente_numero) : null }));
 }
+
+/** Cómo el negocio llama a una pieza en su panel: G-0006, IG-0244. */
+const PREFIJO_PIEZA = { grafica: 'G', instagram: 'IG', aviso: 'A', web: 'W' };
+const codigoPieza = (canal, numero) =>
+  `${PREFIJO_PIEZA[canal] || String(canal || '?').slice(0, 1).toUpperCase()}-${String(numero).padStart(4, '0')}`;
 
 async function guardarBeneficio(negocioId, id, d) {
   const nombre = String(d.nombre || '').trim().slice(0, 120);
@@ -1374,19 +1382,20 @@ async function guardarBeneficio(negocioId, id, d) {
     cantidad_max: Number(d.cantidad_max) > 0 ? Math.round(Number(d.cantidad_max)) : null,
   };
   const noShow = ['liberar', 'quemar'].includes(d.no_show) ? d.no_show : 'liberar';
+  const frente = /^[0-9a-f-]{36}$/i.test(String(d.frente_pieza_id || '')) ? d.frente_pieza_id : null;
   const campos = [negocioId, nombre, d.tipo, valor, JSON.stringify(cond), noShow,
-                  String(d.notas || '').trim().slice(0, 600) || null, d.activo !== false];
+                  String(d.notas || '').trim().slice(0, 600) || null, d.activo !== false, frente];
   if (id) {
     const { rows: [r] } = await pool.query(
       `UPDATE contenido.beneficio SET nombre=$2, tipo=$3, valor=$4, condiciones=$5::jsonb,
-              no_show=$6, notas=$7, activo=$8, actualizado_en=now()
-        WHERE id=$9 AND negocio_id=$1 RETURNING *`, [...campos, id]);
+              no_show=$6, notas=$7, activo=$8, frente_pieza_id=$9, actualizado_en=now()
+        WHERE id=$10 AND negocio_id=$1 RETURNING *`, [...campos, id]);
     if (!r) { const e = new Error('no existe'); e.code = 'no_encontrado'; throw e; }
     return r;
   }
   const { rows: [r] } = await pool.query(
-    `INSERT INTO contenido.beneficio (negocio_id, nombre, tipo, valor, condiciones, no_show, notas, activo)
-     VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8) RETURNING *`, campos);
+    `INSERT INTO contenido.beneficio (negocio_id, nombre, tipo, valor, condiciones, no_show, notas, activo, frente_pieza_id)
+     VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9) RETURNING *`, campos);
   return r;
 }
 
@@ -1481,10 +1490,14 @@ async function consultarInvitacion(codigo, negocioId = null) {
   if (!inv.formaValida(c)) return { ok: false, motivo: 'forma', mensaje: MOTIVOS.forma };
   const { rows: [i] } = await pool.query(
     `SELECT i.*, b.nombre AS beneficio, b.tipo, b.valor, b.condiciones, b.activo AS beneficio_activo,
-            n.slug AS negocio_slug, n.nombre AS negocio_nombre
+            n.slug AS negocio_slug, n.nombre AS negocio_nombre,
+            -- El frente impreso lo define el beneficio: toda la campaña sale con el mismo.
+            m.url AS frente_url, pz.canal AS frente_canal, pz.numero AS frente_numero
        FROM contenido.invitacion i
        JOIN contenido.beneficio b ON b.id=i.beneficio_id
        JOIN contenido.negocios n ON n.id=i.negocio_id
+       LEFT JOIN contenido.piezas pz ON pz.id = b.frente_pieza_id
+       LEFT JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1
       WHERE i.codigo=$1`, [c]);
   if (!i) return { ok: false, motivo: 'no_existe', mensaje: MOTIVOS.no_existe };
   if (negocioId && i.negocio_id !== negocioId) return { ok: false, motivo: 'no_existe', mensaje: MOTIVOS.no_existe };
@@ -1514,7 +1527,7 @@ async function consultarInvitacion(codigo, negocioId = null) {
  */
 async function piezasPublicadas(negocioId) {
   const { rows } = await pool.query(
-    `SELECT pz.titulo_interno, pz.canal, pz.numero, m.url
+    `SELECT pz.id, pz.titulo_interno, pz.canal, pz.numero, m.url
        FROM contenido.piezas pz
        JOIN contenido.revisiones r ON r.id = pz.revision_vigente
        JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1 AND m.tipo = 'image'
@@ -1522,9 +1535,8 @@ async function piezasPublicadas(negocioId) {
       ORDER BY COALESCE(r.publicado_en, pz.actualizado_en) DESC LIMIT 40`, [negocioId]);
   // El código es como el negocio nombra la pieza en el panel (G-0006). Sin él hay que buscar
   // por el título, que casi nunca se recuerda de memoria.
-  const PREFIJO = { grafica: 'G', instagram: 'IG', aviso: 'A', web: 'W' };
   return rows.map(r => ({
-    codigo: `${PREFIJO[r.canal] || r.canal.slice(0, 1).toUpperCase()}-${String(r.numero).padStart(4, '0')}`,
+    id: r.id, codigo: codigoPieza(r.canal, r.numero),
     titulo: r.titulo_interno || 'sin título', canal: r.canal, url: r.url,
   }));
 }
@@ -3264,7 +3276,7 @@ module.exports = {
   completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, clientePorTelefono,
   TIPOS_BENEFICIO, textoBeneficio, getBeneficios, guardarBeneficio,
   emitirInvitaciones, getInvitaciones, anularInvitacion, consultarInvitacion,
-  cerrarUso, liberarPorReserva, invitacionDeReserva, condicionesLegibles, piezasPublicadas,
+  cerrarUso, liberarPorReserva, invitacionDeReserva, condicionesLegibles, piezasPublicadas, codigoPieza,
   invitacionesActivas, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,

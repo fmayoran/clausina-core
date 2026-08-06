@@ -160,7 +160,12 @@ function pintar() {
     const p = await fetch('/api/publico/' + encodeURIComponent(PASES[0].negocio_slug) + '/piezas')
       .then(r => r.json());
     PIEZAS = p.piezas || [];
-    $('sel-frente').innerHTML = '<option value="">logo del negocio</option>' +
+    // La primera opción dice qué pasa si no se elige nada: la pieza que el beneficio indicó,
+    // o el logo si no indicó ninguna. Un "logo del negocio" cuando en realidad va a salir G-0006
+    // haría desconfiar de lo que se está por mandar a imprimir.
+    const propio = PASES.find(j => j.frente_codigo);
+    $('sel-frente').innerHTML =
+      `<option value="">${propio ? 'la del beneficio (' + esc(propio.frente_codigo) + ')' : 'logo del negocio'}</option>` +
       PIEZAS.map(x => `<option value="${esc(x.url)}">${esc(x.codigo)} · ${esc(x.titulo)}</option>`).join('');
   } catch (e) {}
   pintar();

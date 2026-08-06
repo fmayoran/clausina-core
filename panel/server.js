@@ -283,6 +283,9 @@ app.get('/api/publico/pase/:codigo', async (req, res) => {
       // Para el pie: dónde queda, dónde encontrarlos. Sin esto, una invitación reenviada a
       // alguien que no conoce el lugar no le dice ni la dirección.
       web: n ? n.web : null, instagram: n ? n.instagram : null, sede: n ? n.sede : null,
+      // El frente que el negocio indicó para esta campaña. El pliego lo usa por defecto.
+      frente: i.frente_url || null,
+      frente_codigo: i.frente_numero ? db.codigoPieza(i.frente_canal, i.frente_numero) : null,
     });
   } catch (e) { console.error('pase', e.message); res.status(500).json({ ok: false }); }
 });
@@ -1023,6 +1026,11 @@ const guardarBen = async (req, res) => {
 };
 app.post('/api/invitaciones/beneficios', guardarBen);
 app.put('/api/invitaciones/beneficios/:id', guardarBen);
+
+app.get('/api/invitaciones/piezas', async (req, res) => {
+  try { res.json({ piezas: await db.piezasPublicadas(req.negocioId) }); }
+  catch (e) { console.error('piezas', e.message); res.status(500).json({ error: 'db' }); }
+});
 
 app.get('/api/invitaciones', async (req, res) => {
   try {
