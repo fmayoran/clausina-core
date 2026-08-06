@@ -1252,20 +1252,29 @@ async function guardarWhatsappNegocio(negocioId, d) {
   return { ok: true, ...(await getWhatsappNegocio(negocioId)) };
 }
 
-// Los secretos de app de los negocios que tienen WhatsApp propio. El webhook los necesita para
-// validar la firma: cada app firma con el suyo, y el del panel sólo sirve para el de ClaUsina.
-// Se cachean un minuto — llega un webhook por mensaje y no vale descifrar en cada uno.
-let _secretos = null, _secretosAt = 0;
-async function secretosWhatsapp() {
-  if (_secretos && Date.now() - _secretosAt < 60000) return _secretos;
-  const { rows } = await pool.query(
-    `SELECT wa_app_secret_enc FROM contenido.negocio_perfil WHERE wa_app_secret_enc IS NOT NULL`);
-  const out = [];
-  for (const r of rows) {
-    try { out.push(cryptoAds.decrypt(r.wa_app_secret_enc)); } catch (e) { /* uno roto no rompe el resto */ }
+// El secreto de la app DEL NÚMERO al que le escribieron, para validar la firma de ese webhook.
+//
+// Se busca por número y no se prueban todos los secretos conocidos: probar todos significa que,
+// si se filtra el secreto de un negocio, con él se puede forjar un webhook que diga ser de OTRO.
+// El `phoneId` viene del cuerpo sin validar, pero usarlo sólo para ELEGIR con qué llave verificar
+// es seguro — quien miente sobre el número sigue sin poder firmar como su dueño.
+//
+// Se cachea un minuto: llega un webhook por mensaje y no vale descifrar en cada uno.
+let _secretos = new Map(), _secretosAt = 0;
+async function secretoDeNumero(phoneId) {
+  if (!phoneId) return null;
+  if (Date.now() - _secretosAt > 60000) {
+    const { rows } = await pool.query(
+      `SELECT wa_phone_id, wa_app_secret_enc FROM contenido.negocio_perfil
+        WHERE wa_app_secret_enc IS NOT NULL AND wa_phone_id IS NOT NULL`);
+    const m = new Map();
+    for (const r of rows) {
+      try { m.set(r.wa_phone_id, cryptoAds.decrypt(r.wa_app_secret_enc)); }
+      catch (e) { /* uno roto no deja sin validar a los demás */ }
+    }
+    _secretos = m; _secretosAt = Date.now();
   }
-  _secretos = out; _secretosAt = Date.now();
-  return out;
+  return _secretos.get(String(phoneId)) || null;
 }
 
 // Qué negocio es dueño de un número, para saber a quién le llegó el mensaje.
@@ -2545,7 +2554,7 @@ module.exports = {
   crearLink, getLinks, setLinkActivo, getPiezasParaAccion,
   destinatariosAviso, datosParaAviso,
   getWhatsappNegocio, guardarWhatsappNegocio, verificarWhatsappNegocio, PLANTILLAS_RESERVA,
-  secretosWhatsapp, negocioPorPhoneId,
+  secretoDeNumero, negocioPorPhoneId,
   negocioPublico, disponibilidadPublica, registrarApertura, marcarCompletado, linkDeApertura,
   ofertaLanding, guardarQueExponeLanding,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,

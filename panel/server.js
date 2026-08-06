@@ -83,16 +83,22 @@ app.get('/webhook/whatsapp', (req, res) => {
 
 app.post('/webhook/whatsapp', express.raw({ type: '*/*', limit: '2mb' }), async (req, res) => {
   const crudo = Buffer.isBuffer(req.body) ? req.body : Buffer.from('');
-  // Cada app firma con su secreto: el del panel para el número de ClaUsina, y el de cada negocio
-  // para el suyo. Se prueban todos antes de rechazar.
-  let secretos = [];
-  try { secretos = await db.secretosWhatsapp(); } catch (e) { console.error('secretos wa', e.message); }
-  if (!wa.firmaValida(crudo, req.headers['x-hub-signature-256'], secretos)) return res.sendStatus(403);
+
+  // Se parsea ANTES de validar, pero sólo para saber a qué número le escribieron y con eso elegir
+  // con qué secreto verificar. No se confía en nada del cuerpo hasta que la firma da: quien miente
+  // sobre el número sigue sin poder firmar como su dueño.
+  let cuerpo;
+  try { cuerpo = JSON.parse(crudo.toString('utf8') || '{}'); } catch { return res.sendStatus(400); }
+  const destino = (((cuerpo.entry || [])[0] || {}).changes || [])
+    .map(c => ((c.value || {}).metadata || {}).phone_number_id).find(Boolean) || null;
+
+  let secreto = null;
+  try { secreto = await db.secretoDeNumero(destino); } catch (e) { console.error('secreto wa', e.message); }
+  if (!wa.firmaValida(crudo, req.headers['x-hub-signature-256'], secreto ? [secreto] : [])) {
+    return res.sendStatus(403);
+  }
   // Contestamos YA: si tardamos, Meta reintenta y el mismo mensaje llega varias veces.
   res.sendStatus(200);
-
-  let cuerpo;
-  try { cuerpo = JSON.parse(crudo.toString('utf8') || '{}'); } catch { return; }
 
   for (const m of wa.leerMensajes(cuerpo)) {
     try {
