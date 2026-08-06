@@ -62,9 +62,12 @@ function leerMensajes(cuerpo) {
           texto: (m.text && m.text.body)
             || (m.button && m.button.text)
             || (m.interactive && m.interactive.button_reply && m.interactive.button_reply.title)
+            || (m.interactive && m.interactive.list_reply && m.interactive.list_reply.title)
             || '',
-          // Los botones traen un id propio: es lo que usamos para saber QUÉ acción pidió.
+          // Los botones y las listas traen un id propio: es lo que usamos para saber QUÉ eligió,
+          // sin depender de cómo esté escrito el rótulo.
           accion: (m.interactive && m.interactive.button_reply && m.interactive.button_reply.id)
+            || (m.interactive && m.interactive.list_reply && m.interactive.list_reply.id)
             || (m.button && m.button.payload) || '',
           crudo: m,
         });
@@ -74,12 +77,17 @@ function leerMensajes(cuerpo) {
   return out;
 }
 
-async function enviarTexto(a, texto) {
-  if (!configurado()) return { ok: false, motivo: 'sin_configurar' };
+// `cfg` manda desde el número DEL NEGOCIO. Sin cfg sale por el de ClaUsina, que es el canal con
+// el operador. Escribirle a un cliente final desde el número equivocado es el error que hay que
+// evitar: recibe un mensaje de una empresa que no conoce y lo reporta.
+async function enviarTexto(a, texto, cfg = null) {
+  const phone = (cfg && cfg.phone_id) || PHONE_ID;
+  const token = (cfg && cfg.token) || TOKEN;
+  if (!phone || !token) return { ok: false, motivo: 'sin_configurar' };
   try {
-    const r = await fetch(`${API}/${PHONE_ID}/messages`, {
+    const r = await fetch(`${API}/${phone}/messages`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messaging_product: 'whatsapp',
         to: String(a).replace(/\D+/g, ''),
@@ -132,4 +140,56 @@ async function enviarPlantilla(a, nombre, params, idioma = 'es_AR', cfg = null) 
   }
 }
 
-module.exports = { configurado, firmaValida, leerMensajes, enviarTexto, enviarPlantilla, VERIFY };
+// Mensajes interactivos. Sólo se pueden mandar DENTRO de la ventana de 24 h —o sea, cuando el
+// cliente escribió primero—, que es exactamente el caso de una reserva por WhatsApp.
+// Límites de Meta que hay que respetar o la API rechaza el mensaje entero:
+//   · botones: hasta 3, y el título de cada uno hasta 20 caracteres;
+//   · listas: hasta 10 filas, título de fila hasta 24 caracteres.
+async function _enviarInteractivo(a, interactive, cfg) {
+  const phone = (cfg && cfg.phone_id) || PHONE_ID;
+  const token = (cfg && cfg.token) || TOKEN;
+  if (!phone || !token) return { ok: false, motivo: 'sin_configurar' };
+  try {
+    const r = await fetch(`${API}/${phone}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: String(a).replace(/\D+/g, ''),
+        type: 'interactive',
+        interactive,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, motivo: (d.error && d.error.message) || `HTTP ${r.status}` };
+    return { ok: true, id: d.messages && d.messages[0] && d.messages[0].id };
+  } catch (e) { return { ok: false, motivo: e.message }; }
+}
+
+const _corte = (s, n) => String(s == null ? '' : s).slice(0, n);
+
+async function enviarBotones(a, texto, botones, cfg = null) {
+  return _enviarInteractivo(a, {
+    type: 'button',
+    body: { text: _corte(texto, 1024) },
+    action: { buttons: botones.slice(0, 3).map(b => ({
+      type: 'reply', reply: { id: _corte(b.id, 256), title: _corte(b.titulo, 20) } })) },
+  }, cfg);
+}
+
+async function enviarLista(a, texto, rotuloBoton, filas, cfg = null) {
+  return _enviarInteractivo(a, {
+    type: 'list',
+    body: { text: _corte(texto, 1024) },
+    action: {
+      button: _corte(rotuloBoton, 20),
+      sections: [{ rows: filas.slice(0, 10).map(f => ({
+        id: _corte(f.id, 200), title: _corte(f.titulo, 24),
+        ...(f.detalle ? { description: _corte(f.detalle, 72) } : {}) })) }],
+    },
+  }, cfg);
+}
+
+module.exports = { configurado, firmaValida, leerMensajes, enviarTexto, enviarPlantilla,
+                   enviarBotones, enviarLista, VERIFY };

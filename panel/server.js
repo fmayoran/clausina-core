@@ -71,6 +71,7 @@ app.disable('x-powered-by');
 // La firma de Meta se calcula sobre el cuerpo CRUDO: si express.json lo parsea primero, ya no
 // hay forma de reconstruir los bytes exactos y la validación queda inservible.
 const wa = require('./whatsapp');
+const reservaWa = require('./reserva_wa');   // asistente de reservas por WhatsApp (v2.0/F5e)
 
 // Meta valida la URL con un GET antes de aceptarla. Sin esto no se puede completar el alta.
 app.get('/webhook/whatsapp', (req, res) => {
@@ -114,12 +115,18 @@ app.post('/webhook/whatsapp', express.raw({ type: '*/*', limit: '2mb' }), async 
       // registra y no se responde; interpretar lo que pide es un paso posterior.
       const negocio = m.phone_number_id ? await db.negocioPorPhoneId(m.phone_number_id) : null;
       if (negocio) {
+        // Del otro lado hay un CLIENTE FINAL, no un operador. Si el negocio tiene las reservas
+        // abiertas, el asistente lo atiende; si no, se registra y no se contesta — mejor callar
+        // que ofrecer algo que después no se puede cumplir.
+        const atendido = await reservaWa.atender(negocio, m).catch(e => {
+          console.error('reserva wa', e.message); return false;
+        });
         await db.logWhatsapp({
           direccion: 'entrante', wa_id: m.wa_id, usuario_id: null,
           mensaje_id: m.mensaje_id, tipo: m.tipo, texto: m.texto, crudo: m.crudo,
-          estado: 'cliente_de_negocio',
+          estado: atendido ? 'atendido_reservas' : 'cliente_de_negocio',
         });
-        console.log(`whatsapp: mensaje para ${negocio.slug} de ${m.wa_id} — registrado, sin responder`);
+        if (!atendido) console.log(`whatsapp: mensaje para ${negocio.slug} de ${m.wa_id} — registrado, sin responder`);
         continue;
       }
 

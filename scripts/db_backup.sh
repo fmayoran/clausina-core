@@ -29,6 +29,10 @@ PODA=$(docker exec -i "$CID" psql -U postgres -d claude -t -A -q -c \
 PODA_WA=$(docker exec -i "$CID" psql -U postgres -d claude -t -A -q -c \
   "WITH d AS (DELETE FROM contenido.whatsapp_mensaje WHERE creado_en < now()-interval '90 days' RETURNING 1) SELECT count(*) FROM d;" 2>>"$LOG")
 [ -n "${PODA_WA:-}" ] && [ "${PODA_WA:-0}" != "0" ] && echo "$(ts) poda whatsapp_mensaje: $PODA_WA fila(s)" >> "$LOG"
+# Conversaciones de reserva por WhatsApp: se abandonan a los 30 min, así que a las 24 h no sirven.
+PODA_CONV=$(docker exec -i "$CID" psql -U postgres -d claude -t -A -q -c \
+  "WITH d AS (DELETE FROM contenido.wa_conversacion WHERE actualizado_en < now()-interval '1 day' RETURNING 1) SELECT count(*) FROM d;" 2>>"$LOG")
+[ -n "${PODA_CONV:-}" ] && [ "${PODA_CONV:-0}" != "0" ] && echo "$(ts) poda wa_conversacion: $PODA_CONV fila(s)" >> "$LOG"
 
 # --- 1) Dump de la base ---
 TS=$(date +%Y%m%d_%H%M)

@@ -1209,6 +1209,51 @@ async function cambiarEstadoReserva(negocioId, id, estado) {
   return { ok: rowCount > 0 };
 }
 
+// --- Conversación de reserva por WhatsApp (v2.0 / F5e) ------------------------------------
+// Cada mensaje de WhatsApp llega solo, sin memoria. Armar una reserva lleva varios turnos de
+// conversación, así que hay que recordar dónde quedó cada cliente.
+const CONV_MINUTOS = 30;
+
+async function getConversacion(negocioId, waId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT paso, datos, actualizado_en FROM contenido.wa_conversacion
+      WHERE negocio_id=$1 AND wa_id=$2
+        AND actualizado_en > now() - ($3 || ' minutes')::interval`,
+    [negocioId, waId, String(CONV_MINUTOS)]);
+  return r || null;
+}
+
+async function setConversacion(negocioId, waId, paso, datos) {
+  await pool.query(
+    `INSERT INTO contenido.wa_conversacion (negocio_id, wa_id, paso, datos, actualizado_en)
+     VALUES ($1,$2,$3,COALESCE($4::jsonb,'{}'::jsonb), now())
+     ON CONFLICT (negocio_id, wa_id) DO UPDATE
+       SET paso=$3, datos=COALESCE($4::jsonb,'{}'::jsonb), actualizado_en=now()`,
+    [negocioId, waId, paso, datos ? JSON.stringify(datos) : null]);
+}
+
+async function borrarConversacion(negocioId, waId) {
+  await pool.query('DELETE FROM contenido.wa_conversacion WHERE negocio_id=$1 AND wa_id=$2',
+    [negocioId, waId]);
+}
+
+// Poda: una conversación vieja no se retoma, se empieza de nuevo. Sin esto la tabla sólo crece,
+// que es la lección del sqlite de n8n.
+async function podarConversaciones() {
+  const { rowCount } = await pool.query(
+    `DELETE FROM contenido.wa_conversacion WHERE actualizado_en < now() - interval '1 day'`);
+  return rowCount;
+}
+
+// ¿Este negocio puede tomar reservas por WhatsApp? Las mismas condiciones que la página pública:
+// capacidad habilitada y abierta al público. Un canal más no es una puerta trasera.
+async function reservasPorWhatsapp(negocioId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT habilitada, config FROM contenido.negocio_capacidad
+      WHERE negocio_id=$1 AND capacidad='reservas'`, [negocioId]);
+  return !!(r && r.habilitada && (r.config || {}).publico);
+}
+
 // --- WhatsApp propio del negocio (v2.0 / F5d) ---------------------------------------------
 // El número con el que el negocio le habla a SUS clientes. El de ClaUsina queda para hablar con
 // el operador. Ver core/planes/WHATSAPP.md.
@@ -2555,6 +2600,7 @@ module.exports = {
   destinatariosAviso, datosParaAviso,
   getWhatsappNegocio, guardarWhatsappNegocio, verificarWhatsappNegocio, PLANTILLAS_RESERVA,
   secretoDeNumero, negocioPorPhoneId,
+  getConversacion, setConversacion, borrarConversacion, podarConversaciones, reservasPorWhatsapp,
   negocioPublico, disponibilidadPublica, registrarApertura, marcarCompletado, linkDeApertura,
   ofertaLanding, guardarQueExponeLanding,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,
