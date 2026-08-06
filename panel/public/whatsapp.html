@@ -190,6 +190,33 @@
         </label>
         <div class="hint">Sin esto, quien pregunte algo que el asistente no sabe hacer queda sin
           respuesta. Con esto, le avisa que lo van a contestar y el mensaje les llega a ustedes.</div>
+
+        <label class="chk" for="c-auto" style="margin-top:18px;">
+          <input type="checkbox" id="c-auto">
+          Confirmar en el acto las reservas que entran por WhatsApp
+        </label>
+        <div class="hint">Sin esto la reserva queda <b>solicitada</b> y alguien la confirma desde el
+          panel. Es un interruptor aparte del de la página pública a propósito: acá el teléfono lo
+          verificó WhatsApp y la conversación la abrió el cliente, así que saben a quién le están
+          confirmando. En la web cualquiera escribe cualquier cosa.</div>
+      </div>
+
+      <!-- ══ Respuestas frecuentes ══ -->
+      <div class="card2">
+        <div class="sec">Qué sabe responder</div>
+        <div class="hint" style="margin-top:-4px;">Cuando alguien pregunta algo de esta lista, el
+          asistente contesta <b>exactamente el texto que ustedes escribieron acá</b> — no redacta
+          nada por su cuenta. Lo que no está en la lista sigue yendo al inbox.</div>
+        <div id="faq-lista" style="margin-top:14px;"></div>
+        <div class="bar" style="border:0;padding:0;margin-top:12px;">
+          <button class="btn2" onclick="faqAgregar()">Agregar respuesta</button>
+          <button class="btn2" id="b-sugerir" onclick="faqSugerir()">Sugerir desde lo que sabemos</button>
+          <span class="msg" id="msg-faq"></span>
+        </div>
+        <div class="hint" style="margin-top:10px;">"Sugerir" arma borradores: las preguntas que le
+          hacen a un negocio de este rubro, contestadas <b>sólo</b> con datos que ya están cargados.
+          Las que no puede contestar las deja vacías y marcadas — eso les muestra qué falta cargar.
+          <b>No se guarda nada hasta que le den Guardar.</b></div>
       </div>
 
       <div class="bar">
@@ -295,6 +322,9 @@ async function cargarCanal() {
     CANAL = d.config || {}; DISPONIBLES = d.disponibles || [];
     $('c-saludo').value = CANAL.saludo || '';
     $('c-inbox').checked = CANAL.inbox !== false;
+    $('c-auto').checked = !!CANAL.auto_confirmar;
+    FAQ = Array.isArray(CANAL.faq) ? CANAL.faq.map(f => ({ p: f.p, r: f.r })) : [];
+    pintarFaq();
     // Sólo se puede ofrecer lo que el bot sabe hacer Y el negocio tiene habilitado: si la
     // capacidad está apagada, la casilla se ve pero no se puede marcar, y dice por qué.
     const caps = await fetch('api/capacidades').then(r => r.json()).catch(() => []);
@@ -317,12 +347,76 @@ async function guardarCanal() {
   try {
     const r = await fetch('api/whatsapp/canal', { method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ saludo: $('c-saludo').value, ofrece, inbox: $('c-inbox').checked }) });
+      body: JSON.stringify({ saludo: $('c-saludo').value, ofrece, inbox: $('c-inbox').checked,
+                             auto_confirmar: $('c-auto').checked, faq: leerFaq() }) });
     const j = await r.json();
     if (r.ok && j.ok) { CANAL = j.config; m.className = 'msg bien'; m.textContent = 'guardado';
       setTimeout(() => { m.textContent = ''; }, 2500); }
     else { m.className = 'msg mal'; m.textContent = 'no se pudo guardar'; }
   } catch (e) { m.className = 'msg mal'; m.textContent = 'error de conexión'; }
+}
+
+/* ═══════ Respuestas frecuentes ═══════ */
+let FAQ = [];
+
+// Se lee del DOM y no de FAQ: lo que vale es lo que la persona tiene escrito en pantalla, aunque
+// todavía no haya salido del campo.
+function leerFaq() {
+  return [...document.querySelectorAll('#faq-lista .faq-fila')]
+    .map(f => ({ p: f.querySelector('.faq-p').value.trim(), r: f.querySelector('.faq-r').value.trim() }))
+    .filter(f => f.p && f.r);
+}
+
+function pintarFaq() {
+  const cont = $('faq-lista');
+  if (!FAQ.length) {
+    cont.innerHTML = '<div class="hint" style="padding:14px 0;">Todavía no hay respuestas cargadas. ' +
+      'Todo lo que pregunten va al inbox.</div>';
+    return;
+  }
+  cont.innerHTML = FAQ.map((f, i) => `
+    <div class="faq-fila" style="border:1px solid var(--u-line);border-radius:10px;padding:12px;margin-bottom:10px;
+         ${f.falta ? 'border-left:3px solid var(--u-medio);' : ''}">
+      <div style="display:flex;gap:8px;align-items:flex-start;">
+        <input type="text" class="faq-p" value="${escapar(f.p || '')}" placeholder="¿Qué preguntan?"
+               style="flex:1;font-weight:600;">
+        <button class="btn2" title="Quitar" onclick="faqQuitar(${i})" style="padding:6px 10px;">&times;</button>
+      </div>
+      <textarea class="faq-r" rows="2" placeholder="Qué contesta el asistente, palabra por palabra"
+                style="margin-top:8px;">${escapar(f.r || '')}</textarea>
+      ${f.falta ? '<div class="hint" style="margin-top:6px;">Falta el dato para contestar esto. ' +
+                  'Escribilo acá, o cargalo en Identidad y volvé a sugerir.</div>' : ''}
+    </div>`).join('');
+}
+
+function faqAgregar() { FAQ = leerFaq().concat([{ p: '', r: '' }]); pintarFaq(); }
+function faqQuitar(i) { const l = leerFaq(); l.splice(i, 1); FAQ = l; pintarFaq(); }
+
+async function faqSugerir() {
+  const m = $('msg-faq'), b = $('b-sugerir');
+  m.className = 'msg'; m.textContent = 'pensando…'; b.disabled = true;
+  try {
+    const r = await fetch('api/whatsapp/faq/sugerir', { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) {
+      m.className = 'msg mal';
+      m.textContent = j.error === 'sin_clave' ? 'falta la clave de IA en el panel' : 'no se pudo sugerir';
+      return;
+    }
+    // Se AGREGA a lo que ya hay, sin pisar: lo que el negocio escribió a mano vale más que un
+    // borrador. Las repetidas se descartan comparando la pregunta.
+    const previas = leerFaq();
+    const vistas = new Set(previas.map(f => f.p.toLowerCase()));
+    const nuevas = (j.entradas || []).filter(e => !vistas.has((e.p || '').toLowerCase()));
+    FAQ = previas.concat(nuevas);
+    pintarFaq();
+    const faltan = nuevas.filter(e => e.falta).length;
+    m.className = 'msg bien';
+    m.textContent = nuevas.length
+      ? `${nuevas.length} borrador(es)` + (faltan ? ` · ${faltan} sin datos para contestar` : '') + ' · revisalos y guardá'
+      : 'nada nuevo para sugerir';
+  } catch (e) { m.className = 'msg mal'; m.textContent = 'error de conexión'; }
+  finally { b.disabled = false; }
 }
 
 /* ═══════ Inbox ═══════ */

@@ -1078,7 +1078,8 @@ async function getDisponibilidad(negocioId, desde, hasta) {
   const { rows } = await pool.query(
     `WITH dias AS (SELECT d::date AS fecha FROM generate_series($2::date, $3::date, '1 day') d),
           t AS (SELECT * FROM contenido.turno WHERE negocio_id=$1 AND activo)
-     SELECT dias.fecha::text, t.id AS turno_id, t.nombre, t.nombre_publico, t.capacidad, t.orden,
+     SELECT dias.fecha::text, t.id AS turno_id, t.nombre, t.nombre_publico, t.capacidad,
+            t.cantidad_max, t.orden,
             to_char(t.hora_desde,'HH24:MI') AS hora_desde,
             to_char(t.hora_hasta,'HH24:MI') AS hora_hasta,
             COALESCE(r.ocupado, 0)::int AS ocupado,
@@ -1168,7 +1169,12 @@ async function crearReserva(negocioId, d) {
   // Sólo lo que entra por el panel lo cargó una persona del negocio: eso se confirma solo. Todo
   // lo demás —cliente desde una landing, WhatsApp, agente externo— queda SOLICITADA salvo que el
   // negocio active auto_confirmar. Es la regla de la plataforma del lado operativo.
-  const estado = canal === 'panel' ? 'confirmada' : (cfg.auto_confirmar ? 'confirmada' : 'solicitada');
+  // WhatsApp puede autoconfirmar por su cuenta, aunque la web no lo haga: ahí el teléfono lo
+  // verificó Meta y la conversación la abrió el cliente, así que el negocio sabe a quién le está
+  // confirmando. En la página pública cualquiera escribe cualquier cosa. Son riesgos distintos y
+  // por eso son dos interruptores distintos.
+  const autoCanal = canal === 'whatsapp' && (await getCanalWhatsapp(negocioId)).auto_confirmar;
+  const estado = (canal === 'panel' || cfg.auto_confirmar || autoCanal) ? 'confirmada' : 'solicitada';
 
   const cli = await pool.connect();
   try {
@@ -1270,6 +1276,8 @@ const CFG_CANAL = {
   saludo: '',            // vacío = se arma uno con el nombre del negocio
   ofrece: ['reservas'],
   inbox: true,           // guardar lo que no encaja para que lo lea una persona
+  auto_confirmar: false, // confirmar en el acto lo que entra por este canal
+  faq: [],               // [{p, r}] — respuestas que el negocio escribió y el bot repite TAL CUAL
 };
 
 async function getCanalWhatsapp(negocioId) {
@@ -1294,6 +1302,14 @@ async function guardarCanalWhatsapp(negocioId, d) {
     ofrece: [...new Set((Array.isArray(d.ofrece) ? d.ofrece : [])
       .filter(x => CAPS_BOT.some(c => c.id === x)))],
     inbox: d.inbox !== false,
+    auto_confirmar: !!d.auto_confirmar,
+    // Se guarda lo que escribió el negocio, recortado pero sin reescribir: el bot va a repetir
+    // esto palabra por palabra, así que lo que se guarda es exactamente lo que va a salir.
+    faq: (Array.isArray(d.faq) ? d.faq : [])
+      .map(f => ({ p: String((f && f.p) || '').trim().slice(0, 200),
+                   r: String((f && f.r) || '').trim().slice(0, 700) }))
+      .filter(f => f.p && f.r)
+      .slice(0, 40),
   };
   await pool.query(
     `INSERT INTO contenido.negocio_capacidad (negocio_id, capacidad, habilitada, config, actualizado_en)
@@ -1774,6 +1790,9 @@ async function disponibilidadPublica(negocioId, desde, hasta) {
       nombre: d.nombre_publico || d.nombre,
       hora_desde: d.hora_desde, hora_hasta: d.hora_hasta,
       libre: Math.max(0, d.capacidad - d.ocupado),
+      // El tope de UNA reserva: el del turno si lo redefinió, si no el general. Es el número que
+      // hay que decirle a alguien antes de que pruebe con uno que va a rebotar.
+      tope: Math.min(d.cantidad_max || cfg.cantidad_max, Math.max(0, d.capacidad - d.ocupado)),
     }))
     .filter(d => d.libre > 0);
 }

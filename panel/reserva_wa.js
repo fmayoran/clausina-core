@@ -15,6 +15,7 @@
 const wa = require('./whatsapp');
 const db = require('./db');
 const voz = require('./voz');
+const faq = require('./faq');
 
 const DOW = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -86,12 +87,22 @@ async function atender(negocio, mensaje) {
   const datos = conv ? (conv.datos || {}) : {};
 
   try {
-    if (!paso) return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil);
+    if (!paso) {
+      // Si el primer mensaje ya es una pregunta que el negocio tiene contestada, se contesta y
+      // recién después se ofrece el menú: hacerlo al revés obliga a repetir la pregunta.
+      if (await responderFaq(cfg, negocio, waId, entrada, canal)) {
+        return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil) || true;
+      }
+      return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil);
+    }
     // "Otra consulta": lo que sigue va al inbox para que lo lea una persona.
-    if (paso === 'consulta') return await recibirConsulta(cfg, negocio, waId, mensaje);
+    if (paso === 'consulta') return await recibirConsulta(cfg, negocio, waId, entrada, canal);
     if (paso === 'ofrecido') {
       if (entrada === 'consulta') return await pedirConsulta(cfg, negocio, waId);
-      if (!ofreceReservas) return await recibirConsulta(cfg, negocio, waId, mensaje);
+      if (!ofreceReservas) return await recibirConsulta(cfg, negocio, waId, entrada, canal);
+      // Texto libre en vez de un botón: puede ser una pregunta. Si está contestada, se contesta
+      // y se queda donde estaba, en vez de arrancar a pedirle días a alguien que preguntó otra cosa.
+      if (entrada !== 'reservar' && await responderFaq(cfg, negocio, waId, entrada, canal)) return true;
       return await elegirDia(cfg, negocio, waId, entrada);
     }
     if (paso === 'dia') return await elegirTurno(cfg, negocio, waId, entrada, datos);
@@ -134,6 +145,20 @@ async function saludar(cfg, negocio, waId, canal, ofreceReservas, perfil) {
   return true;
 }
 
+/**
+ * Si el negocio ya escribió una respuesta para esto, la manda TAL CUAL y devuelve true.
+ * Lo que sale es el texto del negocio, no uno redactado por el modelo: el modelo sólo elige cuál
+ * de las respuestas guardadas contesta la pregunta, o ninguna.
+ */
+async function responderFaq(cfg, negocio, waId, texto, canal) {
+  const lista = (canal && canal.faq) || [];
+  if (!lista.length) return false;
+  const i = await faq.responder(texto, lista).catch(() => null);
+  if (i == null) return false;
+  await decir(cfg, waId, lista[i].r, negocio.id);
+  return true;
+}
+
 // Consultas que no son una operación del bot: se guardan para que las lea una persona.
 async function pedirConsulta(cfg, negocio, waId) {
   await db.setConversacion(negocio.id, waId, 'consulta', {});
@@ -141,7 +166,9 @@ async function pedirConsulta(cfg, negocio, waId) {
   return true;
 }
 
-async function recibirConsulta(cfg, negocio, waId, mensaje) {
+async function recibirConsulta(cfg, negocio, waId, texto, canal) {
+  // Primero lo que el negocio ya contestó: si hay respuesta, no hay nada que derivar.
+  if (await responderFaq(cfg, negocio, waId, texto, canal)) return true;
   await db.borrarConversacion(negocio.id, waId);
   // El mensaje ya se guarda en la bitácora del webhook: acá sólo se acusa recibo. Prometer un
   // plazo que no controlamos sería peor que no prometer nada.
@@ -188,12 +215,21 @@ async function elegirTurno(cfg, negocio, waId, entrada, datos) {
   return true;
 }
 
+/** El tope REAL de una reserva en ese turno: el del turno o el general, y nunca más que lo libre. */
+async function topeDe(negocioId, fecha, turnoId) {
+  const t = (await db.disponibilidadPublica(negocioId, fecha, fecha)).find(x => x.turno_id === turnoId);
+  return t ? t.tope : null;
+}
+
 async function pedirCantidad(cfg, negocio, waId, entrada, datos) {
   const turnoId = entrada.startsWith('t:') ? entrada.slice(2) : null;
   if (!turnoId) { await decir(cfg, waId, 'Elegí un turno de la lista, por favor.', negocio.id); return true; }
   const cfgRes = await db.getConfigReservas(negocio.id);
   await db.setConversacion(negocio.id, waId, 'cantidad', { ...datos, turno_id: turnoId });
-  await decir(cfg, waId, `¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}? Respondeme con un número.`, negocio.id);
+  // Decir el máximo ANTES evita el ida y vuelta de proponer un número que va a rebotar.
+  const tope = await topeDe(negocio.id, datos.fecha, turnoId);
+  await decir(cfg, waId, `¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}?` +
+    (tope ? ` Hasta ${tope}.` : '') + ' Respondeme con un número.', negocio.id);
   return true;
 }
 
@@ -202,6 +238,14 @@ async function pedirNombre(cfg, negocio, waId, entrada, datos) {
   const cfgRes = await db.getConfigReservas(negocio.id);
   if (!n || n < cfgRes.cantidad_min) {
     await decir(cfg, waId, `Necesito un número. ¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}?`, negocio.id);
+    return true;
+  }
+  // Se rebota acá y con el número puesto, en vez de dejar que llegue hasta crearReserva y vuelva
+  // un error genérico después de haber pedido el nombre.
+  const tope = await topeDe(negocio.id, datos.fecha, datos.turno_id);
+  if (tope && n > tope) {
+    await decir(cfg, waId, `Para ese turno puedo tomar hasta ${tope} ${plural(cfgRes.unidad, tope)} ` +
+      `en una reserva. ¿${cuantos(cfgRes.unidad).replace(/^./, c => c.toUpperCase())} entonces?`, negocio.id);
     return true;
   }
   await db.setConversacion(negocio.id, waId, 'nombre', { ...datos, cantidad: n });
@@ -302,7 +346,7 @@ async function seguirVoz(negocio, mensaje) {
     return void await decir(cfg, waId, 'Gracias, ya le pasé tu mensaje al equipo. Te van a responder por acá.', negocio.id);
   }
 
-  if (!ofreceReservas) return void await recibirConsulta(cfg, negocio, waId, mensaje);
+  if (!ofreceReservas) return void await recibirConsulta(cfg, negocio, waId, texto, canal);
 
   const cfgRes = await db.getConfigReservas(negocio.id);
   const hoy = new Date().toISOString().slice(0, 10);
@@ -316,7 +360,7 @@ async function seguirVoz(negocio, mensaje) {
 
   // No se entendió, o el audio no era para reservar: al inbox, que es donde lo va a leer alguien.
   if (!i) return void await elegirDia(cfg, negocio, waId, '');
-  if (i.intencion !== 'reserva') return void await recibirConsulta(cfg, negocio, waId, mensaje);
+  if (i.intencion !== 'reserva') return void await recibirConsulta(cfg, negocio, waId, texto, canal);
 
   // Cada rama entra por el paso que ya existe, con una entrada armada — así la validación de
   // disponibilidad, el rango de cantidad y el texto de las preguntas son exactamente los mismos

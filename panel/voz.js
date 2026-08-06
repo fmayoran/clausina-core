@@ -16,19 +16,9 @@
  *    lo que pide no es una reserva, la conversación cae al flujo guiado de siempre — listas y
  *    botones. La voz ahorra preguntas cuando funciona; cuando no, no cuesta nada.
  */
-const Anthropic = require('@anthropic-ai/sdk');
+const ia = require('./ia');
 
 const DOW = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-
-let _cliente = null;
-const disponible = () => !!process.env.ANTHROPIC_API_KEY;
-
-function cliente() {
-  // 25 s: el cliente está esperando del otro lado. Si tarda más que eso, preguntarle es más
-  // rápido que seguir esperando.
-  if (!_cliente) _cliente = new Anthropic({ timeout: 25000, maxRetries: 1 });
-  return _cliente;
-}
 
 const SISTEMA = `Sos el asistente de un negocio que toma reservas por WhatsApp. Te llega la
 transcripción de una nota de voz de un cliente y tenés que extraer los datos de la reserva.
@@ -87,37 +77,14 @@ ${texto}
  * o null si no se pudo interpretar (sin clave, error de API, sin disponibilidad).
  */
 async function interpretar(texto, { opciones, hoy, unidad, cantidadMin, cantidadMax }) {
-  if (!disponible() || !texto || !opciones || !opciones.length) return null;
+  if (!ia.disponible() || !texto || !opciones || !opciones.length) return null;
 
-  let cruda;
-  try {
-    const r = await cliente().beta.messages.create({
-      model: 'claude-opus-5',
-      max_tokens: 2000,
-      system: SISTEMA,
-      // El pensamiento viene activado por defecto y cuenta contra max_tokens; con effort bajo
-      // alcanza y de sobra para una extracción, y es lo que menos hace esperar al cliente.
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: esquema(opciones) } },
-      // Si los clasificadores rechazan el pedido, la API lo reintenta sola en otro modelo en la
-      // misma llamada. Un audio de reserva no debería activarlos nunca, pero sin esto un rechazo
-      // deja al cliente sin respuesta.
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      messages: [{ role: 'user', content: prompt(texto, opciones, hoy, unidad) }],
-    });
-    // stop_reason se mira ANTES del contenido: en un rechazo viene vacío, y en un corte por
-    // longitud viene un JSON a medias que no parsea.
-    if (r.stop_reason === 'refusal' || r.stop_reason === 'max_tokens') {
-      console.log('voz: sin interpretación (stop_reason=' + r.stop_reason + ')');
-      return null;
-    }
-    const bloque = (r.content || []).find(b => b.type === 'text');
-    if (!bloque) return null;
-    cruda = JSON.parse(bloque.text);
-  } catch (e) {
-    console.error('voz interpretar', e.message);
-    return null;
-  }
+  const cruda = await ia.pedirJson({
+    sistema: SISTEMA,
+    prompt: prompt(texto, opciones, hoy, unidad),
+    esquema: esquema(opciones),
+  });
+  if (!cruda) return null;
 
   return validar(cruda, { opciones, cantidadMin, cantidadMax });
 }
@@ -141,7 +108,7 @@ function validar(c, { opciones, cantidadMin, cantidadMax }) {
 
   const n = Number.isInteger(c.cantidad) ? c.cantidad : null;
   // El tope del turno elegido sólo aplica si se eligió turno; si no, alcanza con el rango general.
-  const tope = Math.min(cantidadMax || Infinity, t ? t.libre : Infinity);
+  const tope = Math.min(cantidadMax || Infinity, t ? t.tope : Infinity);
   if (n && n >= (cantidadMin || 1) && n <= tope) r.cantidad = n;
 
   // Un nombre de una sola letra o una frase entera no son un nombre: mejor preguntarlo.
@@ -151,4 +118,4 @@ function validar(c, { opciones, cantidadMin, cantidadMax }) {
   return r;
 }
 
-module.exports = { disponible, interpretar };
+module.exports = { disponible: ia.disponible, interpretar };
