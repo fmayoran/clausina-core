@@ -23,16 +23,19 @@
       { id: 'propuestas', label: 'Propuestas',       icon: 'lightbulb',   href: 'propuestas' },
       { id: 'cola',      label: 'Cola y aprobación', icon: 'inbox',       href: 'proyecto' },
       { id: 'instagram', label: 'Instagram',         icon: 'instagram',   href: 'instagram' },
-      { id: 'whatsapp',  label: 'WhatsApp',          icon: 'message-circle', href: 'whatsapp' },
       { id: 'avisos',    label: 'Avisos',            icon: 'megaphone',   href: 'avisos' },
       { id: 'grafica',   label: 'Gráfica',          icon: 'layout-template', href: 'grafica' },
       { id: 'landing',   label: 'Landing',           icon: 'globe',       href: 'landing' },
       { id: 'pauta',     label: 'Pauta',             icon: 'badge-dollar-sign', href: 'pauta' },
       { id: 'biblioteca',label: 'Biblioteca',        icon: 'images',      href: 'biblioteca' },
     ],
+    // WhatsApp vive acá y no en Comunicación: todo lo que está allá pasa por la compuerta de
+    // aprobación — nada sale sin visto humano. El bot contesta en tiempo real y toma reservas,
+    // que es el modo de falla de Operación.
     'Operación': [
       { id: 'clientes',  label: 'Clientes',          icon: 'users-round',    href: 'clientes' },
       { id: 'reservas',  label: 'Reservas',          icon: 'calendar-check', href: 'reservas' },
+      { id: 'whatsapp',  label: 'WhatsApp',          icon: 'message-circle', href: 'whatsapp' },
     ],
     // Fuera de las secciones de negocio: es la cuenta de quien está mirando, no del negocio activo.
     Vos: [
@@ -48,11 +51,30 @@
     return '<a href="' + it.href + '" data-nav="' + it.id + '" class="' + cls + '"><i data-lucide="' + it.icon + '" class="w-4 h-4 shrink-0"></i><span class="nlabel">' + it.label + '</span></a>';
   }
 
+  // Qué secciones están plegadas. Se recuerda entre visitas: si alguien plegó Agencia porque no
+  // la usa, volver a abrírsela en cada carga sería molesto.
+  function plegadas() {
+    try { return JSON.parse(localStorage.getItem('clausina-nav-plegadas') || '[]'); }
+    catch (e) { return []; }
+  }
+  function guardarPlegadas(arr) {
+    try { localStorage.setItem('clausina-nav-plegadas', JSON.stringify(arr)); } catch (e) {}
+  }
+
   function nav(active) {
+    var cerradas = plegadas();
     var out = '';
     Object.keys(NAV).forEach(function (sec) {
-      out += '<div class="nsec mono text-[10px] tracking-[0.16em] uppercase text-pmut dark:text-mut px-2.5 mb-1 mt-4 first:mt-0">' + sec + '</div>';
-      out += NAV[sec].map(function (it) { return link(it, active); }).join('');
+      // La sección de la página actual nunca arranca plegada: esconder dónde estás parado
+      // es peor que un menú largo.
+      var tiene = NAV[sec].some(function (it) { return it.id === active; });
+      var off = cerradas.indexOf(sec) >= 0 && !tiene;
+      out += '<button type="button" data-sec="' + sec + '" class="nsec' + (off ? ' plegada' : '') +
+        ' w-full flex items-center gap-1.5 mono text-[10px] tracking-[0.16em] uppercase text-pmut dark:text-mut px-2.5 mb-1 mt-4 first:mt-0 hover:text-pfg dark:hover:text-fg transition">' +
+        '<svg class="chev w-3 h-3 shrink-0 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>' +
+        '<span>' + sec + '</span></button>';
+      out += '<div class="ngrupo' + (off ? ' oculta' : '') + '" data-grupo="' + sec + '">' +
+        NAV[sec].map(function (it) { return link(it, active); }).join('') + '</div>';
     });
     return out;
   }
@@ -129,11 +151,34 @@
         '.capguard{margin:40px 28px;padding:28px 26px;border:1px dashed #20242B;border-radius:12px;max-width:620px;}' +
         '.capguard h2{font-size:1.4rem;font-weight:800;color:#F5F2EC;margin:0 0 8px;}' +
         '.capguard p{color:#8A8F98;line-height:1.45;margin:0 0 16px;}' +
-        '.capguard a{display:inline-block;background:#CCF24D;color:#0c0c0a;font-weight:700;padding:9px 16px;border-radius:8px;text-decoration:none;}';
+        '.capguard a{display:inline-block;background:#CCF24D;color:#0c0c0a;font-weight:700;padding:9px 16px;border-radius:8px;text-decoration:none;}' +
+        // Secciones plegables: el menú creció y ya no entra de un vistazo.
+        '.nsec{cursor:pointer;background:none;border:0;text-align:left;}' +
+        '.nsec .chev{transform:rotate(0deg);opacity:.55;}' +
+        '.nsec.plegada .chev{transform:rotate(-90deg);}' +
+        '.ngrupo{display:flex;flex-direction:column;gap:2px;}' +
+        '.ngrupo.oculta{display:none;}' +
+        // Con el menú colapsado a íconos, los títulos y las flechas estorban.
+        'body.col .nsec{display:none;} body.col .ngrupo.oculta{display:flex;}';
       document.head.appendChild(st);
     }
     shell.insertAdjacentHTML('afterbegin', html(opts.active || ''));
     if (window.fixIgIcons) window.fixIgIcons(shell);
+
+    // Plegar y desplegar secciones. Un solo listener sobre el menú, no uno por título.
+    var navEl = shell.querySelector('.nav');
+    if (navEl) navEl.addEventListener('click', function (e) {
+      var b = e.target.closest('.nsec'); if (!b) return;
+      var sec = b.getAttribute('data-sec');
+      var g = navEl.querySelector('[data-grupo="' + sec.replace(/"/g, '') + '"]');
+      if (!g) return;
+      var cerrar = !g.classList.contains('oculta');
+      g.classList.toggle('oculta', cerrar);
+      b.classList.toggle('plegada', cerrar);
+      var arr = plegadas().filter(function (x) { return x !== sec; });
+      if (cerrar) arr.push(sec);
+      guardarPlegadas(arr);
+    });
     aplicarPermisos(opts.active || '');
     marcarCapacidades();
     if (opts.cap) guardarCapacidad(opts.cap);

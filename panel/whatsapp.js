@@ -49,6 +49,12 @@ function leerMensajes(cuerpo) {
   for (const entrada of cuerpo.entry || []) {
     for (const c of entrada.changes || []) {
       const v = c.value || {};
+      // Meta manda el nombre del perfil de WhatsApp junto con los mensajes. Sirve para saludar
+      // por el nombre; NO para registrar al cliente, porque suele ser un apodo o estar incompleto.
+      const perfiles = {};
+      for (const c2 of v.contacts || []) {
+        if (c2.wa_id) perfiles[c2.wa_id] = (c2.profile || {}).name || null;
+      }
       for (const m of v.messages || []) {
         out.push({
           mensaje_id: m.id,
@@ -57,6 +63,7 @@ function leerMensajes(cuerpo) {
           // es lo que distingue al operador que le habla a ClaUsina del cliente que le habla a
           // su restaurante.
           phone_number_id: (v.metadata || {}).phone_number_id || null,
+          perfil: perfiles[m.from] || null,
           tipo: m.type,
           // El texto puede venir de un mensaje suelto o del botón que tocaron.
           texto: (m.text && m.text.body)

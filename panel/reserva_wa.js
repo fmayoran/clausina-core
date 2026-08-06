@@ -74,7 +74,7 @@ async function atender(negocio, mensaje) {
   const datos = conv ? (conv.datos || {}) : {};
 
   try {
-    if (!paso) return await saludar(cfg, negocio, waId, canal, ofreceReservas);
+    if (!paso) return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil);
     // "Otra consulta": lo que sigue va al inbox para que lo lea una persona.
     if (paso === 'consulta') return await recibirConsulta(cfg, negocio, waId, mensaje);
     if (paso === 'ofrecido') {
@@ -95,10 +95,18 @@ async function atender(negocio, mensaje) {
   return false;
 }
 
-async function saludar(cfg, negocio, waId, canal, ofreceReservas) {
+async function saludar(cfg, negocio, waId, canal, ofreceReservas, perfil) {
   await db.setConversacion(negocio.id, waId, 'ofrecido', {});
   // El saludo lo escribe el negocio en el configurador; si no puso nada, se arma uno.
-  const saludo = canal.saludo || `Hola. Soy el asistente de ${negocio.nombre}.`;
+  // Si WhatsApp nos da el nombre del perfil, se usa el primero para que no suene a máquina.
+  const nombrePila = String(perfil || '').trim().split(/\s+/)[0] || '';
+  // Si el saludo que escribió el negocio ya arranca con "hola", se le saca para no duplicarlo:
+  // "Hola Fernando. Hola, soy el asistente…" suena a error, y es el que va a escribir cualquiera.
+  const propio = String(canal.saludo || '').trim();
+  const base = (propio || `Soy el asistente de ${negocio.nombre}.`)
+    .replace(/^[¡\s]*hola[\s,.!¡]*/i, '')
+    .replace(/^./, c => c.toUpperCase());
+  const saludo = nombrePila ? `Hola ${nombrePila}. ${base}` : `Hola. ${base}`;
   const botones = [];
   if (ofreceReservas) botones.push({ id: 'reservar', titulo: 'Reservar' });
   if (canal.inbox) botones.push({ id: 'consulta', titulo: 'Otra consulta' });
@@ -184,7 +192,9 @@ async function pedirNombre(cfg, negocio, waId, entrada, datos) {
     return true;
   }
   await db.setConversacion(negocio.id, waId, 'nombre', { ...datos, cantidad: n });
-  await decir(cfg, waId, '¿A nombre de quién?', negocio.id);
+  // Nombre Y apellido: es lo que queda en la base del negocio, y un nombre suelto no alcanza
+  // para reconocer a alguien cuando llega.
+  await decir(cfg, waId, 'Por último, decime tu nombre y apellido, por favor.', negocio.id);
   return true;
 }
 
@@ -199,7 +209,7 @@ const ERRORES = {
 
 async function confirmar(cfg, negocio, waId, entrada, datos) {
   const nombre = String(entrada).trim().slice(0, 80);
-  if (!nombre) { await decir(cfg, waId, '¿A nombre de quién?', negocio.id); return true; }
+  if (!nombre) { await decir(cfg, waId, 'Decime tu nombre y apellido, por favor.', negocio.id); return true; }
 
   let r;
   try {
