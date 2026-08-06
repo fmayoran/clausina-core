@@ -135,6 +135,50 @@ prueba**, porque era el id que había a mano. El número de producción vive en 
 plantillas son por cuenta, **no sirven**. Quedaron ahí inertes: el token no tiene permiso para
 borrarlas. Hay que rehacerlas en el WABA de producción de cada negocio.
 
+## El canal como producto configurable (06/08/2026)
+
+Fer: *"comenzar a armar un configurador del canal de WhatsApp API del negocio"*. El número deja de
+ser una configuración técnica y pasa a ser un canal que el negocio arma. Pantalla **WhatsApp**, tres
+solapas.
+
+### Número
+Lo de antes: ids, token, secreto de la app y el diagnóstico.
+
+### Asistente
+- **El saludo lo escribe el negocio.** Antes estaba en el código.
+- **Elige qué operaciones ofrece el bot.** La lista de opciones **no es "todas las capacidades del
+  negocio"**: es la intersección entre lo que el bot sabe atender (`CAPS_BOT`) y lo que el negocio
+  tiene habilitado. Si una capacidad está apagada, la casilla se ve pero no se puede marcar y dice
+  por qué. Hoy el bot sabe una sola cosa: tomar reservas.
+
+### Inbox
+Lo que no encaja en ninguna operación **no puede quedar sin respuesta**. El asistente ofrece
+"Otra consulta", acusa recibo —sin prometer plazos que no controlamos— y el mensaje queda en un
+inbox por negocio para que lo lea una persona. Se responde desde ahí.
+
+**La ventana de 24 h se muestra explícitamente.** Pasada, Meta no deja responder libre; la pantalla
+lo dice **antes** de que alguien escriba una respuesta que no va a salir.
+
+### Reservar por WhatsApp
+
+Canal alternativo a la página. Funciona porque **el cliente escribe primero**: eso abre la ventana
+y permite contestar con botones y listas **sin plantillas aprobadas** — por eso se pudo probar
+antes de que Meta aprobara nada.
+
+**La ventana deja escribirle, no cambia quién aprueba.** La reserva entra por `crearReserva`, con
+las mismas validaciones y el mismo lock de capacidad que la página y el panel. No hay una segunda
+puerta para reservar, hay un segundo mostrador para el mismo trámite.
+
+El flujo es **guiado y no de texto libre** a propósito: interpretar "una mesa para el finde a la
+noche" es tentador y frágil, y una lista de días no se malinterpreta.
+
+### Cambios de esquema que esto exigió
+
+- `wa_conversacion` — dónde quedó cada cliente. Se descarta a los 30 min: retomar un flujo de ayer
+  con la fecha que eligió ayer sería peor que volver a empezar.
+- `whatsapp_mensaje.negocio_id` — la bitácora se diseñó para **un** número y sin esto no hay inbox
+  posible, porque no se sabe a quién mostrarle qué.
+
 ## Pendientes
 
 1. **Interpretar requerimientos.** Hoy la respuesta sólo confirma identidad y qué negocios
