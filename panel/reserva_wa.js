@@ -47,6 +47,22 @@ async function decir(cfg, waId, texto, negocioId) {
 }
 
 /**
+ * Igual que `decir`, pero para listas y botones. Existe porque `wa.enviarLista` y
+ * `wa.enviarBotones` mandan sin registrar: el inbox mostraba que el cliente eligió "Noche,
+ * primer turno" sin mostrar nunca la pregunta que se lo ofreció. Se guarda el texto y las
+ * opciones, que es lo que necesita leer una persona que abre la conversación después.
+ */
+async function decirOpciones(cfg, waId, texto, opciones, negocioId, enviar) {
+  const r = await enviar();
+  if (negocioId) await db.logWhatsapp({
+    direccion: 'saliente', wa_id: waId, negocio_id: negocioId, mensaje_id: r.id,
+    tipo: 'interactive', estado: r.ok ? 'enviado' : 'error',
+    texto: texto + '\n' + opciones.map(o => '· ' + o).join('\n'),
+  }).catch(() => {});
+  return r;
+}
+
+/**
  * Procesa un mensaje entrante en el número de un negocio.
  * Devuelve true si lo atendió (y por lo tanto ya contestó), false si no aplica.
  */
@@ -137,7 +153,9 @@ async function saludar(cfg, negocio, waId, canal, ofreceReservas, perfil) {
   if (ofreceReservas) botones.push({ id: 'no', titulo: 'Ahora no' });
 
   if (!botones.length) return false;
-  const r = await wa.enviarBotones(waId, `${saludo}\n\n¿En qué te puedo ayudar?`, botones, cfg);
+  const texto = `${saludo}\n\n¿En qué te puedo ayudar?`;
+  const r = await decirOpciones(cfg, waId, texto, botones.map(b => b.titulo), negocio.id,
+    () => wa.enviarBotones(waId, texto, botones, cfg));
   // Si los botones fallan (algún cliente viejo no los soporta), se sigue en texto plano.
   if (!r.ok) await decir(cfg, waId, saludo + (ofreceReservas
     ? '\n\nSi querés reservar, escribime "reservar". Si es otra cosa, contame y te respondemos.'
@@ -196,8 +214,9 @@ async function elegirDia(cfg, negocio, waId, entrada, datos = {}) {
   // Se conserva lo ya sabido: la fecha y el turno se descartan porque son justamente lo que se
   // está por elegir, pero la cantidad y el nombre siguen valiendo.
   await db.setConversacion(negocio.id, waId, 'dia', { cantidad: datos.cantidad, nombre: datos.nombre });
-  await wa.enviarLista(waId, '¿Para qué día?', 'Ver días',
-    fechas.map(f => ({ id: 'd:' + f, titulo: dia(f) })), cfg);
+  const filas = fechas.map(f => ({ id: 'd:' + f, titulo: dia(f) }));
+  await decirOpciones(cfg, waId, '¿Para qué día?', filas.map(f => f.titulo), negocio.id,
+    () => wa.enviarLista(waId, '¿Para qué día?', 'Ver días', filas, cfg));
   return true;
 }
 
@@ -211,9 +230,11 @@ async function elegirTurno(cfg, negocio, waId, entrada, datos) {
     return true;
   }
   await db.setConversacion(negocio.id, waId, 'turno', { ...datos, fecha });
-  await wa.enviarLista(waId, `${dia(fecha)}. ¿Qué turno?`, 'Ver turnos',
-    turnos.map(t => ({ id: 't:' + t.turno_id, titulo: t.nombre,
-                       detalle: `${t.hora_desde} a ${t.hora_hasta}` })), cfg);
+  const texto = `${dia(fecha)}. ¿Qué turno?`;
+  const filas = turnos.map(t => ({ id: 't:' + t.turno_id, titulo: t.nombre,
+                                   detalle: `${t.hora_desde} a ${t.hora_hasta}` }));
+  await decirOpciones(cfg, waId, texto, filas.map(f => `${f.titulo} (${f.detalle})`), negocio.id,
+    () => wa.enviarLista(waId, texto, 'Ver turnos', filas, cfg));
   return true;
 }
 
@@ -278,8 +299,10 @@ async function avanzar(cfg, negocio, waId, datos) {
   const resumen = `${dia(datos.fecha)}${t ? `, ${t.nombre} ${t.hora_desde}` : ''}\n` +
                   `${datos.cantidad} ${plural(cfgRes.unidad, datos.cantidad)}\nA nombre de ${datos.nombre}`;
   await db.setConversacion(negocio.id, waId, 'confirmar_voz', datos);
-  const r = await wa.enviarBotones(waId, `Entendí esto:\n\n${resumen}\n\n¿Lo confirmo?`,
-    [{ id: 'ok_voz', titulo: 'Sí, confirmá' }, { id: 'cambiar_voz', titulo: 'Cambiar algo' }], cfg);
+  const texto = `Entendí esto:\n\n${resumen}\n\n¿Lo confirmo?`;
+  const bot = [{ id: 'ok_voz', titulo: 'Sí, confirmá' }, { id: 'cambiar_voz', titulo: 'Cambiar algo' }];
+  const r = await decirOpciones(cfg, waId, texto, bot.map(b => b.titulo), negocio.id,
+    () => wa.enviarBotones(waId, texto, bot, cfg));
   if (!r.ok) await decir(cfg, waId, `Entendí esto:\n\n${resumen}\n\nRespondeme "sí" para confirmarlo.`, negocio.id);
   return true;
 }
