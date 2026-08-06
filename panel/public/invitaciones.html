@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Invitaciones</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="fonts/clausina-icono-180.png">
+<script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
+<style>
+  :root{--u-surf:#FFFFFF;--u-bg:#F7F5F1;--u-line:#DEDDD3;--u-fg:#0c0c0a;--u-mut:#5A616A;
+        --u-acc:#4d6800;--u-accfg:#FFFFFF;--u-ok:#4d6800;--u-mal:#C4442A;--u-medio:#8A6410;}
+  .dark{--u-surf:#12151A;--u-bg:#0c0c0a;--u-line:#20242B;--u-fg:#F5F2EC;--u-mut:#8A8F98;
+        --u-acc:#CCF24D;--u-accfg:#0c0c0a;--u-ok:#7BC96F;--u-mal:#FF6B4A;--u-medio:#E8A33D;}
+  .mtx{width:100%;border-collapse:separate;border-spacing:0;min-width:720px;}
+  .mtx th,.mtx td{padding:12px;text-align:left;border-bottom:1px solid var(--u-line);vertical-align:middle;}
+  .mtx tbody tr:last-child td{border-bottom:0;}
+  .mtx thead th{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.12em;
+                text-transform:uppercase;font-weight:400;white-space:nowrap;color:var(--u-mut);}
+  .mtx tbody tr:hover{background:rgba(127,127,127,.06);}
+  .mono2{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--u-mut);}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;
+        font-size:.6rem;padding:3px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap;}
+  /* Convención del panel: coral mientras falta algo, verde cuando está. Acá "activa" es verde
+     porque todavía sirve; ámbar es la que está a medio camino y gris la que ya no juega. */
+  .e-activa{color:var(--u-ok);} .e-en_uso{color:var(--u-medio);}
+  .e-agotada,.e-vencida,.e-anulada{color:var(--u-mut);}
+  /* El código es lo que se copia y se dicta: grande, monoespaciado y con el guión de lectura. */
+  .cod{font-family:'JetBrains Mono',monospace;font-size:.9rem;font-weight:500;color:var(--u-fg);
+       letter-spacing:.06em;background:none;border:0;cursor:pointer;padding:0;}
+  .cod:hover{color:var(--u-acc);}
+  .iconbtn{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;
+           border:1px solid var(--u-line);color:var(--u-mut);transition:.15s;background:none;cursor:pointer;}
+  .iconbtn:hover{color:var(--u-fg);border-color:var(--u-fg);}
+  .iconbtn.mal:hover{color:var(--u-mal);border-color:var(--u-mal);}
+  label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--u-mut);margin:14px 0 6px;}
+  input[type=text],input[type=number],input[type=date],select,textarea{width:100%;background:var(--u-bg);
+        border:1px solid var(--u-line);border-radius:8px;padding:9px 11px;font-family:'Inter',sans-serif;
+        font-size:.95rem;color:var(--u-fg);outline:none;}
+  textarea{min-height:80px;resize:vertical;}
+  input:focus,select:focus,textarea:focus{border-color:var(--u-acc);}
+  .btn{background:var(--u-acc);color:var(--u-accfg);border:none;border-radius:8px;font-weight:700;
+       padding:9px 18px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .btn2{background:none;border:1px solid var(--u-line);color:var(--u-mut);border-radius:8px;
+        padding:9px 18px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
+  .btn2:hover{color:var(--u-fg);border-color:var(--u-fg);}
+  .btn2.mal:hover{color:var(--u-mal);border-color:var(--u-mal);}
+  .btn2:disabled{opacity:.4;cursor:default;}
+  .btn2:disabled:hover{color:var(--u-mut);border-color:var(--u-line);}
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;place-items:center;z-index:140;padding:20px;}
+  .ov.on{display:grid;}
+  .dlg{background:var(--u-surf);border:1px solid var(--u-line);border-radius:16px;padding:26px;
+       width:min(620px,100%);max-height:88vh;overflow:auto;color:var(--u-fg);}
+  .err{color:var(--u-mal);font-family:'JetBrains Mono',monospace;font-size:.7rem;margin-top:12px;min-height:1em;}
+  .barra{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+  .aviso{border:1px solid var(--u-line);border-left:3px solid var(--u-medio);border-radius:10px;
+         padding:13px 16px;margin-bottom:18px;font-family:'JetBrains Mono',monospace;
+         font-size:.66rem;line-height:1.6;color:var(--u-mut);}
+  .aviso b{color:var(--u-fg);}
+  .chk{display:flex;align-items:center;gap:9px;text-transform:none;letter-spacing:0;
+       font-size:.85rem;color:var(--u-fg);cursor:pointer;margin-top:16px;}
+  .chk input{width:auto;}
+  .tabs{display:flex;gap:26px;border-bottom:1px solid var(--u-line);margin-bottom:22px;}
+  .tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 2px;cursor:pointer;
+       font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:.12em;
+       text-transform:uppercase;color:var(--u-mut);}
+  .tab.on{color:var(--u-fg);border-bottom-color:var(--u-acc);}
+  .pane{display:none;} .pane.on{display:block;}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:640px){.dos{grid-template-columns:1fr;}}
+  .dias{display:flex;gap:6px;flex-wrap:wrap;}
+  .dias label{margin:0;display:inline-flex;align-items:center;gap:5px;border:1px solid var(--u-line);
+              border-radius:8px;padding:6px 10px;cursor:pointer;text-transform:none;letter-spacing:0;
+              font-family:'Inter',sans-serif;font-size:.8rem;color:var(--u-fg);}
+  .dias input{width:auto;}
+  .vacio{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--u-mut);padding:30px 0;text-align:center;}
+</style>
+</head>
+<body class="bg-paper text-pfg dark:bg-ink dark:text-fg transition-colors">
+<div class="shell">
+  <main class="px-6 md:px-9 py-8 min-w-0">
+    <div class="flex items-baseline gap-3 mb-1 flex-wrap">
+      <h1 class="display font-bold text-xl tracking-tight">Invitaciones</h1>
+      <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
+    </div>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-6" style="max-width:78ch;line-height:1.6;">
+      Un <b>beneficio</b> define qué se regala. Una <b>invitación</b> es un código de ese beneficio
+      que se le manda a alguien y se valida al reservar.
+    </p>
+
+    <div class="aviso">
+      ClaUsina <b>no aplica el descuento</b>: no ve la factura. Emite el código, lo autoriza al
+      reservar, avisa al salón y mide el resultado. La cuenta la hace una persona en el mostrador.
+    </div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab on" data-pane="cod">Códigos</button>
+      <button class="tab" data-pane="ben">Beneficios</button>
+    </div>
+
+    <!-- ══════════ CÓDIGOS ══════════ -->
+    <div class="pane on" id="p-cod">
+      <div class="barra">
+        <select id="f-ben" style="width:auto;min-width:220px" onchange="cargarInv()"></select>
+        <span class="mono2" id="cuenta-cod"></span>
+        <button class="btn" style="margin-left:auto" onclick="abrirEmitir()">Emitir códigos</button>
+      </div>
+      <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card scrollx">
+        <table class="mtx">
+          <thead><tr><th>Código</th><th>Para</th><th>Beneficio</th><th>Estado</th>
+                     <th>Usos</th><th>Vence</th><th></th></tr></thead>
+          <tbody id="tb-cod"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══════════ BENEFICIOS ══════════ -->
+    <div class="pane" id="p-ben">
+      <div class="barra">
+        <span class="mono2" id="cuenta-ben"></span>
+        <button class="btn" style="margin-left:auto" onclick="abrirBeneficio()">Nuevo beneficio</button>
+      </div>
+      <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card scrollx">
+        <table class="mtx">
+          <thead><tr><th>Nombre</th><th>Da</th><th>Cuándo aplica</th><th>Si no viene</th>
+                     <th>Códigos</th><th></th></tr></thead>
+          <tbody id="tb-ben"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ══════════ Diálogo: beneficio ══════════ -->
+<div class="ov" id="ov-ben"><div class="dlg">
+  <h2 class="display font-bold text-lg mb-1" id="ben-tit">Nuevo beneficio</h2>
+  <p class="mono2" style="margin-bottom:6px;">Qué se regala y en qué condiciones.</p>
+  <input type="hidden" id="b-id">
+  <label for="b-nombre">Nombre</label>
+  <input type="text" id="b-nombre" placeholder="Invitación prensa, 20% amigos del local…">
+  <div class="dos">
+    <div>
+      <label for="b-tipo">Tipo</label>
+      <select id="b-tipo" onchange="pintarAyudaTipo()"></select>
+    </div>
+    <div>
+      <label for="b-valor" id="b-valor-lab">Valor</label>
+      <input type="number" id="b-valor" min="1" step="1">
+    </div>
+  </div>
+  <div class="mono2" id="b-ayuda" style="margin-top:6px;"></div>
+
+  <label>Días en que aplica</label>
+  <div class="dias" id="b-dias"></div>
+  <div class="mono2" style="margin-top:6px;">Sin marcar ninguno, aplica todos los días. Restringir a
+    los días flojos es lo que hace que una invitación llene una mesa vacía en vez de regalar una
+    que se vendía sola.</div>
+
+  <label for="b-turnos">Turnos en que aplica</label>
+  <select id="b-turnos" multiple size="4"></select>
+  <div class="mono2" style="margin-top:6px;">Sin seleccionar ninguno, aplica a todos.</div>
+
+  <div class="dos">
+    <div><label for="b-cmin">Mínimo de personas</label><input type="number" id="b-cmin" min="1" placeholder="sin mínimo"></div>
+    <div><label for="b-cmax">Máximo de personas</label><input type="number" id="b-cmax" min="1" placeholder="sin máximo"></div>
+  </div>
+
+  <label for="b-noshow">Si reserva y no viene</label>
+  <select id="b-noshow">
+    <option value="liberar">Liberar — la invitación vuelve a estar disponible</option>
+    <option value="quemar">Quemar — la invitación se pierde</option>
+  </select>
+
+  <label class="chk" for="b-activo"><input type="checkbox" id="b-activo" checked>
+    Activo (se pueden emitir y usar códigos)</label>
+  <div class="err" id="b-err"></div>
+  <div style="display:flex;gap:10px;margin-top:18px;">
+    <button class="btn" onclick="guardarBeneficio()">Guardar</button>
+    <button class="btn2" onclick="cerrar('ov-ben')">Cancelar</button>
+  </div>
+</div></div>
+
+<!-- ══════════ Diálogo: emitir ══════════ -->
+<div class="ov" id="ov-emitir"><div class="dlg">
+  <h2 class="display font-bold text-lg mb-1">Emitir códigos</h2>
+  <p class="mono2" style="margin-bottom:6px;">Cada código es único y se rastrea por separado.</p>
+  <label for="e-ben">Beneficio</label>
+  <select id="e-ben"></select>
+
+  <label for="e-etiquetas">Para quién (uno por línea)</label>
+  <textarea id="e-etiquetas" placeholder="Juan Pérez&#10;María López&#10;Revista Barrio"
+            oninput="sincronizarCantidad()"></textarea>
+  <div class="mono2" style="margin-top:6px;">Opcional, pero es lo que después permite saber quién
+    usó qué. Si lo dejás vacío se emiten códigos sin nombre, para repartir en mano.</div>
+
+  <div class="dos">
+    <div><label for="e-cantidad">Cuántos códigos</label><input type="number" id="e-cantidad" min="1" max="500" value="1"></div>
+    <div><label for="e-usos">Usos por código</label><input type="number" id="e-usos" min="1" value="1"></div>
+  </div>
+  <div class="mono2" style="margin-top:6px;"><b>1 uso</b> = invitación personal, se ata al teléfono
+    de quien la canjea primero. <b>Más de 1</b> = código compartido con cupo, para mandar a una
+    lista ("los primeros 20").</div>
+
+  <label for="e-vence">Vence el</label>
+  <input type="date" id="e-vence">
+
+  <div class="err" id="e-err"></div>
+  <div style="display:flex;gap:10px;margin-top:18px;">
+    <button class="btn" onclick="emitir()">Emitir</button>
+    <button class="btn2" onclick="cerrar('ov-emitir')">Cancelar</button>
+  </div>
+</div></div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="shell.js"></script>
+<script>ClausinaShell({active:'invitaciones',cap:'invitaciones'})</script>
+<script>
+const $ = id => document.getElementById(id);
+const escapar = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const DIAS = [[1,'lun'],[2,'mar'],[3,'mié'],[4,'jue'],[5,'vie'],[6,'sáb'],[7,'dom']];
+const ESTADOS = { activa:'activa', en_uso:'en uso', agotada:'agotada', vencida:'vencida', anulada:'anulada' };
+let BENEFICIOS = [], TIPOS = [], TURNOS = [], INV = [];
+
+const bonito = c => String(c || '').replace(/^(.{3})(.{3})$/, '$1-$2');
+const cerrar = id => $(id).classList.remove('on');
+
+document.getElementById('tabs').addEventListener('click', e => {
+  const b = e.target.closest('.tab'); if (!b) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t === b));
+  document.querySelectorAll('.pane').forEach(x => x.classList.toggle('on', x.id === 'p-' + b.dataset.pane));
+});
+
+/* ═══════ Beneficios ═══════ */
+function condicionesTxt(b) {
+  const c = b.condiciones || {};
+  const p = [];
+  if ((c.dias || []).length) p.push(c.dias.map(d => (DIAS.find(x => x[0] === d) || [])[1]).join(' '));
+  if ((c.turnos || []).length) {
+    p.push(c.turnos.map(t => (TURNOS.find(x => x.id === t) || {}).nombre_publico ||
+                             (TURNOS.find(x => x.id === t) || {}).nombre || '?').join(', '));
+  }
+  if (c.cantidad_min) p.push('desde ' + c.cantidad_min);
+  if (c.cantidad_max) p.push('hasta ' + c.cantidad_max);
+  return p.length ? p.join(' · ') : 'siempre';
+}
+
+async function cargarBeneficios() {
+  const d = await fetch('api/invitaciones/beneficios').then(r => r.json()).catch(() => ({}));
+  BENEFICIOS = d.beneficios || []; TIPOS = d.tipos || []; TURNOS = d.turnos || [];
+  $('cuenta-ben').textContent = BENEFICIOS.length + ' beneficio(s)';
+  $('tb-ben').innerHTML = BENEFICIOS.length ? BENEFICIOS.map(b => `
+    <tr${b.activo ? '' : ' style="opacity:.5"'}>
+      <td><b>${escapar(b.nombre)}</b>${b.activo ? '' : ' <span class="pill e-anulada">inactivo</span>'}</td>
+      <td>${escapar(b.texto)}</td>
+      <td class="mono2">${escapar(condicionesTxt(b))}</td>
+      <td class="mono2">${b.no_show === 'quemar' ? 'se pierde' : 'se libera'}</td>
+      <td class="mono2">${b.invitaciones} emitidos${b.consumidas ? ' · ' + b.consumidas + ' usados' : ''}</td>
+      <td><button class="iconbtn" onclick='abrirBeneficio(${JSON.stringify(b.id)})' title="Editar"
+            aria-label="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button></td>
+    </tr>`).join('') : '<tr><td colspan="6" class="vacio">Todavía no hay beneficios. Creá uno para poder emitir códigos.</td></tr>';
+
+  // Los selectores de beneficio de las dos pantallas salen de la misma lista.
+  const activos = BENEFICIOS.filter(b => b.activo);
+  $('e-ben').innerHTML = activos.map(b =>
+    `<option value="${escapar(b.id)}">${escapar(b.nombre)} — ${escapar(b.texto)}</option>`).join('');
+  $('f-ben').innerHTML = '<option value="">Todos los beneficios</option>' + BENEFICIOS.map(b =>
+    `<option value="${escapar(b.id)}">${escapar(b.nombre)}</option>`).join('');
+  if (window.lucide) lucide.createIcons();
+}
+
+function pintarAyudaTipo() {
+  const t = TIPOS.find(x => x.id === $('b-tipo').value) || {};
+  $('b-ayuda').textContent = t.desc || '';
+  $('b-valor-lab').textContent = t.id === 'porcentaje' ? 'Porcentaje'
+    : t.id === 'gratis_hasta' ? 'Cantidad de personas' : 'Monto en pesos';
+}
+
+function abrirBeneficio(id) {
+  const b = BENEFICIOS.find(x => x.id === id) || null;
+  $('ben-tit').textContent = b ? 'Editar beneficio' : 'Nuevo beneficio';
+  $('b-id').value = b ? b.id : '';
+  $('b-nombre').value = b ? b.nombre : '';
+  $('b-tipo').innerHTML = TIPOS.map(t => `<option value="${escapar(t.id)}">${escapar(t.label)}</option>`).join('');
+  $('b-tipo').value = b ? b.tipo : (TIPOS[0] || {}).id;
+  $('b-valor').value = b ? Number(b.valor) : '';
+  const c = (b && b.condiciones) || {};
+  $('b-dias').innerHTML = DIAS.map(([n, l]) =>
+    `<label><input type="checkbox" value="${n}" ${(c.dias || []).includes(n) ? 'checked' : ''}>${l}</label>`).join('');
+  $('b-turnos').innerHTML = TURNOS.map(t =>
+    `<option value="${escapar(t.id)}" ${(c.turnos || []).includes(t.id) ? 'selected' : ''}>` +
+    `${escapar(t.nombre_publico || t.nombre)} (${t.hora_desde}–${t.hora_hasta})</option>`).join('');
+  $('b-cmin').value = c.cantidad_min || '';
+  $('b-cmax').value = c.cantidad_max || '';
+  $('b-noshow').value = b ? b.no_show : 'liberar';
+  $('b-activo').checked = b ? !!b.activo : true;
+  $('b-err').textContent = '';
+  pintarAyudaTipo();
+  $('ov-ben').classList.add('on');
+}
+
+async function guardarBeneficio() {
+  const e = $('b-err'); e.textContent = 'guardando…';
+  const cuerpo = {
+    nombre: $('b-nombre').value, tipo: $('b-tipo').value, valor: $('b-valor').value,
+    dias: [...$('b-dias').querySelectorAll('input:checked')].map(i => +i.value),
+    turnos: [...$('b-turnos').selectedOptions].map(o => o.value),
+    cantidad_min: $('b-cmin').value, cantidad_max: $('b-cmax').value,
+    no_show: $('b-noshow').value, activo: $('b-activo').checked,
+  };
+  const id = $('b-id').value;
+  try {
+    const r = await fetch('api/invitaciones/beneficios' + (id ? '/' + id : ''),
+      { method: id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cuerpo) });
+    const j = await r.json();
+    if (!r.ok || !j.ok) { e.textContent = j.mensaje || 'No se pudo guardar.'; return; }
+    cerrar('ov-ben'); await cargarBeneficios(); cargarInv();
+  } catch (x) { e.textContent = 'Error de conexión.'; }
+}
+
+/* ═══════ Códigos ═══════ */
+async function cargarInv() {
+  const b = $('f-ben').value;
+  const d = await fetch('api/invitaciones' + (b ? '?beneficio_id=' + encodeURIComponent(b) : ''))
+    .then(r => r.json()).catch(() => ({}));
+  INV = d.invitaciones || [];
+  $('cuenta-cod').textContent = INV.length + ' código(s)';
+  $('sub').textContent = BENEFICIOS.length + ' beneficio(s) · ' + INV.length + ' código(s)';
+  $('tb-cod').innerHTML = INV.length ? INV.map(i => `
+    <tr>
+      <td><button class="cod" onclick='copiar(${JSON.stringify(i.codigo)})'
+            title="Copiar el código">${escapar(bonito(i.codigo))}</button></td>
+      <td>${escapar(i.etiqueta || '—')}</td>
+      <td class="mono2">${escapar(i.texto)}</td>
+      <td><span class="pill e-${escapar(i.estado)}">${escapar(ESTADOS[i.estado] || i.estado)}</span></td>
+      <td class="mono2">${i.usos}/${i.usos_max}</td>
+      <td class="mono2">${i.vence_en ? escapar(fecha(i.vence_en)) : '—'}</td>
+      <td style="white-space:nowrap;">
+        <button class="iconbtn" onclick='copiarEnlace(${JSON.stringify(i.codigo)})'
+          title="Copiar el enlace para mandar" aria-label="Copiar enlace"><i data-lucide="link" class="w-4 h-4"></i></button>
+        ${['activa','en_uso'].includes(i.estado) ? `<button class="iconbtn mal" onclick='anular(${JSON.stringify(i.id)})'
+          title="Dar de baja" aria-label="Dar de baja"><i data-lucide="ban" class="w-4 h-4"></i></button>` : ''}
+      </td>
+    </tr>`).join('') : '<tr><td colspan="7" class="vacio">Todavía no emitiste códigos.</td></tr>';
+  if (window.lucide) lucide.createIcons();
+}
+
+const fecha = iso => iso ? String(iso).slice(0, 10).split('-').reverse().join('/') : '';
+
+async function copiar(c) {
+  try { await navigator.clipboard.writeText(c); avisar('código ' + bonito(c) + ' copiado'); }
+  catch (e) { avisar('no pude copiar'); }
+}
+async function copiarEnlace(c) {
+  try { await navigator.clipboard.writeText(location.origin + '/i/' + c); avisar('enlace copiado'); }
+  catch (e) { avisar('no pude copiar'); }
+}
+function avisar(t) {
+  const s = $('cuenta-cod'), previo = s.textContent;
+  s.textContent = t; setTimeout(() => { s.textContent = previo; }, 2200);
+}
+
+function sincronizarCantidad() {
+  // Escribir cinco nombres y que se emita uno solo es el error obvio: la cantidad sigue a la lista.
+  const n = $('e-etiquetas').value.split('\n').map(x => x.trim()).filter(Boolean).length;
+  if (n) $('e-cantidad').value = n;
+}
+
+function abrirEmitir() {
+  if (!BENEFICIOS.filter(b => b.activo).length) {
+    alert('Primero creá un beneficio activo: es lo que define qué da el código.');
+    return;
+  }
+  $('e-etiquetas').value = ''; $('e-cantidad').value = 1; $('e-usos').value = 1;
+  $('e-vence').value = ''; $('e-err').textContent = '';
+  const sel = $('f-ben').value; if (sel) $('e-ben').value = sel;
+  $('ov-emitir').classList.add('on');
+}
+
+async function emitir() {
+  const e = $('e-err'); e.textContent = 'emitiendo…';
+  try {
+    const r = await fetch('api/invitaciones/emitir', { method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ beneficio_id: $('e-ben').value, etiquetas: $('e-etiquetas').value,
+        cantidad: $('e-cantidad').value, usos_max: $('e-usos').value, vence_en: $('e-vence').value }) });
+    const j = await r.json();
+    if (!r.ok || !j.ok) { e.textContent = j.mensaje || 'No se pudo emitir.'; return; }
+    cerrar('ov-emitir');
+    $('f-ben').value = '';
+    await cargarBeneficios(); await cargarInv();
+    avisar(j.invitaciones.length + ' código(s) emitido(s)');
+  } catch (x) { e.textContent = 'Error de conexión.'; }
+}
+
+async function anular(id) {
+  const i = INV.find(x => x.id === id);
+  if (!confirm('¿Dar de baja el código ' + bonito(i && i.codigo) + '? Deja de servir para siempre.')) return;
+  try {
+    const r = await fetch('api/invitaciones/' + id + '/anular', { method: 'POST' });
+    if (r.ok) cargarInv(); else alert('No se pudo dar de baja.');
+  } catch (e) { alert('Error de conexión.'); }
+}
+
+(async () => { await cargarBeneficios(); await cargarInv(); })();
+</script>
+</body>
+</html>

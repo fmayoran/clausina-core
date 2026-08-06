@@ -909,6 +909,57 @@ app.post('/api/whatsapp/faq/sugerir', async (req, res) => {
   } catch (e) { console.error('faq sugerir', e.message); res.status(500).json({ error: 'ia' }); }
 });
 
+// --- Invitaciones (v2.0 / F6) --------------------------------------------------------------
+app.get('/api/invitaciones/beneficios', async (req, res) => {
+  try {
+    const bs = await db.getBeneficios(req.negocioId);
+    res.json({
+      // El texto se arma en el servidor y no en la pantalla: el mismo beneficio se muestra igual
+      // en el panel, en la página pública y en WhatsApp, y hay una sola versión de esa frase.
+      beneficios: bs.map(b => ({ ...b, texto: db.textoBeneficio(b) })),
+      tipos: db.TIPOS_BENEFICIO,
+      turnos: (await db.getTurnos(req.negocioId)).filter(t => t.activo),
+    });
+  } catch (e) { console.error('beneficios', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+const guardarBen = async (req, res) => {
+  try {
+    const b = await db.guardarBeneficio(req.negocioId, req.params.id || null, req.body || {});
+    res.json({ ok: true, beneficio: b });
+  } catch (e) {
+    // El motivo va al frente: "no se pudo guardar" obliga a adivinar cuál de los campos falló.
+    const msg = { falta_nombre: 'Poné un nombre.', tipo_invalido: 'Elegí un tipo.',
+                  valor_invalido: 'El valor no es válido (el porcentaje no puede pasar de 100).',
+                  no_encontrado: 'Ese beneficio no existe.' }[e.code];
+    if (msg) return res.status(400).json({ ok: false, mensaje: msg });
+    console.error('beneficio guardar', e.message); res.status(500).json({ ok: false, mensaje: 'Error del servidor.' });
+  }
+};
+app.post('/api/invitaciones/beneficios', guardarBen);
+app.put('/api/invitaciones/beneficios/:id', guardarBen);
+
+app.get('/api/invitaciones', async (req, res) => {
+  try {
+    const is = await db.getInvitaciones(req.negocioId, { beneficio_id: req.query.beneficio_id });
+    res.json({ invitaciones: is.map(i => ({ ...i, texto: db.textoBeneficio(i) })) });
+  } catch (e) { console.error('invitaciones', e.message); res.status(500).json({ error: 'db' }); }
+});
+
+app.post('/api/invitaciones/emitir', async (req, res) => {
+  try {
+    res.json({ ok: true, invitaciones: await db.emitirInvitaciones(req.negocioId, req.body || {}) });
+  } catch (e) {
+    if (e.code === 'beneficio_invalido') return res.status(400).json({ ok: false, mensaje: 'Elegí un beneficio.' });
+    console.error('emitir', e.message); res.status(500).json({ ok: false, mensaje: 'Error del servidor.' });
+  }
+});
+
+app.post('/api/invitaciones/:id/anular', async (req, res) => {
+  try { res.json(await db.anularInvitacion(req.negocioId, req.params.id)); }
+  catch (e) { console.error('anular', e.message); res.status(500).json({ ok: false }); }
+});
+
 app.get('/api/whatsapp/inbox', async (req, res) => {
   try { res.json({ conversaciones: await db.getInbox(req.negocioId) }); }
   catch (e) { console.error('wa inbox', e.message); res.status(500).json({ error: 'db' }); }
