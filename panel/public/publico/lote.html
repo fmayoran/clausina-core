@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pliego de invitaciones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700;800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  /* A6 exacto y sin márgenes: la imprenta recorta al borde, así que el sangrado lo pone el
+     diseño y no el navegador. Una tarjeta por página, frente y dorso alternados, que es como
+     se manda a imprimir a doble faz. */
+  @page{size:A6;margin:0;}
+  :root{--f-tit:'Inter Tight',sans-serif;--f-txt:'Inter',sans-serif;
+        --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-linea:#2a2a33;}
+  *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  body{background:#4a4a4a;font-family:var(--f-txt);}
+  .cara{width:105mm;height:148mm;background:var(--c-fondo);color:var(--c-tinta);
+        display:flex;flex-direction:column;align-items:center;justify-content:center;
+        text-align:center;padding:11mm 9mm;position:relative;overflow:hidden;
+        page-break-after:always;break-after:page;margin:0 auto 6mm;}
+  /* El frente: si el negocio tiene una pieza gráfica se usa esa; si no, el logo sobre su color. */
+  .frente{padding:0;}
+  .frente img{width:100%;height:100%;object-fit:cover;display:block;}
+  .frente .fallback{display:flex;flex-direction:column;align-items:center;justify-content:center;
+                    gap:7mm;width:100%;height:100%;padding:12mm;}
+  .frente .fallback img{width:auto;max-width:70%;max-height:34mm;object-fit:contain;}
+  .frente .lema{font-family:var(--f-tit);font-weight:800;font-size:7.4mm;line-height:1.08;
+                text-transform:uppercase;color:var(--c-acento);}
+  .logo{max-height:19mm;max-width:74%;width:auto;margin-bottom:7mm;}
+  .titulo{font-family:var(--f-tit);font-weight:800;font-size:6.4mm;line-height:1.08;
+          text-transform:uppercase;color:var(--c-acento);}
+  .beneficio{font-size:4.1mm;line-height:1.35;margin:3mm 0 0;opacity:.92;}
+  .para{font-size:3.6mm;opacity:.75;margin-top:1.5mm;}
+  .codigo{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:9mm;
+          letter-spacing:.13em;padding:5mm 3mm;border:.4mm dashed var(--c-linea);
+          border-radius:3mm;margin:7mm 0 2.5mm;width:100%;}
+  .rotulo{font-family:'JetBrains Mono',monospace;font-size:2.4mm;letter-spacing:.22em;
+          text-transform:uppercase;opacity:.6;}
+  .cond{font-family:'JetBrains Mono',monospace;font-size:2.6mm;line-height:1.75;opacity:.72;
+        margin-top:4mm;}
+  .otra{font-family:'JetBrains Mono',monospace;font-size:2.5mm;line-height:1.7;opacity:.7;
+        margin-top:5mm;}
+  .pie{font-family:'JetBrains Mono',monospace;font-size:2.1mm;opacity:.5;line-height:1.6;
+       margin-top:auto;padding-top:5mm;}
+  /* Barra de control: sólo en pantalla. */
+  .ctrl{position:sticky;top:0;z-index:5;background:#17171b;color:#eee;padding:12px 16px;
+        display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:.86rem;
+        font-family:'JetBrains Mono',monospace;}
+  .ctrl button,.ctrl select{background:none;border:1px solid #444;color:#eee;border-radius:7px;
+        padding:7px 13px;cursor:pointer;font-family:inherit;font-size:.82rem;}
+  .ctrl button.p{background:#CCF24D;color:#111;border-color:#CCF24D;font-weight:700;}
+  .ctrl .nota{opacity:.6;}
+  @media print{ .ctrl{display:none !important;} body{background:#fff;} .cara{margin:0;} }
+</style>
+</head>
+<body>
+<div class="ctrl">
+  <span id="cuenta">cargando…</span>
+  <label>Frente:
+    <select id="sel-frente" onchange="pintar()"><option value="">logo del negocio</option></select>
+  </label>
+  <button class="p" onclick="window.print()">Imprimir / Guardar PDF</button>
+  <span class="nota">A6 · una cara por página · imprimir a doble faz, borde corto</span>
+</div>
+<div id="hojas"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const CODIGOS = decodeURIComponent(location.pathname.split('/').pop() || '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+const DIAS = { 1:'lunes', 2:'martes', 3:'miércoles', 4:'jueves', 5:'viernes', 6:'sábados', 7:'domingos' };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const fecha = iso => String(iso || '').slice(0, 10).split('-').reverse().join('/');
+let PASES = [], PIEZAS = [];
+
+function marca(m) {
+  if (!m || !Object.keys(m).length) return;
+  const r = document.documentElement.style;
+  const map = { fondo:'--c-fondo', tinta:'--c-tinta', acento:'--c-acento', linea:'--c-linea' };
+  for (const k in map) if (m[k]) r.setProperty(map[k], m[k]);
+  if (m.fuente_titulo) r.setProperty('--f-tit', `'${m.fuente_titulo}', sans-serif`);
+  if (m.fuente_texto) r.setProperty('--f-txt', `'${m.fuente_texto}', sans-serif`);
+}
+
+function condiciones(j) {
+  const c = j.condiciones || {}, l = [];
+  if ((c.dias || []).length && c.dias.length < 7) l.push('Válida ' + c.dias.map(d => DIAS[d]).join(', '));
+  if ((c.franjas || []).length === 1) l.push('Sólo al ' + c.franjas[0].toLowerCase());
+  if (c.cantidad_max) l.push('Hasta ' + c.cantidad_max + ' personas');
+  if (j.vence_en) l.push('Vence el ' + fecha(j.vence_en));
+  return l.join('<br>');
+}
+
+function pintar() {
+  const frente = $('sel-frente').value;
+  $('hojas').innerHTML = PASES.map(j => {
+    // Frente: la pieza elegida a sangre, o el logo del negocio sobre su color.
+    const caraFrente = frente
+      ? `<div class="cara frente"><img src="${esc(frente)}" alt=""></div>`
+      : `<div class="cara frente"><div class="fallback">
+           ${j.logo ? `<img src="${esc(j.logo)}" alt="">` : ''}
+           <div class="lema">Invitación especial</div></div></div>`;
+    const wa = j.whatsapp ? j.whatsapp.replace(/[^0-9+ -]/g, '') : '';
+    return caraFrente + `
+      <div class="cara">
+        ${j.logo ? `<img class="logo" src="${esc(j.logo)}" alt="">` : ''}
+        <div class="titulo">Invitación especial</div>
+        <div class="beneficio">${esc(j.texto)}</div>
+        ${j.etiqueta ? `<div class="para">Para ${esc(j.etiqueta)}</div>` : ''}
+        <div class="codigo">${esc(j.codigo.replace(/^(.{3})(.{3})$/, '$1-$2'))}</div>
+        <div class="rotulo">Presentá este código al reservar</div>
+        <div class="cond">${condiciones(j)}</div>
+        ${wa ? `<div class="otra">Reservá en ${esc(j.negocio_slug)}.ar<br>o por WhatsApp al ${esc(wa)}</div>` : ''}
+        <div class="pie">Presentá esta invitación al llegar al local para validarla ·
+          Sujeta a disponibilidad · El descuento se aplica al pagar</div>
+      </div>`;
+  }).join('');
+  $('cuenta').textContent = `${PASES.length} invitación(es) · ${PASES.length * 2} caras`;
+}
+
+(async () => {
+  const rs = await Promise.all(CODIGOS.map(c =>
+    fetch('/api/publico/pase/' + encodeURIComponent(c)).then(r => r.json()).catch(() => null)));
+  PASES = rs.filter(j => j && j.ok);
+  if (!PASES.length) { $('cuenta').textContent = 'No hay invitaciones para imprimir.'; return; }
+  marca(PASES[0].marca);
+
+  // Piezas gráficas del negocio para usar de frente. Es opcional: sin ninguna, va el logo.
+  try {
+    const p = await fetch('/api/publico/' + encodeURIComponent(PASES[0].negocio_slug) + '/piezas')
+      .then(r => r.json());
+    PIEZAS = p.piezas || [];
+    $('sel-frente').innerHTML = '<option value="">logo del negocio</option>' +
+      PIEZAS.map(x => `<option value="${esc(x.url)}">${esc(x.titulo)}</option>`).join('');
+  } catch (e) {}
+  pintar();
+})();
+</script>
+</body>
+</html>

@@ -1503,6 +1503,21 @@ async function consultarInvitacion(codigo, negocioId = null) {
  * 2. No se nombran los turnos, se dice la franja. "Noche F. Semana T2" es una clave interna del
  *    negocio; al invitado le sirve "Noche", y elegir el turno exacto es un tema de la reserva.
  */
+/**
+ * Piezas ya PUBLICADAS del negocio, para usar de frente de una invitación impresa. Sólo las
+ * publicadas: lo que todavía está en la cola es material de trabajo y no sale de acá.
+ */
+async function piezasPublicadas(negocioId) {
+  const { rows } = await pool.query(
+    `SELECT pz.titulo_interno, pz.canal, m.url
+       FROM contenido.piezas pz
+       JOIN contenido.revisiones r ON r.id = pz.revision_vigente
+       JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1 AND m.tipo = 'imagen'
+      WHERE pz.negocio_id = $1 AND pz.estado = 'publicada'
+      ORDER BY COALESCE(r.publicado_en, pz.actualizado_en) DESC LIMIT 40`, [negocioId]);
+  return rows.map(r => ({ titulo: `${r.titulo_interno || 'sin título'} (${r.canal})`, url: r.url }));
+}
+
 async function condicionesLegibles(negocioId, cond) {
   const c = cond || {};
   const { rows: turnos } = await pool.query(
@@ -3202,7 +3217,7 @@ module.exports = {
   completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, clientePorTelefono,
   TIPOS_BENEFICIO, textoBeneficio, getBeneficios, guardarBeneficio,
   emitirInvitaciones, getInvitaciones, anularInvitacion, consultarInvitacion,
-  cerrarUso, liberarPorReserva, invitacionDeReserva, condicionesLegibles, guardarToken, getUsuarioPorToken, consumirToken,
+  cerrarUso, liberarPorReserva, invitacionDeReserva, condicionesLegibles, piezasPublicadas, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
   getClientes, crearCliente, actualizarCliente, borrarCliente, exportarClientes, borrarTodosLosClientes,

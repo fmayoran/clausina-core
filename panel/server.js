@@ -244,6 +244,24 @@ app.get('/pase/:codigo', async (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'publico', 'pase.html'));
 });
 
+// El pliego para imprenta: varias invitaciones en A6, frente y dorso. No genera el PDF acá —
+// lo hace el navegador al imprimir, que además deja elegir impresora y márgenes. Meter un
+// generador de PDF en la imagen del panel serían 700 MB para hacer lo mismo peor.
+app.get('/pase/lote/:codigos', async (req, res) => {
+  if (!limite(req, res, 20, 60e3)) return;
+  res.sendFile(path.join(__dirname, 'public', 'publico', 'lote.html'));
+});
+
+// Piezas publicadas, para usarlas de frente del impreso.
+app.get('/api/publico/:slug/piezas', async (req, res) => {
+  if (!limite(req, res, 60, 60e3)) return;
+  try {
+    const n = await db.negocioPublico(String(req.params.slug));
+    if (!n) return res.status(404).json({ error: 'no_disponible' });
+    res.json({ piezas: await db.piezasPublicadas(n.id) });
+  } catch (e) { console.error('piezas publicas', e.message); res.status(500).json({ error: 'error' }); }
+});
+
 app.get('/api/publico/pase/:codigo', async (req, res) => {
   if (!limite(req, res, 60, 60e3)) return;
   try {

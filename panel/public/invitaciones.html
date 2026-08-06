@@ -107,13 +107,24 @@
     <!-- ══════════ CÓDIGOS ══════════ -->
     <div class="pane on" id="p-cod">
       <div class="barra">
-        <select id="f-ben" style="width:auto;min-width:220px" onchange="cargarInv()"></select>
+        <select id="f-ben" style="width:auto;min-width:190px" onchange="cargarInv()"></select>
+        <select id="f-estado" style="width:auto" onchange="pintarInv()">
+          <option value="">Todos los estados</option>
+          <option value="activa">Activas</option>
+          <option value="en_uso">En uso</option>
+          <option value="agotada">Agotadas</option>
+          <option value="vencida">Vencidas</option>
+          <option value="anulada">Anuladas</option>
+        </select>
+        <input type="text" id="f-txt" placeholder="Buscar por nombre o código…"
+               style="width:auto;flex:1;min-width:180px" oninput="pintarInv()">
         <span class="mono2" id="cuenta-cod"></span>
-        <button class="btn" style="margin-left:auto" onclick="abrirEmitir()">Emitir códigos</button>
+        <button class="btn2" onclick="imprimirLote()">Imprimir lote</button>
+        <button class="btn" onclick="abrirEmitir()">Emitir códigos</button>
       </div>
       <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card scrollx">
         <table class="mtx">
-          <thead><tr><th>Código</th><th>Para</th><th>Beneficio</th><th>Estado</th>
+          <thead><tr><th>Código</th><th>Invitación</th><th>Para</th><th>Da</th><th>Estado</th>
                      <th>Usos</th><th>Vence</th><th></th></tr></thead>
           <tbody id="tb-cod"></tbody>
         </table>
@@ -339,12 +350,29 @@ async function cargarInv() {
   const d = await fetch('api/invitaciones' + (b ? '?beneficio_id=' + encodeURIComponent(b) : ''))
     .then(r => r.json()).catch(() => ({}));
   INV = d.invitaciones || [];
-  $('cuenta-cod').textContent = INV.length + ' código(s)';
   $('sub').textContent = BENEFICIOS.length + ' beneficio(s) · ' + INV.length + ' código(s)';
-  $('tb-cod').innerHTML = INV.length ? INV.map(i => `
+  pintarInv();
+}
+
+/** Lo que se ve tras los filtros. Se separa de cargarInv para que filtrar no pida nada de red. */
+function filtradas() {
+  const est = $('f-estado').value;
+  const q = $('f-txt').value.trim().toLowerCase();
+  return INV.filter(i =>
+    (!est || i.estado === est) &&
+    (!q || [i.beneficio, i.etiqueta, i.codigo, i.texto].some(x =>
+      String(x || '').toLowerCase().includes(q))));
+}
+
+function pintarInv() {
+  const lista = filtradas();
+  $('cuenta-cod').textContent = lista.length === INV.length
+    ? INV.length + ' código(s)' : lista.length + ' de ' + INV.length;
+  $('tb-cod').innerHTML = lista.length ? lista.map(i => `
     <tr>
       <td><button class="cod" onclick='copiar(${JSON.stringify(i.codigo)})'
             title="Copiar el código">${escapar(bonito(i.codigo))}</button></td>
+      <td>${escapar(i.beneficio)}</td>
       <td>${escapar(i.etiqueta || '—')}</td>
       <td class="mono2">${escapar(i.texto)}</td>
       <td><span class="pill e-${escapar(i.estado)}">${escapar(ESTADOS[i.estado] || i.estado)}</span></td>
@@ -358,7 +386,8 @@ async function cargarInv() {
         ${['activa','en_uso'].includes(i.estado) ? `<button class="iconbtn mal" onclick='anular(${JSON.stringify(i.id)})'
           title="Dar de baja" aria-label="Dar de baja"><i data-lucide="ban" class="w-4 h-4"></i></button>` : ''}
       </td>
-    </tr>`).join('') : '<tr><td colspan="7" class="vacio">Todavía no emitiste códigos.</td></tr>';
+    </tr>`).join('') : `<tr><td colspan="8" class="vacio">${INV.length
+      ? 'Ningún código coincide con el filtro.' : 'Todavía no emitiste códigos.'}</td></tr>`;
   if (window.lucide) lucide.createIcons();
 }
 
@@ -410,6 +439,16 @@ async function emitir() {
     await cargarBeneficios(); await cargarInv();
     avisar(j.invitaciones.length + ' código(s) emitido(s)');
   } catch (x) { e.textContent = 'Error de conexión.'; }
+}
+
+/**
+ * Manda a imprimir LO QUE ESTÁ FILTRADO, no todo: si alguien filtró por una campaña es porque
+ * quiere imprimir esa campaña. El pliego se abre en otra pestaña y desde ahí se guarda como PDF.
+ */
+function imprimirLote() {
+  const lista = filtradas().filter(i => ['activa', 'en_uso'].includes(i.estado));
+  if (!lista.length) { alert('No hay códigos vigentes en lo que estás viendo.'); return; }
+  window.open('/pase/lote/' + lista.map(i => i.codigo).join(',') , '_blank', 'noopener');
 }
 
 async function anular(id) {
