@@ -1492,6 +1492,26 @@ async function consultarInvitacion(codigo, negocioId = null) {
   return { ok: true, invitacion: i, texto: textoBeneficio(i) };
 }
 
+/**
+ * Las condiciones en palabras, con los NOMBRES de los turnos y no sus uuid. Se usa en el pase y
+ * en la página pública: si la invitación vale sólo de noche y el pase no lo dice, la persona se
+ * entera cuando se lo rechazan, que es el mismo problema corrido de lugar.
+ */
+async function condicionesLegibles(negocioId, cond) {
+  const c = cond || {};
+  let turnos = [];
+  if ((c.turnos || []).length) {
+    const { rows } = await pool.query(
+      `SELECT COALESCE(nombre_publico, nombre) AS nombre,
+              to_char(hora_desde,'HH24:MI') AS hora_desde
+         FROM contenido.turno WHERE negocio_id=$1 AND id = ANY($2::uuid[]) ORDER BY hora_desde`,
+      [negocioId, c.turnos]);
+    turnos = rows.map(t => t.nombre);
+  }
+  return { dias: c.dias || [], turnos,
+           cantidad_min: c.cantidad_min || null, cantidad_max: c.cantidad_max || null };
+}
+
 /** Las condiciones del beneficio contra la reserva concreta. Devuelve el motivo, o null si entra. */
 function chocaCondicion(cond, { fecha, turnoId, cantidad, isodow }) {
   const c = cond || {};
@@ -3152,7 +3172,7 @@ module.exports = {
   completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, clientePorTelefono,
   TIPOS_BENEFICIO, textoBeneficio, getBeneficios, guardarBeneficio,
   emitirInvitaciones, getInvitaciones, anularInvitacion, consultarInvitacion,
-  cerrarUso, liberarPorReserva, invitacionDeReserva, guardarToken, getUsuarioPorToken, consumirToken,
+  cerrarUso, liberarPorReserva, invitacionDeReserva, condicionesLegibles, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
   getClientes, crearCliente, actualizarCliente, borrarCliente, exportarClientes, borrarTodosLosClientes,

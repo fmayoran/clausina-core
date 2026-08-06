@@ -336,6 +336,7 @@ async function validarCodigo() {
     const c = j.condiciones || {};
     const partes = [];
     if ((c.dias || []).length) partes.push('sólo ' + c.dias.map(d => DIAS_CORTOS[d]).join(', '));
+    if ((c.turnos || []).length) partes.push('turno ' + c.turnos.join(' o '));
     if (c.cantidad_max) partes.push('hasta ' + c.cantidad_max);
     msg.textContent = '✓ ' + j.texto + (partes.length ? ' — ' + partes.join(' · ') : '') +
       (j.vence_en ? ' · vence el ' + String(j.vence_en).slice(0, 10).split('-').reverse().join('/') : '');

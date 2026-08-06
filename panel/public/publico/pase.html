@@ -129,6 +129,8 @@ function marca(m) {
     const c = j.condiciones || {};
     const l = [];
     if ((c.dias || []).length) l.push('Válida ' + c.dias.map(d => DIAS[d]).join(', '));
+    if ((c.turnos || []).length) l.push('Sólo en el turno ' + c.turnos.join(' o '));
+    if (c.cantidad_min) l.push('Desde ' + c.cantidad_min + ' personas');
     if (c.cantidad_max) l.push('Hasta ' + c.cantidad_max + ' personas');
     if (j.vence_en) l.push('Vence el ' + fecha(j.vence_en));
     if (j.usos_max > 1) l.push('Cupo: ' + j.usos_max + ' usos');

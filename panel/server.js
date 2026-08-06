@@ -256,7 +256,8 @@ app.get('/api/publico/pase/:codigo', async (req, res) => {
     const n = await db.negocioPublico(i.negocio_slug);
     res.json({
       ok: true, codigo: i.codigo, texto: r.texto, etiqueta: i.etiqueta,
-      vence_en: i.vence_en, usos_max: i.usos_max, condiciones: i.condiciones || {},
+      vence_en: i.vence_en, usos_max: i.usos_max,
+      condiciones: await db.condicionesLegibles(i.negocio_id, i.condiciones),
       negocio: i.negocio_nombre, negocio_slug: i.negocio_slug,
       // La marca y el logo salen del negocio: el pase es suyo, no de ClaUsina.
       logo: n ? n.logo : null, marca: n ? n.marca : null,
@@ -312,7 +313,7 @@ app.get('/api/publico/:slug/invitacion/:codigo', async (req, res) => {
     // de a quién más se le mandó, cuántos usos lleva ni de qué campaña es.
     if (!r.ok) return res.json({ ok: false, mensaje: r.mensaje });
     res.json({ ok: true, texto: r.texto, vence_en: r.invitacion.vence_en,
-               condiciones: r.invitacion.condiciones || {} });
+               condiciones: await db.condicionesLegibles(n.id, r.invitacion.condiciones) });
   } catch (e) { console.error('inv publica', e.message); res.status(500).json({ error: 'error' }); }
 });
 
