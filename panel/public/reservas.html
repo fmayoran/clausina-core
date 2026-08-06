@@ -106,8 +106,12 @@
   .thora{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--u-mut);min-width:96px;}
   /* Dos colores: el fondo es lo DISPONIBLE (verde) y la parte pintada lo OCUPADO (coral).
      Así de un vistazo se ve cuánto queda, no sólo cuánto se vendió. */
+  /* position:relative es obligatorio: el tramo ámbar va absoluto y sin esto se posiciona contra
+     la ventana, no contra la barra — aparecía como una franja naranja de alto completo pegada al
+     borde izquierdo de la pantalla. overflow:hidden NO alcanza para recortarlo, porque un
+     absoluto sólo lo recorta el ancestro que además es su bloque contenedor. */
   .barra{flex:1;min-width:120px;height:7px;border-radius:99px;background:var(--u-ok);
-         border:1px solid var(--u-line);overflow:hidden;}
+         border:1px solid var(--u-line);overflow:hidden;position:relative;}
   .barra i{display:block;height:100%;background:var(--u-mal);}
   .barra u{position:absolute;top:0;bottom:0;display:block;background:var(--u-medio);}
   .tcup{font-family:'JetBrains Mono',monospace;font-size:.68rem;min-width:74px;text-align:right;color:var(--u-mut);}
