@@ -1121,6 +1121,20 @@ async function getReservas(negocioId, { desde, hasta, estado } = {}) {
   return rows;
 }
 
+/**
+ * ¿Este teléfono ya es cliente de ESTE negocio? Devuelve {id, nombre} o null.
+ * Nunca busca fuera del negocio: las bases de clientes no se cruzan, ni siquiera para reconocer
+ * a alguien. El mismo número en dos negocios son dos personas distintas para la plataforma.
+ */
+async function clientePorTelefono(negocioId, numero) {
+  const norm = tel.clave(String(numero || ''));
+  if (!norm) return null;
+  const { rows: [c] } = await pool.query(
+    'SELECT id, nombre FROM contenido.cliente WHERE negocio_id=$1 AND telefono_norm=$2',
+    [negocioId, norm]);
+  return c || null;
+}
+
 // Identificar al cliente: si el teléfono ya existe en ESTE negocio se reusa, si no se crea.
 // Nunca se busca fuera del negocio — las bases no se cruzan.
 async function _resolverCliente(cli, negocioId, d) {
@@ -2792,7 +2806,7 @@ async function health() {
 
 module.exports = {
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
-  completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, guardarToken, getUsuarioPorToken, consumirToken,
+  completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, clientePorTelefono, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
   getClientes, crearCliente, actualizarCliente, borrarCliente, exportarClientes, borrarTodosLosClientes,

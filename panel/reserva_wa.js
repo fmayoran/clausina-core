@@ -139,7 +139,10 @@ async function saludar(cfg, negocio, waId, canal, ofreceReservas, perfil) {
   await db.setConversacion(negocio.id, waId, 'ofrecido', {});
   // El saludo lo escribe el negocio en el configurador; si no puso nada, se arma uno.
   // Si WhatsApp nos da el nombre del perfil, se usa el primero para que no suene a máquina.
-  const nombrePila = String(perfil || '').trim().split(/\s+/)[0] || '';
+  // El nombre con el que lo conoce el NEGOCIO gana sobre el del perfil de WhatsApp: el perfil lo
+  // escribe cualquiera y puede decir "Fer 🔥"; el de la ficha es el que quedó de la vez anterior.
+  const cli = await db.clientePorTelefono(negocio.id, waId);
+  const nombrePila = String((cli && cli.nombre) || perfil || '').trim().split(/\s+/)[0] || '';
   // Si el saludo que escribió el negocio ya arranca con "hola", se le saca para no duplicarlo:
   // "Hola Fernando. Hola, soy el asistente…" suena a error, y es el que va a escribir cualquiera.
   const propio = String(canal.saludo || '').trim();
@@ -213,7 +216,8 @@ async function elegirDia(cfg, negocio, waId, entrada, datos = {}) {
   }
   // Se conserva lo ya sabido: la fecha y el turno se descartan porque son justamente lo que se
   // está por elegir, pero la cantidad y el nombre siguen valiendo.
-  await db.setConversacion(negocio.id, waId, 'dia', { cantidad: datos.cantidad, nombre: datos.nombre });
+  await db.setConversacion(negocio.id, waId, 'dia',
+    { cantidad: datos.cantidad, nombre: datos.nombre, pedir_nombre: datos.pedir_nombre });
   const filas = fechas.map(f => ({ id: 'd:' + f, titulo: dia(f) }));
   await decirOpciones(cfg, waId, '¿Para qué día?', filas.map(f => f.titulo), negocio.id,
     () => wa.enviarLista(waId, '¿Para qué día?', 'Ver días', filas, cfg));
@@ -284,6 +288,15 @@ async function avanzar(cfg, negocio, waId, datos) {
     return true;
   }
 
+  // Si el número ya es cliente del negocio, el nombre ya lo sabemos: pedírselo a alguien que ya
+  // vino es la fricción que hace que un canal se sienta burocrático. Igual lo va a ver en el
+  // resumen y lo puede corregir. `pedir_nombre` es cómo se pide esa corrección: si viene puesto,
+  // no se identifica solo — si no, "Cambiar algo" volvería a completarlo y no habría salida.
+  if (!datos.nombre && !datos.pedir_nombre) {
+    const cli = await db.clientePorTelefono(negocio.id, waId);
+    if (cli && cli.nombre) datos = { ...datos, nombre: cli.nombre, cliente_id: cli.id };
+  }
+
   // Nombre Y apellido: es lo que queda en la base del negocio, y un nombre suelto no alcanza
   // para reconocer a alguien cuando llega.
   if (!datos.nombre) {
@@ -326,6 +339,9 @@ async function confirmar(cfg, negocio, waId, entrada, datos) {
     r = await db.crearReserva(negocio.id, {
       turno_id: datos.turno_id, fecha: datos.fecha, cantidad: datos.cantidad,
       cliente_nombre: nombre, cliente_telefono: waId, canal: 'whatsapp',
+      // Si ya se lo identificó, se manda el id: _resolverCliente lo valida contra el negocio y
+      // se ahorra la búsqueda por teléfono.
+      cliente_id: datos.cliente_id || null,
     });
   } catch (e) {
     await db.borrarConversacion(negocio.id, waId);
@@ -428,7 +444,9 @@ async function confirmarVoz(cfg, negocio, waId, entrada, datos) {
     // Entra por la misma puerta que todo el resto: crearReserva, con su lock de capacidad.
     return await confirmar(cfg, negocio, waId, datos.nombre, datos);
   }
-  if (entrada === 'cambiar_voz') return await elegirDia(cfg, negocio, waId, '');
+  // Se rehace desde cero y pidiendo el nombre: si se autocompletara otra vez, alguien que quiere
+  // reservar a nombre de otro quedaría girando en el mismo resumen.
+  if (entrada === 'cambiar_voz') return await elegirDia(cfg, negocio, waId, '', { pedir_nombre: true });
   // Cualquier otra cosa se toma como corrección: mejor rehacerlo guiado que adivinar qué cambió.
   await decir(cfg, waId, 'Dale, lo armamos de nuevo.', negocio.id);
   return await elegirDia(cfg, negocio, waId, '');
