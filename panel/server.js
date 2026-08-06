@@ -95,6 +95,11 @@ app.post('/webhook/whatsapp', express.raw({ type: '*/*', limit: '2mb' }), async 
   let secreto = null;
   try { secreto = await db.secretoDeNumero(destino); } catch (e) { console.error('secreto wa', e.message); }
   if (!wa.firmaValida(crudo, req.headers['x-hub-signature-256'], secreto ? [secreto] : [])) {
+    // Se registra el rechazo (sin el cuerpo). Un 403 acá significa que el mensaje SÍ llegó y que
+    // el problema es la llave — distinguirlo de "no llegó nada" es la mitad de cualquier
+    // diagnóstico de alta, y desde la interfaz de Meta no se ve.
+    console.log(`webhook whatsapp RECHAZADO: destino=${destino || 'desconocido'} ` +
+      `secreto=${secreto ? 'cargado' : 'sin cargar'} firma=${req.headers['x-hub-signature-256'] ? 'presente' : 'ausente'}`);
     return res.sendStatus(403);
   }
   // Contestamos YA: si tardamos, Meta reintenta y el mismo mensaje llega varias veces.
