@@ -1083,13 +1083,17 @@ async function getDisponibilidad(negocioId, desde, hasta) {
             to_char(t.hora_desde,'HH24:MI') AS hora_desde,
             to_char(t.hora_hasta,'HH24:MI') AS hora_hasta,
             COALESCE(r.ocupado, 0)::int AS ocupado,
+            COALESCE(r.pendiente, 0)::int AS pendiente,
             COALESCE(r.reservas, 0)::int AS reservas,
             (bd.id IS NOT NULL OR bt.id IS NOT NULL) AS bloqueado,
             COALESCE(bd.motivo, bt.motivo) AS motivo_bloqueo
        FROM dias
        JOIN t ON EXTRACT(isodow FROM dias.fecha)::smallint = ANY(t.dias)
        LEFT JOIN LATERAL (
-         SELECT sum(cantidad)::int AS ocupado, count(*)::int AS reservas
+         SELECT sum(cantidad)::int AS ocupado, count(*)::int AS reservas,
+                -- Cuánto de lo ocupado todavía no confirmó nadie. El calendario lo pinta aparte:
+                -- un turno lleno de solicitudes sin confirmar no es lo mismo que uno lleno.
+                sum(cantidad) FILTER (WHERE rr.estado='solicitada')::int AS pendiente
            FROM contenido.reserva rr
           WHERE rr.negocio_id=$1 AND rr.turno_id=t.id AND rr.fecha=dias.fecha
             AND rr.estado IN ('solicitada','confirmada','cumplida')) r ON true

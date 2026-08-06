@@ -12,9 +12,9 @@
 <link rel="stylesheet" href="tw.css">
 <style>
   :root{--u-surf:#FFFFFF;--u-bg:#F7F5F1;--u-line:#DEDDD3;--u-fg:#0c0c0a;--u-mut:#5A616A;
-        --u-acc:#4d6800;--u-accfg:#FFFFFF;--u-ok:#4d6800;--u-mal:#C4442A;--u-medio:#8A6410;}
+        --u-acc:#4d6800;--u-accfg:#FFFFFF;--u-ok:#4d6800;--u-mal:#C4442A;--u-medio:#8A6410;--u-medio-suave:#FBF0D6;}
   .dark{--u-surf:#12151A;--u-bg:#0c0c0a;--u-line:#20242B;--u-fg:#F5F2EC;--u-mut:#8A8F98;
-        --u-acc:#CCF24D;--u-accfg:#0c0c0a;--u-ok:#7BC96F;--u-mal:#FF6B4A;--u-medio:#E8A33D;}
+        --u-acc:#CCF24D;--u-accfg:#0c0c0a;--u-ok:#7BC96F;--u-mal:#FF6B4A;--u-medio:#E8A33D;--u-medio-suave:#3A2C13;}
   label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.12em;
         text-transform:uppercase;color:var(--u-mut);margin:0 0 6px;}
   input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{
@@ -73,9 +73,12 @@
   .celda .num{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--u-mut);}
   .celda.hoy .num{color:var(--u-acc);font-weight:600;}
   .minis{display:flex;flex-direction:column;gap:3px;margin-top:auto;}
-  /* Igual que la barra grande: fondo verde = disponible, relleno coral = ocupado. */
+  /* Igual que la barra grande: fondo verde = disponible, relleno coral = confirmado,
+     ámbar = ocupado pero todavía sin confirmar. Un turno lleno de solicitudes sin confirmar no
+     es lo mismo que uno lleno, y con un solo color se veían igual. */
   .mini{height:5px;border-radius:3px;background:var(--u-ok);position:relative;overflow:hidden;}
   .mini i{position:absolute;inset:0 auto 0 0;display:block;background:var(--u-mal);}
+  .mini u{position:absolute;top:0;bottom:0;display:block;background:var(--u-medio);}
   .mini.off{background:repeating-linear-gradient(45deg,var(--u-line),var(--u-line) 2px,transparent 2px,transparent 5px);}
   .leyenda{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;font-family:'JetBrains Mono',monospace;
            font-size:.58rem;color:var(--u-mut);align-items:center;}
@@ -106,6 +109,7 @@
   .barra{flex:1;min-width:120px;height:7px;border-radius:99px;background:var(--u-ok);
          border:1px solid var(--u-line);overflow:hidden;}
   .barra i{display:block;height:100%;background:var(--u-mal);}
+  .barra u{position:absolute;top:0;bottom:0;display:block;background:var(--u-medio);}
   .tcup{font-family:'JetBrains Mono',monospace;font-size:.68rem;min-width:74px;text-align:right;color:var(--u-mut);}
   .tcup b{color:var(--u-fg);}
   .tbloq{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-medio);}
@@ -127,8 +131,9 @@
   /* Pendiente con borde punteado y confirmada con borde lleno: un punto de 6 px es fácil de no
      ver, y si además es la única señal, quien no distingue rojo de verde no tiene ninguna.
      Punteado = todavía no cerrado se entiende sin color y hasta impreso en blanco y negro. */
-  .rchip.s-solicitada{border-style:dashed;border-color:var(--u-mal);}
-  .rchip.s-solicitada .pto{background:var(--u-mal);}
+  .rchip.s-solicitada{border-style:dashed;border-color:var(--u-medio);
+                      background:var(--u-medio-suave);}
+  .rchip.s-solicitada .pto{background:var(--u-medio);}
   .rchip.s-confirmada{border-color:var(--u-ok);}
   .rchip.s-confirmada .pto{background:var(--u-ok);}
   .rchip.s-cumplida .pto{background:var(--u-mut);}
@@ -283,7 +288,8 @@
            justo en las vistas donde más se miran las reservas. -->
       <div class="leyenda">
         <span><b style="background:var(--u-ok)"></b> disponible</span>
-        <span><b style="background:var(--u-mal)"></b> ocupado</span>
+        <span><b style="background:var(--u-mal)"></b> ocupado confirmado</span>
+        <span><b style="background:var(--u-medio)"></b> ocupado sin confirmar</span>
         <span><b class="mini off" style="height:5px"></b> bloqueado o pasado</span>
         <span class="sep"></span>
         <span class="rchip s-confirmada leg"><span class="pto"></span>confirmada</span>
@@ -718,8 +724,13 @@ function pintarGrilla() {
     const minis = (porDia[f] || []).map(t => {
       if (!reservable(t, f)) return `<span class="mini off" title="${t.bloqueado ? 'Bloqueado' : 'Ya pasó'}"></span>`;
       const pct = Math.min(100, Math.round(t.ocupado / t.capacidad * 100));
-      return `<span class="mini" title="${escapar(t.nombre)}: ${t.ocupado} ocupado, ${t.capacidad - t.ocupado} libre de ${t.capacidad}">` +
-             `<i style="width:${pct}%"></i></span>`;
+      // Lo confirmado arranca en cero y lo pendiente sigue a continuación: juntos suman lo ocupado.
+      const pend = Math.min(100, Math.round((t.pendiente || 0) / t.capacidad * 100));
+      const conf = Math.max(0, pct - pend);
+      return `<span class="mini" title="${escapar(t.nombre)}: ${t.ocupado} ocupado` +
+             `${t.pendiente ? ` (${t.pendiente} sin confirmar)` : ''}, ` +
+             `${t.capacidad - t.ocupado} libre de ${t.capacidad}">` +
+             `<i style="width:${conf}%"></i><u style="left:${conf}%;width:${pend}%"></u></span>`;
     }).join('');
     celdas.push(`<button class="celda${f === hoy() ? ' hoy' : ''}${f === SEL ? ' sel' : ''}" onclick="verDia('${f}')">
       <span class="num">${d}</span><span class="minis">${minis}</span></button>`);
@@ -750,6 +761,8 @@ function tarjetaDia(f) {
       ${f === hoy() ? '<span class="disem">hoy</span>' : ''}</div>
     ${ts.map(t => {
       const pct = Math.min(100, Math.round(t.ocupado / t.capacidad * 100));
+      const pendPct = Math.min(100, Math.round((t.pendiente || 0) / t.capacidad * 100));
+      const confPct = Math.max(0, pct - pendPct);
       const lleno = t.ocupado >= t.capacidad;
       const cerrado = lleno || yaPaso(f, t.hora_desde) || t.bloqueado;
       const libre = t.capacidad - t.ocupado;
@@ -758,7 +771,8 @@ function tarjetaDia(f) {
           <span class="thora">${t.hora_desde}–${t.hora_hasta}</span>
           ${t.bloqueado
             ? `<span class="tbloq">bloqueado${t.motivo_bloqueo ? ' · ' + escapar(t.motivo_bloqueo) : ''}</span>`
-            : `<span class="barra" title="${t.ocupado} ocupado · ${libre} disponible"><i style="width:${pct}%"></i></span>
+            : `<span class="barra" title="${t.ocupado} ocupado${t.pendiente ? ` (${t.pendiente} sin confirmar)` : ''} · ${libre} disponible">` +
+                 `<i style="width:${confPct}%"></i><u style="left:${confPct}%;width:${pendPct}%"></u></span>
                <span class="tcup"><b>${libre}</b> libre</span>`}
           <button class="btn2 chico" onclick="abrirReserva('${f}','${t.turno_id}')"
             ${cerrado ? `disabled title="${t.bloqueado ? 'Bloqueado' : (lleno ? 'Sin lugar' : 'Ya pasó')}"` : ''}>Reservar</button>
