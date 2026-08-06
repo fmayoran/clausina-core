@@ -280,6 +280,9 @@ app.get('/api/publico/pase/:codigo', async (req, res) => {
       // La marca y el logo salen del negocio: el pase es suyo, no de ClaUsina.
       logo: n ? n.logo : null, marca: n ? n.marca : null,
       whatsapp: n ? n.whatsapp : null,
+      // Para el pie: dónde queda, dónde encontrarlos. Sin esto, una invitación reenviada a
+      // alguien que no conoce el lugar no le dice ni la dirección.
+      web: n ? n.web : null, instagram: n ? n.instagram : null, sede: n ? n.sede : null,
     });
   } catch (e) { console.error('pase', e.message); res.status(500).json({ ok: false }); }
 });

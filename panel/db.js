@@ -1509,13 +1509,19 @@ async function consultarInvitacion(codigo, negocioId = null) {
  */
 async function piezasPublicadas(negocioId) {
   const { rows } = await pool.query(
-    `SELECT pz.titulo_interno, pz.canal, m.url
+    `SELECT pz.titulo_interno, pz.canal, pz.numero, m.url
        FROM contenido.piezas pz
        JOIN contenido.revisiones r ON r.id = pz.revision_vigente
        JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1 AND m.tipo = 'image'
       WHERE pz.negocio_id = $1 AND pz.estado = 'publicada'
       ORDER BY COALESCE(r.publicado_en, pz.actualizado_en) DESC LIMIT 40`, [negocioId]);
-  return rows.map(r => ({ titulo: `${r.titulo_interno || 'sin título'} (${r.canal})`, url: r.url }));
+  // El código es como el negocio nombra la pieza en el panel (G-0006). Sin él hay que buscar
+  // por el título, que casi nunca se recuerda de memoria.
+  const PREFIJO = { grafica: 'G', instagram: 'IG', aviso: 'A', web: 'W' };
+  return rows.map(r => ({
+    codigo: `${PREFIJO[r.canal] || r.canal.slice(0, 1).toUpperCase()}-${String(r.numero).padStart(4, '0')}`,
+    titulo: r.titulo_interno || 'sin título', canal: r.canal, url: r.url,
+  }));
 }
 
 async function condicionesLegibles(negocioId, cond) {
@@ -1879,6 +1885,15 @@ async function podarConversaciones() {
 
 // ¿Este negocio puede tomar reservas por WhatsApp? Las mismas condiciones que la página pública:
 // capacidad habilitada y abierta al público. Un canal más no es una puerta trasera.
+/** ¿Este negocio tiene invitaciones vivas? Si no, no tiene sentido preguntar por un código. */
+async function invitacionesActivas(negocioId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT 1 FROM contenido.negocio_capacidad c
+       JOIN contenido.beneficio b ON b.negocio_id=c.negocio_id AND b.activo
+      WHERE c.negocio_id=$1 AND c.capacidad='invitaciones' AND c.habilitada LIMIT 1`, [negocioId]);
+  return !!r;
+}
+
 async function reservasPorWhatsapp(negocioId) {
   const { rows: [r] } = await pool.query(
     `SELECT habilitada, config FROM contenido.negocio_capacidad
@@ -2190,7 +2205,7 @@ async function setLinkActivo(negocioId, id, activo) {
 async function negocioPublico(slug) {
   const { rows: [n] } = await pool.query(
     `SELECT p.id, p.slug, p.nombre, pp.slogan, pp.logo, pp.logo_claro, p.dominio_web,
-            nc.config, COALESCE(ni.marca, '{}'::jsonb) AS marca
+            p.ig_handle, nc.config, COALESCE(ni.marca, '{}'::jsonb) AS marca
        FROM contenido.negocios p
        LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id = p.id
        LEFT JOIN contenido.negocio_identidad ni ON ni.negocio_id = p.id
@@ -2203,7 +2218,7 @@ async function negocioPublico(slug) {
   const cfg = { ...CFG_RESERVAS, ...(n.config || {}) };
   return {
     id: n.id, slug: n.slug, nombre: n.nombre, slogan: n.slogan,
-    logo: n.logo, logo_claro: n.logo_claro, web: n.dominio_web,
+    logo: n.logo, logo_claro: n.logo_claro, web: n.dominio_web, instagram: n.ig_handle,
     sede: sede || null,
     // El número del asistente, si el negocio lo tiene andando: sirve para ofrecer el otro
     // camino ("o escribinos") sin que nadie tenga que copiarlo a mano en ningún lado.
@@ -3244,7 +3259,8 @@ module.exports = {
   completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, clientePorTelefono,
   TIPOS_BENEFICIO, textoBeneficio, getBeneficios, guardarBeneficio,
   emitirInvitaciones, getInvitaciones, anularInvitacion, consultarInvitacion,
-  cerrarUso, liberarPorReserva, invitacionDeReserva, condicionesLegibles, piezasPublicadas, guardarToken, getUsuarioPorToken, consumirToken,
+  cerrarUso, liberarPorReserva, invitacionDeReserva, condicionesLegibles, piezasPublicadas,
+  invitacionesActivas, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
   getClientes, crearCliente, actualizarCliente, borrarCliente, exportarClientes, borrarTodosLosClientes,

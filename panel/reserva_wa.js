@@ -155,8 +155,15 @@ async function atender(negocio, mensaje) {
       // Texto libre en vez de un botón: puede ser una pregunta. Si está contestada, se contesta
       // y se queda donde estaba, en vez de arrancar a pedirle días a alguien que preguntó otra cosa.
       if (entrada !== 'reservar' && await responderFaq(cfg, negocio, waId, entrada, canal)) return true;
-      return await elegirDia(cfg, negocio, waId, entrada);
+      // Igual que en la web: se pregunta por el código ANTES de mostrar días, porque la
+      // invitación puede limitar qué días y qué turnos se pueden ofrecer. Quien llegó con una
+      // tarjeta física no tiene por qué adivinar que hay que mencionarla.
+      if (!datos.invitacion && await db.invitacionesActivas(negocio.id)) {
+        return await preguntarCodigo(cfg, negocio, waId, datos);
+      }
+      return await elegirDia(cfg, negocio, waId, entrada, datos);
     }
+    if (paso === 'codigo') return await recibirCodigo(cfg, negocio, waId, entrada, datos);
     if (paso === 'dia') return await elegirTurno(cfg, negocio, waId, entrada, datos);
     if (paso === 'turno') return await pedirCantidad(cfg, negocio, waId, entrada, datos);
     if (paso === 'cantidad') return await pedirNombre(cfg, negocio, waId, entrada, datos);
@@ -215,6 +222,28 @@ async function responderFaq(cfg, negocio, waId, texto, canal) {
   const i = await faq.responder(texto, lista).catch(() => null);
   if (i == null) return false;
   await decir(cfg, waId, lista[i].r, negocio.id);
+  return true;
+}
+
+async function preguntarCodigo(cfg, negocio, waId, datos) {
+  await db.setConversacion(negocio.id, waId, 'codigo', datos);
+  const r = await wa.enviarBotones(waId, '¿Tenés un código de invitación?',
+    [{ id: 'sin_codigo', titulo: 'No, seguir' }], cfg);
+  if (!r.ok) await decir(cfg, waId, '¿Tenés un código de invitación? Escribilo, o respondeme "no".', negocio.id);
+  else await db.logWhatsapp({ direccion: 'saliente', wa_id: waId, negocio_id: negocio.id,
+    mensaje_id: r.id, tipo: 'interactive', estado: 'enviado',
+    texto: '¿Tenés un código de invitación?\n· No, seguir' }).catch(() => {});
+  return true;
+}
+
+async function recibirCodigo(cfg, negocio, waId, entrada, datos) {
+  // El código ya se detecta arriba, en cualquier mensaje: si llegó acá con uno válido, `datos`
+  // lo trae. Lo que queda es seguir, con o sin él.
+  if (entrada === 'sin_codigo' || /^(no|nada|ninguno|seguir)$/i.test(entrada) || datos.invitacion) {
+    return await elegirDia(cfg, negocio, waId, '', datos);
+  }
+  // Escribió algo que no es un código válido: se le dice y se le deja seguir igual.
+  await decir(cfg, waId, 'No reconocí ese código. Podés escribirlo de nuevo o seguir sin él.', negocio.id);
   return true;
 }
 

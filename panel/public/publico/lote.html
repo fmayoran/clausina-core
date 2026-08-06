@@ -10,15 +10,22 @@
   /* A6 exacto y sin márgenes: la imprenta recorta al borde, así que el sangrado lo pone el
      diseño y no el navegador. Una tarjeta por página, frente y dorso alternados, que es como
      se manda a imprimir a doble faz. */
-  @page{size:A6;margin:0;}
+  @page{size:A4;margin:0;}
+  /* Cuatro A6 por A4 para cortar. El A4 mide 210×297 y el A6 105×148,5: entran exactos, así que
+     las marcas de corte son las propias uniones. */
   :root{--f-tit:'Inter Tight',sans-serif;--f-txt:'Inter',sans-serif;
         --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-linea:#2a2a33;}
   *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body{background:#4a4a4a;font-family:var(--f-txt);overflow-x:hidden;}
-  .cara{width:105mm;height:148mm;background:var(--c-fondo);color:var(--c-tinta);
+  .hoja{width:210mm;height:297mm;display:grid;grid-template-columns:105mm 105mm;
+        grid-template-rows:148.5mm 148.5mm;page-break-after:always;break-after:page;
+        margin:0 auto 8mm;background:#111;}
+  .cara{width:105mm;height:148.5mm;background:var(--c-fondo);color:var(--c-tinta);
         display:flex;flex-direction:column;align-items:center;justify-content:center;
-        text-align:center;padding:11mm 9mm;position:relative;overflow:hidden;
-        page-break-after:always;break-after:page;margin:0 auto 6mm;}
+        text-align:center;padding:10mm 8mm;position:relative;overflow:hidden;}
+  /* Un hueco cuando la tanda no llena la hoja: hay que ocupar la celda igual para que las
+     posiciones del dorso sigan calzando con las del frente. */
+  .cara.hueca{background:#fff;}
   /* El frente: si el negocio tiene una pieza gráfica se usa esa; si no, el logo sobre su color. */
   .frente{padding:0;}
   .frente img{width:100%;height:100%;object-fit:cover;display:block;}
@@ -52,7 +59,7 @@
         padding:7px 13px;cursor:pointer;font-family:inherit;font-size:.82rem;}
   .ctrl button.p{background:#CCF24D;color:#111;border-color:#CCF24D;font-weight:700;}
   .ctrl .nota{opacity:.6;}
-  @media print{ .ctrl{display:none !important;} body{background:#fff;} .cara{margin:0;} }
+  @media print{ .ctrl{display:none !important;} body{background:#fff;} .hoja{margin:0;} }
 </style>
 </head>
 <body>
@@ -90,31 +97,54 @@ function condiciones(j) {
   return l.join('<br>');
 }
 
+function caraFrente(j, pieza) {
+  return pieza
+    ? `<div class="cara frente"><img src="${esc(pieza)}" alt=""></div>`
+    : `<div class="cara frente"><div class="fallback">
+         ${j.logo ? `<img src="${esc(j.logo)}" alt="">` : ''}
+         <div class="lema">Invitación especial</div></div></div>`;
+}
+
+function caraDorso(j) {
+  const wa = j.whatsapp ? j.whatsapp.replace(/[^0-9+ -]/g, '') : '';
+  const sede = j.sede ? [j.sede.direccion, j.sede.localidad].filter(Boolean).join(', ') : '';
+  return `<div class="cara">
+      ${j.logo ? `<img class="logo" src="${esc(j.logo)}" alt="">` : ''}
+      <div class="titulo">Invitación especial</div>
+      <div class="beneficio">${esc(j.texto)}</div>
+      ${j.etiqueta ? `<div class="para">Para ${esc(j.etiqueta)}</div>` : ''}
+      <div class="codigo">${esc(j.codigo.replace(/^(.{3})(.{3})$/, '$1-$2'))}</div>
+      <div class="rotulo">Presentá este código al reservar</div>
+      <div class="cond">${condiciones(j)}</div>
+      ${wa ? `<div class="otra">Reservá en ${esc(j.web || j.negocio_slug + '.ar')}<br>o por WhatsApp al ${esc(wa)}</div>` : ''}
+      <div class="pie">
+        <b>Con reserva previa.</b> Sin reserva no podemos garantizarte lugar.<br>
+        Presentá esta invitación al llegar para validarla · El descuento se aplica al pagar
+        ${sede || j.instagram ? '<br>' + [sede, j.instagram].filter(Boolean).map(esc).join(' · ') : ''}
+      </div>
+    </div>`;
+}
+
+const HUECA = '<div class="cara hueca"></div>';
+
 function pintar() {
-  const frente = $('sel-frente').value;
-  $('hojas').innerHTML = PASES.map(j => {
-    // Frente: la pieza elegida a sangre, o el logo del negocio sobre su color.
-    const caraFrente = frente
-      ? `<div class="cara frente"><img src="${esc(frente)}" alt=""></div>`
-      : `<div class="cara frente"><div class="fallback">
-           ${j.logo ? `<img src="${esc(j.logo)}" alt="">` : ''}
-           <div class="lema">Invitación especial</div></div></div>`;
-    const wa = j.whatsapp ? j.whatsapp.replace(/[^0-9+ -]/g, '') : '';
-    return caraFrente + `
-      <div class="cara">
-        ${j.logo ? `<img class="logo" src="${esc(j.logo)}" alt="">` : ''}
-        <div class="titulo">Invitación especial</div>
-        <div class="beneficio">${esc(j.texto)}</div>
-        ${j.etiqueta ? `<div class="para">Para ${esc(j.etiqueta)}</div>` : ''}
-        <div class="codigo">${esc(j.codigo.replace(/^(.{3})(.{3})$/, '$1-$2'))}</div>
-        <div class="rotulo">Presentá este código al reservar</div>
-        <div class="cond">${condiciones(j)}</div>
-        ${wa ? `<div class="otra">Reservá en ${esc(j.negocio_slug)}.ar<br>o por WhatsApp al ${esc(wa)}</div>` : ''}
-        <div class="pie">Presentá esta invitación al llegar al local para validarla ·
-          Sujeta a disponibilidad · El descuento se aplica al pagar</div>
-      </div>`;
-  }).join('');
-  $('cuenta').textContent = `${PASES.length} invitación(es) · ${PASES.length * 2} caras`;
+  const pieza = $('sel-frente').value;
+  const porHoja = 4;
+  let html = '';
+  for (let i = 0; i < PASES.length; i += porHoja) {
+    const tanda = PASES.slice(i, i + porHoja);
+    const frentes = tanda.map(j => caraFrente(j, pieza));
+    // EL DORSO VA ESPEJADO. Al imprimir a doble faz por el borde largo, la hoja gira sobre su eje
+    // vertical: lo que estaba a la izquierda queda a la derecha. Sin intercambiar las columnas,
+    // cada dorso cae detrás de OTRA tarjeta y la tirada entera se tira.
+    const dorsos = tanda.map(j => caraDorso(j));
+    const espejado = [dorsos[1], dorsos[0], dorsos[3], dorsos[2]];
+    html += `<div class="hoja">${frentes.concat(Array(porHoja).fill(HUECA)).slice(0, porHoja).join('')}</div>`;
+    html += `<div class="hoja">${espejado.map(x => x || HUECA).join('')}</div>`;
+  }
+  $('hojas').innerHTML = html;
+  const hojas = Math.ceil(PASES.length / porHoja) * 2;
+  $('cuenta').textContent = `${PASES.length} invitación(es) · ${hojas} hoja(s) A4`;
 }
 
 (async () => {
@@ -130,7 +160,7 @@ function pintar() {
       .then(r => r.json());
     PIEZAS = p.piezas || [];
     $('sel-frente').innerHTML = '<option value="">logo del negocio</option>' +
-      PIEZAS.map(x => `<option value="${esc(x.url)}">${esc(x.titulo)}</option>`).join('');
+      PIEZAS.map(x => `<option value="${esc(x.url)}">${esc(x.codigo)} · ${esc(x.titulo)}</option>`).join('');
   } catch (e) {}
   pintar();
 })();

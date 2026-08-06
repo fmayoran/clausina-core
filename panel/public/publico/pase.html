@@ -39,7 +39,12 @@
   .cta{display:inline-block;margin-top:20px;background:var(--c-acento);color:var(--c-fondo);
        font-family:var(--f-tit);font-weight:700;text-decoration:none;padding:12px 26px;
        border-radius:11px;font-size:.98rem;}
-  .pie{font-family:'JetBrains Mono',monospace;font-size:.56rem;opacity:.45;margin-top:20px;line-height:1.7;}
+  .pie{font-family:'JetBrains Mono',monospace;font-size:.56rem;opacity:.45;margin-top:18px;line-height:1.7;}
+  .pie b{opacity:.85;}
+  /* El pie de contacto se separa: son datos del negocio, no letra chica de la invitación. */
+  .datos{border-top:1px solid var(--c-linea);margin-top:18px;padding-top:14px;
+         font-family:'JetBrains Mono',monospace;font-size:.62rem;line-height:1.9;opacity:.7;}
+  .datos a{color:inherit;}
   .acciones{display:flex;gap:9px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
   .acc{background:none;border:1px solid var(--c-linea);color:var(--c-tinta);opacity:.7;
        border-radius:9px;padding:8px 15px;cursor:pointer;font-family:var(--f-txt);font-size:.82rem;}
@@ -73,6 +78,7 @@
   <a class="cta" id="cta" href="#">Reservar aquí</a>
   <div class="otra" id="otra" style="display:none"></div>
   <div class="pie" id="pie"></div>
+  <div class="datos" id="datos"></div>
 </div>
 <!-- Fuera de la tarjeta: son acciones de quien mira la pantalla, no parte de la invitación, y
      al imprimir no tienen que salir. -->
@@ -87,6 +93,8 @@
 const $ = id => document.getElementById(id);
 const COD = decodeURIComponent(location.pathname.split('/').pop() || '');
 const fecha = iso => String(iso || '').slice(0, 10).split('-').reverse().join('/');
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
 async function compartir() {
   const url = location.origin + '/i/' + COD;
@@ -149,8 +157,17 @@ function marca(m) {
     }
     // El disclaimer que pidió Fer: la invitación se valida al llegar, no al reservar. Es la
     // diferencia entre tomarla y consumirla, dicha en el único lugar donde la lee el invitado.
-    $('pie').textContent = 'Presentá esta invitación al llegar al local para validarla · ' +
-      'Sujeta a disponibilidad · El descuento se aplica al pagar';
+    // La reserva es obligatoria y se dice primero: el riesgo real no es el descuento mal
+    // aplicado, es alguien que llega con la tarjeta y se encuentra sin mesa.
+    $('pie').innerHTML = '<b>Válida sólo con reserva previa.</b> Sin reserva no podemos ' +
+      'garantizarte lugar.<br>Presentá esta invitación al llegar al local para validarla · ' +
+      'El descuento se aplica al pagar';
+    const dd = [];
+    if (j.sede) dd.push([j.sede.direccion, j.sede.localidad, j.sede.partido].filter(Boolean).join(', '));
+    if (j.web) dd.push(`<a href="https://${esc(j.web)}">${esc(j.web)}</a>`);
+    if (j.instagram) dd.push(`<a href="https://instagram.com/${esc(String(j.instagram).replace('@',''))}">${esc(j.instagram)}</a>`);
+    if (j.whatsapp) dd.push('WhatsApp ' + esc(j.whatsapp));
+    $('datos').innerHTML = dd.join('<br>');
     $('acciones').style.display = '';
     $('pase').style.display = '';
   } catch (e) {
