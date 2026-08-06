@@ -59,6 +59,7 @@
         padding:7px 13px;cursor:pointer;font-family:inherit;font-size:.82rem;}
   .ctrl button.p{background:#CCF24D;color:#111;border-color:#CCF24D;font-weight:700;}
   .ctrl .nota{opacity:.6;}
+  .ctrl .nota b{opacity:1;color:#CCF24D;}
   @media print{ .ctrl{display:none !important;} body{background:#fff;} .hoja{margin:0;} }
 </style>
 </head>
@@ -69,7 +70,7 @@
     <select id="sel-frente" onchange="pintar()"><option value="">logo del negocio</option></select>
   </label>
   <button class="p" onclick="window.print()">Imprimir / Guardar PDF</button>
-  <span class="nota">A6 · una cara por página · imprimir a doble faz, borde corto</span>
+  <span class="nota">A4 · 4 por hoja · <b>doble faz girando por el borde largo</b></span>
 </div>
 <div id="hojas"></div>
 
