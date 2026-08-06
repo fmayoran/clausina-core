@@ -285,7 +285,7 @@ app.get('/api/publico/pase/:codigo', async (req, res) => {
       web: n ? n.web : null, instagram: n ? n.instagram : null, sede: n ? n.sede : null,
       // El frente que el negocio indicó para esta campaña. El pliego lo usa por defecto.
       frente: i.frente_url || null,
-      frente_codigo: i.frente_numero ? db.codigoPieza(i.frente_canal, i.frente_numero) : null,
+      frente_codigo: i.frente_numero ? db.codigoPieza('grafica', i.frente_numero) : null,
     });
   } catch (e) { console.error('pase', e.message); res.status(500).json({ ok: false }); }
 });

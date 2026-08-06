@@ -1349,16 +1349,16 @@ function textoBeneficio(b, unidad = 'personas') {
 
 async function getBeneficios(negocioId) {
   const { rows } = await pool.query(
-    `SELECT b.*, pz.canal AS frente_canal, pz.numero AS frente_numero, pz.titulo_interno AS frente_titulo,
+    `SELECT b.*, gf.numero AS frente_numero, gf.nombre AS frente_titulo,
             (SELECT count(*)::int FROM contenido.invitacion i WHERE i.beneficio_id=b.id) AS invitaciones,
             (SELECT count(*)::int FROM contenido.invitacion_uso u
                WHERE u.invitacion_id IN (SELECT id FROM contenido.invitacion WHERE beneficio_id=b.id)
                  AND u.estado='consumida') AS consumidas
        FROM contenido.beneficio b
-       LEFT JOIN contenido.piezas pz ON pz.id = b.frente_pieza_id
+       LEFT JOIN contenido.grafica gf ON gf.id = b.frente_grafica_id
       WHERE b.negocio_id=$1 ORDER BY b.activo DESC, b.creado_en DESC`,
     [negocioId]);
-  return rows.map(r => ({ ...r, frente: r.frente_numero ? codigoPieza(r.frente_canal, r.frente_numero) : null }));
+  return rows.map(r => ({ ...r, frente: r.frente_numero ? codigoPieza('grafica', r.frente_numero) : null }));
 }
 
 /** Cómo el negocio llama a una pieza en su panel: G-0006, IG-0244. */
@@ -1382,19 +1382,19 @@ async function guardarBeneficio(negocioId, id, d) {
     cantidad_max: Number(d.cantidad_max) > 0 ? Math.round(Number(d.cantidad_max)) : null,
   };
   const noShow = ['liberar', 'quemar'].includes(d.no_show) ? d.no_show : 'liberar';
-  const frente = /^[0-9a-f-]{36}$/i.test(String(d.frente_pieza_id || '')) ? d.frente_pieza_id : null;
+  const frente = /^[0-9a-f-]{36}$/i.test(String(d.frente_grafica_id || '')) ? d.frente_grafica_id : null;
   const campos = [negocioId, nombre, d.tipo, valor, JSON.stringify(cond), noShow,
                   String(d.notas || '').trim().slice(0, 600) || null, d.activo !== false, frente];
   if (id) {
     const { rows: [r] } = await pool.query(
       `UPDATE contenido.beneficio SET nombre=$2, tipo=$3, valor=$4, condiciones=$5::jsonb,
-              no_show=$6, notas=$7, activo=$8, frente_pieza_id=$9, actualizado_en=now()
+              no_show=$6, notas=$7, activo=$8, frente_grafica_id=$9, actualizado_en=now()
         WHERE id=$10 AND negocio_id=$1 RETURNING *`, [...campos, id]);
     if (!r) { const e = new Error('no existe'); e.code = 'no_encontrado'; throw e; }
     return r;
   }
   const { rows: [r] } = await pool.query(
-    `INSERT INTO contenido.beneficio (negocio_id, nombre, tipo, valor, condiciones, no_show, notas, activo, frente_pieza_id)
+    `INSERT INTO contenido.beneficio (negocio_id, nombre, tipo, valor, condiciones, no_show, notas, activo, frente_grafica_id)
      VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9) RETURNING *`, campos);
   return r;
 }
@@ -1492,12 +1492,14 @@ async function consultarInvitacion(codigo, negocioId = null) {
     `SELECT i.*, b.nombre AS beneficio, b.tipo, b.valor, b.condiciones, b.activo AS beneficio_activo,
             n.slug AS negocio_slug, n.nombre AS negocio_nombre,
             -- El frente impreso lo define el beneficio: toda la campaña sale con el mismo.
-            m.url AS frente_url, pz.canal AS frente_canal, pz.numero AS frente_numero
+            gv.png_url AS frente_url, gf.numero AS frente_numero
        FROM contenido.invitacion i
        JOIN contenido.beneficio b ON b.id=i.beneficio_id
        JOIN contenido.negocios n ON n.id=i.negocio_id
-       LEFT JOIN contenido.piezas pz ON pz.id = b.frente_pieza_id
-       LEFT JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1
+       LEFT JOIN contenido.grafica gf ON gf.id = b.frente_grafica_id
+       LEFT JOIN LATERAL (SELECT png_url FROM contenido.grafica_version x
+                           WHERE x.grafica_id = gf.id AND x.estado='lista' AND x.png_url IS NOT NULL
+                           ORDER BY x.nro DESC LIMIT 1) gv ON true
       WHERE i.codigo=$1`, [c]);
   if (!i) return { ok: false, motivo: 'no_existe', mensaje: MOTIVOS.no_existe };
   if (negocioId && i.negocio_id !== negocioId) return { ok: false, motivo: 'no_existe', mensaje: MOTIVOS.no_existe };
@@ -1527,17 +1529,19 @@ async function consultarInvitacion(codigo, negocioId = null) {
  */
 async function piezasPublicadas(negocioId) {
   const { rows } = await pool.query(
-    `SELECT pz.id, pz.titulo_interno, pz.canal, pz.numero, m.url
-       FROM contenido.piezas pz
-       JOIN contenido.revisiones r ON r.id = pz.revision_vigente
-       JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1 AND m.tipo = 'image'
-      WHERE pz.negocio_id = $1 AND pz.estado = 'publicada'
-      ORDER BY COALESCE(r.publicado_en, pz.actualizado_en) DESC LIMIT 40`, [negocioId]);
-  // El código es como el negocio nombra la pieza en el panel (G-0006). Sin él hay que buscar
-  // por el título, que casi nunca se recuerda de memoria.
+    `SELECT g.id, g.numero, g.nombre, g.formato, g.ancho_mm, g.alto_mm, v.png_url
+       FROM contenido.grafica g
+       JOIN LATERAL (SELECT png_url FROM contenido.grafica_version x
+                      WHERE x.grafica_id = g.id AND x.estado = 'lista' AND x.png_url IS NOT NULL
+                      ORDER BY x.nro DESC LIMIT 1) v ON true
+      WHERE g.negocio_id = $1 ORDER BY g.actualizado_en DESC LIMIT 60`, [negocioId]);
   return rows.map(r => ({
-    id: r.id, codigo: codigoPieza(r.canal, r.numero),
-    titulo: r.titulo_interno || 'sin título', canal: r.canal, url: r.url,
+    id: r.id, codigo: codigoPieza('grafica', r.numero),
+    titulo: r.nombre || 'sin nombre', url: r.png_url,
+    // El formato y las medidas se muestran porque importan: una pieza pensada para un afiche
+    // estirada a A6 se ve mal, y elegirla a ciegas se descubre recién con la tirada impresa.
+    formato: r.formato || null,
+    medidas: r.ancho_mm && r.alto_mm ? `${Math.round(r.ancho_mm)}×${Math.round(r.alto_mm)}mm` : null,
   }));
 }
 

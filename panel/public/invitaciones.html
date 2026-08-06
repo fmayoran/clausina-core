@@ -184,9 +184,7 @@
 
   <label for="b-frente">Frente del impreso</label>
   <select id="b-frente"></select>
-  <div class="mono2" style="margin-top:6px;">La pieza que va del lado de adelante cuando se
-    imprime esta invitación; los datos van al dorso. Se elige por código (G-0006). Sin ninguna,
-    el frente es el logo sobre el color del negocio. Sólo aparecen las piezas ya aprobadas.</div>
+  <div class="mono2" style="margin-top:6px;" id="b-frente-nota"></div>
 
   <label for="b-noshow">Si reserva y no viene</label>
   <select id="b-noshow">
@@ -326,11 +324,15 @@ function abrirBeneficio(id) {
     `${escapar(t.nombre_publico || t.nombre)} (${t.hora_desde}–${t.hora_hasta})</option>`).join('');
   $('b-cmin').value = c.cantidad_min || '';
   $('b-cmax').value = c.cantidad_max || '';
-  // Las de gráfica primero: son las que se diseñan para imprimir.
-  const orden = [...PIEZAS].sort((x, y) => (x.canal === 'grafica' ? -1 : 1) - (y.canal === 'grafica' ? -1 : 1));
-  $('b-frente').innerHTML = '<option value="">logo del negocio</option>' + orden.map(x =>
-    `<option value="${escapar(x.id)}">${escapar(x.codigo)} · ${escapar(x.titulo)}</option>`).join('');
-  $('b-frente').value = (b && b.frente_pieza_id) || '';
+  // Sin ninguna pieza no se deja un desplegable vacío: se dice dónde se crean, que es lo que
+  // la persona necesita saber en ese momento.
+  $('b-frente').innerHTML = '<option value="">logo del negocio</option>' + PIEZAS.map(x =>
+    `<option value="${escapar(x.id)}">${escapar(x.codigo)} · ${escapar(x.titulo)}` +
+    `${x.medidas ? ' · ' + escapar(x.medidas) : ''}</option>`).join('');
+  $('b-frente-nota').textContent = PIEZAS.length
+    ? 'La pieza que va del lado de adelante cuando se imprime; los datos van al dorso. Sólo las de Gráfica con una versión lista.'
+    : 'Todavía no hay piezas en Gráfica. Creá una ahí y va a aparecer acá para elegirla.';
+  $('b-frente').value = (b && b.frente_grafica_id) || '';
   $('b-noshow').value = b ? b.no_show : 'liberar';
   $('b-activo').checked = b ? !!b.activo : true;
   $('b-err').textContent = '';
@@ -346,7 +348,7 @@ async function guardarBeneficio() {
     turnos: [...$('b-turnos').selectedOptions].map(o => o.value),
     cantidad_min: $('b-cmin').value, cantidad_max: $('b-cmax').value,
     no_show: $('b-noshow').value, activo: $('b-activo').checked,
-    frente_pieza_id: $('b-frente').value || null,
+    frente_grafica_id: $('b-frente').value || null,
   };
   const id = $('b-id').value;
   try {
