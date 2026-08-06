@@ -199,7 +199,8 @@ function turnosPermitidos() {
   return TURNOS.filter(t => {
     const iso = new Date(t.fecha + 'T12:00:00').getDay() || 7;
     if ((c.dias || []).length && !c.dias.includes(iso)) return false;
-    if ((c.turnos || []).length && !c.turnos.includes(t.nombre)) return false;
+    // Por id y no por nombre: el nombre público puede repetirse entre turnos.
+    if ((c.turno_ids || []).length && !c.turno_ids.includes(t.turno_id)) return false;
     return true;
   });
 }
@@ -358,7 +359,7 @@ async function validarCodigo() {
     const c = j.condiciones || {};
     const partes = [];
     if ((c.dias || []).length) partes.push('sólo ' + c.dias.map(d => DIAS_CORTOS[d]).join(', '));
-    if ((c.turnos || []).length) partes.push('turno ' + c.turnos.join(' o '));
+    if ((c.franjas || []).length === 1) partes.push('sólo al ' + c.franjas[0].toLowerCase());
     if (c.cantidad_max) partes.push('hasta ' + c.cantidad_max);
     msg.textContent = '✓ ' + j.texto + (partes.length ? ' — ' + partes.join(' · ') : '') +
       (j.vence_en ? ' · vence el ' + String(j.vence_en).slice(0, 10).split('-').reverse().join('/') : '');

@@ -1493,22 +1493,35 @@ async function consultarInvitacion(codigo, negocioId = null) {
 }
 
 /**
- * Las condiciones en palabras, con los NOMBRES de los turnos y no sus uuid. Se usa en el pase y
- * en la página pública: si la invitación vale sólo de noche y el pase no lo dice, la persona se
- * entera cuando se lo rechazan, que es el mismo problema corrido de lugar.
+ * Las condiciones como las tiene que leer un invitado, CRUZADAS CON LA AGENDA REAL.
+ *
+ * Dos correcciones sobre decir simplemente lo que guarda el beneficio:
+ *
+ * 1. Los días se intersectan con los días en que esos turnos realmente corren. Una invitación
+ *    "lunes a viernes, turno Noche" decía viernes, y el turno Noche no corre los viernes: el
+ *    invitado leía un día en el que después no lo iban a dejar reservar.
+ * 2. No se nombran los turnos, se dice la franja. "Noche F. Semana T2" es una clave interna del
+ *    negocio; al invitado le sirve "Noche", y elegir el turno exacto es un tema de la reserva.
  */
 async function condicionesLegibles(negocioId, cond) {
   const c = cond || {};
-  let turnos = [];
-  if ((c.turnos || []).length) {
-    const { rows } = await pool.query(
-      `SELECT COALESCE(nombre_publico, nombre) AS nombre,
-              to_char(hora_desde,'HH24:MI') AS hora_desde
-         FROM contenido.turno WHERE negocio_id=$1 AND id = ANY($2::uuid[]) ORDER BY hora_desde`,
-      [negocioId, c.turnos]);
-    turnos = rows.map(t => t.nombre);
-  }
-  return { dias: c.dias || [], turnos,
+  const { rows: turnos } = await pool.query(
+    `SELECT id, dias, EXTRACT(hour FROM hora_desde)::int AS hora
+       FROM contenido.turno WHERE negocio_id=$1 AND activo`, [negocioId]);
+
+  // Los turnos que la invitación admite: los que nombra, o todos si no nombra ninguno.
+  const admitidos = (c.turnos || []).length
+    ? turnos.filter(t => c.turnos.includes(t.id)) : turnos;
+
+  // La franja sale de la hora y no del nombre: los nombres los escribe cada negocio como quiere.
+  const franjas = [...new Set(admitidos.map(t => (t.hora < 17 ? 'Mediodía' : 'Noche')))]
+    .sort((a, b) => (a === 'Mediodía' ? -1 : 1));
+
+  // Días en que ALGUNO de esos turnos corre de verdad, cruzado con los días de la invitación.
+  const corren = new Set(admitidos.flatMap(t => t.dias || []));
+  const dias = ((c.dias || []).length ? c.dias.filter(x => corren.has(x)) : [...corren]).sort();
+
+  return { dias, franjas, turno_ids: admitidos.map(t => t.id),
            cantidad_min: c.cantidad_min || null, cantidad_max: c.cantidad_max || null };
 }
 
