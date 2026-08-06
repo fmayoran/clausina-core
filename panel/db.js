@@ -1341,9 +1341,12 @@ async function fichaNegocio(negocioId) {
 
 async function getCanalWhatsapp(negocioId) {
   const { rows: [r] } = await pool.query(
-    `SELECT config FROM contenido.negocio_capacidad
+    `SELECT config, actualizado_en FROM contenido.negocio_capacidad
       WHERE negocio_id=$1 AND capacidad='whatsapp'`, [negocioId]);
   const cfg = { ...CFG_CANAL, ...((r && r.config) || {}) };
+  // Cuándo se guardó por última vez. La pantalla lo devuelve al guardar y así se detecta si
+  // alguien más tocó la config mientras estaba abierta.
+  cfg.actualizado_en = (r && r.actualizado_en) ? r.actualizado_en.toISOString() : null;
   // Sólo se ofrece lo que el bot sabe hacer Y el negocio tiene habilitado.
   const { rows: caps } = await pool.query(
     `SELECT capacidad FROM contenido.negocio_capacidad
@@ -1355,8 +1358,20 @@ async function getCanalWhatsapp(negocioId) {
 
 async function guardarCanalWhatsapp(negocioId, d) {
   const actual = await getCanalWhatsapp(negocioId);
+
+  // Guarda contra el pisón silencioso: la pantalla carga la config UNA vez y guarda todo el
+  // objeto. Si en el medio la cambió otro —otra pestaña, otra persona, o la propia plataforma—
+  // guardar desde una pantalla vieja borra lo que no estaba cuando se abrió. Pasó de verdad:
+  // se cargó una respuesta frecuente desde afuera con el panel abierto.
+  if (d.visto_en && actual.actualizado_en && d.visto_en !== actual.actualizado_en) {
+    return { ok: false, error: 'desactualizado', config: actual };
+  }
+
+  // actualizado_en es dato de la fila, no de la config: si entrara al spread quedaría guardado
+  // dentro del jsonb y contaminaría la comparación de la próxima vez.
+  const { actualizado_en, ...base } = actual;
   const cfg = {
-    ...actual,
+    ...base,
     saludo: String(d.saludo || '').trim().slice(0, 600),
     ofrece: [...new Set((Array.isArray(d.ofrece) ? d.ofrece : [])
       .filter(x => CAPS_BOT.some(c => c.id === x)))],

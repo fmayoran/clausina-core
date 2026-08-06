@@ -348,10 +348,16 @@ async function guardarCanal() {
     const r = await fetch('api/whatsapp/canal', { method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ saludo: $('c-saludo').value, ofrece, inbox: $('c-inbox').checked,
-                             auto_confirmar: $('c-auto').checked, faq: leerFaq() }) });
+                             auto_confirmar: $('c-auto').checked, faq: leerFaq(),
+                             visto_en: CANAL.actualizado_en }) });
     const j = await r.json();
     if (r.ok && j.ok) { CANAL = j.config; m.className = 'msg bien'; m.textContent = 'guardado';
       setTimeout(() => { m.textContent = ''; }, 2500); }
+    else if (j.error === 'desactualizado') {
+      // No se pisa y no se descarta lo escrito: se avisa y la persona decide.
+      m.className = 'msg mal';
+      m.textContent = 'esto cambió mientras lo tenías abierto — recargá antes de guardar';
+    }
     else { m.className = 'msg mal'; m.textContent = 'no se pudo guardar'; }
   } catch (e) { m.className = 'msg mal'; m.textContent = 'error de conexión'; }
 }
