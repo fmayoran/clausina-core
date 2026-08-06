@@ -253,6 +253,7 @@ const CAPS = [
   { id: 'grafica',   grupo: 'comunicacion', label: 'Gráfica',            icon: 'layout-template',   href: 'grafica',   desc: 'Folletos, afiches y vía pública', depende: ['estilo'] },
   { id: 'clientes',  grupo: 'operacion',    label: 'Clientes',           icon: 'users-round',       href: 'clientes',  desc: 'Base de clientes del negocio' },
   { id: 'reservas',  grupo: 'operacion',    label: 'Reservas',           icon: 'calendar-check',    href: 'reservas',  desc: 'Turnos, disponibilidad y reservas', depende: ['clientes'] },
+  { id: 'invitaciones', grupo: 'operacion', label: 'Invitaciones',       icon: 'ticket',            href: 'invitaciones', desc: 'Códigos con descuento para repartir', depende: ['reservas'] },
 ];
 const GRUPOS_CAP = [
   { id: 'identidad',    label: 'Identidad',   desc: 'Quién es el negocio' },
@@ -287,6 +288,9 @@ function evaluarCap(cap, d, cfg) {
     // Sin el WABA no se pueden mirar las plantillas, que son por cuenta y no por número.
     if (!d.wa_waba_id) faltan.push('id de la cuenta (WABA)');
     if (!d.wa_token_enc) faltan.push('token');
+  } else if (cap.id === 'invitaciones') {
+    // Sin un beneficio cargado no hay nada que repartir: es configuración, no un detalle.
+    if (!d.beneficios_activos) faltan.push('al menos un beneficio definido');
   } else if (cap.id === 'clientes') {
     // Decisión de Fer: la fuente de verdad se declara por capacidad y por negocio. Sin
     // declararla, ClaUsina podría terminar compitiendo con el sistema que el cliente ya usa.
@@ -301,7 +305,8 @@ async function getCapacidades(negocioId) {
     `SELECT p.ig_handle, p.ig_user_id, p.dominio_web, pp.estilo_md, pp.ig_token_enc,
             pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id, pp.meta_ads_token_enc,
             pp.wa_phone_id, pp.wa_waba_id, pp.wa_token_enc,
-            (SELECT count(*) FROM contenido.turno t WHERE t.negocio_id=p.id AND t.activo)::int AS turnos_activos
+            (SELECT count(*) FROM contenido.turno t WHERE t.negocio_id=p.id AND t.activo)::int AS turnos_activos,
+            (SELECT count(*) FROM contenido.beneficio b WHERE b.negocio_id=p.id AND b.activo)::int AS beneficios_activos
        FROM contenido.negocios p LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id
       WHERE p.id=$1`, [negocioId]);
   const { rows } = await pool.query(
