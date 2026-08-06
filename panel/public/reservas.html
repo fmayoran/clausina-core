@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tw.css">
+<link rel="stylesheet" href="campo-fecha.css">
 <style>
   :root{--u-surf:#FFFFFF;--u-bg:#F7F5F1;--u-line:#DEDDD3;--u-fg:#0c0c0a;--u-mut:#5A616A;
         --u-acc:#4d6800;--u-accfg:#FFFFFF;--u-ok:#4d6800;--u-mal:#C4442A;--u-medio:#8A6410;--u-medio-suave:#FBF0D6;}
@@ -178,29 +179,7 @@
      <input type="date"> se renderiza según el idioma del NAVEGADOR, no del sitio: en un Chrome
      en inglés muestra mm/dd/aaaa y no hay forma de forzarlo desde la página. Por eso un campo
      propio, que además nos deja controlar el calendario. */
-  .fecha{position:relative;}
-  .fecha-txt{cursor:pointer;padding-right:38px !important;}
-  .fecha-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:grid;
-             place-items:center;width:28px;height:28px;border:0;background:none;color:var(--u-mut);
-             cursor:pointer;border-radius:6px;}
-  .fecha-btn:hover{color:var(--u-fg);}
-  .fecha-pop{display:none;position:absolute;z-index:60;top:calc(100% + 5px);left:0;
-             background:var(--u-surf);border:1px solid var(--u-line);border-radius:12px;
-             padding:12px;width:262px;box-shadow:0 12px 34px rgba(0,0,0,.28);}
-  .fecha-pop.on{display:block;}
-  .fp-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px;}
-  .fp-mes{font-family:'Inter Tight',sans-serif;font-weight:600;font-size:.86rem;text-transform:capitalize;}
-  .fp-nav{border:1px solid var(--u-line);background:none;color:var(--u-mut);border-radius:6px;
-          width:26px;height:26px;cursor:pointer;line-height:1;}
-  .fp-nav:hover{color:var(--u-fg);border-color:var(--u-fg);}
-  .fp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
-  .fp-dow{font-family:'JetBrains Mono',monospace;font-size:.5rem;color:var(--u-mut);
-          text-align:center;padding-bottom:3px;letter-spacing:.06em;}
-  .fp-d{border:0;background:none;color:var(--u-fg);border-radius:6px;height:30px;cursor:pointer;
-        font-family:'JetBrains Mono',monospace;font-size:.7rem;}
-  .fp-d:hover{background:color-mix(in srgb,var(--u-acc) 18%,transparent);}
-  .fp-d.vacia{visibility:hidden;cursor:default;}
-  .fp-d.off{color:var(--u-mut);opacity:.32;cursor:default;}
+  /* El campo de fecha con calendario vive en campo-fecha.css (lo comparte Invitaciones). */
   .fp-d.off:hover{background:none;}
   .fp-d.hoy{outline:1px solid var(--u-mut);}
   .fp-d.sel{background:var(--u-acc);color:var(--u-accfg);font-weight:700;}
@@ -502,6 +481,7 @@
 </div>
 
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="campo-fecha.js"></script>
 <script src="shell.js"></script>
 <script>ClausinaShell({active:'reservas',cap:'reservas'})</script>
 <script>
@@ -541,61 +521,7 @@ document.getElementById('tabs').addEventListener('click', e => {
   if (b.dataset.pane === 'links') cargarLinks();
 });
 
-/* ═══════ Campo de fecha (formato dd/mm/aaaa + calendario) ═══════ */
-// El nativo <input type="date"> muestra el formato del navegador, no el del sitio. Este campo
-// siempre escribe dd/mm/aaaa y trae su propio calendario.
-const aLatino = iso => iso ? `${iso.slice(8,10)}/${iso.slice(5,7)}/${iso.slice(0,4)}` : '';
-
-function CampoFecha(cont, opts) {
-  opts = opts || {};
-  let iso = '', mes = '';
-  const txt = cont.querySelector('.fecha-txt');
-  const pop = cont.querySelector('.fecha-pop');
-
-  function pintar() {
-    const y = +mes.slice(0, 4), m = +mes.slice(5, 7);
-    const nom = new Date(mes + 'T12:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-    const arranque = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() || 7) - 1;
-    const dias = new Date(Date.UTC(y, m, 0)).getUTCDate();
-    let celdas = '';
-    for (let i = 0; i < arranque; i++) celdas += '<button type="button" class="fp-d vacia"></button>';
-    for (let d = 1; d <= dias; d++) {
-      const f = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const fuera = opts.min && f < opts.min;
-      celdas += `<button type="button" class="fp-d${fuera ? ' off' : ''}${f === iso ? ' sel' : ''}${f === hoy() ? ' hoy' : ''}"
-        ${fuera ? 'disabled' : `data-f="${f}"`}>${d}</button>`;
-    }
-    pop.innerHTML = `<div class="fp-cab">
-        <button type="button" class="fp-nav" data-mes="-1">‹</button>
-        <span class="fp-mes">${nom}</span>
-        <button type="button" class="fp-nav" data-mes="1">›</button>
-      </div>
-      <div class="fp-grid">${DIAS.map(([, l]) => `<span class="fp-dow">${l.slice(0,1)}</span>`).join('')}${celdas}</div>`;
-  }
-  function abrir() { mes = (iso || hoy()).slice(0, 8) + '01'; pintar(); pop.classList.add('on'); }
-  function cerrar() { pop.classList.remove('on'); }
-
-  txt.addEventListener('click', () => pop.classList.contains('on') ? cerrar() : abrir());
-  cont.querySelector('.fecha-btn').addEventListener('click', e => {
-    e.preventDefault(); pop.classList.contains('on') ? cerrar() : abrir();
-  });
-  pop.addEventListener('click', e => {
-    const nav = e.target.closest('.fp-nav');
-    if (nav) { const d = new Date(mes + 'T12:00:00Z');
-      d.setUTCMonth(d.getUTCMonth() + (+nav.dataset.mes), 1);
-      mes = d.toISOString().slice(0, 10); pintar(); return; }
-    const dia = e.target.closest('.fp-d[data-f]');
-    if (dia) { api.valor = dia.dataset.f; cerrar(); if (opts.onChange) opts.onChange(iso); }
-  });
-  // Cerrar al tocar fuera: si no, quedan dos calendarios abiertos pisándose.
-  document.addEventListener('click', e => { if (!cont.contains(e.target)) cerrar(); });
-
-  const api = {
-    get valor() { return iso; },
-    set valor(v) { iso = v || ''; txt.value = aLatino(iso); },
-  };
-  return api;
-}
+/* El campo de fecha vive en campo-fecha.js: lo usan Reservas e Invitaciones. */
 let FD_RESERVA = null, FD_BLOQUEO = null;
 
 /* ═══════ Campo de hora en 24 h ═══════ */

@@ -1398,6 +1398,12 @@ async function emitirInvitaciones(negocioId, d) {
   const cantidad = Math.max(1, Math.min(Number(d.cantidad) || etiquetas.length || 1, 500));
   const usosMax = Math.max(1, Math.min(Number(d.usos_max) || 1, 100000));
   const vence = /^\d{4}-\d{2}-\d{2}$/.test(d.vence_en || '') ? d.vence_en : null;
+  // Una invitación que nace vencida no sirve para nada, y no avisar convierte un error de tipeo
+  // en seis códigos inutilizables que nadie mira hasta que alguien los quiere usar. Se rechaza
+  // acá y no sólo en la pantalla: el campo puede cambiar, la regla no.
+  if (vence && vence < new Date().toISOString().slice(0, 10)) {
+    const e = new Error('vencimiento en el pasado'); e.code = 'vence_pasado'; throw e;
+  }
 
   const nuevas = [];
   for (let i = 0; i < cantidad; i++) {

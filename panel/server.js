@@ -236,6 +236,34 @@ app.get('/i/:codigo', async (req, res) => {
   } catch (e) { console.error('invitacion link', e.message); res.status(500).send('Error'); }
 });
 
+// El pase: la invitación en versión imprimible o para mandar por mail. Es pública a propósito —
+// el código YA es el secreto, y quien lo tiene es su dueño. Pedir una sesión para ver la propia
+// invitación no protegería nada y la haría inservible como algo que se reenvía.
+app.get('/pase/:codigo', async (req, res) => {
+  if (!limite(req, res, 60, 60e3)) return;
+  res.sendFile(path.join(__dirname, 'public', 'publico', 'pase.html'));
+});
+
+app.get('/api/publico/pase/:codigo', async (req, res) => {
+  if (!limite(req, res, 60, 60e3)) return;
+  try {
+    const r = await db.consultarInvitacion(String(req.params.codigo));
+    const i = r.invitacion;
+    if (!r.ok) {
+      // Aunque no sirva, se dice de qué negocio es para poder ofrecer reservar igual.
+      return res.json({ ok: false, mensaje: r.mensaje, negocio_slug: i ? i.negocio_slug : null });
+    }
+    const n = await db.negocioPublico(i.negocio_slug);
+    res.json({
+      ok: true, codigo: i.codigo, texto: r.texto, etiqueta: i.etiqueta,
+      vence_en: i.vence_en, usos_max: i.usos_max, condiciones: i.condiciones || {},
+      negocio: i.negocio_nombre, negocio_slug: i.negocio_slug,
+      // La marca y el logo salen del negocio: el pase es suyo, no de ClaUsina.
+      logo: n ? n.logo : null, marca: n ? n.marca : null,
+    });
+  } catch (e) { console.error('pase', e.message); res.status(500).json({ ok: false }); }
+});
+
 // La página pública de reservas de un negocio.
 app.get('/r/:slug', async (req, res) => {
   if (!limite(req, res, 120, 60e3)) return;
@@ -985,6 +1013,8 @@ app.post('/api/invitaciones/emitir', async (req, res) => {
     res.json({ ok: true, invitaciones: await db.emitirInvitaciones(req.negocioId, req.body || {}) });
   } catch (e) {
     if (e.code === 'beneficio_invalido') return res.status(400).json({ ok: false, mensaje: 'Elegí un beneficio.' });
+    if (e.code === 'vence_pasado') return res.status(400).json({ ok: false,
+      mensaje: 'Esa fecha de vencimiento ya pasó: los códigos nacerían vencidos.' });
     console.error('emitir', e.message); res.status(500).json({ ok: false, mensaje: 'Error del servidor.' });
   }
 });
