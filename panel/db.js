@@ -102,6 +102,19 @@ async function logWhatsapp({ direccion, wa_id, usuario_id, mensaje_id, tipo, tex
   } catch (e) { console.error('log whatsapp', e.message); return false; }
 }
 
+/**
+ * La transcripción de una nota de voz, si ya la escribió el worker del host.
+ * Se busca por el id de Meta y no por el de la fila porque el webhook atiende el mensaje ANTES
+ * de guardarlo: cuando alguien necesita esperar la transcripción, todavía no hay id propio.
+ */
+async function transcripcionDe(mensajeId) {
+  if (!mensajeId) return null;
+  const { rows: [r] } = await pool.query(
+    `SELECT texto FROM contenido.whatsapp_mensaje
+      WHERE mensaje_id=$1 AND direccion='entrante' LIMIT 1`, [mensajeId]);
+  return r && r.texto ? r.texto : null;
+}
+
 /** ¿Ya procesamos este mensaje? Meta reintenta si tardamos en responder. */
 async function whatsappYaVisto(mensajeId) {
   if (!mensajeId) return false;
@@ -2715,7 +2728,7 @@ async function health() {
 
 module.exports = {
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
-  completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, guardarToken, getUsuarioPorToken, consumirToken,
+  completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
   getClientes, crearCliente, actualizarCliente, borrarCliente, exportarClientes, borrarTodosLosClientes,

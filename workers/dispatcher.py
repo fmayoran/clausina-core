@@ -268,12 +268,16 @@ DETECTORS = {
 }
 
 
-def run():
+def run(solo=None):
+    """`solo` limita la corrida a esos detectores. Lo usa el timer rápido de las notas de voz:
+    del otro lado hay un cliente esperando la respuesta, y un ciclo de 60 s es demasiado. El
+    resto de los procesos no tiene a nadie mirando, así que sigue en la cadencia normal.
+    Encolar dos veces el mismo ítem es inofensivo: acquire_inflight lo deduplica."""
     encolados = 0
     # Se recorre DETECTORS y no una lista aparte: tener las dos obliga a acordarse de las dos,
     # y olvidarse de la segunda NO da error — el detector simplemente no corre nunca.
     for tipo in DETECTORS:
-        if tipo not in MIGRATED:
+        if tipo not in MIGRATED or (solo and tipo not in solo):
             continue
         try:
             for job in DETECTORS[tipo]():
@@ -283,13 +287,16 @@ def run():
                     log(f"encolado {job['tipo']}/{job['negocio_slug']} ({job['lock_key']})")
         except Exception as e:
             log(f"!! detector {tipo} falló: {e}")
-    # Latido de salud del dispatcher (lo lee la barra de control de workers del panel).
-    heartbeat("dispatcher", f"chequeo ok · {encolados} encolado(s)")
+    # Latido de salud del dispatcher (lo lee la barra de control de workers del panel). Sólo lo
+    # escribe la corrida COMPLETA: si lo escribiera también la parcial, el panel mostraría verde
+    # aunque hiciera media hora que no se chequea nada más que las notas de voz.
+    if not solo:
+        heartbeat("dispatcher", f"chequeo ok · {encolados} encolado(s)")
 
 
 if __name__ == "__main__":
     try:
-        run()
+        run(solo=set(sys.argv[1:]) or None)
     except Exception as e:
         log(f"!! error en dispatcher: {e}")
         sys.exit(1)

@@ -127,6 +127,11 @@ app.post('/webhook/whatsapp', express.raw({ type: '*/*', limit: '2mb' }), async 
           media_id: m.media_id,
           estado: atendido ? 'atendido_bot' : 'cliente_de_negocio',
         });
+        // Nota de voz: la transcripción llega después, del worker del host. Se la espera SIN
+        // await — bloquear acá dejaría al resto del lote de Meta esperando a whisper.
+        if (atendido && m.tipo === 'audio' && m.media_id) {
+          reservaWa.seguirVoz(negocio, m).catch(e => console.error('seguir voz', e.message));
+        }
         if (!atendido) console.log(`whatsapp: mensaje para ${negocio.slug} de ${m.wa_id} — registrado, sin responder`);
         continue;
       }
