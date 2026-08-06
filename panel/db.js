@@ -3,6 +3,7 @@
 const { Pool } = require('pg');
 const cryptoAds = require('./crypto_ads');
 const tel = require('./telefono');
+const inv = require('./invitaciones');
 
 const pool = new Pool({
   host: process.env.PGHOST || 'crm_pgvector',
@@ -1261,8 +1262,18 @@ async function crearReserva(negocioId, d) {
        String(d.agente_id || '').trim() || null, String(d.notas || '').trim() || null,
        String(d.ref_externa || '').trim() || null, d.link_id || null]);
 
+    // La invitación se toma acá adentro: si la reserva se cae, el cupo no se gastó, y si la
+    // invitación no entra, la reserva no queda hecha con un descuento que no existe.
+    let invitacion = null;
+    if (d.invitacion_codigo) {
+      invitacion = await _tomarInvitacion(cli, negocioId, d.invitacion_codigo, {
+        reservaId: r.id, clienteId, fecha: d.fecha, turnoId: d.turno_id, cantidad,
+        telefonoNorm: d.cliente_telefono ? tel.clave(String(d.cliente_telefono)) : null,
+      });
+    }
+
     await cli.query('COMMIT');
-    return { ok: true, id: r.id, estado, libre: libre - cantidad };
+    return { ok: true, id: r.id, estado, libre: libre - cantidad, invitacion };
   } catch (e) {
     await cli.query('ROLLBACK'); throw e;
   } finally { cli.release(); }
@@ -1276,7 +1287,298 @@ async function cambiarEstadoReserva(negocioId, id, estado) {
     `UPDATE contenido.reserva SET estado=$3 WHERE id=$1 AND negocio_id=$2
        AND NOT (estado='cancelada' AND $3 IN ('solicitada','confirmada'))`,
     [id, negocioId, estado]);
+
+  if (rowCount) {
+    // Cancelar devuelve la invitación al ruedo. Sin esto se la come en silencio y la persona se
+    // queda sin nada. El no-show es distinto: ahí decide el beneficio si se libera o se quema.
+    if (estado === 'cancelada') await liberarPorReserva(negocioId, id).catch(() => {});
+    if (estado === 'no_show') {
+      const u = await invitacionDeReserva(id);
+      if (u && u.estado === 'tomada') {
+        await cerrarUso(negocioId, u.uso_id,
+          u.no_show === 'quemar' ? 'perdida' : 'liberada', 'no se presentó').catch(() => {});
+      }
+    }
+  }
   return { ok: rowCount > 0 };
+}
+
+// --- Invitaciones (v2.0 / F6) --------------------------------------------------------------
+// Repartir invitaciones con descuento y poder rastrear cada una. Tres piezas separadas:
+// beneficio (QUÉ da) → invitación (EL CÓDIGO) → uso (QUÉ RESERVA lo tomó y si vino).
+//
+// LO QUE ESTA CAPACIDAD NO HACE: aplicar el descuento. ClaUsina no ve la factura. Emite,
+// autoriza, avisa y mide; la cuenta la hace una persona en el mostrador.
+
+const TIPOS_BENEFICIO = [
+  { id: 'porcentaje',   label: '% de descuento',      sufijo: '%',  desc: 'Sobre el total de la cuenta' },
+  { id: 'gratis_hasta', label: 'Sin cargo hasta',     sufijo: '',   desc: 'Invitación para N cubiertos' },
+  { id: 'monto_fijo',   label: 'Monto fijo',          sufijo: '$',  desc: 'Se descuenta del total' },
+];
+
+/** Cómo se le dice a una persona lo que le tocó. Se usa igual en el panel, la web y WhatsApp. */
+function textoBeneficio(b, unidad = 'personas') {
+  if (!b) return '';
+  const n = Number(b.valor);
+  if (b.tipo === 'porcentaje')   return `${n % 1 ? n : n | 0}% de descuento`;
+  if (b.tipo === 'monto_fijo')   return `$${(n | 0).toLocaleString('es-AR')} de descuento`;
+  if (b.tipo === 'gratis_hasta') return `sin cargo hasta ${n | 0} ${unidad}`;
+  return b.nombre || '';
+}
+
+async function getBeneficios(negocioId) {
+  const { rows } = await pool.query(
+    `SELECT b.*, (SELECT count(*)::int FROM contenido.invitacion i WHERE i.beneficio_id=b.id) AS invitaciones,
+            (SELECT count(*)::int FROM contenido.invitacion_uso u
+               WHERE u.invitacion_id IN (SELECT id FROM contenido.invitacion WHERE beneficio_id=b.id)
+                 AND u.estado='consumida') AS consumidas
+       FROM contenido.beneficio b WHERE b.negocio_id=$1 ORDER BY b.activo DESC, b.creado_en DESC`,
+    [negocioId]);
+  return rows;
+}
+
+async function guardarBeneficio(negocioId, id, d) {
+  const nombre = String(d.nombre || '').trim().slice(0, 120);
+  if (!nombre) { const e = new Error('nombre'); e.code = 'falta_nombre'; throw e; }
+  if (!TIPOS_BENEFICIO.some(t => t.id === d.tipo)) { const e = new Error('tipo'); e.code = 'tipo_invalido'; throw e; }
+  const valor = Number(d.valor);
+  if (!Number.isFinite(valor) || valor <= 0) { const e = new Error('valor'); e.code = 'valor_invalido'; throw e; }
+  // Un porcentaje mayor a 100 es siempre un error de carga, y regalarlo sin querer sale caro.
+  if (d.tipo === 'porcentaje' && valor > 100) { const e = new Error('%'); e.code = 'valor_invalido'; throw e; }
+
+  const cond = {
+    dias: [...new Set((Array.isArray(d.dias) ? d.dias : []).map(Number).filter(n => n >= 1 && n <= 7))].sort(),
+    turnos: (Array.isArray(d.turnos) ? d.turnos : []).filter(x => /^[0-9a-f-]{36}$/i.test(String(x))),
+    cantidad_min: Number(d.cantidad_min) > 0 ? Math.round(Number(d.cantidad_min)) : null,
+    cantidad_max: Number(d.cantidad_max) > 0 ? Math.round(Number(d.cantidad_max)) : null,
+  };
+  const noShow = ['liberar', 'quemar'].includes(d.no_show) ? d.no_show : 'liberar';
+  const campos = [negocioId, nombre, d.tipo, valor, JSON.stringify(cond), noShow,
+                  String(d.notas || '').trim().slice(0, 600) || null, d.activo !== false];
+  if (id) {
+    const { rows: [r] } = await pool.query(
+      `UPDATE contenido.beneficio SET nombre=$2, tipo=$3, valor=$4, condiciones=$5::jsonb,
+              no_show=$6, notas=$7, activo=$8, actualizado_en=now()
+        WHERE id=$9 AND negocio_id=$1 RETURNING *`, [...campos, id]);
+    if (!r) { const e = new Error('no existe'); e.code = 'no_encontrado'; throw e; }
+    return r;
+  }
+  const { rows: [r] } = await pool.query(
+    `INSERT INTO contenido.beneficio (negocio_id, nombre, tipo, valor, condiciones, no_show, notas, activo)
+     VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8) RETURNING *`, campos);
+  return r;
+}
+
+/**
+ * Emite N códigos de un beneficio. `etiquetas` nombra a quién va cada uno (una por línea); si hay
+ * menos etiquetas que códigos, los que sobran quedan sin nombre — sirven para repartir en mano.
+ */
+async function emitirInvitaciones(negocioId, d) {
+  const { rows: [b] } = await pool.query(
+    'SELECT id, activo FROM contenido.beneficio WHERE id=$1 AND negocio_id=$2', [d.beneficio_id, negocioId]);
+  if (!b) { const e = new Error('beneficio'); e.code = 'beneficio_invalido'; throw e; }
+
+  const etiquetas = String(d.etiquetas || '').split('\n').map(x => x.trim()).filter(Boolean).slice(0, 500);
+  const cantidad = Math.max(1, Math.min(Number(d.cantidad) || etiquetas.length || 1, 500));
+  const usosMax = Math.max(1, Math.min(Number(d.usos_max) || 1, 100000));
+  const vence = /^\d{4}-\d{2}-\d{2}$/.test(d.vence_en || '') ? d.vence_en : null;
+
+  const nuevas = [];
+  for (let i = 0; i < cantidad; i++) {
+    // El código es único en toda la plataforma. La colisión es rarísima pero no imposible, y la
+    // base es la única que puede decidirlo sin una carrera: se reintenta contra su rechazo.
+    let fila = null;
+    for (let intento = 0; intento < 8 && !fila; intento++) {
+      try {
+        const { rows: [r] } = await pool.query(
+          `INSERT INTO contenido.invitacion (negocio_id, beneficio_id, codigo, etiqueta, usos_max, vence_en)
+           VALUES ($1,$2,$3,$4,$5,$6::date) RETURNING *`,
+          [negocioId, d.beneficio_id, inv.generar(), etiquetas[i] || null, usosMax, vence]);
+        fila = r;
+      } catch (e) { if (e.code !== '23505') throw e; }   // 23505 = código repetido
+    }
+    if (!fila) { const e = new Error('no pude generar un código libre'); e.code = 'sin_codigo'; throw e; }
+    nuevas.push(fila);
+  }
+  return nuevas;
+}
+
+async function getInvitaciones(negocioId, { beneficio_id } = {}) {
+  const params = [negocioId];
+  let filtro = '';
+  if (beneficio_id) { params.push(beneficio_id); filtro = ' AND i.beneficio_id=$2'; }
+  const { rows } = await pool.query(
+    `SELECT i.*, b.nombre AS beneficio, b.tipo, b.valor, b.no_show,
+            (SELECT count(*)::int FROM contenido.invitacion_uso u
+              WHERE u.invitacion_id=i.id AND u.estado='consumida') AS consumidas,
+            (SELECT max(u.tomada_en) FROM contenido.invitacion_uso u WHERE u.invitacion_id=i.id) AS ultimo_uso
+       FROM contenido.invitacion i JOIN contenido.beneficio b ON b.id=i.beneficio_id
+      WHERE i.negocio_id=$1${filtro} ORDER BY i.creado_en DESC LIMIT 500`, params);
+  return rows.map(r => ({ ...r, estado: estadoInvitacion(r) }));
+}
+
+/** El estado no se guarda: se deriva. Guardarlo obliga a acordarse de moverlo y se desincroniza. */
+function estadoInvitacion(i) {
+  if (i.anulada_en) return 'anulada';
+  if (i.vence_en && new Date(i.vence_en) < new Date(new Date().toISOString().slice(0, 10))) return 'vencida';
+  if (i.usos >= i.usos_max) return 'agotada';
+  return i.usos > 0 ? 'en_uso' : 'activa';
+}
+
+async function anularInvitacion(negocioId, id) {
+  const { rowCount } = await pool.query(
+    'UPDATE contenido.invitacion SET anulada_en=now() WHERE id=$1 AND negocio_id=$2 AND anulada_en IS NULL',
+    [id, negocioId]);
+  return { ok: rowCount > 0 };
+}
+
+const MOTIVOS = {
+  forma:     'Ese código no es válido. Fijate si lo copiaste completo.',
+  no_existe: 'No encuentro ese código.',
+  anulada:   'Esa invitación fue dada de baja.',
+  vencida:   'Esa invitación ya venció.',
+  agotada:   'Esa invitación ya se usó.',
+  inactivo:  'Esa invitación ya no está disponible.',
+  ajena:     'Esa invitación ya está en uso por otra persona.',
+  dia:       'Esa invitación no aplica al día que elegiste.',
+  turno:     'Esa invitación no aplica a ese turno.',
+  cantidad:  'Esa invitación no aplica para esa cantidad.',
+};
+
+/**
+ * Mira un código sin tomarlo. Es lo que se usa para mostrar QUÉ da antes de pedir nada más:
+ * validar recién al final, después de que la persona cargó todo, es la peor versión posible.
+ */
+async function consultarInvitacion(codigo, negocioId = null) {
+  const c = inv.limpiar(codigo);
+  if (!inv.formaValida(c)) return { ok: false, motivo: 'forma', mensaje: MOTIVOS.forma };
+  const { rows: [i] } = await pool.query(
+    `SELECT i.*, b.nombre AS beneficio, b.tipo, b.valor, b.condiciones, b.activo AS beneficio_activo,
+            n.slug AS negocio_slug, n.nombre AS negocio_nombre
+       FROM contenido.invitacion i
+       JOIN contenido.beneficio b ON b.id=i.beneficio_id
+       JOIN contenido.negocios n ON n.id=i.negocio_id
+      WHERE i.codigo=$1`, [c]);
+  if (!i) return { ok: false, motivo: 'no_existe', mensaje: MOTIVOS.no_existe };
+  if (negocioId && i.negocio_id !== negocioId) return { ok: false, motivo: 'no_existe', mensaje: MOTIVOS.no_existe };
+
+  const est = estadoInvitacion(i);
+  if (est === 'anulada') return { ok: false, motivo: 'anulada', mensaje: MOTIVOS.anulada };
+  if (est === 'vencida') return { ok: false, motivo: 'vencida', mensaje: MOTIVOS.vencida };
+  if (est === 'agotada') return { ok: false, motivo: 'agotada', mensaje: MOTIVOS.agotada };
+  if (!i.beneficio_activo) return { ok: false, motivo: 'inactivo', mensaje: MOTIVOS.inactivo };
+  return { ok: true, invitacion: i, texto: textoBeneficio(i) };
+}
+
+/** Las condiciones del beneficio contra la reserva concreta. Devuelve el motivo, o null si entra. */
+function chocaCondicion(cond, { fecha, turnoId, cantidad, isodow }) {
+  const c = cond || {};
+  if ((c.dias || []).length && !c.dias.includes(isodow)) return 'dia';
+  if ((c.turnos || []).length && !c.turnos.includes(turnoId)) return 'turno';
+  if (c.cantidad_min && cantidad < c.cantidad_min) return 'cantidad';
+  if (c.cantidad_max && cantidad > c.cantidad_max) return 'cantidad';
+  return null;
+}
+
+/**
+ * Toma la invitación DENTRO de la transacción de la reserva. Es lo único que garantiza que no
+ * queden reservas con un descuento que nunca se descontó del cupo, ni cupos gastados por reservas
+ * que la base terminó rechazando.
+ *
+ * El FOR UPDATE serializa a dos personas peleando el último uso de un código compartido — el
+ * mismo problema que la capacidad del turno, y se resuelve igual.
+ */
+async function _tomarInvitacion(cli, negocioId, codigo, { reservaId, clienteId, fecha, turnoId, cantidad, telefonoNorm }) {
+  const c = inv.limpiar(codigo);
+  if (!inv.formaValida(c)) { const e = new Error('código'); e.code = 'inv_forma'; throw e; }
+
+  const { rows: [i] } = await cli.query(
+    `SELECT i.*, b.condiciones, b.activo AS beneficio_activo, b.nombre AS beneficio, b.tipo, b.valor
+       FROM contenido.invitacion i JOIN contenido.beneficio b ON b.id=i.beneficio_id
+      WHERE i.codigo=$1 AND i.negocio_id=$2 FOR UPDATE OF i`, [c, negocioId]);
+  if (!i) { const e = new Error('código'); e.code = 'inv_no_existe'; throw e; }
+
+  const est = estadoInvitacion(i);
+  if (est === 'anulada') { const e = new Error('anulada'); e.code = 'inv_anulada'; throw e; }
+  if (est === 'vencida') { const e = new Error('vencida'); e.code = 'inv_vencida'; throw e; }
+  if (est === 'agotada') { const e = new Error('agotada'); e.code = 'inv_agotada'; throw e; }
+  if (!i.beneficio_activo) { const e = new Error('inactivo'); e.code = 'inv_inactivo'; throw e; }
+
+  // El primero que la usa se la queda. Reenviarla deja de servir después del primer canje, sin
+  // pedirle a nadie que se identifique de antemano. Sólo aplica a las personales.
+  if (i.usos_max === 1 && i.telefono_norm && telefonoNorm && i.telefono_norm !== telefonoNorm) {
+    const e = new Error('ajena'); e.code = 'inv_ajena'; throw e;
+  }
+
+  const { rows: [dw] } = await cli.query('SELECT EXTRACT(isodow FROM $1::date)::int AS d', [fecha]);
+  const choca = chocaCondicion(i.condiciones, { fecha, turnoId, cantidad, isodow: dw.d });
+  if (choca) { const e = new Error(choca); e.code = 'inv_' + choca; throw e; }
+
+  await cli.query(
+    `INSERT INTO contenido.invitacion_uso (invitacion_id, negocio_id, reserva_id, cliente_id)
+     VALUES ($1,$2,$3,$4)`, [i.id, negocioId, reservaId, clienteId || null]);
+  await cli.query(
+    `UPDATE contenido.invitacion SET usos = usos + 1,
+            telefono_norm = COALESCE(telefono_norm, $2) WHERE id=$1`,
+    [i.id, telefonoNorm || null]);
+  return { id: i.id, codigo: c, beneficio: i.beneficio, tipo: i.tipo, valor: i.valor,
+           texto: textoBeneficio(i) };
+}
+
+/**
+ * Cierra un uso. `consumida` la marca una persona del salón cuando la aplicó de verdad.
+ * `liberada` devuelve el cupo; `perdida` lo gasta. Cuál de las dos aplica ante un no-show lo
+ * decide el beneficio, porque depende del tipo de invitación (decisión de Fer).
+ */
+async function cerrarUso(negocioId, usoId, estado, notas) {
+  if (!['consumida', 'liberada', 'perdida'].includes(estado)) {
+    const e = new Error('estado'); e.code = 'estado_invalido'; throw e;
+  }
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    const { rows: [u] } = await cli.query(
+      `SELECT * FROM contenido.invitacion_uso WHERE id=$1 AND negocio_id=$2 FOR UPDATE`,
+      [usoId, negocioId]);
+    if (!u) { await cli.query('ROLLBACK'); return { ok: false, error: 'no_encontrado' }; }
+    if (u.estado !== 'tomada') { await cli.query('ROLLBACK'); return { ok: false, error: 'ya_cerrado' }; }
+
+    await cli.query(
+      `UPDATE contenido.invitacion_uso SET estado=$2, cerrada_en=now(),
+              notas=COALESCE($3, notas) WHERE id=$1`, [usoId, estado, notas || null]);
+    // Sólo liberar devuelve el cupo. Consumir y perder lo gastan, que es la diferencia entre las
+    // dos políticas de no-show.
+    if (estado === 'liberada') {
+      await cli.query('UPDATE contenido.invitacion SET usos = GREATEST(0, usos - 1) WHERE id=$1',
+        [u.invitacion_id]);
+    }
+    await cli.query('COMMIT');
+    return { ok: true };
+  } catch (e) { await cli.query('ROLLBACK'); throw e; }
+  finally { cli.release(); }
+}
+
+/**
+ * Al cancelar una reserva su invitación vuelve al ruedo. Sin esto, cancelar una reserva se come
+ * la invitación en silencio y la persona se queda sin nada.
+ */
+async function liberarPorReserva(negocioId, reservaId) {
+  const { rows: [u] } = await pool.query(
+    `SELECT id FROM contenido.invitacion_uso
+      WHERE reserva_id=$1 AND negocio_id=$2 AND estado='tomada'`, [reservaId, negocioId]);
+  if (!u) return { ok: false };
+  return await cerrarUso(negocioId, u.id, 'liberada', 'la reserva se canceló');
+}
+
+/** La invitación de una reserva, para mostrarla en el detalle y en la lista del día. */
+async function invitacionDeReserva(reservaId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT u.id AS uso_id, u.estado, i.codigo, b.nombre AS beneficio, b.tipo, b.valor, b.no_show
+       FROM contenido.invitacion_uso u
+       JOIN contenido.invitacion i ON i.id=u.invitacion_id
+       JOIN contenido.beneficio b ON b.id=i.beneficio_id
+      WHERE u.reserva_id=$1`, [reservaId]);
+  return r ? { ...r, texto: textoBeneficio(r) } : null;
 }
 
 // --- El canal de WhatsApp como producto (v2.0 / F5f) --------------------------------------
@@ -2825,7 +3127,10 @@ async function health() {
 
 module.exports = {
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
-  completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, clientePorTelefono, guardarToken, getUsuarioPorToken, consumirToken,
+  completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, clientePorTelefono,
+  TIPOS_BENEFICIO, textoBeneficio, getBeneficios, guardarBeneficio,
+  emitirInvitaciones, getInvitaciones, anularInvitacion, consultarInvitacion,
+  cerrarUso, liberarPorReserva, invitacionDeReserva, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
   getClientes, crearCliente, actualizarCliente, borrarCliente, exportarClientes, borrarTodosLosClientes,
