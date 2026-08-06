@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula", "descubrimiento", "marca_gen", "grafica"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula", "descubrimiento", "voz", "marca_gen", "grafica"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -270,7 +270,9 @@ DETECTORS = {
 
 def run():
     encolados = 0
-    for tipo in ("correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula", "descubrimiento", "marca_gen", "grafica"):
+    # Se recorre DETECTORS y no una lista aparte: tener las dos obliga a acordarse de las dos,
+    # y olvidarse de la segunda NO da error — el detector simplemente no corre nunca.
+    for tipo in DETECTORS:
         if tipo not in MIGRATED:
             continue
         try:
