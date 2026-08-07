@@ -25,7 +25,9 @@
   .banda{background:var(--c-marca-fondo,#101014);border-radius:20px;padding:26px 34px;
          display:inline-block;max-width:82%;}
   .banda .logo{max-width:100%;}
-  .cabecera{margin-bottom:50px;}
+  /* Flex y no text-align: el logo es un bloque dentro de un span, y ahí el centrado de
+     texto no lo alcanza — quedaba corrido a la izquierda. */
+  .cabecera{display:flex;justify-content:center;width:100%;margin-bottom:50px;}
   .rot{font-family:'JetBrains Mono',monospace;font-size:23px;letter-spacing:.3em;
        text-transform:uppercase;opacity:.62;}
   .nombre{font-family:var(--f-tit);font-weight:800;font-size:86px;line-height:1.05;
