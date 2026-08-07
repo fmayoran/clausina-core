@@ -127,7 +127,7 @@ async function atender(negocio, mensaje) {
   // persona a acordarse de cuándo decirlo.
   const codigo = inv.buscarEnTexto(entrada);
   if (codigo && codigo !== datos.invitacion) {
-    const r = await db.consultarInvitacion(codigo, negocio.id).catch(() => null);
+    const r = await db.consultarInvitacion(codigo, negocio.id, waId).catch(() => null);
     if (r && r.ok) {
       datos = { ...datos, invitacion: codigo };
       if (paso) await db.setConversacion(negocio.id, waId, paso, datos);
@@ -406,6 +406,7 @@ const ERRORES = {
   inv_vencida:  'Esa invitación ya venció. Escribime "reservar" y la hacemos sin ella.',
   inv_anulada:  'Esa invitación fue dada de baja. Escribime "reservar" y la hacemos sin ella.',
   inv_ajena:    'Esa invitación ya está en uso por otra persona.',
+  inv_repetida: 'Esa invitación ya la usaste. Escribime "reservar" y la hacemos sin ella.',
   inv_dia:      'La invitación no aplica a ese día. Escribime "reservar" y elegimos otro.',
   inv_turno:    'La invitación no aplica a ese turno. Escribime "reservar" y elegimos otro.',
   inv_cantidad: 'La invitación no aplica para esa cantidad. Escribime "reservar" y lo vemos.',
@@ -522,7 +523,7 @@ async function seguirVoz(negocio, mensaje) {
   let invitacion = null;
   const codigo = inv.buscarEnTexto(texto);
   if (codigo) {
-    const c = await db.consultarInvitacion(codigo, negocio.id).catch(() => null);
+    const c = await db.consultarInvitacion(codigo, negocio.id, waId).catch(() => null);
     if (c && c.ok) {
       invitacion = codigo;
       await decir(cfg, waId, `¡Bien! Tu invitación está activa: ${c.texto}.`, negocio.id);

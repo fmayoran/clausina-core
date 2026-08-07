@@ -33,6 +33,8 @@
   .cod{font-family:'JetBrains Mono',monospace;font-size:.9rem;font-weight:500;color:var(--u-fg);
        letter-spacing:.06em;background:none;border:0;cursor:pointer;padding:0;}
   .cod:hover{color:var(--u-acc);}
+  td.acciones{white-space:nowrap;}
+  td.acciones .iconbtn + .iconbtn{margin-left:4px;}
   .iconbtn{display:inline-grid;vertical-align:middle;place-items:center;width:32px;height:32px;border-radius:8px;
            border:1px solid var(--u-line);color:var(--u-mut);transition:.15s;background:none;cursor:pointer;}
   .iconbtn:hover{color:var(--u-fg);border-color:var(--u-fg);}
@@ -100,12 +102,12 @@
     </div>
 
     <div class="tabs" id="tabs">
-      <button class="tab on" data-pane="cod">Códigos</button>
-      <button class="tab" data-pane="ben">Beneficios</button>
+      <button class="tab on" data-pane="ben">Beneficios</button>
+      <button class="tab" data-pane="cod">Invitaciones</button>
     </div>
 
     <!-- ══════════ CÓDIGOS ══════════ -->
-    <div class="pane on" id="p-cod">
+    <div class="pane" id="p-cod">
       <div class="barra">
         <select id="f-ben" style="width:auto;min-width:190px" onchange="cargarInv()"></select>
         <select id="f-estado" style="width:auto" onchange="pintarInv()">
@@ -132,15 +134,15 @@
     </div>
 
     <!-- ══════════ BENEFICIOS ══════════ -->
-    <div class="pane" id="p-ben">
+    <div class="pane on" id="p-ben">
       <div class="barra">
         <span class="mono2" id="cuenta-ben"></span>
         <button class="btn" style="margin-left:auto" onclick="abrirBeneficio()">Nuevo beneficio</button>
       </div>
       <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card scrollx">
         <table class="mtx">
-          <thead><tr><th>Nombre</th><th>Da</th><th>Cuándo aplica</th><th>Frente</th>
-                     <th>Si no viene</th><th>Códigos</th><th></th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Beneficio</th><th>Cuándo aplica</th>
+                     <th>Si no viene</th><th>Invitaciones</th><th></th></tr></thead>
           <tbody id="tb-ben"></tbody>
         </table>
       </div>
@@ -285,12 +287,16 @@ async function cargarBeneficios() {
       <td><b>${escapar(b.nombre)}</b>${b.activo ? '' : ' <span class="pill e-anulada">inactivo</span>'}</td>
       <td>${escapar(b.texto)}</td>
       <td class="mono2">${escapar(condicionesTxt(b))}</td>
-      <td class="mono2">${b.frente ? escapar(b.frente) : 'logo'}</td>
       <td class="mono2">${b.no_show === 'quemar' ? 'se pierde' : 'se libera'}</td>
       <td class="mono2">${b.invitaciones} emitidos${b.consumidas ? ' · ' + b.consumidas + ' usados' : ''}</td>
-      <td><button class="iconbtn" onclick='abrirBeneficio(${JSON.stringify(b.id)})' title="Editar"
-            aria-label="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button></td>
-    </tr>`).join('') : '<tr><td colspan="7" class="vacio">Todavía no hay beneficios. Creá uno para poder emitir códigos.</td></tr>';
+      <td class="acciones">
+        <button class="iconbtn" onclick='window.open("pase/muestra/" + ${JSON.stringify(b.id)}, "_blank")'
+          title="Ver cómo queda la invitación" aria-label="Ver cómo queda la invitación">
+          <i data-lucide="eye" class="w-4 h-4"></i></button>
+        <button class="iconbtn" onclick='abrirBeneficio(${JSON.stringify(b.id)})' title="Editar"
+          aria-label="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="6" class="vacio">Todavía no hay beneficios. Creá uno para poder emitir códigos.</td></tr>';
 
   // Los selectores de beneficio de las dos pantallas salen de la misma lista.
   const activos = BENEFICIOS.filter(b => b.activo);

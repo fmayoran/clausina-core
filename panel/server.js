@@ -1027,6 +1027,20 @@ const guardarBen = async (req, res) => {
 app.post('/api/invitaciones/beneficios', guardarBen);
 app.put('/api/invitaciones/beneficios/:id', guardarBen);
 
+// Ver cómo va a quedar la invitación ANTES de emitir códigos e imprimirlos. Devuelve lo mismo
+// que el pase real, armado desde el beneficio, con un código de mentira bien marcado: descubrir
+// que el frente o las condiciones estaban mal después de la tirada sale caro.
+app.get('/api/invitaciones/beneficios/:id/muestra', async (req, res) => {
+  try {
+    const m = await db.muestraBeneficio(req.negocioId, String(req.params.id));
+    if (!m) return res.status(404).json({ ok: false, mensaje: 'Ese beneficio no existe.' });
+    res.json(m);
+  } catch (e) { console.error('muestra beneficio', e.message); res.status(500).json({ ok: false }); }
+});
+app.get('/pase/muestra/:id', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'publico', 'pase.html'));
+});
+
 app.get('/api/invitaciones/piezas', async (req, res) => {
   try { res.json({ piezas: await db.piezasPublicadas(req.negocioId) }); }
   catch (e) { console.error('piezas', e.message); res.status(500).json({ error: 'db' }); }

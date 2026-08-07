@@ -62,6 +62,11 @@
     .codigo{border-color:#999;}
     .pie{opacity:.7;}
   }
+  .cta.inerte{opacity:.45;pointer-events:none;}
+  .aviso{max-width:430px;margin:16px auto 0;padding:11px 14px;border-radius:11px;
+         border:1px dashed var(--c-linea);font-size:.78rem;line-height:1.5;opacity:.8;
+         text-align:center;}
+  @media print{ .aviso{display:none;} }
 </style>
 </head>
 <body>
@@ -92,6 +97,11 @@
 <script>
 const $ = id => document.getElementById(id);
 const COD = decodeURIComponent(location.pathname.split('/').pop() || '');
+// La misma página sirve el pase real y la muestra del panel. Tiene que ser la MISMA: una vista
+// previa armada aparte mostraría bien algo que después se imprime mal.
+const MUESTRA = /\/pase\/muestra\//.test(location.pathname);
+const FUENTE = MUESTRA ? '/api/invitaciones/beneficios/' + encodeURIComponent(COD) + '/muestra'
+                       : '/api/publico/pase/' + encodeURIComponent(COD);
 const fecha = iso => String(iso || '').slice(0, 10).split('-').reverse().join('/');
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
   ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -131,7 +141,7 @@ function marca(m) {
 
 (async () => {
   try {
-    const j = await fetch('/api/publico/pase/' + encodeURIComponent(COD)).then(r => r.json());
+    const j = await fetch(FUENTE).then(r => r.json());
     if (!j.ok) {
       // Un pase que no sirve igual dice de qué negocio es y deja reservar: perder la reserva por
       // un código vencido es peor que perder el descuento.
@@ -148,7 +158,18 @@ function marca(m) {
     $('beneficio').textContent = j.texto;
     if (j.etiqueta) { $('para').textContent = 'Para ' + j.etiqueta; $('para').style.display = ''; }
     $('codigo').textContent = j.codigo.replace(/^(.{3})(.{3})$/, '$1-$2');
-    $('cta').href = '/i/' + j.codigo;
+    if (MUESTRA) {
+      // Sin esto la muestra se puede imprimir y repartir por error: tiene que ser evidente en la
+      // propia tarjeta que ese código no existe.
+      document.title = 'Muestra · ' + j.negocio;
+      $('cta').removeAttribute('href');
+      $('cta').classList.add('inerte');
+      $('acciones').insertAdjacentHTML('beforebegin',
+        '<div class="aviso">Así se va a ver la invitación. El código es de muestra: ' +
+        'los reales se generan al emitir.</div>');
+    } else {
+      $('cta').href = '/i/' + j.codigo;
+    }
 
     const c = j.condiciones || {};
     const l = [...(c.frases || [])];
@@ -175,7 +196,8 @@ function marca(m) {
     if (j.instagram) dd.push(`<a href="https://instagram.com/${esc(String(j.instagram).replace('@',''))}">${esc(j.instagram)}</a>`);
     if (j.whatsapp) dd.push('WhatsApp ' + esc(j.whatsapp));
     $('datos').innerHTML = dd.join('<br>');
-    $('acciones').style.display = '';
+    // Imprimir o compartir una muestra sería repartir un código que no existe.
+    if (!MUESTRA) $('acciones').style.display = '';
     $('pase').style.display = '';
   } catch (e) {
     $('error').style.display = '';

@@ -1366,6 +1366,47 @@ const PREFIJO_PIEZA = { grafica: 'G', instagram: 'IG', aviso: 'A', web: 'W' };
 const codigoPieza = (canal, numero) =>
   `${PREFIJO_PIEZA[canal] || String(canal || '?').slice(0, 1).toUpperCase()}-${String(numero).padStart(4, '0')}`;
 
+/**
+ * El pase de un beneficio con datos de muestra, para verlo antes de emitir e imprimir.
+ * Devuelve la misma forma que el pase real: si la muestra se armara distinto, mostraría bien
+ * algo que después sale mal, que es justo lo que se quiere evitar.
+ */
+async function muestraBeneficio(negocioId, beneficioId) {
+  const { rows: [b] } = await pool.query(
+    `SELECT b.*, gf.numero AS frente_numero,
+            gv.png_url AS frente_url,
+            n.slug, n.nombre AS negocio, n.dominio_web, n.ig_handle,
+            pp.logo, COALESCE(ni.marca, '{}'::jsonb) AS marca
+       FROM contenido.beneficio b
+       JOIN contenido.negocios n ON n.id = b.negocio_id
+       LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id = n.id
+       LEFT JOIN contenido.negocio_identidad ni ON ni.negocio_id = n.id
+       LEFT JOIN contenido.grafica gf ON gf.id = b.frente_grafica_id
+       LEFT JOIN LATERAL (SELECT png_url FROM contenido.grafica_version x
+                           WHERE x.grafica_id = gf.id AND x.estado='lista' AND x.png_url IS NOT NULL
+                           ORDER BY x.nro DESC LIMIT 1) gv ON true
+      WHERE b.id = $1 AND b.negocio_id = $2`, [beneficioId, negocioId]);
+  if (!b) return null;
+  const { rows: [sede] } = await pool.query(
+    `SELECT direccion, localidad, partido FROM contenido.negocio_sede
+      WHERE negocio_id=$1 ORDER BY principal DESC, orden LIMIT 1`, [negocioId]);
+  const { rows: [w] } = await pool.query(
+    `SELECT config->>'numero' AS n FROM contenido.negocio_capacidad
+      WHERE negocio_id=$1 AND capacidad='whatsapp' AND habilitada`, [negocioId]);
+  return {
+    ok: true, muestra: true,
+    // Un código que no existe y que se nota que no existe: nadie lo va a confundir con uno real.
+    codigo: 'MUESTRA', texto: textoBeneficio(b), etiqueta: b.etiqueta || null,
+    vence_en: null, usos_max: 1,
+    condiciones: await condicionesLegibles(negocioId, b.condiciones),
+    negocio: b.negocio, negocio_slug: b.slug,
+    logo: b.logo, marca: b.marca || {}, whatsapp: w ? w.n : null,
+    web: b.dominio_web, instagram: b.ig_handle, sede: sede || null,
+    frente: b.frente_url || null,
+    frente_codigo: b.frente_numero ? codigoPieza('grafica', b.frente_numero) : null,
+  };
+}
+
 async function guardarBeneficio(negocioId, id, d) {
   const nombre = String(d.nombre || '').trim().slice(0, 120);
   if (!nombre) { const e = new Error('nombre'); e.code = 'falta_nombre'; throw e; }
@@ -1476,6 +1517,7 @@ const MOTIVOS = {
   agotada:   'Esa invitación ya se usó.',
   inactivo:  'Esa invitación ya no está disponible.',
   ajena:     'Esa invitación ya está en uso por otra persona.',
+  repetida:  'Esa invitación ya la usaste.',
   dia:       'Esa invitación no aplica al día que elegiste.',
   turno:     'Esa invitación no aplica a ese turno.',
   cantidad:  'Esa invitación no aplica para esa cantidad.',
@@ -1485,7 +1527,22 @@ const MOTIVOS = {
  * Mira un código sin tomarlo. Es lo que se usa para mostrar QUÉ da antes de pedir nada más:
  * validar recién al final, después de que la persona cargó todo, es la peor versión posible.
  */
-async function consultarInvitacion(codigo, negocioId = null) {
+/**
+ * ¿Esta persona ya usó esta invitación? Una invitación de campaña puede tener 100 usos y aun así
+ * no puede valer 100 veces para la misma persona: el cupo es de cuánta gente entra, no de cuántas
+ * veces vuelve la misma. Para las de un uso ya lo cubre `usos_max`; esto es para las multiuso.
+ * Un uso liberado (la reserva se canceló) no cuenta: ahí no llegó a usarla.
+ */
+async function _yaUsada(q, invitacionId, clienteId) {
+  if (!clienteId) return false;
+  const { rows } = await q.query(
+    `SELECT 1 FROM contenido.invitacion_uso
+      WHERE invitacion_id=$1 AND cliente_id=$2 AND estado <> 'liberada' LIMIT 1`,
+    [invitacionId, clienteId]);
+  return rows.length > 0;
+}
+
+async function consultarInvitacion(codigo, negocioId = null, telefono = null) {
   const c = inv.limpiar(codigo);
   if (!inv.formaValida(c)) return { ok: false, motivo: 'forma', mensaje: MOTIVOS.forma };
   const { rows: [i] } = await pool.query(
@@ -1509,6 +1566,13 @@ async function consultarInvitacion(codigo, negocioId = null) {
   if (est === 'vencida') return { ok: false, motivo: 'vencida', mensaje: MOTIVOS.vencida };
   if (est === 'agotada') return { ok: false, motivo: 'agotada', mensaje: MOTIVOS.agotada };
   if (!i.beneficio_activo) return { ok: false, motivo: 'inactivo', mensaje: MOTIVOS.inactivo };
+  // Con el teléfono a mano se avisa acá, al tomar el código, y no al final de la reserva: que
+  // falle recién al confirmar deja a la persona con la sensación de haber perdido el tiempo.
+  if (telefono) {
+    const cli = await clientePorTelefono(i.negocio_id, telefono);
+    if (cli && await _yaUsada(pool, i.id, cli.id))
+      return { ok: false, motivo: 'repetida', mensaje: MOTIVOS.repetida };
+  }
   return { ok: true, invitacion: i, texto: textoBeneficio(i) };
 }
 
@@ -1634,6 +1698,10 @@ async function _tomarInvitacion(cli, negocioId, codigo, { reservaId, clienteId, 
     const e = new Error('ajena'); e.code = 'inv_ajena'; throw e;
   }
 
+  // El chequeo que manda: acá adentro de la transacción, con la invitación bloqueada. El de
+  // `consultarInvitacion` es sólo para avisar antes; dos reservas a la vez lo pasarían las dos.
+  if (await _yaUsada(cli, i.id, clienteId)) { const e = new Error('repetida'); e.code = 'inv_repetida'; throw e; }
+
   const { rows: [dw] } = await cli.query('SELECT EXTRACT(isodow FROM $1::date)::int AS d', [fecha]);
   const choca = chocaCondicion(i.condiciones, { fecha, turnoId, cantidad, isodow: dw.d });
   if (choca) { const e = new Error(choca); e.code = 'inv_' + choca; throw e; }
@@ -1711,7 +1779,9 @@ async function pedirTarjeta(negocioId, reservaId, waId) {
 async function reservaTarjeta(negocioId, reservaId) {
   const { rows: [r] } = await pool.query(
     `SELECT r.id, r.fecha::text, r.cantidad, r.estado,
-            t.nombre AS turno, to_char(t.hora_desde,'HH24:MI') AS hora_desde,
+            -- El nombre interno es una clave del negocio ("Noche F. Semana T2"): hacia el
+            -- cliente va siempre el público, igual que en el chat y en la página de reservas.
+            COALESCE(t.nombre_publico, t.nombre) AS turno, to_char(t.hora_desde,'HH24:MI') AS hora_desde,
             c.nombre AS cliente,
             nc.config AS cfg_reservas,
             pp.logo, pp.logo_claro, p.nombre AS negocio,
@@ -3330,6 +3400,7 @@ module.exports = {
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
   completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, clientePorTelefono,
   TIPOS_BENEFICIO, textoBeneficio, getBeneficios, guardarBeneficio,
+  muestraBeneficio,
   emitirInvitaciones, getInvitaciones, anularInvitacion, consultarInvitacion,
   cerrarUso, liberarPorReserva, invitacionDeReserva, condicionesLegibles, piezasPublicadas, codigoPieza,
   reservaTarjeta, pedirTarjeta,

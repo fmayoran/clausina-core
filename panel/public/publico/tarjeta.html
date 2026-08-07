@@ -25,8 +25,12 @@
   .detalle{font-size:36px;line-height:1.5;opacity:.86;margin-top:16px;}
   /* El beneficio se destaca sólo si lo hay: en una reserva común no tiene por qué ocupar lugar. */
   .beneficio{margin-top:46px;border:2px dashed var(--c-linea);border-radius:24px;
-             padding:24px 38px;font-size:36px;line-height:1.4;}
+             padding:22px 38px 26px;font-size:34px;line-height:1.4;}
   .beneficio b{color:var(--c-acento);}
+  /* El código es lo que van a pedir en el mostrador: sin él la tarjeta no sirve para validar
+     nada. Va en monoespaciada y partido, que es como se lee y se dicta sin equivocarse. */
+  .codigo{display:block;margin-top:12px;font-family:'JetBrains Mono',monospace;font-weight:700;
+          font-size:44px;letter-spacing:.16em;color:var(--c-acento);}
   .pie{position:absolute;left:86px;right:86px;bottom:58px;
        font-family:'JetBrains Mono',monospace;font-size:18px;line-height:1.9;opacity:.55;}
 </style>
@@ -81,13 +85,14 @@ function marca(m) {
   $('cuando').textContent = `${DOW[d.getDay()]} ${d.getDate()} de ${MES[d.getMonth()]}`;
   $('detalle').textContent = `${j.turno} · ${j.hora_desde} h · ${j.cantidad} ${j.unidad}`;
   if (j.invitacion) {
-    $('beneficio').innerHTML = 'Con tu invitación: <b>' + esc(j.invitacion.texto) + '</b>';
+    $('beneficio').innerHTML = 'Con tu invitación: <b>' + esc(j.invitacion.texto) + '</b>' +
+      '<span class="codigo">' + esc(j.invitacion.codigo.replace(/^(.{3})(.{3})$/, '$1-$2')) + '</span>';
     $('beneficio').style.display = '';
   }
   const pie = [];
   if (j.sede) pie.push([j.sede.direccion, j.sede.localidad].filter(Boolean).join(', '));
+  if (j.invitacion) pie.push('Mostrá este código al llegar');
   if (j.estado !== 'confirmada') pie.push('Te confirmamos por acá');
-  else if (j.invitacion) pie.push('Mostrá esta tarjeta al llegar');
   $('pie').textContent = pie.join(' · ');
   // La foto se saca cuando terminaron de llegar la tipografía de marca y el logo. Sin esperarlos
   // la tarjeta sale con la fuente de reemplazo y un hueco donde va el logo, y como igual "cargó"
