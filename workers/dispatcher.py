@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula", "descubrimiento", "voz", "marca_gen", "grafica"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula", "descubrimiento", "voz", "tarjeta", "marca_gen", "grafica"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -128,6 +128,23 @@ def det_voz():
         if mid:
             jobs.append({"tipo": "voz", "negocio_slug": slug,
                          "payload": {"mensaje_id": mid}, "lock_key": f"voz:{mid}"})
+    return jobs
+
+
+def det_tarjeta():
+    # La tarjeta de una reserva recién tomada. Ventana corta a propósito: si el pedido quedó
+    # colgado media hora, la persona ya cerró el chat y mandarle la imagen ahí es peor que no
+    # mandarla. Vencidos quedan como error, no reintentando para siempre.
+    psql("UPDATE contenido.tarjeta_req SET estado='error', error='no se alcanzó a dibujar', "
+         "hecho_en=now() WHERE estado='pendiente' AND pedido_en < now() - interval '30 minutes'")
+    jobs = []
+    for row in _lines("SELECT t.reserva_id||'|'||n.slug FROM contenido.tarjeta_req t "
+                      "JOIN contenido.negocios n ON n.id=t.negocio_id "
+                      "WHERE t.estado='pendiente' ORDER BY t.pedido_en LIMIT 10"):
+        rid, slug = row.split('|', 1)
+        if rid:
+            jobs.append({"tipo": "tarjeta", "negocio_slug": slug,
+                         "payload": {"reserva_id": rid}, "lock_key": f"tarjeta:{rid}"})
     return jobs
 
 
@@ -263,6 +280,7 @@ DETECTORS = {
     "marca_capsula": det_marca_capsula,
     "descubrimiento": det_descubrimiento,
     "voz": det_voz,
+    "tarjeta": det_tarjeta,
     "marca_gen": det_marca_gen,
     "grafica": det_grafica,
 }

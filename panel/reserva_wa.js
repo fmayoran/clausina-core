@@ -454,6 +454,11 @@ async function confirmar(cfg, negocio, waId, entrada, datos) {
     ? `¡Listo! Reserva confirmada en ${negocio.nombre}.\n\n${cuando}\n${cant}\nA nombre de ${nombre}${conInv}\n\nTe esperamos.`
     : `Anotado. Tu pedido quedó registrado en ${negocio.nombre}.\n\n${cuando}\n${cant}\nA nombre de ${nombre}${conInv}\n\nQueda pendiente de confirmación; te aviso por acá.`,
     negocio.id);
+
+  // Y la tarjeta. Va como pedido y no acá mismo porque dibujarla lleva unos segundos (la
+  // fotografía un navegador en el host) y el chat no puede quedarse mudo esperando eso: primero
+  // sale la confirmación por texto, que es la que importa, y la imagen llega detrás.
+  await db.pedirTarjeta(negocio.id, r.id, waId);
   return true;
 }
 

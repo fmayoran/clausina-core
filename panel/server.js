@@ -1246,6 +1246,20 @@ app.post('/api/reservas/:id/invitacion', async (req, res) => {
   }
 });
 
+// La tarjeta de la reserva: una imagen que cierra el circuito por WhatsApp. La dibuja el
+// navegador y la fotografía el host (scripts/tarjeta_job.sh); acá sólo viven la página y sus
+// datos, para que el diseño se pueda mirar y corregir en el panel como cualquier otra pantalla.
+app.get('/tarjeta/:id', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'publico', 'tarjeta.html'));
+});
+app.get('/api/reservas/:id/tarjeta', async (req, res) => {
+  try {
+    const t = await db.reservaTarjeta(req.negocioId, String(req.params.id));
+    if (!t) return res.status(404).json({ ok: false, error: 'no existe esa reserva' });
+    res.json(t);
+  } catch (e) { console.error('tarjeta', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+
 app.post('/api/reservas/:id/estado', async (req, res) => {
   try {
     const estado = (req.body || {}).estado;

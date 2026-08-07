@@ -95,6 +95,7 @@
   .msj.entrante{align-self:flex-start;background:var(--u-bg);border:1px solid var(--u-line);}
   .msj.saliente{align-self:flex-end;background:color-mix(in srgb,var(--u-acc) 16%,transparent);
     border:1px solid color-mix(in srgb,var(--u-acc) 40%,transparent);}
+  .msj .adj{display:block;max-width:min(240px,100%);border-radius:8px;}
   .msj .h{display:block;font-family:'JetBrains Mono',monospace;font-size:.54rem;color:var(--u-mut);margin-top:4px;}
   .responder{display:flex;gap:8px;margin-top:14px;align-items:flex-end;}
   .responder textarea{min-height:44px;}
@@ -448,6 +449,14 @@ async function cargarInbox() {
   } catch (e) {}
 }
 
+// Una imagen que mandamos se ve como imagen, no como una URL larga: quien mira el inbox tiene
+// que ver lo mismo que le llegó al cliente.
+function cuerpo(m) {
+  if (m.tipo === 'image' && /^https?:\/\//.test(m.texto || ''))
+    return `<img class="adj" src="${escapar(m.texto)}" alt="imagen enviada" loading="lazy">`;
+  return escapar(m.texto || '(' + (m.tipo || 'sin texto') + ')');
+}
+
 async function verConv(waId, silencioso) {
   ACTUAL = waId;
   if (!silencioso) document.querySelectorAll('.conv').forEach(b =>
@@ -458,7 +467,7 @@ async function verConv(waId, silencioso) {
     const ms = d.mensajes || [];
     $('chat').innerHTML = `
       <div class="hilo" id="hilo">${ms.map(m => `
-        <div class="msj ${escapar(m.direccion)}">${escapar(m.texto || '(' + (m.tipo || 'sin texto') + ')')}
+        <div class="msj ${escapar(m.direccion)}">${cuerpo(m)}
           <span class="h">${cuando(m.creado_en)}</span></div>`).join('')}</div>
       ${c.ventana_abierta
         ? `<div class="responder">

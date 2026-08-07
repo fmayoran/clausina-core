@@ -119,6 +119,32 @@ async function enviarTexto(a, texto, cfg = null) {
 // `cfg` permite mandar desde el número DEL NEGOCIO en vez del de la plataforma. Se usa para
 // escribirle al cliente final: el comensal tiene que ver el nombre del lugar donde reservó, no
 // el de ClaUsina. Sin cfg sale por el número de ClaUsina, que es el canal con el operador.
+/**
+ * Manda una imagen por su URL. Meta la busca sola, así que la URL tiene que ser pública — por eso
+ * las tarjetas van a una carpeta de media que no exige sesión. Subir el archivo a Meta y mandar
+ * el id sería la alternativa, pero agrega un paso y un id que caduca a los 30 días.
+ */
+async function enviarImagen(a, url, caption, cfg = null) {
+  const phone = (cfg && cfg.phone_id) || PHONE_ID;
+  const token = (cfg && cfg.token) || TOKEN;
+  if (!phone || !token) return { ok: false, motivo: 'sin_configurar' };
+  try {
+    const r = await fetch(`${API}/${phone}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: String(a).replace(/\D+/g, ''),
+        type: 'image',
+        image: { link: url, caption: String(caption || '').slice(0, 1024) },
+      }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, motivo: (j.error && j.error.message) || `http ${r.status}` };
+    return { ok: true, id: ((j.messages || [])[0] || {}).id || null };
+  } catch (e) { return { ok: false, motivo: e.message }; }
+}
+
 async function enviarPlantilla(a, nombre, params, idioma = 'es_AR', cfg = null) {
   const phone = (cfg && cfg.phone_id) || PHONE_ID;
   const token = (cfg && cfg.token) || TOKEN;
@@ -200,5 +226,5 @@ async function enviarLista(a, texto, rotuloBoton, filas, cfg = null) {
   }, cfg);
 }
 
-module.exports = { configurado, firmaValida, leerMensajes, enviarTexto, enviarPlantilla,
+module.exports = { configurado, firmaValida, leerMensajes, enviarTexto, enviarImagen, enviarPlantilla,
                    enviarBotones, enviarLista, VERIFY };

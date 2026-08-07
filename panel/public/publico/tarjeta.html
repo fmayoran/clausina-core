@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Tarjeta de reserva</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700;800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  /* Una sola cara, cuadrada-ish: es lo que se ve bien en la burbuja de un chat sin tener que
+     abrirla. Un formato vertical de tarjeta se recorta en la vista previa. */
+  :root{--f-tit:'Inter Tight',sans-serif;--f-txt:'Inter',sans-serif;
+        --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-linea:#2a2a33;}
+  *{box-sizing:border-box;margin:0;}
+  body{background:#222;font-family:var(--f-txt);}
+  #tarjeta{width:1080px;height:1080px;background:var(--c-fondo);color:var(--c-tinta);
+           display:flex;flex-direction:column;align-items:center;justify-content:center;
+           text-align:center;padding:96px 86px;position:relative;overflow:hidden;}
+  .logo{max-height:132px;max-width:64%;width:auto;margin-bottom:54px;}
+  .rot{font-family:'JetBrains Mono',monospace;font-size:22px;letter-spacing:.3em;
+       text-transform:uppercase;opacity:.6;}
+  .nombre{font-family:var(--f-tit);font-weight:800;font-size:74px;line-height:1.06;
+          letter-spacing:-.01em;margin:18px 0 8px;}
+  .cuando{font-family:var(--f-tit);font-weight:700;font-size:52px;line-height:1.15;
+          color:var(--c-acento);margin-top:30px;text-transform:capitalize;}
+  .detalle{font-size:30px;line-height:1.5;opacity:.86;margin-top:14px;}
+  /* El beneficio se destaca sólo si lo hay: en una reserva común no tiene por qué ocupar lugar. */
+  .beneficio{margin-top:38px;border:2px dashed var(--c-linea);border-radius:22px;
+             padding:22px 34px;font-size:30px;line-height:1.4;}
+  .beneficio b{color:var(--c-acento);}
+  .pie{position:absolute;left:86px;right:86px;bottom:54px;
+       font-family:'JetBrains Mono',monospace;font-size:19px;line-height:1.9;opacity:.55;}
+</style>
+</head>
+<body>
+<div id="tarjeta">
+  <img class="logo" id="logo" alt="" style="display:none">
+  <div class="rot" id="rot">Reserva confirmada</div>
+  <div class="nombre" id="nombre"></div>
+  <div class="cuando" id="cuando"></div>
+  <div class="detalle" id="detalle"></div>
+  <div class="beneficio" id="beneficio" style="display:none"></div>
+  <div class="pie" id="pie"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const ID = new URLSearchParams(location.search).get('reserva') || '';
+const DOW = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+function marca(m) {
+  if (!m || !Object.keys(m).length) return;
+  const r = document.documentElement.style;
+  const map = { fondo:'--c-fondo', tinta:'--c-tinta', acento:'--c-acento', linea:'--c-linea' };
+  for (const k in map) if (m[k]) r.setProperty(map[k], m[k]);
+  if (m.fuente_titulo) r.setProperty('--f-tit', `'${m.fuente_titulo}', sans-serif`);
+  if (m.fuente_texto) r.setProperty('--f-txt', `'${m.fuente_texto}', sans-serif`);
+}
+
+(async () => {
+  const j = await fetch('/api/reservas/' + encodeURIComponent(ID) + '/tarjeta').then(r => r.json());
+  if (!j.ok) { document.body.innerHTML = '<pre style="color:#eee;padding:20px">' + esc(j.error || 'error') + '</pre>'; return; }
+  marca(j.marca);
+  if (j.logo) { $('logo').src = j.logo; $('logo').style.display = ''; }
+  // Solicitada y confirmada no dicen lo mismo, y prometer confirmación cuando el negocio todavía
+  // no la dio sería exactamente el problema que evitamos en todo el resto del circuito.
+  $('rot').textContent = j.estado === 'confirmada' ? 'Reserva confirmada' : 'Reserva registrada';
+  $('nombre').textContent = j.cliente || '';
+  const d = new Date(j.fecha + 'T12:00:00');
+  $('cuando').textContent = `${DOW[d.getDay()]} ${d.getDate()} de ${MES[d.getMonth()]}`;
+  $('detalle').textContent = `${j.turno} · ${j.hora_desde} h · ${j.cantidad} ${j.unidad}`;
+  if (j.invitacion) {
+    $('beneficio').innerHTML = 'Con tu invitación: <b>' + esc(j.invitacion.texto) + '</b>';
+    $('beneficio').style.display = '';
+  }
+  const pie = [];
+  if (j.sede) pie.push([j.sede.direccion, j.sede.localidad].filter(Boolean).join(', '));
+  if (j.estado !== 'confirmada') pie.push('Te confirmamos por acá');
+  else if (j.invitacion) pie.push('Mostrá esta tarjeta al llegar');
+  $('pie').textContent = pie.join(' · ');
+  // Bandera para que el renderer sepa que ya está todo dibujado, sin adivinar con un sleep.
+  document.body.dataset.listo = '1';
+})().catch(e => { document.body.innerHTML = '<pre style="color:#eee">' + esc(e.message) + '</pre>'; });
+</script>
+</body>
+</html>

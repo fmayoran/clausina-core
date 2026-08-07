@@ -1695,6 +1695,57 @@ async function liberarPorReserva(negocioId, reservaId) {
 }
 
 /** La invitación de una reserva, para mostrarla en el detalle y en la lista del día. */
+// Los datos de UNA reserva, tal como los dibuja la tarjeta que se le manda al cliente. No se
+// reusa getReservas porque eso trae el teléfono y el mail: acá se arma una imagen que va a
+// terminar reenviada a un grupo, y nada que no esté en la tarjeta tiene por qué salir del panel.
+// Pedir la tarjeta de una reserva. Que falle no puede voltear la reserva ni la confirmación por
+// texto: la imagen es un extra, y una reserva tomada sin tarjeta es una reserva tomada.
+async function pedirTarjeta(negocioId, reservaId, waId) {
+  try {
+    await pool.query(
+      `INSERT INTO contenido.tarjeta_req (reserva_id, negocio_id, wa_id)
+       VALUES ($1,$2,$3) ON CONFLICT (reserva_id) DO NOTHING`, [reservaId, negocioId, String(waId)]);
+  } catch (e) { console.error('pedir tarjeta', e.message); }
+}
+
+async function reservaTarjeta(negocioId, reservaId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT r.id, r.fecha::text, r.cantidad, r.estado,
+            t.nombre AS turno, to_char(t.hora_desde,'HH24:MI') AS hora_desde,
+            c.nombre AS cliente,
+            nc.config AS cfg_reservas,
+            pp.logo, pp.logo_claro, p.nombre AS negocio,
+            COALESCE(ni.marca, '{}'::jsonb) AS marca,
+            i.codigo AS invitacion_codigo, b.tipo AS invitacion_tipo, b.valor AS invitacion_valor
+       FROM contenido.reserva r
+       JOIN contenido.turno t ON t.id = r.turno_id
+       JOIN contenido.cliente c ON c.id = r.cliente_id
+       JOIN contenido.negocios p ON p.id = r.negocio_id
+       LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id = p.id
+       LEFT JOIN contenido.negocio_identidad ni ON ni.negocio_id = p.id
+       LEFT JOIN contenido.negocio_capacidad nc ON nc.negocio_id = p.id AND nc.capacidad = 'reservas'
+       LEFT JOIN contenido.invitacion_uso iu ON iu.reserva_id = r.id
+       LEFT JOIN contenido.invitacion i ON i.id = iu.invitacion_id
+       LEFT JOIN contenido.beneficio b ON b.id = i.beneficio_id
+      WHERE r.id = $1 AND r.negocio_id = $2`, [reservaId, negocioId]);
+  if (!r) return null;
+  const { rows: [sede] } = await pool.query(
+    `SELECT direccion, localidad FROM contenido.negocio_sede
+      WHERE negocio_id=$1 ORDER BY principal DESC, orden LIMIT 1`, [negocioId]);
+  const unidad = UNIDADES.find(u => u.id === ((r.cfg_reservas || {}).unidad || CFG_RESERVAS.unidad)) || UNIDADES[0];
+  return {
+    ok: true, id: r.id, estado: r.estado, fecha: r.fecha, turno: r.turno, hora_desde: r.hora_desde,
+    cantidad: r.cantidad, unidad: r.cantidad === 1 ? unidad.sing : unidad.plur,
+    cliente: r.cliente, negocio: r.negocio,
+    // Fondo oscuro: si el negocio tiene una versión clara del logo, es la que se ve.
+    logo: r.logo_claro || r.logo || null,
+    marca: r.marca || {}, sede: sede || null,
+    invitacion: r.invitacion_codigo
+      ? { codigo: r.invitacion_codigo, texto: textoBeneficio({ tipo: r.invitacion_tipo, valor: r.invitacion_valor }) }
+      : null,
+  };
+}
+
 async function invitacionDeReserva(reservaId) {
   const { rows: [r] } = await pool.query(
     `SELECT u.id AS uso_id, u.estado, i.codigo, b.nombre AS beneficio, b.tipo, b.valor, b.no_show
@@ -3281,6 +3332,7 @@ module.exports = {
   TIPOS_BENEFICIO, textoBeneficio, getBeneficios, guardarBeneficio,
   emitirInvitaciones, getInvitaciones, anularInvitacion, consultarInvitacion,
   cerrarUso, liberarPorReserva, invitacionDeReserva, condicionesLegibles, piezasPublicadas, codigoPieza,
+  reservaTarjeta, pedirTarjeta,
   invitacionesActivas, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
