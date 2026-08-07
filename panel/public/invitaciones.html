@@ -59,6 +59,11 @@
   .ov.on{display:grid;}
   .dlg{background:var(--u-surf);border:1px solid var(--u-line);border-radius:16px;padding:26px;
        width:min(620px,100%);max-height:88vh;overflow:auto;color:var(--u-fg);}
+  /* La muestra va en un iframe con la MISMA página del pase real: una réplica hecha acá
+     mostraría bien algo que después se imprime distinto. */
+  .dlg.previo{width:min(520px,100%);padding:18px;}
+  .previo iframe{width:100%;height:min(70vh,760px);border:1px solid var(--u-line);
+                 border-radius:12px;background:var(--u-bg);display:block;}
   .err{color:var(--u-mal);font-family:'JetBrains Mono',monospace;font-size:.7rem;margin-top:12px;min-height:1em;}
   .barra{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
   .aviso{border:1px solid var(--u-line);border-left:3px solid var(--u-medio);border-radius:10px;
@@ -184,6 +189,13 @@
     <div><label for="b-cmax">Máximo de personas</label><input type="number" id="b-cmax" min="1" placeholder="sin máximo"></div>
   </div>
 
+  <label for="b-tema">Diseño base</label>
+  <select id="b-tema">
+    <option value="claro">Claro — fondo blanco (recomendado para imprimir)</option>
+    <option value="oscuro">Oscuro — fondo de la marca</option>
+  </select>
+  <div class="mono2" style="margin-top:6px;" id="b-tema-nota"></div>
+
   <label for="b-frente">Frente del impreso</label>
   <select id="b-frente"></select>
   <div class="mono2" style="margin-top:6px;" id="b-frente-nota"></div>
@@ -200,6 +212,17 @@
   <div style="display:flex;gap:10px;margin-top:18px;">
     <button class="btn" onclick="guardarBeneficio()">Guardar</button>
     <button class="btn2" onclick="cerrar('ov-ben')">Cancelar</button>
+  </div>
+</div></div>
+
+<!-- ══════════ Diálogo: cómo queda la invitación ══════════ -->
+<div class="ov" id="ov-previo"><div class="dlg previo">
+  <h2 class="display font-bold text-lg mb-1">Así queda la invitación</h2>
+  <p class="mono2" style="margin-bottom:12px;">La misma página que recibe el invitado. El código
+    es de muestra.</p>
+  <iframe id="previo-marco" title="Vista previa de la invitación"></iframe>
+  <div style="display:flex;gap:10px;margin-top:14px;">
+    <button class="btn2" onclick="cerrar('ov-previo')">Cerrar</button>
   </div>
 </div></div>
 
@@ -254,7 +277,10 @@ let BENEFICIOS = [], TIPOS = [], TURNOS = [], INV = [], PIEZAS = [];
 let FD_VENCE = null;
 
 const bonito = c => String(c || '').replace(/^(.{3})(.{3})$/, '$1-$2');
-const cerrar = id => $(id).classList.remove('on');
+const cerrar = id => {
+  $(id).classList.remove('on');
+  if (id === 'ov-previo') $('previo-marco').removeAttribute('src');
+};
 
 document.getElementById('tabs').addEventListener('click', e => {
   const b = e.target.closest('.tab'); if (!b) return;
@@ -296,7 +322,7 @@ async function cargarBeneficios() {
       <td class="mono2">${b.no_show === 'quemar' ? 'se pierde' : 'se libera'}</td>
       <td class="mono2">${b.invitaciones} emitidos${b.consumidas ? ' · ' + b.consumidas + ' usados' : ''}</td>
       <td class="acciones">
-        <button class="iconbtn" onclick='window.open("pase/muestra/" + ${JSON.stringify(b.id)}, "_blank")'
+        <button class="iconbtn" onclick='verMuestra(${JSON.stringify(b.id)})'
           title="Ver cómo queda la invitación" aria-label="Ver cómo queda la invitación">
           <i data-lucide="eye" class="w-4 h-4"></i></button>
         <button class="iconbtn" onclick='abrirBeneficio(${JSON.stringify(b.id)})' title="Editar"
@@ -344,12 +370,22 @@ function abrirBeneficio(id) {
   $('b-frente-nota').textContent = PIEZAS.length
     ? 'La pieza que va del lado de adelante cuando se imprime; los datos van al dorso. Sólo las de Gráfica con una versión lista.'
     : 'Todavía no hay piezas en Gráfica. Creá una ahí y va a aparecer acá para elegirla.';
+  $('b-tema').value = (b && b.tema) || 'claro';
+  $('b-tema-nota').textContent = 'De qué color sale la invitación, digital e impresa. El acento y ' +
+    'las tipografías del negocio se respetan en las dos.';
   $('b-frente').value = (b && b.frente_grafica_id) || '';
   $('b-noshow').value = b ? b.no_show : 'liberar';
   $('b-activo').checked = b ? !!b.activo : true;
   $('b-err').textContent = '';
   pintarAyudaTipo();
   $('ov-ben').classList.add('on');
+}
+
+function verMuestra(id) {
+  // El src se pone al abrir y se saca al cerrar: dejarlo cargado mantiene viva una página que
+  // ya no se ve, y al reabrir mostraría la versión anterior del beneficio.
+  $('previo-marco').src = 'pase/muestra/' + encodeURIComponent(id);
+  $('ov-previo').classList.add('on');
 }
 
 async function guardarBeneficio() {
@@ -360,7 +396,7 @@ async function guardarBeneficio() {
     turnos: [...$('b-turnos').selectedOptions].map(o => o.value),
     cantidad_min: $('b-cmin').value, cantidad_max: $('b-cmax').value,
     no_show: $('b-noshow').value, activo: $('b-activo').checked,
-    frente_grafica_id: $('b-frente').value || null,
+    frente_grafica_id: $('b-frente').value || null, tema: $('b-tema').value,
   };
   const id = $('b-id').value;
   try {

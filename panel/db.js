@@ -1376,7 +1376,7 @@ async function muestraBeneficio(negocioId, beneficioId) {
     `SELECT b.*, gf.numero AS frente_numero,
             gv.png_url AS frente_url,
             n.slug, n.nombre AS negocio, n.dominio_web, n.ig_handle,
-            pp.logo, COALESCE(ni.marca, '{}'::jsonb) AS marca
+            pp.logo, pp.logo_claro, COALESCE(ni.marca, '{}'::jsonb) AS marca
        FROM contenido.beneficio b
        JOIN contenido.negocios n ON n.id = b.negocio_id
        LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id = n.id
@@ -1400,7 +1400,8 @@ async function muestraBeneficio(negocioId, beneficioId) {
     vence_en: null, usos_max: 1,
     condiciones: await condicionesLegibles(negocioId, b.condiciones),
     negocio: b.negocio, negocio_slug: b.slug,
-    logo: b.logo, marca: b.marca || {}, whatsapp: w ? w.n : null,
+    logo: b.logo, logo_claro: b.logo_claro, tema: b.tema || 'claro',
+    marca: b.marca || {}, whatsapp: w ? w.n : null,
     web: b.dominio_web, instagram: b.ig_handle, sede: sede || null,
     frente: b.frente_url || null,
     frente_codigo: b.frente_numero ? codigoPieza('grafica', b.frente_numero) : null,
@@ -1424,19 +1425,22 @@ async function guardarBeneficio(negocioId, id, d) {
   };
   const noShow = ['liberar', 'quemar'].includes(d.no_show) ? d.no_show : 'liberar';
   const frente = /^[0-9a-f-]{36}$/i.test(String(d.frente_grafica_id || '')) ? d.frente_grafica_id : null;
+  // Sobre qué base se dibuja la invitación. No sale del modo de la marca: una marca oscura no
+  // implica querer imprimir en negro, y lo impreso se piensa sobre papel blanco.
+  const tema = d.tema === 'oscuro' ? 'oscuro' : 'claro';
   const campos = [negocioId, nombre, d.tipo, valor, JSON.stringify(cond), noShow,
-                  String(d.notas || '').trim().slice(0, 600) || null, d.activo !== false, frente];
+                  String(d.notas || '').trim().slice(0, 600) || null, d.activo !== false, frente, tema];
   if (id) {
     const { rows: [r] } = await pool.query(
       `UPDATE contenido.beneficio SET nombre=$2, tipo=$3, valor=$4, condiciones=$5::jsonb,
-              no_show=$6, notas=$7, activo=$8, frente_grafica_id=$9, actualizado_en=now()
-        WHERE id=$10 AND negocio_id=$1 RETURNING *`, [...campos, id]);
+              no_show=$6, notas=$7, activo=$8, frente_grafica_id=$9, tema=$10, actualizado_en=now()
+        WHERE id=$11 AND negocio_id=$1 RETURNING *`, [...campos, id]);
     if (!r) { const e = new Error('no existe'); e.code = 'no_encontrado'; throw e; }
     return r;
   }
   const { rows: [r] } = await pool.query(
-    `INSERT INTO contenido.beneficio (negocio_id, nombre, tipo, valor, condiciones, no_show, notas, activo, frente_grafica_id)
-     VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9) RETURNING *`, campos);
+    `INSERT INTO contenido.beneficio (negocio_id, nombre, tipo, valor, condiciones, no_show, notas, activo, frente_grafica_id, tema)
+     VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10) RETURNING *`, campos);
   return r;
 }
 
@@ -1546,7 +1550,7 @@ async function consultarInvitacion(codigo, negocioId = null, telefono = null) {
   const c = inv.limpiar(codigo);
   if (!inv.formaValida(c)) return { ok: false, motivo: 'forma', mensaje: MOTIVOS.forma };
   const { rows: [i] } = await pool.query(
-    `SELECT i.*, b.nombre AS beneficio, b.tipo, b.valor, b.condiciones, b.activo AS beneficio_activo,
+    `SELECT i.*, b.nombre AS beneficio, b.tipo, b.valor, b.condiciones, b.activo AS beneficio_activo, b.tema,
             n.slug AS negocio_slug, n.nombre AS negocio_nombre,
             -- El frente impreso lo define el beneficio: toda la campaña sale con el mismo.
             gv.png_url AS frente_url, gf.numero AS frente_numero

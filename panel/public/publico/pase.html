@@ -12,6 +12,10 @@
      negocio, no de ClaUsina. Sin marca cargada, cae en una paleta neutra. */
   :root{--f-tit:'Inter Tight',sans-serif;--f-txt:'Inter',sans-serif;
         --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-suave:#1b1b21;--c-linea:#2a2a33;}
+  /* La otra base. El beneficio elige cuál: en papel el blanco gana casi siempre, y el acento
+     de la marca es lo único que se conserva de su paleta. */
+  :root[data-tema="claro"]{--c-fondo:#F2F0EA;--c-tinta:#15150F;--c-acento:#B33A00;
+                           --c-suave:#FFFFFF;--c-linea:#DCD8CC;}
   *{box-sizing:border-box;margin:0;}
   body{background:var(--c-fondo);color:var(--c-tinta);font-family:var(--f-txt);
        min-height:100vh;display:grid;place-items:center;padding:26px 18px;}
@@ -20,6 +24,11 @@
   .envoltorio{width:min(430px,100%);}
   /* El logo manda: es lo primero y lo más grande, y trae el nombre adentro. */
   .logo{max-height:78px;max-width:78%;width:auto;margin:0 auto 22px;display:block;}
+  /* El logo de un negocio suele ser una sola pieza, pensada para fondo oscuro: sobre papel
+     blanco se borra. Sin variante clara cargada, se lo apoya en su propio fondo. */
+  .banda{background:var(--c-marca-fondo,#101014);border-radius:12px;padding:16px 20px;
+         margin:0 auto 22px;display:inline-block;max-width:88%;}
+  .banda .logo{margin:0;max-width:100%;}
   .titulo{font-family:var(--f-tit);font-weight:800;font-size:1.62rem;line-height:1.1;
           letter-spacing:-.01em;text-transform:uppercase;color:var(--c-acento);}
   .beneficio{font-size:1.02rem;line-height:1.4;margin:10px 0 4px;color:var(--c-tinta);opacity:.92;}
@@ -51,15 +60,13 @@
   .acc:hover{opacity:1;}
   .mal{font-family:'JetBrains Mono',monospace;font-size:.78rem;line-height:1.7;opacity:.8;}
   /* Impreso: sin fondo oscuro (gasta tinta y se ve mal), sin botones, y en tamaño tarjeta. */
+  /* Impreso: sin botones y a todo el ancho de la hoja. Los colores ya los puso el tema del
+     beneficio — pisarlos acá dejaría en blanco una invitación que se pidió oscura a propósito. */
   @media print{
-    body{background:#fff;color:#111;padding:0;display:block;}
-    .pase{border:1px solid #bbb;border-radius:14px;background:#fff;width:100%;max-width:none;
-          margin:0;box-shadow:none;}
-    .beneficio{color:#111;}
+    body{padding:0;display:block;background:var(--c-suave);}
+    .pase{width:100%;max-width:none;margin:0;box-shadow:none;}
     .cta,.acciones{display:none !important;}
-    .titulo{color:#111;}
     .envoltorio{width:100%;}
-    .codigo{border-color:#999;}
     .pie{opacity:.7;}
   }
   .cta.inerte{opacity:.45;pointer-events:none;}
@@ -73,7 +80,7 @@
 <div class="envoltorio">
 <div class="pase" id="pase" style="display:none">
   <!-- El nombre del negocio no va como texto: ya está en el logo, y repetirlo lo ensucia. -->
-  <img class="logo" id="logo" alt="" style="display:none">
+  <span id="banda"><img class="logo" id="logo" alt="" style="display:none"></span>
   <div class="titulo">Invitación especial</div>
   <div class="beneficio" id="beneficio"></div>
   <div class="para" id="para" style="display:none"></div>
@@ -120,15 +127,21 @@ async function compartir() {
   } catch (e) {}
 }
 
-function marca(m) {
+function marca(m, claro) {
   if (!m || !Object.keys(m).length) return;
   const r = document.documentElement.style;
   // Los nombres son los que guarda la identidad del negocio (texto, superficie), no los de los
   // tokens de esta página: usar el nombre del token deja el pase con la paleta de ClaUsina y
   // sin ningún error a la vista.
   const set = (v, k) => { if (m[k]) r.setProperty(v, m[k]); };
-  set('--c-fondo', 'fondo'); set('--c-tinta', 'texto'); set('--c-acento', 'acento');
-  set('--c-suave', 'superficie'); set('--c-linea', 'linea');
+  // El fondo de la marca se guarda igual aunque no se use de fondo: es lo que va detrás del
+  // logo cuando el pase es claro y el negocio no tiene una versión clara del suyo.
+  if (m.fondo) r.setProperty('--c-marca-fondo', m.fondo);
+  set('--c-acento', 'acento');
+  // En claro la marca aporta el acento y las tipografías, nada más: si aportara el fondo y la
+  // tinta, elegir "claro" no cambiaría nada en una marca oscura.
+  if (!claro) { set('--c-fondo', 'fondo'); set('--c-tinta', 'texto');
+                set('--c-suave', 'superficie'); set('--c-linea', 'linea'); }
   const fams = [m.fuente_titulo, m.fuente_texto].filter(Boolean);
   if (fams.length) {
     const q = fams.map(f => 'family=' + encodeURIComponent(f).replace(/%20/g, '+') + ':wght@400;600;700').join('&');
@@ -150,9 +163,17 @@ function marca(m) {
         (j.negocio_slug ? `<br><br><a class="cta" href="/r/${j.negocio_slug}">Reservar igual</a>` : '');
       return;
     }
-    marca(j.marca);
+    // El beneficio manda sobre el modo: es una decisión de esta pieza, no del sitio.
+    const claro = (j.tema || 'claro') === 'claro';
+    if (claro) document.documentElement.dataset.tema = 'claro';
+    marca(j.marca, claro);
     document.title = 'Invitación especial · ' + j.negocio;
-    if (j.logo) { $('logo').src = j.logo; $('logo').alt = j.negocio; $('logo').style.display = ''; }
+    const src = claro && j.logo_claro ? j.logo_claro : j.logo;
+    if (src) {
+      $('logo').src = src; $('logo').alt = j.negocio; $('logo').style.display = '';
+      // La banda sólo cuando hace falta: con una versión clara del logo sería un recuadro de más.
+      if (claro && !j.logo_claro) $('banda').className = 'banda';
+    }
     // Sin logo cargado el nombre tiene que aparecer igual, si no la tarjeta no dice de quién es.
     else { $('titulo').textContent = j.negocio + ' te invita'; }
     $('beneficio').textContent = j.texto;

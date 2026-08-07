@@ -278,7 +278,10 @@ app.get('/api/publico/pase/:codigo', async (req, res) => {
       condiciones: await db.condicionesLegibles(i.negocio_id, i.condiciones),
       negocio: i.negocio_nombre, negocio_slug: i.negocio_slug,
       // La marca y el logo salen del negocio: el pase es suyo, no de ClaUsina.
-      logo: n ? n.logo : null, marca: n ? n.marca : null,
+      logo: n ? n.logo : null, logo_claro: n ? n.logo_claro : null,
+      marca: n ? n.marca : null,
+      // Sobre qué base se dibuja: lo decide el beneficio, no el modo de la marca.
+      tema: i.tema || 'claro',
       whatsapp: n ? n.whatsapp : null,
       // Para el pie: dónde queda, dónde encontrarlos. Sin esto, una invitación reenviada a
       // alguien que no conoce el lugar no le dice ni la dirección.

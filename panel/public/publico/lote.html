@@ -15,11 +15,14 @@
      las marcas de corte son las propias uniones. */
   :root{--f-tit:'Inter Tight',sans-serif;--f-txt:'Inter',sans-serif;
         --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-linea:#2a2a33;}
+  /* La base clara: la elige el beneficio y es la que ahorra tinta en papel común. */
+  :root[data-tema="claro"]{--c-fondo:#FFFFFF;--c-tinta:#15150F;--c-acento:#B33A00;
+                           --c-linea:#DCD8CC;}
   *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body{background:#4a4a4a;font-family:var(--f-txt);overflow-x:hidden;}
   .hoja{width:210mm;height:297mm;display:grid;grid-template-columns:105mm 105mm;
         grid-template-rows:148.5mm 148.5mm;page-break-after:always;break-after:page;
-        margin:0 auto 8mm;background:#111;}
+        margin:0 auto 8mm;background:var(--c-linea);}
   .cara{width:105mm;height:148.5mm;background:var(--c-fondo);color:var(--c-tinta);
         display:flex;flex-direction:column;align-items:center;justify-content:center;
         text-align:center;padding:10mm 8mm;position:relative;overflow:hidden;}
@@ -35,6 +38,11 @@
   .frente .lema{font-family:var(--f-tit);font-weight:800;font-size:7.4mm;line-height:1.08;
                 text-transform:uppercase;color:var(--c-acento);}
   .logo{max-height:19mm;max-width:74%;width:auto;margin-bottom:7mm;}
+  /* El logo del negocio está pensado para fondo oscuro: sobre papel blanco se borra. */
+  .banda{background:var(--c-marca-fondo,#101014);border-radius:3mm;padding:4mm 5mm;
+         margin-bottom:7mm;display:inline-block;max-width:86%;}
+  .banda .logo{margin:0;max-width:100%;}
+  .frente .fallback .banda{margin:0;}
   .titulo{font-family:var(--f-tit);font-weight:800;font-size:6.4mm;line-height:1.08;
           text-transform:uppercase;color:var(--c-acento);}
   .beneficio{font-size:4.1mm;line-height:1.35;margin:3mm 0 0;opacity:.92;}
@@ -83,13 +91,15 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
 const fecha = iso => String(iso || '').slice(0, 10).split('-').reverse().join('/');
 let PASES = [], PIEZAS = [];
 
-function marca(m) {
+function marca(m, claro) {
   if (!m || !Object.keys(m).length) return;
   const r = document.documentElement.style;
   // Los nombres los pone la identidad del negocio: 'texto', no 'tinta'.
   const set = (v, k) => { if (m[k]) r.setProperty(v, m[k]); };
-  set('--c-fondo', 'fondo'); set('--c-tinta', 'texto');
-  set('--c-acento', 'acento'); set('--c-linea', 'linea');
+  if (m.fondo) r.setProperty('--c-marca-fondo', m.fondo);
+  set('--c-acento', 'acento');
+  // En claro la marca aporta el acento y las tipografías; el resto lo pone la base.
+  if (!claro) { set('--c-fondo', 'fondo'); set('--c-tinta', 'texto'); set('--c-linea', 'linea'); }
   const fams = [m.fuente_titulo, m.fuente_texto].filter(Boolean);
   if (fams.length) {
     const q = fams.map(f => 'family=' + encodeURIComponent(f).replace(/%20/g, '+') + ':wght@400;600;700').join('&');
@@ -106,11 +116,20 @@ function condiciones(j) {
   return l.join('<br>');
 }
 
+/** El logo que se ve sobre la base elegida, y si hace falta apoyarlo en su propio fondo. */
+function logoDe(j, clase) {
+  const claro = (j.tema || 'claro') === 'claro';
+  const src = claro && j.logo_claro ? j.logo_claro : j.logo;
+  if (!src) return '';
+  const img = `<img class="${clase}" src="${esc(src)}" alt="">`;
+  return (claro && !j.logo_claro) ? `<span class="banda">${img}</span>` : img;
+}
+
 function caraFrente(j, pieza) {
   return pieza
     ? `<div class="cara frente"><img src="${esc(pieza)}" alt=""></div>`
     : `<div class="cara frente"><div class="fallback">
-         ${j.logo ? `<img src="${esc(j.logo)}" alt="">` : ''}
+         ${logoDe(j, '')}
          <div class="lema">Invitación especial</div></div></div>`;
 }
 
@@ -118,7 +137,7 @@ function caraDorso(j) {
   const wa = j.whatsapp ? j.whatsapp.replace(/[^0-9+ -]/g, '') : '';
   const sede = j.sede ? [j.sede.direccion, j.sede.localidad].filter(Boolean).join(', ') : '';
   return `<div class="cara">
-      ${j.logo ? `<img class="logo" src="${esc(j.logo)}" alt="">` : ''}
+      ${logoDe(j, 'logo')}
       <div class="titulo">Invitación especial</div>
       <div class="beneficio">${esc(j.texto)}</div>
       ${j.etiqueta ? `<div class="para">Para ${esc(j.etiqueta)}</div>` : ''}
@@ -163,7 +182,11 @@ function pintar() {
     fetch('/api/publico/pase/' + encodeURIComponent(c)).then(r => r.json()).catch(() => null)));
   PASES = rs.filter(j => j && j.ok);
   if (!PASES.length) { $('cuenta').textContent = 'No hay invitaciones para imprimir.'; return; }
-  marca(PASES[0].marca);
+  // Todas las invitaciones de un pliego salen del mismo beneficio en la práctica; si se mezclan,
+  // manda la primera: una hoja no puede tener dos bases distintas.
+  const claro = (PASES[0].tema || 'claro') === 'claro';
+  if (claro) document.documentElement.dataset.tema = 'claro';
+  marca(PASES[0].marca, claro);
 
   // Piezas gráficas del negocio para usar de frente. Es opcional: sin ninguna, va el logo.
   try {
