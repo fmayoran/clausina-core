@@ -71,6 +71,13 @@
   }
   /* Inerte, pero con su color real: bajarle la opacidad haría dudar del botón que se está
      yendo a evaluar, que es justo lo que la muestra tiene que mostrar bien. */
+  :root[data-tema="claro"] .rotulo,
+  :root[data-tema="claro"] .cond,
+  :root[data-tema="claro"] .otra,
+  :root[data-tema="claro"] .datos{opacity:.88;}
+  :root[data-tema="claro"] .pie{opacity:.72;}
+  :root[data-tema="claro"] .beneficio,
+  :root[data-tema="claro"] .para{opacity:1;}
   .cta.inerte{pointer-events:none;cursor:default;}
   .aviso{max-width:430px;margin:16px auto 0;padding:11px 14px;border-radius:11px;
          border:1px dashed var(--c-linea);font-size:.78rem;line-height:1.5;opacity:.8;

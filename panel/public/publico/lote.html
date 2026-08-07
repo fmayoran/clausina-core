@@ -29,6 +29,12 @@
   /* Un hueco cuando la tanda no llena la hoja: hay que ocupar la celda igual para que las
      posiciones del dorso sigan calzando con las del frente. */
   .cara.hueca{background:#fff;}
+  :root[data-tema="claro"] .rotulo,
+  :root[data-tema="claro"] .cond,
+  :root[data-tema="claro"] .otra{opacity:.88;}
+  :root[data-tema="claro"] .pie{opacity:.72;}
+  :root[data-tema="claro"] .beneficio,
+  :root[data-tema="claro"] .para{opacity:1;}
   /* El frente: si el negocio tiene una pieza gráfica se usa esa; si no, el logo sobre su color. */
   .frente{padding:0;}
   .frente img{width:100%;height:100%;object-fit:cover;display:block;}
