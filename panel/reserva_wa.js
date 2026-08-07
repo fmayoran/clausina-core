@@ -126,6 +126,10 @@ async function atender(negocio, mensaje) {
   // final de una frase. Se detecta siempre y se guarda; pedirlo en un paso fijo obligaría a la
   // persona a acordarse de cuándo decirlo.
   const codigo = inv.buscarEnTexto(entrada);
+  // Un código que existe pero no sirve (agotado, vencido, ya usado) NO es un código que no se
+  // entendió: si se lo trata igual, el paso que pide el código contesta "no me figura" después
+  // de que acá se dijo el motivo real, y la conversación queda dando vueltas sin avanzar.
+  let rechazo = null;
   if (codigo && codigo !== datos.invitacion) {
     const r = await db.consultarInvitacion(codigo, negocio.id, waId).catch(() => null);
     if (r && r.ok) {
@@ -134,8 +138,12 @@ async function atender(negocio, mensaje) {
       await decir(cfg, waId, `¡Bien! Tu invitación está activa: ${r.texto}. ` +
         `La dejo aplicada a esta reserva.`, negocio.id);
     } else if (r) {
-      // Se avisa y se sigue: que el código no sirva no es razón para no dejar reservar.
-      await decir(cfg, waId, `${r.mensaje} No te preocupes, seguimos con la reserva igual.`, negocio.id);
+      rechazo = r.mensaje;
+      // En el paso del código, la salida la ofrece ese paso —con sus dos botones—. En cualquier
+      // otro, la reserva ya venía en marcha y no hay nada que preguntar: se avisa y se sigue.
+      if (paso !== 'codigo') {
+        await decir(cfg, waId, `${rechazo} No te preocupes, seguimos con la reserva igual.`, negocio.id);
+      }
     }
   }
 
@@ -164,7 +172,7 @@ async function atender(negocio, mensaje) {
       }
       return await elegirDia(cfg, negocio, waId, entrada, datos);
     }
-    if (paso === 'codigo') return await recibirCodigo(cfg, negocio, waId, entrada, datos);
+    if (paso === 'codigo') return await recibirCodigo(cfg, negocio, waId, entrada, datos, rechazo);
     if (paso === 'dia') return await elegirTurno(cfg, negocio, waId, entrada, datos);
     if (paso === 'turno') return await pedirCantidad(cfg, negocio, waId, entrada, datos);
     if (paso === 'cantidad') return await pedirNombre(cfg, negocio, waId, entrada, datos);
@@ -243,7 +251,7 @@ async function preguntarCodigo(cfg, negocio, waId, datos) {
   return true;
 }
 
-async function recibirCodigo(cfg, negocio, waId, entrada, datos) {
+async function recibirCodigo(cfg, negocio, waId, entrada, datos, rechazo) {
   // El código ya se detecta arriba, en cualquier mensaje: si llegó acá con uno válido, `datos`
   // lo trae. Lo que queda es seguir, con o sin él.
   if (entrada === 'sin_codigo' || /^(no|nada|ninguno|seguir)$/i.test(entrada) || datos.invitacion) {
@@ -252,6 +260,17 @@ async function recibirCodigo(cfg, negocio, waId, entrada, datos) {
   if (entrada === 'con_codigo') {
     await decir(cfg, waId, 'Perfecto. Escribime el código tal como te llegó — son seis ' +
       'caracteres, como ABC-123.', negocio.id);
+    return true;
+  }
+  // El código se entendió pero no sirve. El motivo se dice una sola vez y con las dos salidas a
+  // la vista: quedarse en el paso repitiendo "probá de nuevo" es dejar a la persona sin reserva
+  // por algo que no puede arreglar.
+  if (rechazo) {
+    const texto = `${rechazo}\n\nPodés escribirme otro código, o seguimos sin invitación.`;
+    const botones = [{ id: 'sin_codigo', titulo: 'Seguir sin código' }];
+    const r = await decirOpciones(cfg, waId, texto, ['Seguir sin código'], negocio.id,
+      () => wa.enviarBotones(waId, texto, botones, cfg));
+    if (!r.ok) await decir(cfg, waId, texto + ' Respondeme "seguir".', negocio.id);
     return true;
   }
   await decir(cfg, waId, 'Ese código no me figura. Fijate si está bien copiado y probá de nuevo, ' +
