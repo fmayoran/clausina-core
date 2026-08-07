@@ -23,15 +23,17 @@
         border-radius:20px;padding:30px 28px 26px;text-align:center;position:relative;overflow:hidden;}
   .envoltorio{width:min(430px,100%);}
   /* El logo manda: es lo primero y lo más grande, y trae el nombre adentro. */
-  .logo{max-height:78px;max-width:78%;width:auto;margin:0 auto 22px;display:block;}
+  .logo{max-height:104px;max-width:86%;width:auto;margin:0 auto 24px;display:block;}
   /* El logo de un negocio suele ser una sola pieza, pensada para fondo oscuro: sobre papel
      blanco se borra. Sin variante clara cargada, se lo apoya en su propio fondo. */
-  .banda{background:var(--c-marca-fondo,#101014);border-radius:12px;padding:16px 20px;
-         margin:0 auto 22px;display:inline-block;max-width:88%;}
+  .banda{background:var(--c-marca-fondo,#101014);border-radius:12px;padding:18px 24px;
+         margin:0 auto 24px;display:inline-block;max-width:92%;}
   .banda .logo{margin:0;max-width:100%;}
-  .titulo{font-family:var(--f-tit);font-weight:800;font-size:1.62rem;line-height:1.1;
-          letter-spacing:-.01em;text-transform:uppercase;color:var(--c-acento);}
-  .beneficio{font-size:1.02rem;line-height:1.4;margin:10px 0 4px;color:var(--c-tinta);opacity:.92;}
+  .titulo{font-family:var(--f-tit);font-weight:800;font-size:1.5rem;line-height:1.1;
+          letter-spacing:.02em;text-transform:uppercase;color:var(--c-acento);}
+  /* El beneficio es lo que se lee de un vistazo: después del logo, es lo más grande de la pieza. */
+  .beneficio{font-family:var(--f-tit);font-weight:700;font-size:1.5rem;line-height:1.25;
+             margin:12px 0 4px;color:var(--c-tinta);}
   .rotulo{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.24em;
           text-transform:uppercase;opacity:.62;}
   .para{font-size:.9rem;opacity:.75;margin-bottom:20px;}
@@ -48,12 +50,22 @@
   .cta{display:inline-block;margin-top:20px;background:var(--c-acento);color:var(--c-fondo);
        font-family:var(--f-tit);font-weight:700;text-decoration:none;padding:12px 26px;
        border-radius:11px;font-size:.98rem;}
-  .pie{font-family:'JetBrains Mono',monospace;font-size:.56rem;opacity:.45;margin-top:18px;line-height:1.7;}
-  .pie b{opacity:.85;}
+  /* La letra chica es un párrafo, no una lista de advertencias sueltas: justificado y con
+     punto seguido se lee de corrido y ocupa la mitad del alto. */
+  .pie{font-size:.68rem;opacity:.6;margin-top:20px;line-height:1.6;text-align:justify;
+       hyphens:auto;text-wrap:pretty;}
+  .pie b{opacity:.9;}
   /* El pie de contacto se separa: son datos del negocio, no letra chica de la invitación. */
-  .datos{border-top:1px solid var(--c-linea);margin-top:18px;padding-top:14px;
-         font-family:'JetBrains Mono',monospace;font-size:.62rem;line-height:1.9;opacity:.7;}
-  .datos a{color:inherit;}
+  .datos{border-top:1px solid var(--c-linea);margin-top:18px;padding-top:15px;
+         font-family:'JetBrains Mono',monospace;font-size:.63rem;line-height:1.9;opacity:.75;}
+  .datos a{color:inherit;text-decoration:none;}
+  /* Los contactos en una línea. El ícono hace de etiqueta: sin él hay que escribir "Instagram:"
+     y "WhatsApp:" delante de cada uno, que es más tinta para decir lo mismo. */
+  .contactos{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
+             gap:6px 16px;margin-top:4px;}
+  .contactos span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+  .contactos svg{width:12px;height:12px;flex:0 0 auto;opacity:.85;}
+  .sede{display:block;}
   .acciones{display:flex;gap:9px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
   .acc{background:none;border:1px solid var(--c-linea);color:var(--c-tinta);opacity:.7;
        border-radius:9px;padding:8px 15px;cursor:pointer;font-family:var(--f-txt);font-size:.82rem;}
@@ -112,6 +124,13 @@
 
 <script>
 const $ = id => document.getElementById(id);
+// SVG inline y no una tipografía de íconos: la invitación se imprime y se guarda, y no puede
+// depender de que un servidor externo conteste. Heredan el color del texto.
+const ICONO = {
+  web: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/></svg>',
+  ig: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/></svg>',
+  wa: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2c-5.46 0-9.9 4.44-9.9 9.9 0 1.75.46 3.45 1.32 4.95L2 22l5.3-1.39a9.86 9.86 0 0 0 4.74 1.21h.01c5.46 0 9.9-4.44 9.9-9.9 0-2.64-1.03-5.13-2.9-7A9.82 9.82 0 0 0 12.04 2zm5.8 14.1c-.25.7-1.45 1.33-2 1.4-.51.07-1.16.1-1.87-.12-.43-.14-.99-.32-1.7-.63-2.99-1.29-4.94-4.3-5.09-4.5-.15-.2-1.22-1.62-1.22-3.1 0-1.47.77-2.19 1.04-2.49.27-.3.6-.37.79-.37h.57c.18 0 .43-.7.67.51.25.6.85 2.07.92 2.22.07.15.12.32.02.52-.1.2-.15.32-.3.5l-.44.51c-.15.15-.3.32-.13.62.17.3.76 1.25 1.63 2.03 1.12 1 2.06 1.31 2.36 1.46.3.15.47.12.65-.07.17-.2.75-.87.95-1.17.2-.3.4-.25.67-.15.27.1 1.72.81 2.02.96.3.15.5.22.57.35.07.12.07.72-.18 1.42z"/></svg>',
+};
 const COD = decodeURIComponent(location.pathname.split('/').pop() || '');
 // La misma página sirve el pase real y la muestra del panel. Tiene que ser la MISMA: una vista
 // previa armada aparte mostraría bien algo que después se imprime mal.
@@ -217,15 +236,19 @@ function marca(m, claro) {
     // diferencia entre tomarla y consumirla, dicha en el único lugar donde la lee el invitado.
     // La reserva es obligatoria y se dice primero: el riesgo real no es el descuento mal
     // aplicado, es alguien que llega con la tarjeta y se encuentra sin mesa.
-    $('pie').innerHTML = '<b>Válida sólo con reserva previa.</b> Sin reserva no podemos ' +
-      'garantizarte lugar.<br>Presentá esta invitación al llegar al local para validarla · ' +
-      'El descuento se aplica al pagar';
-    const dd = [];
-    if (j.sede) dd.push([j.sede.direccion, j.sede.localidad, j.sede.partido].filter(Boolean).join(', '));
-    if (j.web) dd.push(`<a href="https://${esc(j.web)}">${esc(j.web)}</a>`);
-    if (j.instagram) dd.push(`<a href="https://instagram.com/${esc(String(j.instagram).replace('@',''))}">${esc(j.instagram)}</a>`);
-    if (j.whatsapp) dd.push('WhatsApp ' + esc(j.whatsapp));
-    $('datos').innerHTML = dd.join('<br>');
+    $('pie').innerHTML = '<b>Válida sólo con reserva previa</b>, sin reserva no podemos ' +
+      'garantizarte lugar. Presentá esta invitación al llegar al local para validarla. ' +
+      'El descuento se aplica al pagar.';
+    const sede = j.sede
+      ? [j.sede.direccion, j.sede.localidad, j.sede.partido].filter(Boolean).join(', ') : '';
+    const ig = j.instagram ? String(j.instagram).replace('@', '') : '';
+    const wa = j.whatsapp ? String(j.whatsapp).replace(/[^0-9]/g, '') : '';
+    const linea = [];
+    if (j.web) linea.push(`<span>${ICONO.web}<a href="https://${esc(j.web)}">${esc(j.web)}</a></span>`);
+    if (ig) linea.push(`<span>${ICONO.ig}<a href="https://instagram.com/${esc(ig)}">@${esc(ig)}</a></span>`);
+    if (j.whatsapp) linea.push(`<span>${ICONO.wa}<a href="https://wa.me/${esc(wa)}">${esc(j.whatsapp)}</a></span>`);
+    $('datos').innerHTML = (sede ? `<span class="sede">${esc(sede)}</span>` : '') +
+      (linea.length ? `<div class="contactos">${linea.join('')}</div>` : '');
     // Imprimir o compartir una muestra sería repartir un código que no existe.
     if (!MUESTRA) $('acciones').style.display = '';
     $('pase').style.display = '';
