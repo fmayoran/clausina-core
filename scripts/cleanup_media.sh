@@ -73,11 +73,28 @@ while IFS= read -r f; do
 done < <(find "$MATDIR" -type f 2>/dev/null)
 rm -f "$refs"
 
+# --- B2) Tarjetas de reserva ya entregadas ---
+# Una por reserva, y su único destinatario ya la tiene en el chat. Se guardan un tiempo por si
+# hay que ver qué se mandó, y después sobran: si no se podaran, la carpeta crece para siempre.
+tarN=0; tarB=0
+TARDIR="$MEDIA/tarjetas"
+if [ -d "$TARDIR" ]; then
+  while IFS= read -r f; do
+    b=$(sz "$f"); tarB=$((tarB+b)); tarN=$((tarN+1))
+    echo "  [tarjeta] ${f#$MEDIA/} ($(human "$b"))"
+    if [ "$APPLY" = 1 ]; then
+      rm -f "$f"
+      psql "UPDATE contenido.tarjeta_req SET url=NULL WHERE url LIKE '%/$(basename "$f")'" >/dev/null
+    fi
+  done < <(find "$TARDIR" -type f -mtime +60 2>/dev/null)
+fi
+
 # --- C) Podar carpetas vacías ---
 [ "$APPLY" = 1 ] && find "$MATDIR" -mindepth 1 -type d -empty -delete 2>/dev/null
 
 echo "-- Resumen --"
 echo "  material terminal: $termN archivo(s) · $(human "$termB")"
 echo "  huérfanos:         $orfN archivo(s) · $(human "$orfB")"
-echo "  TOTAL a liberar:   $(human $((termB+orfB)))"
+echo "  tarjetas viejas:   $tarN archivo(s) · $(human "$tarB")"
+echo "  TOTAL a liberar:   $(human $((termB+orfB+tarB)))"
 [ "$APPLY" = 1 ] && echo "  -> BORRADO aplicado." || echo "  -> DRY-RUN: no se borró nada. Corré con --apply para aplicar."
