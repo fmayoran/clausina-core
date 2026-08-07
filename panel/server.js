@@ -1447,12 +1447,15 @@ app.post('/api/perfil/logo', async (req, res) => {
     if (!m || !LOGO_EXT[m[1]]) return res.status(400).json({ ok: false, error: 'imagen_invalida' });
     const buf = Buffer.from(m[2], 'base64');
     if (buf.length > 5 * 1024 * 1024) return res.status(413).json({ ok: false, error: 'muy_grande' });
+    // Cuál de las dos variantes se está subiendo. El nombre del archivo las distingue: si las dos
+    // se llamaran igual, revisar el media store a mano sería adivinar.
+    const claro = String((req.body && req.body.variante) || '') === 'claro';
     const dir = path.join('/app/media', 'marca', req.negocio);
     await fs.promises.mkdir(dir, { recursive: true });
-    const fname = `logo-${Date.now()}.${LOGO_EXT[m[1]]}`;
+    const fname = `logo${claro ? '-claro' : ''}-${Date.now()}.${LOGO_EXT[m[1]]}`;
     await fs.promises.writeFile(path.join(dir, fname), buf);
     const url = `https://${req.get('host')}/media/marca/${req.negocio}/${fname}`;
-    await db.setLogo(req.negocioId, url);
+    await db.setLogo(req.negocioId, url, claro ? 'claro' : 'oscuro');
     res.json({ ok: true, url });
   } catch (e) { console.error('logo upload', e.message); res.status(500).json({ ok: false, error: 'upload' }); }
 });

@@ -40,13 +40,18 @@ def q(sql):
     return subprocess.run(["docker","exec","-i",pg,"psql","-U","postgres","-d","claude","-t","-A","-q","-c",sql],
                           capture_output=True, text=True).stdout.strip()
 row=q("SELECT coalesce(p.nombre,'')||E'\\n---S---\\n'||coalesce(pp.slogan,'')||E'\\n---L---\\n'||coalesce(pp.logo,'')"
+      "||E'\\n---C---\\n'||coalesce(pp.logo_claro,'')"
       "||E'\\n---B---\\n'||coalesce(pp.brief_md,'')||E'\\n---E---\\n'||coalesce(pp.estilo_md,'') "
       f"FROM contenido.negocios p JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id WHERE p.id='{pid}'")
 nombre, _, r1 = row.partition('\n---S---\n')
 slogan, _, r2 = r1.partition('\n---L---\n')
-logo,   _, r3 = r2.partition('\n---B---\n')
+logo,   _, r2b = r2.partition('\n---C---\n')
+# La variante para fondo claro: el manual muestra el logo sobre los dos fondos, y sin ella la
+# página de logo del manual mostraba un rectángulo vacío en la mitad clara.
+logoc,  _, r3 = r2b.partition('\n---B---\n')
 brief,  _, estilo = r3.partition('\n---E---\n')
 json.dump({"nombre":nombre.strip(),"slogan":slogan.strip(),"logo":logo.strip(),
+           "logo_claro":logoc.strip(),
            "brief":brief.strip(),"estilo_md":estilo.strip(),
            "version":os.environ.get("VER",""),"fecha":os.environ.get("FECHA","")},
           open(f"/tmp/manual_ctx_{gid}.json","w"), ensure_ascii=False)

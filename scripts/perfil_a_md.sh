@@ -14,10 +14,11 @@ E'# %s — Perfil de marca\n'
  '**Slogan:** %s\n'
  '**Instagram:** %s\n'
  '**Web:** %s\n'
- '**Logo:** %s\n\n'
+ '**Logo:** %s\n'
+ '**Logo alternativo (fondo claro):** %s\n\n'
  '%s\n',
  pr.nombre, coalesce(pp.slogan,''), coalesce(pr.ig_handle,''), coalesce(pr.dominio_web,''),
- coalesce(pp.logo,''), coalesce(pp.brief_md,''))
+ coalesce(pp.logo,''), coalesce(pp.logo_claro,'(no cargado)'), coalesce(pp.brief_md,''))
 FROM contenido.negocios pr
 LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id = pr.id
 WHERE pr.slug = :'slug';

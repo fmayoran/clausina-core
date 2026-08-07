@@ -227,7 +227,7 @@ async function getProyectoId(slug) {
 async function getPerfil(negocioId) {
   const { rows: [r] } = await pool.query(
     `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email, p.whatsapp, p.gestion, p.prefijo,
-            pp.slogan, pp.logo, pp.brief_md, pp.estilo_md, pp.actualizado_en,
+            pp.slogan, pp.logo, pp.logo_claro, pp.brief_md, pp.estilo_md, pp.actualizado_en,
             pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id,
             (pp.meta_ads_token_enc IS NOT NULL) AS meta_ads_token_set,
             (pp.ig_token_enc IS NOT NULL) AS ig_token_set
@@ -748,10 +748,11 @@ async function guardarPerfil(negocioId, d) {
     _negociosAt = 0;   // el inicio agrupa por esto: invalidar el cache
   }
   await pool.query(`
-    INSERT INTO contenido.negocio_perfil (negocio_id, slogan, logo, brief_md, estilo_md, actualizado_en)
-    VALUES ($1,$2,$3,$4,$5, now())
-    ON CONFLICT (negocio_id) DO UPDATE SET slogan=$2, logo=$3, brief_md=$4, estilo_md=$5, actualizado_en=now()`,
-    [negocioId, nn(d.slogan), nn(d.logo), nn(d.brief_md), nn(d.estilo_md)]);
+    INSERT INTO contenido.negocio_perfil (negocio_id, slogan, logo, logo_claro, brief_md, estilo_md, actualizado_en)
+    VALUES ($1,$2,$3,$4,$5,$6, now())
+    ON CONFLICT (negocio_id) DO UPDATE SET slogan=$2, logo=$3, logo_claro=$4,
+                                           brief_md=$5, estilo_md=$6, actualizado_en=now()`,
+    [negocioId, nn(d.slogan), nn(d.logo), nn(d.logo_claro), nn(d.brief_md), nn(d.estilo_md)]);
   // Pauta: IDs en claro (COALESCE: vacío = no toca); token cifrado, write-only.
   await pool.query(
     `UPDATE contenido.negocio_perfil SET
@@ -770,11 +771,17 @@ async function guardarPerfil(negocioId, d) {
   return true;
 }
 // Actualiza SOLO el logo (sin tocar slogan/brief). Lo usa la subida de archivo del perfil.
-async function setLogo(negocioId, url) {
+/**
+ * El logo del negocio. `variante='claro'` guarda la versión PARA FONDO CLARO — un logo es una
+ * sola pieza pensada para un fondo, y sobre el contrario desaparece: sin las dos, cada pieza que
+ * no sea del color de la marca tiene que inventar un parche.
+ */
+async function setLogo(negocioId, url, variante = 'oscuro') {
+  const col = variante === 'claro' ? 'logo_claro' : 'logo';
   await pool.query(`
-    INSERT INTO contenido.negocio_perfil (negocio_id, logo, actualizado_en)
+    INSERT INTO contenido.negocio_perfil (negocio_id, ${col}, actualizado_en)
     VALUES ($1,$2, now())
-    ON CONFLICT (negocio_id) DO UPDATE SET logo=$2, actualizado_en=now()`,
+    ON CONFLICT (negocio_id) DO UPDATE SET ${col}=$2, actualizado_en=now()`,
     [negocioId, url]);
   _negociosAt = 0;   // el logo se cachea en la lista de marcas
   return true;
@@ -1811,8 +1818,9 @@ async function reservaTarjeta(negocioId, reservaId) {
     ok: true, id: r.id, estado: r.estado, fecha: r.fecha, turno: r.turno, hora_desde: r.hora_desde,
     cantidad: r.cantidad, unidad: r.cantidad === 1 ? unidad.sing : unidad.plur,
     cliente: r.cliente, negocio: r.negocio,
-    // Fondo oscuro: si el negocio tiene una versión clara del logo, es la que se ve.
-    logo: r.logo_claro || r.logo || null,
+    // La tarjeta va sobre el fondo de la marca (oscuro): el que corresponde es el logo normal.
+    // `logo_claro` es la variante PARA fondo claro y acá se vería negro sobre negro.
+    logo: r.logo || r.logo_claro || null,
     marca: r.marca || {}, sede: sede || null,
     invitacion: r.invitacion_codigo
       ? { codigo: r.invitacion_codigo, texto: textoBeneficio({ tipo: r.invitacion_tipo, valor: r.invitacion_valor }) }

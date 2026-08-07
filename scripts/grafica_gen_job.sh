@@ -48,7 +48,7 @@ def q(sql):
 g = json.loads(q(f"SELECT row_to_json(t) FROM (SELECT nombre, formato, ancho_mm, alto_mm, mensaje, "
                  f"caras, fondo_modo, fondo_url, fondo_prompt, datos FROM contenido.grafica WHERE id='{gid}') t"))
 neg = json.loads(q(f"SELECT row_to_json(t) FROM (SELECT n.nombre, n.slug, n.dominio_web, n.ig_handle, n.email, "
-                   f"n.whatsapp, p.logo, p.slogan, p.estilo_md FROM contenido.negocios n "
+                   f"n.whatsapp, p.logo, p.logo_claro, p.slogan, p.estilo_md FROM contenido.negocios n "
                    f"LEFT JOIN contenido.negocio_perfil p ON p.negocio_id=n.id "
                    f"WHERE n.id=(SELECT negocio_id FROM contenido.grafica WHERE id='{gid}')) t"))
 cont = q(f"SELECT coalesce(json_agg(json_build_object('nombre',nombre,'rol',rol,'whatsapp',whatsapp,'email',email)),'[]') "

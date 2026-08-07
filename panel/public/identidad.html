@@ -261,13 +261,26 @@
           <div><label for="nombre">Negocio</label><input type="text" id="nombre"></div>
           <div><label for="slogan">Slogan</label><input type="text" id="slogan"></div>
           <div class="full">
-            <label for="logo">Logo <span class="hint">— subí el archivo, o pegá una URL</span></label>
+            <label for="logo">Logo <span class="hint">— para fondo oscuro. Subí el archivo, o pegá una URL</span></label>
             <div style="display:flex;gap:8px;align-items:center;">
-              <span id="logoBox" style="display:none;width:42px;height:42px;flex:0 0 auto;border-radius:8px;background:var(--u-bg);border:1px solid var(--u-line);overflow:hidden;position:relative;"><img id="logoPrev" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:5px;"></span>
+              <span id="logoBox" style="display:none;width:42px;height:42px;flex:0 0 auto;border-radius:8px;background:#101014;border:1px solid var(--u-line);overflow:hidden;position:relative;"><img id="logoPrev" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:5px;"></span>
               <input type="text" id="logo" style="flex:1;">
               <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" style="display:none;" onchange="subirLogo(this)">
               <button type="button" class="btn2" id="logoBtn" onclick="document.getElementById('logoFile').click()">Subir…</button>
             </div>
+          </div>
+          <!-- Un logo es una sola pieza pensada para un fondo, y sobre el contrario desaparece.
+               Con las dos variantes cargadas, cada pieza elige la que le sirve en vez de parchear. -->
+          <div class="full">
+            <label for="logo_claro">Logo alternativo <span class="hint">— para fondo claro (impresos, invitaciones en blanco). Opcional</span></label>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span id="logoClaroBox" style="display:none;width:42px;height:42px;flex:0 0 auto;border-radius:8px;background:#FFFFFF;border:1px solid var(--u-line);overflow:hidden;position:relative;"><img id="logoClaroPrev" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:5px;"></span>
+              <input type="text" id="logo_claro" style="flex:1;">
+              <input type="file" id="logoClaroFile" accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif" style="display:none;" onchange="subirLogo(this, 'claro')">
+              <button type="button" class="btn2" id="logoClaroBtn" onclick="document.getElementById('logoClaroFile').click()">Subir…</button>
+            </div>
+            <div class="hint" style="margin-top:5px;">Sin esta variante, las piezas de fondo claro
+              apoyan el logo sobre una banda del color de la marca.</div>
           </div>
           <div><label for="dominio_web">Web <span class="hint">— dominio</span></label><input type="text" id="dominio_web" placeholder="marca.ar"></div>
           <div><label for="email">Email <span class="hint">— del negocio</span></label><input type="text" id="email" placeholder="hola@marca.ar"></div>
@@ -582,7 +595,7 @@ async function guardarFicha(confirmar) {
 
 /* ═══════════ Perfil: marca, brief, estilo, redes ═══════════ */
 const CAMPOS = ['nombre','slogan','ig_handle','dominio_web','email','whatsapp','ig_user_id',
-                'telegram_chat_id','logo','brief_md','estilo_md',
+                'telegram_chat_id','logo','logo_claro','brief_md','estilo_md',
                 'meta_ads_account_id','meta_ads_page_id','meta_ads_ig_id'];
 function fval(id) { const e = $(id); return e ? String(e.value || '').trim() : ''; }
 
@@ -600,6 +613,7 @@ async function cargarPerfil() {
     const p = await r.json();
     CAMPOS.forEach(c => { const el = $(c); if (el) el.value = p[c] || ''; });
     mostrarLogo(p.logo || '');
+    mostrarLogo(p.logo_claro || '', 'claro');
     const g = $('gestion'); if (g) g.value = p.gestion || 'integral';
     const pf = $('prefijo'); if (pf) pf.value = p.prefijo || '';
     try { renderContactos(await fetch('api/contactos').then(r => r.json())); } catch (_) { renderContactos([]); }
@@ -626,19 +640,28 @@ async function guardarPerfil() {
   } catch (e) { toast('Error de conexión', true); }
 }
 
-function mostrarLogo(v) {
-  const box = $('logoBox'), img = $('logoPrev');
+// Cada variante tiene su propia miniatura, y el recuadro va del color del fondo al que está
+// destinada: un logo blanco sobre una miniatura blanca se ve vacío y parece que falló la subida.
+const LOGOS = {
+  oscuro: { campo: 'logo', box: 'logoBox', prev: 'logoPrev', btn: 'logoBtn' },
+  claro:  { campo: 'logo_claro', box: 'logoClaroBox', prev: 'logoClaroPrev', btn: 'logoClaroBtn' },
+};
+
+function mostrarLogo(v, variante = 'oscuro') {
+  const r = LOGOS[variante];
+  const box = $(r.box), img = $(r.prev);
   if (v && /^https?:\/\//.test(v)) { img.src = v; box.style.display = 'inline-block'; }
   else { img.removeAttribute('src'); box.style.display = 'none'; }
 }
-async function subirLogo(input) {
+async function subirLogo(input, variante = 'oscuro') {
   const file = input.files && input.files[0]; if (!file) return;
-  const btn = $('logoBtn'); const txt = btn.textContent; btn.textContent = 'Subiendo…'; btn.disabled = true;
+  const r = LOGOS[variante];
+  const btn = $(r.btn); const txt = btn.textContent; btn.textContent = 'Subiendo…'; btn.disabled = true;
   try {
-    const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); });
+    const dataUrl = await new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(rd.result); rd.onerror = rej; rd.readAsDataURL(file); });
     const d = await fetch('api/perfil/logo', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dataUrl }) }).then(r => r.json());
-    if (d && d.ok) { $('logo').value = d.url; mostrarLogo(d.url); toast('Logo subido'); }
+      body: JSON.stringify({ dataUrl, variante }) }).then(x => x.json());
+    if (d && d.ok) { $(r.campo).value = d.url; mostrarLogo(d.url, variante); toast('Logo subido'); }
     else { toast(d && d.error === 'muy_grande' ? 'Imagen muy grande (máx 5MB)' : 'No se pudo subir el logo', true); }
   } catch (e) { toast('Error de conexión', true); }
   finally { btn.textContent = txt; btn.disabled = false; input.value = ''; }
