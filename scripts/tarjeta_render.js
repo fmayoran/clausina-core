@@ -29,11 +29,19 @@ function enPanel(codigo, ...args) {
   try {
     // La sesión se emite a nombre del dueño del negocio: la tarjeta muestra datos del negocio y
     // el endpoint filtra por negocio_id, así que la sesión tiene que tener uno.
-    const uid = enPanel(
-      `const db=require('/app/db');db.getUsuarioPorEmail(process.argv[1]).then(u=>{
-         if(!u)process.exit(1); process.stdout.write(u.id);});`,
+    //
+    // Un solo `docker exec`, y con process.exit() explícito: `db` deja abierto el pool de
+    // Postgres, que mantiene vivo el event loop, y `docker exec` espera a que el proceso termine.
+    // Sin el exit, emitir la sesión tardaba 30 segundos —el 40% de todo lo que tardaba la
+    // tarjeta en llegar— esperando a que el pool se muriera de aburrimiento.
+    const token = enPanel(
+      `const db=require('/app/db'), auth=require('/app/auth');
+       db.getUsuarioPorEmail(process.argv[1]).then(u=>{
+         if(!u){ process.exit(1); }
+         process.stdout.write(auth.issue(u.id));
+         process.exit(0);
+       }).catch(()=>process.exit(1));`,
       process.env.TARJETA_USUARIO || 'fernando@clausina.ar');
-    const token = enPanel(`process.stdout.write(require('/app/auth').issue(process.argv[1]));`, uid);
 
     nav = await chromium.launch();
     const ctx = await nav.newContext({
