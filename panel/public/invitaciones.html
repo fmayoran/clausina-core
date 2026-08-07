@@ -266,10 +266,16 @@ document.getElementById('tabs').addEventListener('click', e => {
 function condicionesTxt(b) {
   const c = b.condiciones || {};
   const p = [];
-  if ((c.dias || []).length) p.push(c.dias.map(d => (DIAS.find(x => x[0] === d) || [])[1]).join(' '));
+  if ((c.dias || []).length === 7) p.push('todos los días');
+  else if ((c.dias || []).length) p.push(c.dias.map(d => (DIAS.find(x => x[0] === d) || [])[1]).join(' '));
   if ((c.turnos || []).length) {
-    p.push(c.turnos.map(t => (TURNOS.find(x => x.id === t) || {}).nombre_publico ||
-                             (TURNOS.find(x => x.id === t) || {}).nombre || '?').join(', '));
+    // La franja, no los turnos: un negocio con tres turnos de noche daba "Noche, Noche primer
+    // turno, Noche segundo turno", que no se lee. Elegir el turno exacto es tema de la reserva.
+    const f = [...new Set(c.turnos.map(id => {
+      const t = TURNOS.find(x => x.id === id);
+      return t ? (parseInt(t.hora_desde, 10) < 17 ? 'Mediodía' : 'Noche') : '?';
+    }))].sort((a, b) => (a === 'Mediodía' ? -1 : 1));
+    p.push(f.join(' y '));
   }
   if (c.cantidad_min) p.push('desde ' + c.cantidad_min);
   if (c.cantidad_max) p.push('hasta ' + c.cantidad_max);
@@ -373,7 +379,7 @@ async function cargarInv() {
   const d = await fetch('api/invitaciones' + (b ? '?beneficio_id=' + encodeURIComponent(b) : ''))
     .then(r => r.json()).catch(() => ({}));
   INV = d.invitaciones || [];
-  $('sub').textContent = BENEFICIOS.length + ' beneficio(s) · ' + INV.length + ' código(s)';
+  $('sub').textContent = BENEFICIOS.length + ' beneficio(s) · ' + INV.length + ' invitación(es)';
   pintarInv();
 }
 
@@ -390,7 +396,7 @@ function filtradas() {
 function pintarInv() {
   const lista = filtradas();
   $('cuenta-cod').textContent = lista.length === INV.length
-    ? INV.length + ' código(s)' : lista.length + ' de ' + INV.length;
+    ? INV.length + ' invitación(es)' : lista.length + ' de ' + INV.length;
   $('tb-cod').innerHTML = lista.length ? lista.map(i => `
     <tr>
       <td><button class="cod" onclick='copiar(${JSON.stringify(i.codigo)})'
@@ -460,7 +466,7 @@ async function emitir() {
     cerrar('ov-emitir');
     $('f-ben').value = '';
     await cargarBeneficios(); await cargarInv();
-    avisar(j.invitaciones.length + ' código(s) emitido(s)');
+    avisar(j.invitaciones.length + ' invitación(es) emitida(s)');
   } catch (x) { e.textContent = 'Error de conexión.'; }
 }
 
