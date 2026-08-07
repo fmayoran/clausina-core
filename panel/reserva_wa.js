@@ -273,9 +273,40 @@ async function recibirCodigo(cfg, negocio, waId, entrada, datos, rechazo) {
     if (!r.ok) await decir(cfg, waId, texto + ' Respondeme "seguir".', negocio.id);
     return true;
   }
+  // Nada de lo que escribió se parece a un código: no está intentando dictarlo, está diciendo
+  // otra cosa ("hola", "tengo otro", "dale"). Insistir con "fijate si está bien copiado" deja la
+  // conversación en un bucle del que no se sale ni saludando — pasó, y no había manera de salir.
+  if (!pareceCodigo(entrada)) {
+    await decir(cfg, waId, 'No encontré un código ahí, así que seguimos sin invitación. ' +
+      'Si la tenés a mano, escribime el código en cualquier momento y la aplico.', negocio.id);
+    return await elegirDia(cfg, negocio, waId, '', datos);
+  }
+  // Sí parece un código, pero está mal. Se deja reintentar, no para siempre: al tercero se sigue
+  // igual. Perder la reserva por un código mal impreso es el peor final posible.
+  const fallos = (datos.codigo_fallos || 0) + 1;
+  if (fallos >= 3) {
+    await decir(cfg, waId, 'Ese código sigue sin figurarme. Seguimos con la reserva y lo vemos ' +
+      'cuando llegues — mostralo en el local y lo resolvemos ahí.', negocio.id);
+    const { codigo_fallos, ...limpio } = datos;
+    return await elegirDia(cfg, negocio, waId, '', limpio);
+  }
+  await db.setConversacion(negocio.id, waId, 'codigo', { ...datos, codigo_fallos: fallos });
   await decir(cfg, waId, 'Ese código no me figura. Fijate si está bien copiado y probá de nuevo, ' +
-    'o seguimos sin él y lo vemos cuando llegues.', negocio.id);
+    'o respondeme "seguir" y lo vemos cuando llegues.', negocio.id);
   return true;
+}
+
+/**
+ * ¿El mensaje es un intento de dictar un código, aunque esté mal? Se mira la FORMA, no la
+ * validez: un token corto y sin espacios que mezcle letras y números, o todo en mayúsculas.
+ * Sirve para distinguir "GAFQ9X" (mal copiado: hay que avisar) de "hola" (no viene al caso).
+ */
+function pareceCodigo(texto) {
+  return String(texto || '').split(/[\s.,;:!?]+/).filter(Boolean).some(t => {
+    const c = t.replace(/[^A-Za-z0-9]/g, '');
+    if (c.length < 4 || c.length > 9) return false;
+    return /[0-9]/.test(c) || c === c.toUpperCase();
+  });
 }
 
 // Consultas que no son una operación del bot: se guardan para que las lea una persona.
