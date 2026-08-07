@@ -1795,9 +1795,13 @@ async function reservaTarjeta(negocioId, reservaId) {
             COALESCE(t.nombre_publico, t.nombre) AS turno, to_char(t.hora_desde,'HH24:MI') AS hora_desde,
             c.nombre AS cliente,
             nc.config AS cfg_reservas,
-            pp.logo, pp.logo_claro, p.nombre AS negocio,
+            pp.logo, pp.logo_claro, p.nombre AS negocio, p.dominio_web, p.ig_handle,
             COALESCE(ni.marca, '{}'::jsonb) AS marca,
-            i.codigo AS invitacion_codigo, b.tipo AS invitacion_tipo, b.valor AS invitacion_valor
+            i.codigo AS invitacion_codigo, b.tipo AS invitacion_tipo, b.valor AS invitacion_valor,
+            -- La tarjeta de una reserva CON invitación tiene que verse como la invitación que la
+            -- persona ya tiene en la mano: mismo tema, mismos colores. Sin invitación es una
+            -- pieza de marca y va sobre el fondo del negocio.
+            b.tema AS invitacion_tema
        FROM contenido.reserva r
        JOIN contenido.turno t ON t.id = r.turno_id
        JOIN contenido.cliente c ON c.id = r.cliente_id
@@ -1818,10 +1822,11 @@ async function reservaTarjeta(negocioId, reservaId) {
     ok: true, id: r.id, estado: r.estado, fecha: r.fecha, turno: r.turno, hora_desde: r.hora_desde,
     cantidad: r.cantidad, unidad: r.cantidad === 1 ? unidad.sing : unidad.plur,
     cliente: r.cliente, negocio: r.negocio,
-    // La tarjeta va sobre el fondo de la marca (oscuro): el que corresponde es el logo normal.
-    // `logo_claro` es la variante PARA fondo claro y acá se vería negro sobre negro.
-    logo: r.logo || r.logo_claro || null,
+    tema: r.invitacion_codigo ? (r.invitacion_tema || 'claro') : 'oscuro',
+    // Cada variante para el fondo que le toca. Elegir mal es un logo invisible, no un error.
+    logo: r.logo || null, logo_claro: r.logo_claro || null,
     marca: r.marca || {}, sede: sede || null,
+    web: r.dominio_web || null, instagram: r.ig_handle || null,
     invitacion: r.invitacion_codigo
       ? { codigo: r.invitacion_codigo, texto: textoBeneficio({ tipo: r.invitacion_tipo, valor: r.invitacion_valor }) }
       : null,

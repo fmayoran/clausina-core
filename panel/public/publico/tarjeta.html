@@ -6,38 +6,53 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link id="fuentes" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700;800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
-  /* Una sola cara, cuadrada-ish: es lo que se ve bien en la burbuja de un chat sin tener que
-     abrirla. Un formato vertical de tarjeta se recorta en la vista previa. */
+  /* Una sola cara, cuadrada: es lo que WhatsApp muestra entero en la burbuja sin tener que
+     abrirla. Y es la MISMA pieza que la invitación impresa —mismo tema, misma jerarquía, mismo
+     pie— porque quien la recibe ya tiene la otra en la mano: si no se parecen, parecen de dos
+     negocios distintos. */
   :root{--f-tit:'Inter Tight',sans-serif;--f-txt:'Inter',sans-serif;
-        --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-linea:#2a2a33;}
+        --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-suave:#1b1b21;--c-linea:#2a2a33;}
+  :root[data-tema="claro"]{--c-fondo:#F2F0EA;--c-tinta:#15150F;--c-acento:#B33A00;
+                           --c-suave:#FFFFFF;--c-linea:#DCD8CC;}
   *{box-sizing:border-box;margin:0;}
   body{background:#222;font-family:var(--f-txt);}
-  #tarjeta{width:1080px;height:1080px;background:var(--c-fondo);color:var(--c-tinta);
+  #tarjeta{width:1080px;height:1080px;background:var(--c-suave);color:var(--c-tinta);
            display:flex;flex-direction:column;align-items:center;justify-content:center;
-           text-align:center;padding:96px 86px;position:relative;overflow:hidden;}
-  .logo{max-height:168px;max-width:70%;width:auto;margin-bottom:62px;}
-  .rot{font-family:'JetBrains Mono',monospace;font-size:25px;letter-spacing:.3em;
-       text-transform:uppercase;opacity:.6;}
-  .nombre{font-family:var(--f-tit);font-weight:800;font-size:92px;line-height:1.05;
-          letter-spacing:-.01em;margin:16px 0 6px;}
-  .cuando{font-family:var(--f-tit);font-weight:700;font-size:66px;line-height:1.12;
-          color:var(--c-acento);margin-top:34px;text-transform:capitalize;}
-  .detalle{font-size:36px;line-height:1.5;opacity:.86;margin-top:16px;}
-  /* El beneficio se destaca sólo si lo hay: en una reserva común no tiene por qué ocupar lugar. */
-  .beneficio{margin-top:46px;border:2px dashed var(--c-linea);border-radius:24px;
-             padding:22px 38px 26px;font-size:34px;line-height:1.4;}
-  .beneficio b{color:var(--c-acento);}
-  /* El código es lo que van a pedir en el mostrador: sin él la tarjeta no sirve para validar
-     nada. Va en monoespaciada y partido, que es como se lee y se dicta sin equivocarse. */
-  .codigo{display:block;margin-top:12px;font-family:'JetBrains Mono',monospace;font-weight:700;
-          font-size:44px;letter-spacing:.08em;color:var(--c-acento);}
-  .pie{position:absolute;left:86px;right:86px;bottom:58px;
-       font-family:'JetBrains Mono',monospace;font-size:18px;line-height:1.9;opacity:.55;}
+           text-align:center;padding:80px 86px 210px;position:relative;overflow:hidden;}
+  .logo{max-height:150px;max-width:74%;width:auto;display:block;}
+  /* El logo del negocio es una sola pieza pensada para un fondo; sin la variante que hace falta,
+     se lo apoya en su propio color en vez de dejarlo invisible. */
+  .banda{background:var(--c-marca-fondo,#101014);border-radius:20px;padding:26px 34px;
+         display:inline-block;max-width:82%;}
+  .banda .logo{max-width:100%;}
+  .cabecera{margin-bottom:50px;}
+  .rot{font-family:'JetBrains Mono',monospace;font-size:23px;letter-spacing:.3em;
+       text-transform:uppercase;opacity:.62;}
+  .nombre{font-family:var(--f-tit);font-weight:800;font-size:86px;line-height:1.05;
+          letter-spacing:-.01em;margin:14px 0 6px;}
+  .cuando{font-family:var(--f-tit);font-weight:700;font-size:62px;line-height:1.12;
+          color:var(--c-acento);margin-top:28px;text-transform:capitalize;}
+  .detalle{font-size:34px;line-height:1.5;opacity:.86;margin-top:14px;}
+  /* El beneficio sólo si lo hay: en una reserva común no tiene por qué ocupar lugar. */
+  .beneficio{margin-top:42px;border:2px dashed var(--c-linea);border-radius:24px;
+             padding:24px 40px 28px;}
+  .beneficio .que{font-family:var(--f-tit);font-weight:700;font-size:38px;line-height:1.25;}
+  /* El código es lo que van a pedir en el mostrador: sin él la tarjeta no valida nada. */
+  .beneficio .codigo{display:block;margin-top:10px;font-family:'JetBrains Mono',monospace;
+          font-weight:700;font-size:44px;letter-spacing:.08em;color:var(--c-acento);}
+  /* El pie repite el de la invitación impresa, con los mismos íconos. */
+  .pie{position:absolute;left:86px;right:86px;bottom:56px;
+       border-top:1px solid var(--c-linea);padding-top:26px;
+       font-family:'JetBrains Mono',monospace;font-size:22px;line-height:1.75;opacity:.72;}
+  .contactos{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
+             gap:6px 30px;margin-top:6px;}
+  .contactos span{display:inline-flex;align-items:center;gap:9px;white-space:nowrap;}
+  .contactos svg{width:22px;height:22px;flex:0 0 auto;opacity:.85;}
 </style>
 </head>
 <body>
 <div id="tarjeta">
-  <img class="logo" id="logo" alt="" style="display:none">
+  <div class="cabecera"><span id="banda"><img class="logo" id="logo" alt="" style="display:none"></span></div>
   <div class="rot" id="rot">Reserva confirmada</div>
   <div class="nombre" id="nombre"></div>
   <div class="cuando" id="cuando"></div>
@@ -53,16 +68,24 @@ const DOW = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado
 const MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
   ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+// Los mismos íconos que la invitación, dibujados acá: la tarjeta se convierte en imagen y no
+// puede depender de que un servidor externo conteste en el momento del render.
+const ICONO = {
+  web: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/></svg>',
+  ig: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/></svg>',
+};
 
-// Mismos nombres de token que guarda la identidad del negocio y que usa la página pública de
-// reservas. Inventar acá un nombre distinto ("tinta" por "texto") no da error: simplemente la
-// tarjeta sale con la paleta de ClaUsina y nadie se entera hasta verla.
-function marca(m) {
+// Mismos nombres de token que guarda la identidad del negocio y que usa la invitación.
+function marca(m, claro) {
   if (!m || !Object.keys(m).length) return;
   const r = document.documentElement.style;
   const set = (v, k) => { if (m[k]) r.setProperty(v, m[k]); };
-  set('--c-fondo', 'fondo'); set('--c-tinta', 'texto');
-  set('--c-acento', 'acento'); set('--c-linea', 'linea');
+  if (m.fondo) r.setProperty('--c-marca-fondo', m.fondo);
+  set('--c-acento', 'acento');
+  // En claro la marca aporta el acento y las tipografías, no el fondo: si aportara el fondo,
+  // una invitación clara de una marca oscura volvería a salir negra.
+  if (!claro) { set('--c-fondo', 'fondo'); set('--c-tinta', 'texto');
+                set('--c-suave', 'superficie'); set('--c-linea', 'linea'); }
   const fams = [m.fuente_titulo, m.fuente_texto].filter(Boolean);
   if (fams.length) {
     const q = fams.map(f => 'family=' + encodeURIComponent(f).replace(/%20/g, '+') + ':wght@400;600;700').join('&');
@@ -75,8 +98,17 @@ function marca(m) {
 (async () => {
   const j = await fetch('/api/reservas/' + encodeURIComponent(ID) + '/tarjeta').then(r => r.json());
   if (!j.ok) { document.body.innerHTML = '<pre style="color:#eee;padding:20px">' + esc(j.error || 'error') + '</pre>'; return; }
-  marca(j.marca);
-  if (j.logo) { $('logo').src = j.logo; $('logo').style.display = ''; }
+  // Con invitación, la tarjeta sale con el tema del beneficio: es la misma pieza que la persona
+  // ya tiene impresa. Sin invitación es una pieza de marca y va sobre el fondo del negocio.
+  const claro = (j.tema || 'oscuro') === 'claro';
+  if (claro) document.documentElement.dataset.tema = 'claro';
+  marca(j.marca, claro);
+
+  const src = claro && j.logo_claro ? j.logo_claro : j.logo;
+  if (src) {
+    $('logo').src = src; $('logo').style.display = '';
+    if (claro && !j.logo_claro) $('banda').className = 'banda';
+  }
   // Solicitada y confirmada no dicen lo mismo, y prometer confirmación cuando el negocio todavía
   // no la dio sería exactamente el problema que evitamos en todo el resto del circuito.
   $('rot').textContent = j.estado === 'confirmada' ? 'Reserva confirmada' : 'Reserva registrada';
@@ -85,15 +117,22 @@ function marca(m) {
   $('cuando').textContent = `${DOW[d.getDay()]} ${d.getDate()} de ${MES[d.getMonth()]}`;
   $('detalle').textContent = `${j.turno} · ${j.hora_desde} h · ${j.cantidad} ${j.unidad}`;
   if (j.invitacion) {
-    $('beneficio').innerHTML = 'Con tu invitación: <b>' + esc(j.invitacion.texto) + '</b>' +
+    $('beneficio').innerHTML =
+      '<div class="que">' + esc(j.invitacion.texto) + '</div>' +
       '<span class="codigo">' + esc(j.invitacion.codigo.replace(/^(.{3})(.{3})$/, '$1-$2')) + '</span>';
     $('beneficio').style.display = '';
   }
-  const pie = [];
-  if (j.sede) pie.push([j.sede.direccion, j.sede.localidad].filter(Boolean).join(', '));
-  if (j.invitacion) pie.push('Mostrá este código al llegar');
-  if (j.estado !== 'confirmada') pie.push('Te confirmamos por acá');
-  $('pie').textContent = pie.join(' · ');
+
+  const sede = j.sede ? [j.sede.direccion, j.sede.localidad].filter(Boolean).join(', ') : '';
+  const ig = j.instagram ? String(j.instagram).replace('@', '') : '';
+  const linea = [];
+  if (j.web) linea.push(`<span>${ICONO.web}${esc(j.web)}</span>`);
+  if (ig) linea.push(`<span>${ICONO.ig}@${esc(ig)}</span>`);
+  const nota = j.invitacion ? 'Mostrá este código al llegar'
+             : (j.estado !== 'confirmada' ? 'Te confirmamos por acá' : '');
+  $('pie').innerHTML = [sede, nota].filter(Boolean).map(esc).join(' · ') +
+    (linea.length ? `<div class="contactos">${linea.join('')}</div>` : '');
+
   // La foto se saca cuando terminaron de llegar la tipografía de marca y el logo. Sin esperarlos
   // la tarjeta sale con la fuente de reemplazo y un hueco donde va el logo, y como igual "cargó"
   // nadie se entera.
