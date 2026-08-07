@@ -6,7 +6,7 @@
 <title>Invitación</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700;800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link id="fuentes" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700;800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   /* Los tokens los pisa la marca del negocio, igual que en la página de reservas: el pase es del
      negocio, no de ClaUsina. Sin marca cargada, cae en una paleta neutra. */
@@ -113,13 +113,20 @@ async function compartir() {
 function marca(m) {
   if (!m || !Object.keys(m).length) return;
   const r = document.documentElement.style;
-  if (m.fondo) r.setProperty('--c-fondo', m.fondo);
-  if (m.tinta) r.setProperty('--c-tinta', m.tinta);
-  if (m.acento) r.setProperty('--c-acento', m.acento);
-  if (m.suave) r.setProperty('--c-suave', m.suave);
-  if (m.linea) r.setProperty('--c-linea', m.linea);
-  if (m.fuente_titulo) r.setProperty('--f-tit', `'${m.fuente_titulo}', sans-serif`);
-  if (m.fuente_texto) r.setProperty('--f-txt', `'${m.fuente_texto}', sans-serif`);
+  // Los nombres son los que guarda la identidad del negocio (texto, superficie), no los de los
+  // tokens de esta página: usar el nombre del token deja el pase con la paleta de ClaUsina y
+  // sin ningún error a la vista.
+  const set = (v, k) => { if (m[k]) r.setProperty(v, m[k]); };
+  set('--c-fondo', 'fondo'); set('--c-tinta', 'texto'); set('--c-acento', 'acento');
+  set('--c-suave', 'superficie'); set('--c-linea', 'linea');
+  const fams = [m.fuente_titulo, m.fuente_texto].filter(Boolean);
+  if (fams.length) {
+    const q = fams.map(f => 'family=' + encodeURIComponent(f).replace(/%20/g, '+') + ':wght@400;600;700').join('&');
+    document.getElementById('fuentes').href =
+      `https://fonts.googleapis.com/css2?${q}&family=JetBrains+Mono:wght@500;700&display=swap`;
+    if (m.fuente_titulo) r.setProperty('--f-tit', `'${m.fuente_titulo}', sans-serif`);
+    if (m.fuente_texto) r.setProperty('--f-txt', `'${m.fuente_texto}', sans-serif`);
+  }
 }
 
 (async () => {

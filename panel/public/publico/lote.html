@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pliego de invitaciones</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700;800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link id="fuentes" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700;800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   /* A6 exacto y sin márgenes: la imprenta recorta al borde, así que el sangrado lo pone el
      diseño y no el navegador. Una tarjeta por página, frente y dorso alternados, que es como
@@ -86,10 +86,18 @@ let PASES = [], PIEZAS = [];
 function marca(m) {
   if (!m || !Object.keys(m).length) return;
   const r = document.documentElement.style;
-  const map = { fondo:'--c-fondo', tinta:'--c-tinta', acento:'--c-acento', linea:'--c-linea' };
-  for (const k in map) if (m[k]) r.setProperty(map[k], m[k]);
-  if (m.fuente_titulo) r.setProperty('--f-tit', `'${m.fuente_titulo}', sans-serif`);
-  if (m.fuente_texto) r.setProperty('--f-txt', `'${m.fuente_texto}', sans-serif`);
+  // Los nombres los pone la identidad del negocio: 'texto', no 'tinta'.
+  const set = (v, k) => { if (m[k]) r.setProperty(v, m[k]); };
+  set('--c-fondo', 'fondo'); set('--c-tinta', 'texto');
+  set('--c-acento', 'acento'); set('--c-linea', 'linea');
+  const fams = [m.fuente_titulo, m.fuente_texto].filter(Boolean);
+  if (fams.length) {
+    const q = fams.map(f => 'family=' + encodeURIComponent(f).replace(/%20/g, '+') + ':wght@400;600;700').join('&');
+    const l = document.getElementById('fuentes');
+    if (l) l.href = `https://fonts.googleapis.com/css2?${q}&family=JetBrains+Mono:wght@500;700&display=swap`;
+    if (m.fuente_titulo) r.setProperty('--f-tit', `'${m.fuente_titulo}', sans-serif`);
+    if (m.fuente_texto) r.setProperty('--f-txt', `'${m.fuente_texto}', sans-serif`);
+  }
 }
 
 function condiciones(j) {

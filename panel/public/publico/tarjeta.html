@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Tarjeta de reserva</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700;800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link id="fuentes" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700;800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   /* Una sola cara, cuadrada-ish: es lo que se ve bien en la burbuja de un chat sin tener que
      abrirla. Un formato vertical de tarjeta se recorta en la vista previa. */
@@ -44,19 +44,28 @@
 
 <script>
 const $ = id => document.getElementById(id);
-const ID = new URLSearchParams(location.search).get('reserva') || '';
+const ID = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
 const DOW = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 const MES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
   ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
+// Mismos nombres de token que guarda la identidad del negocio y que usa la página pública de
+// reservas. Inventar acá un nombre distinto ("tinta" por "texto") no da error: simplemente la
+// tarjeta sale con la paleta de ClaUsina y nadie se entera hasta verla.
 function marca(m) {
   if (!m || !Object.keys(m).length) return;
   const r = document.documentElement.style;
-  const map = { fondo:'--c-fondo', tinta:'--c-tinta', acento:'--c-acento', linea:'--c-linea' };
-  for (const k in map) if (m[k]) r.setProperty(map[k], m[k]);
-  if (m.fuente_titulo) r.setProperty('--f-tit', `'${m.fuente_titulo}', sans-serif`);
-  if (m.fuente_texto) r.setProperty('--f-txt', `'${m.fuente_texto}', sans-serif`);
+  const set = (v, k) => { if (m[k]) r.setProperty(v, m[k]); };
+  set('--c-fondo', 'fondo'); set('--c-tinta', 'texto');
+  set('--c-acento', 'acento'); set('--c-linea', 'linea');
+  const fams = [m.fuente_titulo, m.fuente_texto].filter(Boolean);
+  if (fams.length) {
+    const q = fams.map(f => 'family=' + encodeURIComponent(f).replace(/%20/g, '+') + ':wght@400;600;700').join('&');
+    $('fuentes').href = `https://fonts.googleapis.com/css2?${q}&family=JetBrains+Mono:wght@500;700&display=swap`;
+    if (m.fuente_titulo) r.setProperty('--f-tit', `'${m.fuente_titulo}', sans-serif`);
+    if (m.fuente_texto) r.setProperty('--f-txt', `'${m.fuente_texto}', sans-serif`);
+  }
 }
 
 (async () => {
@@ -80,6 +89,14 @@ function marca(m) {
   if (j.estado !== 'confirmada') pie.push('Te confirmamos por acá');
   else if (j.invitacion) pie.push('Mostrá esta tarjeta al llegar');
   $('pie').textContent = pie.join(' · ');
+  // La foto se saca cuando terminaron de llegar la tipografía de marca y el logo. Sin esperarlos
+  // la tarjeta sale con la fuente de reemplazo y un hueco donde va el logo, y como igual "cargó"
+  // nadie se entera.
+  await document.fonts.ready;
+  const img = $('logo');
+  if (img.style.display !== 'none' && !img.complete) {
+    await new Promise(ok => { img.onload = img.onerror = ok; setTimeout(ok, 4000); });
+  }
   // Bandera para que el renderer sepa que ya está todo dibujado, sin adivinar con un sleep.
   document.body.dataset.listo = '1';
 })().catch(e => { document.body.innerHTML = '<pre style="color:#eee">' + esc(e.message) + '</pre>'; });
