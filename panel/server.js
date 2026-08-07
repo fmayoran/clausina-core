@@ -1450,11 +1450,15 @@ app.post('/api/perfil/logo', async (req, res) => {
     // Cuál de las dos variantes se está subiendo. El nombre del archivo las distingue: si las dos
     // se llamaran igual, revisar el media store a mano sería adivinar.
     const claro = String((req.body && req.body.variante) || '') === 'claro';
-    const dir = path.join('/app/media', 'marca', req.negocio);
+    // Los logos NO van a `marca/`: esa carpeta está cerrada porque es material de trabajo, y el
+    // logo tiene que poder verlo cualquiera — la invitación, la página pública de reservas y el
+    // manual de marca son públicos. Detrás de la sesión se ve bien en el panel y desaparece
+    // para el invitado, que es el único que importa.
+    const dir = path.join('/app/media', 'logos', req.negocio);
     await fs.promises.mkdir(dir, { recursive: true });
     const fname = `logo${claro ? '-claro' : ''}-${Date.now()}.${LOGO_EXT[m[1]]}`;
     await fs.promises.writeFile(path.join(dir, fname), buf);
-    const url = `https://${req.get('host')}/media/marca/${req.negocio}/${fname}`;
+    const url = `https://${req.get('host')}/media/logos/${req.negocio}/${fname}`;
     await db.setLogo(req.negocioId, url, claro ? 'claro' : 'oscuro');
     res.json({ ok: true, url });
   } catch (e) { console.error('logo upload', e.message); res.status(500).json({ ok: false, error: 'upload' }); }
@@ -1717,13 +1721,21 @@ app.get('/api/biblioteca', async (req, res) => {
     const logoBase = logoUrl ? decodeURIComponent(logoUrl.split('?')[0].split('/').pop() || '') : null;
     let marca = [];
     try {
-      const dir = path.join('/app/media', 'marca', req.negocio);
-      const files = await fs.promises.readdir(dir);
-      const items = await Promise.all(files.filter(f => !f.startsWith('.')).map(async f => {
-        const st = await fs.promises.stat(path.join(dir, f)).catch(() => null);
-        const tipo = /\.(mp4|webm|mov)$/i.test(f) ? 'video' : 'image';
-        return { url: '/media/marca/' + encodeURIComponent(req.negocio) + '/' + encodeURIComponent(f), filename: f, tipo, fecha: st ? st.mtime : null };
-      }));
+      // Dos carpetas: `marca/` (assets de trabajo, cerrada) y `logos/` (pública). Las dos son
+      // material de marca para quien mira la biblioteca; la separación es de permisos, no de uso.
+      const items = [];
+      for (const carpeta of ['marca', 'logos']) {
+        const dir = path.join('/app/media', carpeta, req.negocio);
+        const files = await fs.promises.readdir(dir).catch(() => []);
+        for (const f of files.filter(x => !x.startsWith('.'))) {
+          const st = await fs.promises.stat(path.join(dir, f)).catch(() => null);
+          items.push({
+            url: `/media/${carpeta}/` + encodeURIComponent(req.negocio) + '/' + encodeURIComponent(f),
+            filename: f, tipo: /\.(mp4|webm|mov)$/i.test(f) ? 'video' : 'image',
+            fecha: st ? st.mtime : null,
+          });
+        }
+      }
       marca = items.filter(it => it.filename !== logoBase).sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
     } catch (_) { /* sin carpeta de marca todavía */ }
     // El logo del perfil va primero (sea del store o de la landing).

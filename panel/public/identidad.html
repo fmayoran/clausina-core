@@ -653,12 +653,67 @@ function mostrarLogo(v, variante = 'oscuro') {
   if (v && /^https?:\/\//.test(v)) { img.src = v; box.style.display = 'inline-block'; }
   else { img.removeAttribute('src'); box.style.display = 'none'; }
 }
+/**
+ * Recorta el margen sobrante de un logo. Los archivos de marca casi siempre vienen centrados en
+ * un lienzo cuadrado con aire alrededor; como las piezas escalan por alto, ese aire se lleva la
+ * mitad del espacio y el logo sale chico sin que se entienda por qué.
+ *
+ * Sólo saca lo UNIFORME desde los bordes, comparando contra el color de la esquina: un marco de
+ * color forma parte del logo y se conserva. Si no encuentra nada que sacar, devuelve el original.
+ */
+async function recortarMargen(dataUrl) {
+  const img = await new Promise((ok, mal) => {
+    const i = new Image(); i.onload = () => ok(i); i.onerror = mal; i.src = dataUrl;
+  });
+  const w = img.naturalWidth, h = img.naturalHeight;
+  if (!w || !h || w * h > 30e6) return dataUrl;          // un lienzo enorme no vale el trabajo
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const cx = cv.getContext('2d', { willReadFrequently: true });
+  cx.drawImage(img, 0, 0);
+  let d;
+  try { d = cx.getImageData(0, 0, w, h).data; } catch (_) { return dataUrl; }
+
+  const en = (x, y) => (y * w + x) * 4;
+  const fondo = [d[0], d[1], d[2], d[3]];
+  const TOL = 14;
+  // Transparente cuenta como fondo aunque el color de la esquina sea otro.
+  const esFondo = i => (d[i + 3] < 12 && fondo[3] < 12) ||
+    (Math.abs(d[i] - fondo[0]) <= TOL && Math.abs(d[i + 1] - fondo[1]) <= TOL &&
+     Math.abs(d[i + 2] - fondo[2]) <= TOL && Math.abs(d[i + 3] - fondo[3]) <= TOL);
+  const filaVacia = y => { for (let x = 0; x < w; x++) if (!esFondo(en(x, y))) return false; return true; };
+  const colVacia = x => { for (let y = 0; y < h; y++) if (!esFondo(en(x, y))) return false; return true; };
+
+  let top = 0, bot = h - 1, izq = 0, der = w - 1;
+  while (top < bot && filaVacia(top)) top++;
+  while (bot > top && filaVacia(bot)) bot--;
+  while (izq < der && colVacia(izq)) izq++;
+  while (der > izq && colVacia(der)) der--;
+  const nw = der - izq + 1, nh = bot - top + 1;
+  // Nada que recortar, o un recorte tan chico que no cambia nada: se deja el original.
+  if (nw < 8 || nh < 8 || (nw > w * 0.96 && nh > h * 0.96)) return dataUrl;
+
+  // Un respiro mínimo para que el logo no quede pegado al borde de la caja que lo contenga.
+  const aire = Math.round(Math.max(nw, nh) * 0.02);
+  const out = document.createElement('canvas');
+  out.width = nw + aire * 2; out.height = nh + aire * 2;
+  const ox = out.getContext('2d');
+  // Si el original tenía fondo opaco, el respiro va del mismo color; si era transparente, queda
+  // transparente. Pintar blanco sobre un logo transparente le agregaría una caja que no tenía.
+  if (fondo[3] > 12) { ox.fillStyle = `rgba(${fondo[0]},${fondo[1]},${fondo[2]},${fondo[3] / 255})`;
+                       ox.fillRect(0, 0, out.width, out.height); }
+  ox.drawImage(img, izq, top, nw, nh, aire, aire, nw, nh);
+  return out.toDataURL('image/png');
+}
+
 async function subirLogo(input, variante = 'oscuro') {
   const file = input.files && input.files[0]; if (!file) return;
   const r = LOGOS[variante];
   const btn = $(r.btn); const txt = btn.textContent; btn.textContent = 'Subiendo…'; btn.disabled = true;
   try {
-    const dataUrl = await new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(rd.result); rd.onerror = rej; rd.readAsDataURL(file); });
+    let dataUrl = await new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(rd.result); rd.onerror = rej; rd.readAsDataURL(file); });
+    // Un SVG no se recorta con un canvas y tampoco lo necesita: escala solo.
+    if (file.type !== 'image/svg+xml') dataUrl = await recortarMargen(dataUrl).catch(() => dataUrl);
     const d = await fetch('api/perfil/logo', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ dataUrl, variante }) }).then(x => x.json());
     if (d && d.ok) { $(r.campo).value = d.url; mostrarLogo(d.url, variante); toast('Logo subido'); }
