@@ -67,7 +67,14 @@ function CampoFecha(cont, opts) {
     if (dia) { api.valor = dia.dataset.f; cerrar(); if (opts.onChange) opts.onChange(iso); }
   });
   // Cerrar al tocar fuera: si no, quedan dos calendarios abiertos pisándose.
-  document.addEventListener('click', e => { if (!cont.contains(e.target)) cerrar(); });
+  document.addEventListener('click', e => {
+    // Se mira el CAMINO del evento y no `contains`: al cambiar de mes el calendario se repinta
+    // entero, así que para cuando el clic llega hasta acá el botón ‹ o › que se tocó ya no está
+    // en el DOM, `contains` da false y el calendario se cerraba justo al navegar. composedPath
+    // se arma al despachar el evento, cuando el botón todavía existía.
+    const camino = e.composedPath ? e.composedPath() : [];
+    if (!camino.includes(cont) && !cont.contains(e.target)) cerrar();
+  });
 
   const api = {
     get valor() { return iso; },
