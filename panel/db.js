@@ -1822,7 +1822,10 @@ async function reservaTarjeta(negocioId, reservaId) {
     ok: true, id: r.id, estado: r.estado, fecha: r.fecha, turno: r.turno, hora_desde: r.hora_desde,
     cantidad: r.cantidad, unidad: r.cantidad === 1 ? unidad.sing : unidad.plur,
     cliente: r.cliente, negocio: r.negocio,
-    tema: r.invitacion_codigo ? (r.invitacion_tema || 'claro') : 'oscuro',
+    // Con invitación manda el beneficio; sin invitación, el mismo default que los beneficios.
+    // Que dos reservas del mismo negocio salgan de distinto color según si hubo descuento se lee
+    // como un error, no como una decisión.
+    tema: r.invitacion_tema || 'claro',
     // Cada variante para el fondo que le toca. Elegir mal es un logo invisible, no un error.
     logo: r.logo || null, logo_claro: r.logo_claro || null,
     marca: r.marca || {}, sede: sede || null,

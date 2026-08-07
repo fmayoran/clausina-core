@@ -104,8 +104,8 @@ function marca(m, claro) {
   const j = await fetch('/api/reservas/' + encodeURIComponent(ID) + '/tarjeta').then(r => r.json());
   if (!j.ok) { document.body.innerHTML = '<pre style="color:#eee;padding:20px">' + esc(j.error || 'error') + '</pre>'; return; }
   // Con invitación, la tarjeta sale con el tema del beneficio: es la misma pieza que la persona
-  // ya tiene impresa. Sin invitación es una pieza de marca y va sobre el fondo del negocio.
-  const claro = (j.tema || 'oscuro') === 'claro';
+  // ya tiene impresa. Sin invitación, el mismo default que los beneficios.
+  const claro = (j.tema || 'claro') === 'claro';
   if (claro) document.documentElement.dataset.tema = 'claro';
   marca(j.marca, claro);
 
