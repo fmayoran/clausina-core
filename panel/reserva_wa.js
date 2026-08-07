@@ -131,10 +131,11 @@ async function atender(negocio, mensaje) {
     if (r && r.ok) {
       datos = { ...datos, invitacion: codigo };
       if (paso) await db.setConversacion(negocio.id, waId, paso, datos);
-      await decir(cfg, waId, `Tomé tu invitación: ${r.texto}. Seguimos con la reserva.`, negocio.id);
+      await decir(cfg, waId, `¡Bien! Tu invitación está activa: ${r.texto}. ` +
+        `La dejo aplicada a esta reserva.`, negocio.id);
     } else if (r) {
       // Se avisa y se sigue: que el código no sirva no es razón para no dejar reservar.
-      await decir(cfg, waId, `${r.mensaje} Igual podemos seguir con la reserva.`, negocio.id);
+      await decir(cfg, waId, `${r.mensaje} No te preocupes, seguimos con la reserva igual.`, negocio.id);
     }
   }
 
@@ -196,9 +197,11 @@ async function saludar(cfg, negocio, waId, canal, ofreceReservas, perfil, datos 
     .replace(/^./, c => c.toUpperCase());
   const saludo = nombrePila ? `Hola ${nombrePila}. ${base}` : `Hola. ${base}`;
   const botones = [];
+  // Sin "Ahora no": ofrecer una salida antes de que la persona haya pedido nada suena a que
+  // estamos insistiendo. Quien no quiere nada simplemente no contesta, y "no" escrito sigue
+  // cortando el flujo igual.
   if (ofreceReservas) botones.push({ id: 'reservar', titulo: 'Reservar' });
   if (canal.inbox) botones.push({ id: 'consulta', titulo: 'Otra consulta' });
-  if (ofreceReservas) botones.push({ id: 'no', titulo: 'Ahora no' });
 
   if (!botones.length) return false;
   const texto = `${saludo}\n\n¿En qué te puedo ayudar?`;
@@ -227,12 +230,16 @@ async function responderFaq(cfg, negocio, waId, texto, canal) {
 
 async function preguntarCodigo(cfg, negocio, waId, datos) {
   await db.setConversacion(negocio.id, waId, 'codigo', datos);
-  const r = await wa.enviarBotones(waId, '¿Tenés un código de invitación?',
-    [{ id: 'sin_codigo', titulo: 'No, seguir' }], cfg);
-  if (!r.ok) await decir(cfg, waId, '¿Tenés un código de invitación? Escribilo, o respondeme "no".', negocio.id);
+  // Dos botones y no uno: con un solo "No, seguir" no queda claro que el sí se contesta
+  // escribiendo el código, y la persona se queda sin saber qué hacer.
+  const texto = '¿Tenés un código de invitación?';
+  const botones = [{ id: 'con_codigo', titulo: 'Sí, tengo uno' },
+                   { id: 'sin_codigo', titulo: 'No tengo' }];
+  const r = await wa.enviarBotones(waId, texto, botones, cfg);
+  if (!r.ok) await decir(cfg, waId, texto + ' Escribilo acá, o respondeme "no".', negocio.id);
   else await db.logWhatsapp({ direccion: 'saliente', wa_id: waId, negocio_id: negocio.id,
     mensaje_id: r.id, tipo: 'interactive', estado: 'enviado',
-    texto: '¿Tenés un código de invitación?\n· No, seguir' }).catch(() => {});
+    texto: texto + '\n· Sí, tengo uno\n· No tengo' }).catch(() => {});
   return true;
 }
 
@@ -242,8 +249,13 @@ async function recibirCodigo(cfg, negocio, waId, entrada, datos) {
   if (entrada === 'sin_codigo' || /^(no|nada|ninguno|seguir)$/i.test(entrada) || datos.invitacion) {
     return await elegirDia(cfg, negocio, waId, '', datos);
   }
-  // Escribió algo que no es un código válido: se le dice y se le deja seguir igual.
-  await decir(cfg, waId, 'No reconocí ese código. Podés escribirlo de nuevo o seguir sin él.', negocio.id);
+  if (entrada === 'con_codigo') {
+    await decir(cfg, waId, 'Perfecto. Escribime el código tal como te llegó — son seis ' +
+      'caracteres, como ABC-123.', negocio.id);
+    return true;
+  }
+  await decir(cfg, waId, 'Ese código no me figura. Fijate si está bien copiado y probá de nuevo, ' +
+    'o seguimos sin él y lo vemos cuando llegues.', negocio.id);
   return true;
 }
 
@@ -381,11 +393,11 @@ async function avanzar(cfg, negocio, waId, datos) {
                   `${datos.cantidad} ${plural(cfgRes.unidad, datos.cantidad)}\nA nombre de ${datos.nombre}` +
                   (datos.invitacion ? `\nCon tu invitación ${inv.bonito(datos.invitacion)}` : '');
   await db.setConversacion(negocio.id, waId, 'confirmar_voz', datos);
-  const texto = `Entendí esto:\n\n${resumen}\n\n¿Lo confirmo?`;
+  const texto = `Así queda tu reserva:\n\n${resumen}\n\n¿La confirmo?`;
   const bot = [{ id: 'ok_voz', titulo: 'Sí, confirmá' }, { id: 'cambiar_voz', titulo: 'Cambiar algo' }];
   const r = await decirOpciones(cfg, waId, texto, bot.map(b => b.titulo), negocio.id,
     () => wa.enviarBotones(waId, texto, bot, cfg));
-  if (!r.ok) await decir(cfg, waId, `Entendí esto:\n\n${resumen}\n\nRespondeme "sí" para confirmarlo.`, negocio.id);
+  if (!r.ok) await decir(cfg, waId, `Así queda tu reserva:\n\n${resumen}\n\nRespondeme "sí" para confirmarla.`, negocio.id);
   return true;
 }
 
@@ -508,8 +520,8 @@ async function seguirVoz(negocio, mensaje) {
     const c = await db.consultarInvitacion(codigo, negocio.id).catch(() => null);
     if (c && c.ok) {
       invitacion = codigo;
-      await decir(cfg, waId, `Tomé tu invitación: ${c.texto}.`, negocio.id);
-    } else if (c) await decir(cfg, waId, `${c.mensaje} Igual seguimos con la reserva.`, negocio.id);
+      await decir(cfg, waId, `¡Bien! Tu invitación está activa: ${c.texto}.`, negocio.id);
+    } else if (c) await decir(cfg, waId, `${c.mensaje} No te preocupes, seguimos igual.`, negocio.id);
   }
 
   const i = await voz.interpretar(texto, {
