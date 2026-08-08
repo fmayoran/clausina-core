@@ -577,6 +577,17 @@ async function getVerificacion() {
   catch (e) { return null; }
 }
 
+// Salud de los servicios de TERCEROS (la escribe el cron salud_externa_job.sh). Va aparte de
+// la verificación de integridad porque mira afuera y falla distinto: un token que vence o una
+// credencial que caduca no son una rotura nuestra, pero nos dejan sin publicar igual.
+async function getSaludExterna() {
+  const { rows } = await pool.query(
+    "SELECT valor, actualizado_en FROM contenido.plataforma_config WHERE clave='salud_externa'");
+  if (!rows[0] || !rows[0].valor) return null;
+  try { return { chequeos: JSON.parse(rows[0].valor), cuando: rows[0].actualizado_en }; }
+  catch (e) { return null; }
+}
+
 // Config de plataforma: lo transversal a todas las marcas (hoy, la lente de Instagram).
 // Mismo criterio que los tokens de marca: cifrado en la DB, write-only hacia el navegador.
 async function getLente() {
@@ -3441,7 +3452,7 @@ module.exports = {
   ofertaLanding, guardarQueExponeLanding,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,
   crearDescubrimiento, getDescubrimiento,
-  getLente, getLenteToken, guardarLente, getVerificacion,
+  getLente, getLenteToken, guardarLente, getVerificacion, getSaludExterna,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,
   pedirGeneracion, getGeneracion,
   FORMATOS, getGraficas, getGrafica, crearGrafica, iterarGrafica, estadoGrafica,

@@ -900,6 +900,11 @@ app.get('/api/verificacion', soloAdmin, async (req, res) => {
   catch (e) { console.error('verificacion', e.message); res.status(500).json({ error: 'db' }); }
 });
 
+app.get('/api/salud-externa', soloAdmin, async (req, res) => {
+  try { res.json(await db.getSaludExterna() || { chequeos: [], cuando: null }); }
+  catch (e) { console.error('salud externa', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 // Lente de Instagram: config de PLATAFORMA (la agencia, no una marca). El token se guarda
 // cifrado y es write-only: nunca vuelve al navegador (solo decimos si está cargado).
 app.get('/api/plataforma/lente', soloAdmin, async (req, res) => {

@@ -137,6 +137,13 @@
       <div class="mono text-[11px] text-pmut dark:text-mut">leyendo…</div>
     </div>
 
+    <!-- SERVICIOS EXTERNOS: lo que depende de terceros y vence sin avisar -->
+    <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1 mt-8">Servicios externos</div>
+    <p class="mono text-[11px] text-pmut dark:text-mut mb-3">de qué dependemos afuera · credenciales, cupos y tokens que vencen <span id="ext-cuando"></span></p>
+    <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card p-5 mb-2" id="ext-box">
+      <div class="mono text-[11px] text-pmut dark:text-mut">leyendo…</div>
+    </div>
+
     <!-- PLATAFORMA: lo que es de la agencia y no de una marca -->
     <div class="mono text-[11px] tracking-[0.16em] uppercase text-pmut dark:text-mut mb-1 mt-8">Plataforma</div>
     <p class="mono text-[11px] text-pmut dark:text-mut mb-3">la lente con la que ClaUsina mira Instagram · transversal a todas los negocios</p>
@@ -374,6 +381,31 @@ setInterval(cargar,20000);
         <div style="min-width:0"><div class="text-sm">${c.chequeo}</div>
           <div class="mono text-[11px] text-pmut dark:text-mut" style="line-height:1.5">${(c.mensaje||'').replace(/</g,'&lt;')}</div>
           ${(c.detalle||[]).slice(0,4).map(x=>`<div class="mono text-[10px]" style="color:${col.fallo};line-height:1.5">— ${String(x).replace(/</g,'&lt;')}</div>`).join('')}
+        </div></div>`).join('');
+})();
+</script>
+<script>
+// Servicios de terceros: lo escribe el cron (salud_externa_job.sh) y acá sólo se muestra.
+// Mismo dibujo que Integridad a propósito: son dos preguntas distintas —¿estamos rotos por
+// dentro? ¿nos dejaron afuera?— y leerlas con la misma forma es lo que las hace comparables.
+(async function saludExterna(){
+  const box=document.getElementById('ext-box'); if(!box) return;
+  let d; try{ d=await fetch('api/salud-externa').then(r=>r.json()); }catch(e){ box.innerHTML='<div class="mono text-[11px] text-pmut dark:text-mut">no se pudo leer</div>'; return; }
+  const chks=d.chequeos||[];
+  if(!chks.length){ box.innerHTML='<div class="mono text-[11px] text-pmut dark:text-mut">todavía no corrió el primer chequeo</div>'; return; }
+  const col={ok:'#CCF24D',fallo:'#FF6A45',aviso:'#E0A458'};
+  const caidos=chks.filter(c=>c.estado==='fallo').length;
+  const avisos=chks.filter(c=>c.estado==='aviso').length;
+  document.getElementById('ext-cuando').textContent = d.cuando ? ('· último: '+new Date(d.cuando).toLocaleString('es-AR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false})) : '';
+  box.innerHTML =
+    `<div class="mono text-[11px] mb-3" style="color:${caidos?col.fallo:(avisos?col.aviso:col.ok)}">`
+    + (caidos? `${caidos} servicio(s) caído(s) — hay cosas que no están saliendo` : (avisos? `${avisos} aviso(s)` : 'todo conectado'))
+    + `</div>`
+    + chks.map(c=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--pline,#20242B)">
+        <span style="width:8px;height:8px;border-radius:50%;background:${col[c.estado]||'#8A8F98'};margin-top:5px;flex:0 0 auto"></span>
+        <div style="min-width:0"><div class="text-sm">${c.chequeo}</div>
+          <div class="mono text-[11px] text-pmut dark:text-mut" style="line-height:1.5">${(c.mensaje||'').replace(/</g,'&lt;')}</div>
+          ${(c.detalle||[]).slice(0,5).map(x=>`<div class="mono text-[10px]" style="color:${col[c.estado]||col.fallo};line-height:1.5">— ${String(x).replace(/</g,'&lt;')}</div>`).join('')}
         </div></div>`).join('');
 })();
 </script>
