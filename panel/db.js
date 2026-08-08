@@ -467,7 +467,13 @@ const FORMATOS = [
 ];
 
 // --- Gráfica: piezas promocionales (folletos, afiches, vía pública) ---
-async function getGraficas(negocioId) {
+/**
+ * Las piezas del negocio. Las DESCARTADAS quedan afuera salvo que se pidan: descartar es decir
+ * "esta no va", y que siga ocupando la grilla al lado de las vivas hace que descartar no se note.
+ * No se borran —una pieza descartada puede volver, y el número ya se repartió—, sólo se corren
+ * de la vista principal.
+ */
+async function getGraficas(negocioId, { descartadas = false } = {}) {
   const { rows } = await pool.query(`
     SELECT g.id, g.numero, g.nombre, g.formato, g.ancho_mm, g.alto_mm, g.mensaje, g.estado, g.version_actual,
            g.caras, g.fondo_modo, g.fondo_url, g.datos, g.actualizado_en,
@@ -475,8 +481,17 @@ async function getGraficas(negocioId) {
       FROM contenido.grafica g
       LEFT JOIN LATERAL (SELECT * FROM contenido.grafica_version x
                           WHERE x.grafica_id=g.id ORDER BY x.nro DESC LIMIT 1) v ON true
-     WHERE g.negocio_id=$1 ORDER BY g.actualizado_en DESC`, [negocioId]);
+     WHERE g.negocio_id=$1 AND ($2 OR g.estado <> 'descartada')
+     ORDER BY g.actualizado_en DESC`, [negocioId, descartadas]);
   return rows;
+}
+
+/** Cuántas hay descartadas, para poder ofrecerlas sin traerlas. */
+async function contarGraficasDescartadas(negocioId) {
+  const { rows: [r] } = await pool.query(
+    "SELECT count(*)::int AS n FROM contenido.grafica WHERE negocio_id=$1 AND estado='descartada'",
+    [negocioId]);
+  return r ? r.n : 0;
 }
 
 async function getGrafica(negocioId, id) {
@@ -3505,7 +3520,7 @@ module.exports = {
   getLente, getLenteToken, guardarLente, getVerificacion, getSaludExterna,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,
   pedirGeneracion, getGeneracion,
-  FORMATOS, getGraficas, getGrafica, crearGrafica, iterarGrafica, duplicarGrafica, estadoGrafica,
+  FORMATOS, getGraficas, contarGraficasDescartadas, getGrafica, crearGrafica, iterarGrafica, duplicarGrafica, estadoGrafica,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,

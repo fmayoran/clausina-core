@@ -219,11 +219,22 @@ function card(g){
         <span>${esc(f?f.label:g.formato)} · ${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm</span>
         ${g.caras===2?'<span>frente+dorso</span>':''}${g.version_actual?`<span>v${g.version_actual}</span>`:''}</div></div></div>`;
 }
+// Las descartadas no se muestran salvo que se pidan. VER_DESC se mantiene entre recargas de la
+// grilla —si alguien las abrió para revisarlas, descartar otra no puede volver a esconderlas—.
+let VER_DESC = false;
+function verDescartadas(v){ VER_DESC = v; cargar(); }
+
 async function cargar(){
   try{
-    const r=await fetch('api/grafica'); if(r.status===401){location.href='login';return;}
-    PIEZAS=await r.json();
-    document.getElementById('sub').textContent = PIEZAS.length ? `${PIEZAS.length} pieza(s)` : 'sin piezas todavía';
+    const r=await fetch('api/grafica' + (VER_DESC ? '?descartadas=1' : '')); if(r.status===401){location.href='login';return;}
+    const d=await r.json();
+    PIEZAS = d.piezas || [];
+    const ocultas = d.descartadas || 0;
+    document.getElementById('sub').innerHTML =
+      (PIEZAS.length ? `${PIEZAS.length} pieza(s)` : 'sin piezas todavía') +
+      (ocultas ? (VER_DESC
+        ? ` · <a onclick="verDescartadas(false)" style="cursor:pointer;text-decoration:underline">ocultar las ${ocultas} descartada(s)</a>`
+        : ` · <a onclick="verDescartadas(true)" style="cursor:pointer;text-decoration:underline">ver ${ocultas} descartada(s)</a>`) : '');
     document.getElementById('grid').innerHTML = PIEZAS.map(card).join('') +
       `<div class="gnew" onclick="abrirNueva()"><div class="in"><div class="plus">+</div>Nueva pieza</div></div>`;
     const trabajando = PIEZAS.some(g=>g.v_estado==='pendiente'||g.v_estado==='procesando');

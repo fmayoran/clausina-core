@@ -859,8 +859,15 @@ app.get('/api/generacion', async (req, res) => {
 // --- Gráfica: material promocional (folletos, afiches, vía pública) ---
 app.get('/api/grafica/formatos', (req, res) => res.json(db.FORMATOS));
 app.get('/api/grafica', async (req, res) => {
-  try { res.json(await db.getGraficas(req.negocioId)); }
-  catch (e) { console.error('grafica', e.message); res.status(500).json({ error: 'db' }); }
+  try {
+    const descartadas = req.query.descartadas === '1';
+    const [piezas, ocultas] = await Promise.all([
+      db.getGraficas(req.negocioId, { descartadas }),
+      db.contarGraficasDescartadas(req.negocioId),
+    ]);
+    // La cuenta viaja siempre: es lo que permite ofrecer "ver las descartadas" sin traerlas.
+    res.json({ piezas, descartadas: ocultas });
+  } catch (e) { console.error('grafica', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.get('/api/grafica/:id', async (req, res) => {
   try {
