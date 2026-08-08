@@ -153,7 +153,19 @@ function fcard(f, idx){
 function overview(){
   const taller=tallerFolders(), sys=sysFolders();
   _FOLDERS=[...taller, ...sys];
-  let html = `<div class="crumb mb-3"><span class="seclbl">Tu taller</span><button class="abtn" style="margin-left:auto" onclick="subir()">⬆ Subir</button></div>`;
+  let html='';
+  // Lo que se le pidió al bibliotecario va ARRIBA y en la pantalla de entrada. Antes sólo se veía
+  // entrando a "En proceso": se pedía desde acá, se volvía acá, y no había ni rastro del pedido
+  // —ni "generando…" ni el motivo del fallo—. Un pedido que falla en silencio parece uno que
+  // nunca terminó.
+  const work=(DATA.trabajando||[]);
+  if(work.length){
+    const fallos=work.filter(g=>g.estado==='error').length;
+    html += `<div class="crumb mb-3"><span class="seclbl">Pedidos al bibliotecario</span>` +
+      (fallos?`<span class="mono text-[11px]" style="color:#FF6A45;margin-left:10px">${fallos} sin resolver</span>`:'') +
+      `</div><div class="mgrid mb-8">${work.map(workCell).join('')}</div>`;
+  }
+  html += `<div class="crumb mb-3"><span class="seclbl">Tu taller</span><button class="abtn" style="margin-left:auto" onclick="subir()">⬆ Subir</button></div>`;
   html += `<div class="fgrid mb-8">${taller.map((f,i)=>fcard(f,i)).join('')}</div>`;
   if(sys.length){
     html += `<div class="seclbl mb-3">Del sistema · solo lectura</div><div class="fgrid">${sys.map((f,i)=>fcard(f, taller.length+i)).join('')}</div>`;
