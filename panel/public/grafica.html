@@ -169,6 +169,7 @@
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="abtn ok" style="flex:1" onclick="setEstado('aprobada')">Aprobar</button>
+        <button class="abtn" onclick="duplicar()" title="Crear una pieza nueva igual a esta">Duplicar</button>
         <button class="abtn" onclick="setEstado('descartada')">Descartar</button>
       </div>
     </div>
@@ -403,6 +404,25 @@ async function iterar(){
   }catch(e){ err.textContent='Error de conexión'; }
   b.disabled=false; b.textContent='Generar nueva versión';
 }
+// Duplicar: misma pieza, otro nombre. Se propone "<nombre> (copia)" y se deja editar — un
+// nombre repetido en la grilla obliga a abrir las dos para saber cuál es cuál.
+async function duplicar(){
+  if(!DET) return;
+  const actual = document.getElementById('d-nombre').textContent.replace(/^G-\d+ · /,'');
+  const nombre = prompt('Nombre de la pieza nueva:', actual + ' (copia)');
+  if(nombre===null) return;
+  try{
+    const r = await fetch('api/grafica/'+DET+'/duplicar',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre})}).then(x=>x.json());
+    if(!r.ok){ toast('No se pudo duplicar',true); return; }
+    toast('Creada '+cod(r.numero));
+    cerrar('ov-det');
+    await cargar();
+    // Se abre la copia: lo que se quiere hacer después de duplicar es tocarla, no buscarla.
+    abrirDet(r.id);
+  }catch(_){ toast('No se pudo duplicar',true); }
+}
+
 async function setEstado(e){
   if(!DET) return;
   if(e==='descartada' && !confirm('¿Descartar esta pieza?')) return;

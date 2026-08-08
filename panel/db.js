@@ -520,6 +520,56 @@ async function crearGrafica(negocioId, d) {
   } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
 }
 
+/**
+ * Duplica una pieza: misma definición (formato, medidas, fondo, datos, mensaje) con otro nombre.
+ *
+ * Se copia también la ÚLTIMA VERSIÓN LISTA, apuntando a los mismos archivos. Es a propósito: el
+ * job de iteración parte del HTML de la versión anterior, así que la copia arranca del diseño
+ * real y no de cero —que además costaría una generación con IA—. Los archivos se comparten y no
+ * se duplican porque en cuanto se itera la copia se escriben los suyos; copiar de entrada un PDF
+ * de imprenta de decenas de MB sería pagar disco por un estado que dura hasta el primer cambio.
+ *
+ * Lo que NO se copia: el número (cada pieza tiene el suyo, es su nombre en el panel), el estado
+ * —una copia nace borrador aunque la original esté aprobada, porque nadie aprobó la copia— y el
+ * historial de versiones anteriores, que es de la pieza original y no dice nada de esta.
+ */
+async function duplicarGrafica(negocioId, id, nombreNuevo) {
+  const { rows: [g] } = await pool.query(
+    'SELECT * FROM contenido.grafica WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
+  if (!g) return { ok: false, error: 'no_existe' };
+
+  const nombre = String(nombreNuevo || '').trim().slice(0, 120) || `${g.nombre} (copia)`;
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    const { rows: [nueva] } = await cli.query(
+      `INSERT INTO contenido.grafica (negocio_id, nombre, formato, ancho_mm, alto_mm, caras,
+                                      mensaje, fondo_modo, fondo_url, fondo_prompt, datos)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb) RETURNING id, numero`,
+      [negocioId, nombre, g.formato, g.ancho_mm, g.alto_mm, g.caras, g.mensaje,
+       g.fondo_modo, g.fondo_url, g.fondo_prompt, JSON.stringify(g.datos || {})]);
+
+    const { rows: [v] } = await cli.query(
+      `SELECT html_url, pdf_url, png_url, png_dorso_url FROM contenido.grafica_version
+        WHERE grafica_id=$1 AND estado='lista' ORDER BY nro DESC LIMIT 1`, [id]);
+    if (v && v.html_url) {
+      await cli.query(
+        `INSERT INTO contenido.grafica_version
+           (grafica_id, nro, instruccion, estado, html_url, pdf_url, png_url, png_dorso_url, procesado_en)
+         VALUES ($1, 1, $2, 'lista', $3, $4, $5, $6, now())`,
+        [nueva.id, `Copia de ${g.nombre}`, v.html_url, v.pdf_url, v.png_url, v.png_dorso_url]);
+      await cli.query('UPDATE contenido.grafica SET version_actual=1 WHERE id=$1', [nueva.id]);
+    } else {
+      // La original nunca llegó a diseñarse: la copia arranca igual que una pieza nueva, en cola.
+      await cli.query(
+        'INSERT INTO contenido.grafica_version (grafica_id, nro, instruccion) VALUES ($1, 1, $2)',
+        [nueva.id, g.mensaje || null]);
+    }
+    await cli.query('COMMIT');
+    return { ok: true, id: nueva.id, numero: nueva.numero, nombre };
+  } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
+}
+
 // Nueva iteración: se parte del diseño anterior y se aplica la instrucción de cambio.
 async function iterarGrafica(negocioId, id, d) {
   const { rows: [g] } = await pool.query(
@@ -3455,7 +3505,7 @@ module.exports = {
   getLente, getLenteToken, guardarLente, getVerificacion, getSaludExterna,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,
   pedirGeneracion, getGeneracion,
-  FORMATOS, getGraficas, getGrafica, crearGrafica, iterarGrafica, estadoGrafica,
+  FORMATOS, getGraficas, getGrafica, crearGrafica, iterarGrafica, duplicarGrafica, estadoGrafica,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,

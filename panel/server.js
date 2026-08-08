@@ -882,6 +882,14 @@ app.post('/api/grafica/:id/iterar', async (req, res) => {
     res.status(r.ok ? 200 : 409).json(r);
   } catch (e) { console.error('grafica-iterar', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
+// Duplicar: una pieza nueva igual a otra, con otro nombre. No pide aprobador — crear un
+// borrador no publica nada; lo que sí la pide es aprobarlo.
+app.post('/api/grafica/:id/duplicar', async (req, res) => {
+  try {
+    const r = await db.duplicarGrafica(req.negocioId, req.params.id, (req.body || {}).nombre);
+    res.status(r.ok ? 200 : 404).json(r);
+  } catch (e) { console.error('grafica-duplicar', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
 app.post('/api/grafica/:id/estado', soloAprobador, async (req, res) => {
   try { res.json(await db.estadoGrafica(req.negocioId, req.params.id, (req.body || {}).estado)); }
   catch (e) { console.error('grafica-estado', e.message); res.status(500).json({ ok: false, error: 'db' }); }
