@@ -28,7 +28,7 @@ CHAT=$(psql "SELECT coalesce(telegram_chat_id,'') FROM contenido.negocios WHERE 
 BOT=$(grep '^TELEGRAM_BOT_TOKEN=' "$REPO/$slug.env" 2>/dev/null | cut -d= -f2-)
 
 echo "$(ts) solicitud $sid ($slug)" >> "$LOG"
-psql "UPDATE contenido.solicitudes_campania SET estado='procesando' WHERE id='$sid';" >/dev/null
+psql "UPDATE contenido.solicitudes_campania SET estado='procesando', iniciado_en=now() WHERE id='$sid';" >/dev/null
 
 # Contexto para el creativo: instrucción + marca + moneda + publicaciones disponibles como creativo.
 cd "$REPO" || exit 1

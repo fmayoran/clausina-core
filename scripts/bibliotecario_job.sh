@@ -33,7 +33,7 @@ ourl=$(echo "$row"  | python3 -c "import sys,json;print(json.load(sys.stdin).get
 otipo=$(echo "$row" | python3 -c "import sys,json;print(json.load(sys.stdin).get('origen_tipo') or '')")
 
 echo "$(ts) solicitud $sid ($slug): $instr" >> "$LOG"
-psql "UPDATE contenido.solicitudes_biblioteca SET estado='procesando' WHERE id='$sid';" >/dev/null
+psql "UPDATE contenido.solicitudes_biblioteca SET estado='procesando', iniciado_en=now() WHERE id='$sid';" >/dev/null
 
 # Descargar el asset fuente si es edición (/media -> disco directo; http -> curl).
 origen=""

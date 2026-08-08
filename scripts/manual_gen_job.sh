@@ -25,7 +25,7 @@ pid=$(psql "SELECT negocio_id FROM contenido.negocio_gen WHERE id='$gid';")
 [ -z "$pid" ] && exit 0
 
 echo "$(ts) manual $gid ($slug)" >> "$LOG"
-psql "UPDATE contenido.negocio_gen SET estado='procesando' WHERE id='$gid';" >/dev/null
+psql "UPDATE contenido.negocio_gen SET estado='procesando', iniciado_en=now() WHERE id='$gid';" >/dev/null
 rm -f "/tmp/manual_res_$gid.html"
 
 # Versión y fecha para control: cada manual generado incrementa la versión de la marca.

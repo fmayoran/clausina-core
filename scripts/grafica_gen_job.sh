@@ -24,7 +24,7 @@ estado=$(psql "SELECT estado FROM contenido.grafica_version WHERE id='$vid';")
 case "$estado" in pendiente|procesando) ;; *) echo "$(ts) $vid sin estado procesable ($estado)" >> "$LOG"; exit 0;; esac
 gid=$(psql "SELECT grafica_id FROM contenido.grafica_version WHERE id='$vid';")
 [ -z "$gid" ] && exit 0
-psql "UPDATE contenido.grafica_version SET estado='procesando' WHERE id='$vid';" >/dev/null
+psql "UPDATE contenido.grafica_version SET estado='procesando', iniciado_en=now() WHERE id='$vid';" >/dev/null
 echo "$(ts) grafica $vid ($slug)" >> "$LOG"
 
 DIRW="/tmp/graf_$vid"; rm -rf "$DIRW"; mkdir -p "$DIRW"

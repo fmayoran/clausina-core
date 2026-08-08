@@ -22,7 +22,7 @@ estado=$(psql "SELECT estado FROM contenido.negocio_descubrimiento WHERE id='$di
 case "$estado" in pendiente|procesando) ;; *) echo "$(ts) $did sin estado procesable ($estado)" >> "$LOG"; exit 0;; esac
 
 echo "$(ts) descubrimiento $did" >> "$LOG"
-psql "UPDATE contenido.negocio_descubrimiento SET estado='procesando' WHERE id='$did';" >/dev/null
+psql "UPDATE contenido.negocio_descubrimiento SET estado='procesando', iniciado_en=now() WHERE id='$did';" >/dev/null
 
 # Contexto para el analista.
 PG="$PG" DID="$did" python3 - <<'PY'

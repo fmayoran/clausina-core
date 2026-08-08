@@ -23,7 +23,7 @@ pid=$(psql "SELECT negocio_id FROM contenido.negocio_gen WHERE id='$gid';")
 [ -z "$pid" ] && exit 0
 
 echo "$(ts) estilo $gid ($slug)" >> "$LOG"
-psql "UPDATE contenido.negocio_gen SET estado='procesando' WHERE id='$gid';" >/dev/null
+psql "UPDATE contenido.negocio_gen SET estado='procesando', iniciado_en=now() WHERE id='$gid';" >/dev/null
 
 SHOTS="/tmp/estilo_feed_$gid"
 rm -rf "$SHOTS" "/tmp/estilo_res_$gid.md"; mkdir -p "$SHOTS"

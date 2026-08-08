@@ -85,8 +85,12 @@ def det_brief():
 def det_bibliotecario():
     # Recuperación: solicitudes 'procesando' atascadas (worker caído / job muerto) -> 'error'.
     # El job puede tardar hasta ~25 min (timeout de claude); 40 min es margen seguro.
+    #
+    # El reloj corre desde `iniciado_en` —cuándo ARRANCÓ— y no desde `creado_en`. Con creado_en,
+    # reintentar un pedido viejo lo mataba al minuto siguiente de arrancar, y un pedido que había
+    # esperado en cola moría apenas empezaba. Mismo criterio en todos los detectores de abajo.
     psql("UPDATE contenido.solicitudes_biblioteca SET estado='error', procesado_en=now() "
-         "WHERE estado='procesando' AND creado_en < now() - interval '40 minutes'")
+         "WHERE estado='procesando' AND COALESCE(iniciado_en, creado_en) < now() - interval '40 minutes'")
     # Solicitudes del bibliotecario (crear/editar assets de la biblioteca): estado='pendiente'.
     jobs = []
     for row in _lines("SELECT s.id||'|'||COALESCE(p.slug,'cortafuego') "
@@ -102,7 +106,7 @@ def det_bibliotecario():
 def det_campania():
     # Recuperación: solicitudes 'procesando' atascadas (worker caído / job muerto) -> 'error'.
     psql("UPDATE contenido.solicitudes_campania SET estado='error', procesado_en=now() "
-         "WHERE estado='procesando' AND creado_en < now() - interval '40 minutes'")
+         "WHERE estado='procesando' AND COALESCE(iniciado_en, creado_en) < now() - interval '40 minutes'")
     # Pedidos de propuesta de campaña al creativo: estado='pendiente'.
     jobs = []
     for row in _lines("SELECT s.id||'|'||COALESCE(p.slug,'cortafuego') "
@@ -166,7 +170,7 @@ def det_descubrimiento():
     # la marca todavía no tiene slug propio en proyectos -> el job es agnóstico (no usa cápsula).
     psql("UPDATE contenido.negocio_descubrimiento SET estado='error', "
          "error='El análisis se quedó colgado. Probá de nuevo o cargá los datos a mano.', procesado_en=now() "
-         "WHERE estado='procesando' AND creado_en < now() - interval '20 minutes'")
+         "WHERE estado='procesando' AND COALESCE(iniciado_en, creado_en) < now() - interval '20 minutes'")
     jobs = []
     for did in _lines("SELECT id FROM contenido.negocio_descubrimiento WHERE estado='pendiente' ORDER BY creado_en"):
         did = did.strip()
@@ -180,7 +184,7 @@ def det_marca_gen():
     # Recuperación de colgados: el manual/estilo puede tardar (claude -p); 40 min es margen seguro.
     psql("UPDATE contenido.negocio_gen SET estado='error', "
          "error='Se quedó colgado. Probá de nuevo.', procesado_en=now() "
-         "WHERE estado='procesando' AND creado_en < now() - interval '40 minutes'")
+         "WHERE estado='procesando' AND COALESCE(iniciado_en, creado_en) < now() - interval '40 minutes'")
     jobs = []
     for row in _lines("SELECT g.id||'|'||g.tipo||'|'||COALESCE(p.slug,'') "
                       "FROM contenido.negocio_gen g JOIN contenido.negocios p ON p.id=g.negocio_id "
@@ -196,7 +200,7 @@ def det_grafica():
     # Diseño de piezas gráficas (folletos, afiches, vía pública). Una versión por pedido.
     psql("UPDATE contenido.grafica_version SET estado='error', "
          "error='Se quedó colgado. Probá de nuevo.', procesado_en=now() "
-         "WHERE estado='procesando' AND creado_en < now() - interval '40 minutes'")
+         "WHERE estado='procesando' AND COALESCE(iniciado_en, creado_en) < now() - interval '40 minutes'")
     jobs = []
     for row in _lines("SELECT v.id||'|'||COALESCE(n.slug,'') FROM contenido.grafica_version v "
                       "JOIN contenido.grafica g ON g.id=v.grafica_id "
