@@ -228,8 +228,11 @@ async function cargar(){
   try{
     const r=await fetch('api/grafica' + (VER_DESC ? '?descartadas=1' : '')); if(r.status===401){location.href='login';return;}
     const d=await r.json();
-    PIEZAS = d.piezas || [];
-    const ocultas = d.descartadas || 0;
+    // Se aceptan las dos formas —array pelado y {piezas,descartadas}—. El día que esto cambió,
+    // las pestañas que ya estaban abiertas seguían con el JS viejo: PIEZAS quedaba siendo un
+    // objeto, .map explotaba, y la grilla se congelaba mostrando "diseñando…" para siempre.
+    PIEZAS = Array.isArray(d) ? d : (d.piezas || []);
+    const ocultas = Array.isArray(d) ? 0 : (d.descartadas || 0);
     document.getElementById('sub').innerHTML =
       (PIEZAS.length ? `${PIEZAS.length} pieza(s)` : 'sin piezas todavía') +
       (ocultas ? ` · <a onclick="verDescartadas(${!VER_DESC})" style="cursor:pointer;text-decoration:underline">` +
@@ -241,7 +244,15 @@ async function cargar(){
     if(trabajando && !_poll) _poll=setInterval(cargar,6000);
     if(!trabajando && _poll){ clearInterval(_poll); _poll=null; }
     if(DET) refrescarDet();
-  }catch(e){ document.getElementById('sub').textContent='sin conexión'; }
+  }catch(e){
+    const sub=document.getElementById('sub');
+    sub.innerHTML = (e instanceof TypeError && /fetch|network/i.test(e.message))
+      ? 'sin conexión'
+      : 'esta pantalla quedó desactualizada · <a onclick="location.reload()" style="cursor:pointer;text-decoration:underline">recargar</a>';
+    // Sin esto, un error deja el poll corriendo y repitiendo el mismo fallo cada 6 segundos.
+    if(_poll){ clearInterval(_poll); _poll=null; }
+    console.error('grafica cargar', e);
+  }
 }
 
 // ---- nueva ----
