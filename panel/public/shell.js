@@ -4,20 +4,16 @@
  *   <script src="shell.js"></script><script>ClausinaShell({active:'inicio'})</script>
  * Provee window.toggleMode y window.salir. El init de dark va inline en el <head>. */
 (function () {
+  // El menú se lee de arriba abajo en orden de uso: primero el negocio que estás mirando, después
+  // la agencia, y al final la administración —que se toca una vez por mes y no tiene por qué
+  // ocupar el mismo lugar que el trabajo diario—. `ambito:'negocio'` marca los grupos que
+  // dependen del selector de arriba: sin esa distinción, "Instagram" no dice de quién es.
   var NAV = {
-    Agencia: [
-      { id: 'inicio',       label: 'Inicio',            icon: 'layout-dashboard', href: '.' },
-      { id: 'maquinas',     label: 'Sala de máquinas',  icon: 'gauge',            href: 'maquinas' },
-      { id: 'negocios',     label: 'Negocios',          icon: 'boxes',            href: 'negocios' },
-      { id: 'pantallas',    label: 'Pantallas',         icon: 'monitor',          href: 'audiovisual' },
-      { id: 'estilo',       label: 'Sistema de diseño', icon: 'palette',          href: 'estilo' },
-      { id: 'arquitectura', label: 'Arquitectura',      icon: 'git-fork',         href: 'arquitectura' },
-      { id: 'usuarios',     label: 'Usuarios',          icon: 'users',            href: 'usuarios' },
-      { id: 'rubros',       label: 'Rubros y atributos',icon: 'tags',             href: 'rubros' },
-    ],
-    // v2.0: el negocio activo se ordena en tres grupos con ritmos de cambio distintos.
     Identidad: [
       { id: 'identidad', label: 'Identidad',         icon: 'id-card',     href: 'identidad' },
+      // Vive acá y no en Comunicación: mide quién es el negocio puertas afuera (su presencia),
+      // no una pieza que haya que aprobar. Antes no tenía entrada y se llegaba sólo de rebote.
+      { id: 'auditoria', label: 'Auditoría',         icon: 'chart-column', href: 'auditoria' },
     ],
     'Comunicación': [
       { id: 'propuestas', label: 'Propuestas',       icon: 'lightbulb',   href: 'propuestas' },
@@ -38,11 +34,30 @@
       { id: 'whatsapp',  label: 'WhatsApp',          icon: 'message-circle', href: 'whatsapp' },
       { id: 'invitaciones', label: 'Invitaciones',   icon: 'ticket',         href: 'invitaciones' },
     ],
+    Agencia: [
+      { id: 'inicio',       label: 'Inicio',            icon: 'layout-dashboard', href: '.' },
+      { id: 'maquinas',     label: 'Sala de máquinas',  icon: 'gauge',            href: 'maquinas' },
+      { id: 'negocios',     label: 'Negocios',          icon: 'boxes',            href: 'negocios' },
+      { id: 'pantallas',    label: 'Pantallas',         icon: 'monitor',          href: 'audiovisual' },
+      { id: 'estilo',       label: 'Sistema de diseño', icon: 'palette',          href: 'estilo' },
+    ],
+    // Lo estructural: se configura una vez y se mira poco. Arranca plegada a propósito.
+    'Administración': [
+      { id: 'arquitectura', label: 'Arquitectura',      icon: 'git-fork',    href: 'arquitectura' },
+      { id: 'usuarios',     label: 'Usuarios',          icon: 'users',       href: 'usuarios' },
+      { id: 'rubros',       label: 'Rubros y atributos',icon: 'tags',        href: 'rubros' },
+    ],
     // Fuera de las secciones de negocio: es la cuenta de quien está mirando, no del negocio activo.
     Vos: [
       { id: 'micuenta',  label: 'Mi cuenta',         icon: 'user-round',  href: 'mi-cuenta' },
     ],
   };
+
+  // Los grupos que dependen del negocio activo. Se dibujan pegados al selector y con un filete
+  // al costado: es lo que contesta "¿esto es de Cortafuego o de la agencia?" sin agregar texto.
+  var AMBITO_NEGOCIO = ['Identidad', 'Comunicación', 'Operación'];
+  // Plegadas la primera vez. Después manda lo que haya elegido la persona.
+  var PLEGADAS_POR_DEFECTO = ['Administración'];
 
   function link(it, active) {
     var on = it.id === active;
@@ -55,8 +70,12 @@
   // Qué secciones están plegadas. Se recuerda entre visitas: si alguien plegó Agencia porque no
   // la usa, volver a abrírsela en cada carga sería molesto.
   function plegadas() {
-    try { return JSON.parse(localStorage.getItem('clausina-nav-plegadas') || '[]'); }
-    catch (e) { return []; }
+    try {
+      var g = localStorage.getItem('clausina-nav-plegadas');
+      // Nunca eligió nada: arranca con lo estructural plegado. Distinto de haber elegido
+      // "ninguna plegada", que es una lista vacía y hay que respetar.
+      return g === null ? PLEGADAS_POR_DEFECTO.slice() : JSON.parse(g || '[]');
+    } catch (e) { return []; }
   }
   function guardarPlegadas(arr) {
     try { localStorage.setItem('clausina-nav-plegadas', JSON.stringify(arr)); } catch (e) {}
@@ -70,18 +89,21 @@
       // es peor que un menú largo.
       var tiene = NAV[sec].some(function (it) { return it.id === active; });
       var off = cerradas.indexOf(sec) >= 0 && !tiene;
+      var neg = AMBITO_NEGOCIO.indexOf(sec) >= 0;
       out += '<button type="button" data-sec="' + sec + '" class="nsec' + (off ? ' plegada' : '') +
+        (neg ? ' delnegocio' : '') +
         ' w-full flex items-center gap-1.5 mono text-[10px] tracking-[0.16em] uppercase text-pmut dark:text-mut px-2.5 mb-1 mt-4 first:mt-0 hover:text-pfg dark:hover:text-fg transition">' +
         '<svg class="chev w-3 h-3 shrink-0 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>' +
         '<span>' + sec + '</span></button>';
-      out += '<div class="ngrupo' + (off ? ' oculta' : '') + '" data-grupo="' + sec + '">' +
+      out += '<div class="ngrupo' + (off ? ' oculta' : '') + (neg ? ' delnegocio' : '') +
+        '" data-grupo="' + sec + '">' +
         NAV[sec].map(function (it) { return link(it, active); }).join('') + '</div>';
     });
     return out;
   }
 
   // Secciones que pertenecen al negocio activo (y no a la plataforma): definen el breadcrumb.
-  var SECS_NEGOCIO = ['Identidad', 'Comunicación', 'Operación'];
+  var SECS_NEGOCIO = AMBITO_NEGOCIO;
   function labelOf(id){ for(var s in NAV){ for(var i=0;i<NAV[s].length;i++) if(NAV[s][i].id===id) return NAV[s][i].label; } return ''; }
   function sectionOf(id){ for(var s in NAV){ for(var i=0;i<NAV[s].length;i++) if(NAV[s][i].id===id) return s; } return ''; }
   // Breadcrumb contextual: Inicio › Marca › Página. La Marca enlaza al proyecto (home de la marca).
@@ -119,18 +141,104 @@
         '</button>' +
         '<div id="sw-menu" class="hidden absolute left-0 right-0 top-full mt-1 z-30 rounded-xl border border-pline dark:border-line bg-side dark:bg-sideD shadow-xl p-1 max-h-72 overflow-auto"></div>' +
       '</div>' +
+      '<button type="button" class="nbuscar mb-2" onclick="ClausinaPaleta(true)">' +
+        '<i data-lucide="search" class="w-4 h-4 shrink-0"></i><span>Buscar sección</span>' +
+        '<kbd>Ctrl K</kbd></button>' +
       '<nav class="nav flex flex-col gap-0.5">' + nav(active) + '</nav>' +
       '<div class="mt-auto flex items-center gap-1 pt-3">' +
         '<button onclick="toggleMode()" class="grid place-items-center w-9 h-9 rounded-lg border border-pline dark:border-line hover:border-acc transition shrink-0" aria-label="modo"><i data-lucide="sun-medium" class="w-4 h-4 hidden dark:block"></i><i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i></button>' +
         '<button onclick="salir()" class="nlabel flex-1 flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-pmut dark:text-mut hover:text-cor transition"><i data-lucide="log-out" class="w-4 h-4"></i> Salir</button>' +
       '</div>' +
     '</aside>' +
+    '<div class="paleta" id="paleta" onclick="if(event.target===this)ClausinaPaleta(false)">' +
+      '<div class="paleta-caja">' +
+        '<input id="paleta-q" placeholder="Ir a…" autocomplete="off" spellcheck="false">' +
+        '<div class="paleta-lista" id="paleta-lista"></div>' +
+      '</div></div>' +
     '<div class="backdrop" onclick="document.body.classList.remove(\'navopen\')"></div>' +
     '<div class="mtop flex items-center gap-2.5 px-5 h-14 bg-side dark:bg-sideD border-b border-pline dark:border-line">' +
       '<button onclick="document.body.classList.toggle(\'navopen\')" class="grid place-items-center w-9 h-9 -ml-2 rounded-lg" aria-label="menú"><i data-lucide="menu" class="w-5 h-5"></i></button>' +
       '<a href="." class="display font-bold tracking-tight">ClaUsina<span class="acc-text">.</span></a>' +
       '<button onclick="toggleMode()" class="ml-auto grid place-items-center w-9 h-9 rounded-lg border border-pline dark:border-line" aria-label="modo"><i data-lucide="sun-medium" class="w-4 h-4 hidden dark:block"></i><i data-lucide="moon" class="w-4 h-4 block dark:hidden"></i></button>' +
     '</div>';
+  }
+
+  /* ── Buscador de secciones ────────────────────────────────────────────────
+   * Con 22 destinos, encontrar deja de ser mirar y pasa a ser recordar en qué grupo quedó cada
+   * cosa. Escribir tres letras no exige recordar nada.
+   *
+   * Sale de la MISMA lista NAV que dibuja el menú: una lista aparte se desactualiza el día que
+   * se agrega una sección, y el buscador queda mintiendo sin que nadie se entere. Los destinos
+   * que los permisos le sacaron a esta persona tampoco se ofrecen acá.
+   */
+  var PAL = { items: [], sel: 0, filtrados: [] };
+
+  function palItems() {
+    var out = [];
+    Object.keys(NAV).forEach(function (sec) {
+      NAV[sec].forEach(function (it) {
+        // Si el enlace no está en el menú, los permisos lo sacaron: tampoco va acá.
+        if (!document.querySelector('[data-nav="' + it.id + '"]')) return;
+        out.push({ id: it.id, label: it.label, href: it.href, icon: it.icon, grupo: sec });
+      });
+    });
+    return out;
+  }
+
+  // Sin tildes y en minúscula: buscar "grafica" tiene que encontrar "Gráfica".
+  function plano(t) {
+    return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function palPintar() {
+    var q = plano((document.getElementById('paleta-q') || {}).value || '');
+    PAL.filtrados = !q ? PAL.items : PAL.items.filter(function (it) {
+      return plano(it.label).indexOf(q) >= 0 || plano(it.grupo).indexOf(q) >= 0;
+    });
+    if (PAL.sel >= PAL.filtrados.length) PAL.sel = 0;
+    var lista = document.getElementById('paleta-lista');
+    if (!lista) return;
+    lista.innerHTML = PAL.filtrados.length
+      ? PAL.filtrados.map(function (it, i) {
+          return '<a class="paleta-it' + (i === PAL.sel ? ' sel' : '') + '" href="' + it.href + '" data-i="' + i + '">' +
+            '<i data-lucide="' + it.icon + '" class="w-4 h-4 shrink-0"></i>' +
+            '<span>' + esc(it.label) + '</span><span class="g">' + esc(it.grupo) + '</span></a>';
+        }).join('')
+      : '<div class="paleta-vacio">Nada con ese nombre.</div>';
+    if (window.lucide) lucide.createIcons();
+    if (window.fixIgIcons) window.fixIgIcons(lista);
+    var sel = lista.querySelector('.sel');
+    if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+  }
+
+  window.ClausinaPaleta = function (abrir) {
+    var pal = document.getElementById('paleta'); if (!pal) return;
+    if (abrir === false) { pal.classList.remove('on'); return; }
+    PAL.items = palItems(); PAL.sel = 0;
+    var q = document.getElementById('paleta-q');
+    if (q) q.value = '';
+    pal.classList.add('on');
+    palPintar();
+    if (q) q.focus();
+  };
+
+  function palTeclas(e) {
+    var pal = document.getElementById('paleta');
+    var abierta = pal && pal.classList.contains('on');
+    var enCampo = /^(input|textarea|select)$/i.test((e.target.tagName || '')) || e.target.isContentEditable;
+    if (!abierta) {
+      // "/" sólo cuando no se está escribiendo en otro lado; Ctrl/⌘+K siempre.
+      if ((e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); ClausinaPaleta(true); }
+      else if (e.key === '/' && !enCampo) { e.preventDefault(); ClausinaPaleta(true); }
+      return;
+    }
+    if (e.key === 'Escape') { e.preventDefault(); ClausinaPaleta(false); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); PAL.sel = Math.min(PAL.sel + 1, PAL.filtrados.length - 1); palPintar(); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); PAL.sel = Math.max(PAL.sel - 1, 0); palPintar(); return; }
+    if (e.key === 'Enter') {
+      var it = PAL.filtrados[PAL.sel];
+      if (it) { e.preventDefault(); location.href = it.href; }
+    }
   }
 
   window.toggleMode = function () {
@@ -159,8 +267,36 @@
         '.nsec.plegada .chev{transform:rotate(-90deg);}' +
         '.ngrupo{display:flex;flex-direction:column;gap:2px;}' +
         '.ngrupo.oculta{display:none;}' +
-        // Con el menú colapsado a íconos, los títulos y las flechas estorban.
-        'body.col .nsec{display:none;} body.col .ngrupo.oculta{display:flex;}';
+        // Un filete al costado ata los grupos del negocio activo al selector de arriba. Sin esto
+        // "Instagram" y "Negocios" se ven igual y no se sabe cuál depende de cuál.
+        '.nsec.delnegocio,.ngrupo.delnegocio{border-left:2px solid var(--acc,#CCF24D);' +
+        'padding-left:8px;margin-left:2px;}' +
+        '.nsec.delnegocio{border-left-color:color-mix(in srgb,var(--acc,#CCF24D) 45%,transparent);}' +
+        '.ngrupo.delnegocio{border-left-color:color-mix(in srgb,var(--acc,#CCF24D) 20%,transparent);}' +
+        // Con el menú colapsado a íconos, los títulos, las flechas y el filete estorban.
+        'body.col .nsec{display:none;} body.col .ngrupo.oculta{display:flex;}' +
+        'body.col .ngrupo.delnegocio{border-left:0;padding-left:0;margin-left:0;}' +
+        // Buscador de secciones (Ctrl+K o /).
+        '.nbuscar{display:flex;align-items:center;gap:7px;width:100%;padding:7px 10px;' +
+        'border-radius:10px;border:1px solid var(--pline,#20242B);background:none;cursor:text;' +
+        'color:inherit;opacity:.6;font-size:.78rem;transition:.15s;}' +
+        '.nbuscar:hover{opacity:1;border-color:var(--acc,#CCF24D);}' +
+        '.nbuscar kbd{margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.6rem;' +
+        'border:1px solid currentColor;border-radius:4px;padding:1px 4px;opacity:.7;}' +
+        'body.col .nbuscar span,body.col .nbuscar kbd{display:none;}' +
+        '.paleta{position:fixed;inset:0;z-index:200;display:none;background:rgba(0,0,0,.55);' +
+        'padding:14vh 18px 18px;}' +
+        '.paleta.on{display:block;}' +
+        '.paleta-caja{max-width:520px;margin:0 auto;border-radius:14px;overflow:hidden;' +
+        'border:1px solid var(--pline,#20242B);background:var(--surf,#12151A);box-shadow:0 18px 60px rgba(0,0,0,.5);}' +
+        '.paleta input{width:100%;padding:15px 17px;border:0;outline:none;background:none;' +
+        'color:inherit;font-size:1rem;font-family:inherit;}' +
+        '.paleta-lista{max-height:52vh;overflow:auto;border-top:1px solid var(--pline,#20242B);}' +
+        '.paleta-it{display:flex;align-items:center;gap:10px;padding:10px 17px;cursor:pointer;' +
+        'text-decoration:none;color:inherit;}' +
+        '.paleta-it .g{margin-left:auto;font-family:\'JetBrains Mono\',monospace;font-size:.6rem;opacity:.5;}' +
+        '.paleta-it.sel{background:color-mix(in srgb,var(--acc,#CCF24D) 14%,transparent);}' +
+        '.paleta-vacio{padding:16px 17px;font-size:.8rem;opacity:.6;}';
       document.head.appendChild(st);
     }
     shell.insertAdjacentHTML('afterbegin', html(opts.active || ''));
@@ -180,7 +316,18 @@
       if (cerrar) arr.push(sec);
       guardarPlegadas(arr);
     });
-    aplicarPermisos(opts.active || '');
+    // El buscador se arma DESPUÉS de los permisos: pregunta por los enlaces que quedaron
+    // dibujados, así que no puede ofrecer lo que a esta persona se le quitó.
+    aplicarPermisos(opts.active || '').then(function () { PAL.items = palItems(); });
+    document.addEventListener('keydown', palTeclas);
+    var pq = document.getElementById('paleta-q');
+    if (pq) pq.addEventListener('input', function () { PAL.sel = 0; palPintar(); });
+    var plista = document.getElementById('paleta-lista');
+    if (plista) plista.addEventListener('mousemove', function (e) {
+      var a = e.target.closest('.paleta-it'); if (!a) return;
+      var i = +a.getAttribute('data-i');
+      if (i !== PAL.sel) { PAL.sel = i; palPintar(); }
+    });
     marcarCapacidades();
     if (opts.cap) guardarCapacidad(opts.cap);
     // Páginas de contenido (panel.css) son dark-only: forzar dark y ocultar el toggle.
@@ -243,10 +390,14 @@
         var a = document.querySelector('[data-nav="' + id + '"]');
         if (a) a.remove();
       });
-      // Si una sección se quedó sin ítems, su título sobra.
+      // Si una sección se quedó sin ítems, su título sobra. Se mira el GRUPO, no el hermano
+      // siguiente: los enlaces viven dentro del div, así que quitarlos deja el div vacío en su
+      // lugar y el título quedaba colgado igual. Con Administración —que para un usuario de
+      // negocio se vacía entera— eso se veía como un encabezado sin nada debajo.
       document.querySelectorAll('.nsec').forEach(function (h) {
-        var n = h.nextElementSibling;
-        if (!n || n.classList.contains('nsec')) h.remove();
+        var sec = h.getAttribute('data-sec');
+        var g = document.querySelector('[data-grupo="' + (sec || '').replace(/"/g, '') + '"]');
+        if (!g || !g.querySelector('a')) { if (g) g.remove(); h.remove(); }
       });
       if (NAV_ADMIN.indexOf(active) >= 0) location.replace('proyecto');
       return yo;
