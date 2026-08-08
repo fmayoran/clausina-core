@@ -232,9 +232,9 @@ async function cargar(){
     const ocultas = d.descartadas || 0;
     document.getElementById('sub').innerHTML =
       (PIEZAS.length ? `${PIEZAS.length} pieza(s)` : 'sin piezas todavía') +
-      (ocultas ? (VER_DESC
-        ? ` · <a onclick="verDescartadas(false)" style="cursor:pointer;text-decoration:underline">ocultar las ${ocultas} descartada(s)</a>`
-        : ` · <a onclick="verDescartadas(true)" style="cursor:pointer;text-decoration:underline">ver ${ocultas} descartada(s)</a>`) : '');
+      (ocultas ? ` · <a onclick="verDescartadas(${!VER_DESC})" style="cursor:pointer;text-decoration:underline">` +
+        (VER_DESC ? (ocultas === 1 ? 'ocultar la descartada' : `ocultar las ${ocultas} descartadas`)
+                  : (ocultas === 1 ? 'ver 1 descartada' : `ver ${ocultas} descartadas`)) + '</a>' : '');
     document.getElementById('grid').innerHTML = PIEZAS.map(card).join('') +
       `<div class="gnew" onclick="abrirNueva()"><div class="in"><div class="plus">+</div>Nueva pieza</div></div>`;
     const trabajando = PIEZAS.some(g=>g.v_estado==='pendiente'||g.v_estado==='procesando');
