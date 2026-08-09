@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "marca_capsula", "descubrimiento", "voz", "tarjeta", "marca_gen", "grafica"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "skill_sync", "marca_capsula", "descubrimiento", "voz", "tarjeta", "marca_gen", "grafica"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -152,6 +152,21 @@ def det_tarjeta():
     return jobs
 
 
+def det_skill_sync():
+    # La DB manda y el archivo .md es la copia derivada: cuando alguien guarda un skill en el
+    # panel, hay que reescribir ~/.claude/skills/<slug>/SKILL.md. El panel corre en un contenedor
+    # y no puede escribir en el disco del host, así que deja el pedido y esto lo levanta.
+    jobs = []
+    for row in _lines("SELECT DISTINCT slug FROM contenido.skill_sync_req WHERE NOT procesado"):
+        slug = row.strip()
+        if slug:
+            jobs.append({"tipo": "skill_sync", "negocio_slug": "",
+                         "payload": {"slug": slug}, "lock_key": f"skill_sync:{slug}"})
+    if jobs:
+        psql("UPDATE contenido.skill_sync_req SET procesado=true WHERE NOT procesado")
+    return jobs
+
+
 def det_marca_capsula():
     # La cápsula deriva de la DB: aplicar pedidos de scaffold/archivar (un job por pedido).
     jobs = []
@@ -281,6 +296,7 @@ DETECTORS = {
     "campania_meta": det_campania_meta,
     "pauta_sync": det_pauta_sync,
     "secrets_sync": det_secrets_sync,
+    "skill_sync": det_skill_sync,
     "marca_capsula": det_marca_capsula,
     "descubrimiento": det_descubrimiento,
     "voz": det_voz,

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Skills</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="fonts/clausina-icono-180.png">
+<script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
+<style>
+  :root{--u-surf:#FFFFFF;--u-bg:#F7F5F1;--u-line:#DEDDD3;--u-fg:#0c0c0a;--u-mut:#5A616A;
+        --u-acc:#4d6800;--u-accfg:#FFFFFF;--u-mal:#C4442A;}
+  .dark{--u-surf:#12151A;--u-bg:#0c0c0a;--u-line:#20242B;--u-fg:#F5F2EC;--u-mut:#8A8F98;
+        --u-acc:#CCF24D;--u-accfg:#0c0c0a;--u-mal:#FF6B4A;}
+  .mono2{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--u-mut);}
+  .btn{background:var(--u-acc);color:var(--u-accfg);border:none;border-radius:8px;font-weight:700;
+       padding:9px 18px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .btn2{background:none;border:1px solid var(--u-line);color:var(--u-mut);border-radius:8px;
+        padding:9px 18px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
+  .btn2:hover{color:var(--u-fg);border-color:var(--u-fg);}
+  #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--u-surf);
+         border:1px solid var(--u-line);color:var(--u-fg);font-family:'JetBrains Mono',monospace;
+         font-size:.78rem;padding:11px 18px;border-radius:8px;opacity:0;transition:opacity .25s;
+         pointer-events:none;z-index:200;}
+  #toast.show{opacity:1;}
+  #toast.err{border-color:var(--u-mal);color:var(--u-mal);}
+  .tabs{display:flex;gap:24px;border-bottom:1px solid var(--u-line);margin-bottom:20px;flex-wrap:wrap;}
+  .tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 2px;cursor:pointer;
+       font-family:'JetBrains Mono',monospace;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+       color:var(--u-mut);}
+  .tab.on{color:var(--u-fg);border-bottom-color:var(--u-acc);}
+  label{display:block;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--u-mut);margin:16px 0 5px;}
+  input,textarea{width:100%;background:var(--u-bg);border:1px solid var(--u-line);border-radius:9px;
+        padding:10px 12px;color:var(--u-fg);font-size:.9rem;font-family:inherit;outline:none;}
+  input:focus,textarea:focus{border-color:var(--u-acc);}
+  textarea{font-family:'JetBrains Mono',monospace;font-size:.78rem;line-height:1.65;resize:vertical;}
+  #cuerpo{min-height:520px;}
+  .hint{font-family:'JetBrains Mono',monospace;font-size:.63rem;color:var(--u-mut);margin-top:6px;line-height:1.65;}
+  .aviso{border:1px solid var(--u-line);border-left:3px solid var(--u-acc);border-radius:10px;
+         padding:13px 16px;margin-bottom:20px;font-family:'JetBrains Mono',monospace;
+         font-size:.66rem;line-height:1.7;color:var(--u-mut);}
+</style>
+</head>
+<body>
+<div class="shell">
+<main class="px-6 md:px-10 py-8 max-w-[1000px]">
+  <div class="flex items-baseline gap-3 flex-wrap mb-1">
+    <h1 class="display text-2xl font-extrabold tracking-tight">Skills</h1>
+    <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
+  </div>
+  <p class="mono text-[11px] text-pmut dark:text-mut mb-5" style="line-height:1.7;max-width:72ch">
+    Las instrucciones con las que trabaja cada agente. Se editan acá y el archivo que lee Claude
+    se regenera solo — la base es la fuente de verdad.
+  </p>
+
+  <div class="aviso">
+    Esto es lo <b>genérico de la agencia</b>: el rol, el método, el criterio. Lo particular de cada
+    negocio —su voz, su contexto, sus reglas— vive en <b>Identidad</b> y el agente lo lee del
+    negocio activo. Guardar lo mismo en los dos lados es garantizar que se contradigan.
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div id="editor" style="display:none">
+    <div class="flex items-baseline gap-3 flex-wrap">
+      <span class="mono2" id="meta"></span>
+      <button class="btn2" style="margin-left:auto" onclick="verHistorial()">Versiones anteriores</button>
+    </div>
+
+    <label for="nombre">Nombre</label>
+    <input type="text" id="nombre">
+
+    <label for="descripcion">Cuándo usarla</label>
+    <textarea id="descripcion" style="min-height:80px"></textarea>
+    <div class="hint">Es lo que lee Claude para decidir si activa esta skill. Una descripción
+      pobre hace que no se active nunca: nombrá las tareas y las frases con las que se pide.</div>
+
+    <label for="cuerpo">Instrucciones</label>
+    <textarea id="cuerpo" spellcheck="false"></textarea>
+    <div class="hint" id="hist"></div>
+
+    <div style="display:flex;gap:10px;margin-top:18px;align-items:center">
+      <button class="btn" id="b-guardar" onclick="guardar()">Guardar</button>
+      <span class="mono2" id="msg"></span>
+    </div>
+  </div>
+</main>
+</div>
+
+<div id="toast"></div>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="shell.js"></script>
+<script>ClausinaShell({active:'skills'});</script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let _t; function toast(m,e){ const t=$('toast'); t.textContent=m; t.classList.toggle('err',!!e); t.classList.add('show'); clearTimeout(_t); _t=setTimeout(()=>t.classList.remove('show'),3600); }
+
+let SKILLS=[], ACTUAL=null;
+
+async function cargar(){
+  try{
+    const d = await fetch('api/skills').then(r=>r.json());
+    SKILLS = d.skills || [];
+    $('sub').textContent = SKILLS.length ? `${SKILLS.length} skill(s)` : 'sin skills';
+    $('tabs').innerHTML = SKILLS.map((s,i)=>
+      `<button class="tab${i===0?' on':''}" data-slug="${esc(s.slug)}" onclick="abrir('${esc(s.slug)}')">/${esc(s.slug)}</button>`).join('');
+    if(SKILLS.length) abrir(SKILLS[0].slug);
+  }catch(e){ $('sub').textContent='sin conexión'; }
+}
+
+async function abrir(slug){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on', t.dataset.slug===slug));
+  try{
+    const s = await fetch('api/skills/'+encodeURIComponent(slug)).then(r=>r.json());
+    if(s.error){ toast('No se pudo abrir',true); return; }
+    ACTUAL = s;
+    $('nombre').value = s.nombre || '';
+    $('descripcion').value = s.descripcion || '';
+    $('cuerpo').value = s.contenido_md || '';
+    const f = s.actualizado_en ? new Date(s.actualizado_en).toLocaleString('es-AR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}) : '';
+    $('meta').textContent = `${(s.contenido_md||'').length} caracteres${f?' · última edición '+f:''}`;
+    $('editor').style.display = '';
+    $('msg').textContent = '';
+    cargarHistorial();
+  }catch(e){ toast('Error de conexión',true); }
+}
+
+async function cargarHistorial(){
+  if(!ACTUAL) return;
+  try{
+    const d = await fetch(`api/skills/${encodeURIComponent(ACTUAL.slug)}/historial`).then(r=>r.json());
+    const vs = d.versiones||[];
+    if(!vs.length){ $('hist').textContent=''; return; }
+    const f = t => new Date(t).toLocaleString('es-AR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false});
+    $('hist').innerHTML = 'Versiones anteriores: ' + vs.slice(0,5).map(v=>
+      `<a onclick="verVersion(${v.id})" style="cursor:pointer;text-decoration:underline">${f(v.guardado_en)} (${v.largo})</a>`).join(' · ');
+  }catch(e){ $('hist').textContent=''; }
+}
+function verHistorial(){ cargarHistorial(); toast('Las versiones se listan debajo del editor'); }
+
+async function verVersion(id){
+  try{
+    const v = await fetch('api/skills/version/'+id).then(r=>r.json());
+    if(!v||!v.contenido){ toast('No se pudo leer',true); return; }
+    const ok = confirm(`Versión del ${new Date(v.guardado_en).toLocaleString('es-AR')} — ${v.largo} caracteres.\n\n`+
+      v.contenido.slice(0,400)+(v.contenido.length>400?'\n[…]':'')+
+      `\n\n¿Cargarla en el editor? (todavía no se guarda)`);
+    if(!ok) return;
+    $('cuerpo').value = v.contenido;
+    toast('Cargada en el editor — revisá y guardá');
+  }catch(e){ toast('Error de conexión',true); }
+}
+
+async function guardar(){
+  if(!ACTUAL) return;
+  const b=$('b-guardar'); b.disabled=true; $('msg').textContent='guardando…';
+  const body={ nombre:$('nombre').value, descripcion:$('descripcion').value, contenido_md:$('cuerpo').value };
+  try{
+    let r = await fetch('api/skills/'+encodeURIComponent(ACTUAL.slug),{method:'PUT',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    let d = await r.json();
+    // Misma red que el brief: un recorte grande se pregunta con el número a la vista.
+    if(r.status===409 && d.error==='recorte_grande'){
+      const x=d.detalle||{};
+      const ok=confirm(`Cuidado: el skill queda en ${x.largo_nuevo} caracteres, cuando tenía ${x.largo_actual}.\n`+
+        `Se perderían ${x.perdidos}.\n\nSi no fue a propósito, cancelá: no se guardó nada.\n¿Guardar igual?`);
+      if(!ok){ $('msg').textContent='no se guardó'; b.disabled=false; return; }
+      body.confirmar_recorte=true;
+      r = await fetch('api/skills/'+encodeURIComponent(ACTUAL.slug),{method:'PUT',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      d = await r.json();
+    }
+    if(d.ok){
+      $('msg').textContent='';
+      // El archivo lo reescribe un worker del host: no es instantáneo y decirlo evita que
+      // alguien crea que no se guardó.
+      toast('Guardado — el archivo se regenera en menos de un minuto');
+      abrir(ACTUAL.slug);
+    } else { $('msg').textContent='no se pudo guardar'; }
+  }catch(e){ $('msg').textContent='error de conexión'; }
+  b.disabled=false;
+}
+
+cargar();
+</script>
+</body>
+</html>

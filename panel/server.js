@@ -1504,6 +1504,41 @@ app.post('/api/perfil/logo', async (req, res) => {
   } catch (e) { console.error('logo upload', e.message); res.status(500).json({ ok: false, error: 'upload' }); }
 });
 
+// --- Skills: las instrucciones de los agentes. Son de la AGENCIA, no de un negocio. ---------
+app.get('/api/skills', soloAdmin, async (req, res) => {
+  try { res.json({ skills: await db.getSkills() }); }
+  catch (e) { console.error('skills', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.get('/api/skills/:slug', soloAdmin, async (req, res) => {
+  try {
+    const sk = await db.getSkill(String(req.params.slug));
+    if (!sk) return res.status(404).json({ error: 'no_existe' });
+    res.json(sk);
+  } catch (e) { console.error('skill', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.put('/api/skills/:slug', soloAdmin, async (req, res) => {
+  try {
+    const b = req.body || {};
+    res.json(await db.guardarSkill(String(req.params.slug), b, req.usuario && req.usuario.id,
+                                   b.confirmar_recorte === true));
+  } catch (e) {
+    if (e.code === 'recorte_grande') return res.status(409).json({ ok: false, error: e.code, detalle: e.detalle });
+    if (e.code === 'no_encontrado') return res.status(404).json({ ok: false });
+    console.error('skill guardar', e.message); res.status(500).json({ ok: false });
+  }
+});
+app.get('/api/skills/:slug/historial', soloAdmin, async (req, res) => {
+  try { res.json({ versiones: await db.getSkillHistorial(String(req.params.slug)) }); }
+  catch (e) { res.status(500).json({ error: 'db' }); }
+});
+app.get('/api/skills/version/:id', soloAdmin, async (req, res) => {
+  try {
+    const v = await db.getSkillVersion(Number(req.params.id));
+    if (!v) return res.status(404).json({ error: 'no_existe' });
+    res.json(v);
+  } catch (e) { res.status(500).json({ error: 'db' }); }
+});
+
 // --- Campañas (v2.0 / F7) ------------------------------------------------------------------
 app.get('/api/campanias/catalogos', (req, res) =>
   res.json({ objetivos: db.OBJETIVOS_CAMPANIA, tipos: db.TIPOS_ACCION }));

@@ -43,6 +43,9 @@
       { id: 'negocios',     label: 'Negocios',          icon: 'boxes',            href: 'negocios' },
       { id: 'pantallas',    label: 'Pantallas',         icon: 'monitor',          href: 'audiovisual' },
       { id: 'estilo',       label: 'Sistema de diseño', icon: 'palette',          href: 'estilo' },
+      // Las instrucciones de los agentes: genéricas de la agencia. Lo particular de cada negocio
+      // vive en Identidad, y el agente lo lee del negocio activo.
+      { id: 'skills',       label: 'Skills',            icon: 'sparkles',         href: 'skills' },
     ],
     // Lo estructural: se configura una vez y se mira poco. Arranca plegada a propósito.
     'Administración': [
@@ -378,7 +381,7 @@
   // Secciones que son de la plataforma, no de un negocio: sólo el admin las ve.
   // 'inicio' es el tablero de la agencia (consume /api/agencia, /api/maquinas, alta de negocios):
   // para un usuario de negocio no tiene nada, así que además lo mandamos a la home de SU negocio.
-  var NAV_ADMIN = ['inicio', 'maquinas', 'negocios', 'arquitectura', 'usuarios', 'rubros'];
+  var NAV_ADMIN = ['inicio', 'maquinas', 'negocios', 'arquitectura', 'usuarios', 'rubros', 'skills'];
 
   function aplicarPermisos(active) {
     return fetch('api/yo').then(function (r) { return r.ok ? r.json() : null; }).then(function (yo) {

@@ -2048,6 +2048,76 @@ async function canjearEnMostrador(negocioId, codigo, d = {}) {
   } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
 }
 
+// --- Skills: las instrucciones de los agentes (v2.0) ---------------------------------------
+// La DB es la fuente de verdad y el archivo .md del disco es una copia derivada, igual que la
+// credencial de n8n. Se editan en el panel; al guardar se pide la regeneración y un worker del
+// host reescribe ~/.claude/skills/<slug>/SKILL.md — el panel corre en un contenedor y no llega
+// a ese disco.
+
+async function getSkills() {
+  const { rows } = await pool.query(
+    `SELECT s.slug, s.nombre, s.descripcion, s.activo, s.actualizado_en,
+            length(s.contenido_md) AS largo, u.nombre AS por
+       FROM contenido.skill s LEFT JOIN contenido.usuario u ON u.id = s.actualizado_por
+      ORDER BY s.slug`);
+  return rows;
+}
+
+async function getSkill(slug) {
+  const { rows: [r] } = await pool.query('SELECT * FROM contenido.skill WHERE slug=$1', [slug]);
+  return r || null;
+}
+
+/**
+ * Guarda un skill. Con la misma red que el brief: un recorte brusco no se acepta en silencio y
+ * la versión anterior queda archivada. Son textos largos escritos a mano; perderlos duele igual.
+ */
+async function guardarSkill(slug, d, usuarioId, confirmado) {
+  const { rows: [prev] } = await pool.query('SELECT contenido_md FROM contenido.skill WHERE slug=$1', [slug]);
+  if (!prev) { const e = new Error('no existe'); e.code = 'no_encontrado'; throw e; }
+  const viejo = prev.contenido_md || '';
+  const nuevo = String(d.contenido_md == null ? viejo : d.contenido_md);
+  const perdidos = viejo.length - nuevo.length;
+  if (!confirmado && perdidos >= RECORTE_MIN_CHARS && nuevo.length < viejo.length * RECORTE_PROPORCION) {
+    const e = new Error('recorte'); e.code = 'recorte_grande';
+    e.detalle = { campo: 'skill', largo_actual: viejo.length, largo_nuevo: nuevo.length, perdidos };
+    throw e;
+  }
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    if (viejo && viejo !== nuevo) {
+      await cli.query(
+        'INSERT INTO contenido.skill_hist (slug, contenido, largo, usuario_id) VALUES ($1,$2,$3,$4)',
+        [slug, viejo, viejo.length, usuarioId || null]);
+    }
+    await cli.query(
+      `UPDATE contenido.skill SET nombre=COALESCE($2,nombre), descripcion=COALESCE($3,descripcion),
+              contenido_md=$4, activo=COALESCE($5,activo), actualizado_en=now(), actualizado_por=$6
+        WHERE slug=$1`,
+      [slug, d.nombre || null, d.descripcion || null, nuevo,
+       typeof d.activo === 'boolean' ? d.activo : null, usuarioId || null]);
+    // El pedido va DENTRO de la transacción: si el guardado falla, no se regenera un archivo con
+    // un contenido que no quedó guardado.
+    await cli.query('INSERT INTO contenido.skill_sync_req (slug) VALUES ($1)', [slug]);
+    await cli.query('COMMIT');
+  } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
+  return { ok: true };
+}
+
+async function getSkillHistorial(slug) {
+  const { rows } = await pool.query(
+    `SELECT h.id, h.largo, h.guardado_en, u.nombre AS usuario
+       FROM contenido.skill_hist h LEFT JOIN contenido.usuario u ON u.id=h.usuario_id
+      WHERE h.slug=$1 ORDER BY h.guardado_en DESC LIMIT 20`, [slug]);
+  return rows;
+}
+async function getSkillVersion(id) {
+  const { rows: [r] } = await pool.query(
+    'SELECT slug, contenido, largo, guardado_en FROM contenido.skill_hist WHERE id=$1', [id]);
+  return r || null;
+}
+
 // --- Campañas (v2.0 / F7) ------------------------------------------------------------------
 // Una campaña agrupa acciones de marketing con un objetivo, una ventana y un público. Las
 // acciones no son entidades nuevas: apuntan a lo que ya existe. Ver core/planes/CAMPANIAS.md.
@@ -3793,6 +3863,7 @@ module.exports = {
   TIPOS_BENEFICIO, textoBeneficio, getBeneficios, guardarBeneficio,
   muestraBeneficio, canjearEnMostrador,
 
+  getSkills, getSkill, guardarSkill, getSkillHistorial, getSkillVersion,
   OBJETIVOS_CAMPANIA, TIPOS_ACCION, getCampanias, getCampania, guardarCampania,
   estadoCampania, guardarAccion, borrarAccion, opcionesAccion,
   emitirInvitaciones, getInvitaciones, anularInvitacion, consultarInvitacion,
