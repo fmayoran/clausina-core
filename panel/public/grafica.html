@@ -8,6 +8,7 @@
 <script>document.documentElement.classList.add('dark');</script>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
 <link rel="stylesheet" href="tw.css">
 <link rel="stylesheet" href="panel.css">
 <style>
@@ -198,7 +199,7 @@
 
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="shell.js"></script>
-<script>ClausinaShell({active:'grafica',cap:'grafica',darkOnly:true});</script>
+<script>ClausinaShell({active:'grafica',cap:'grafica'});</script>
 <script>
 const cod = n => n ? 'G-'+String(n).padStart(4,'0') : '';
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
