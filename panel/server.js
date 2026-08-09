@@ -1504,6 +1504,64 @@ app.post('/api/perfil/logo', async (req, res) => {
   } catch (e) { console.error('logo upload', e.message); res.status(500).json({ ok: false, error: 'upload' }); }
 });
 
+// --- Campañas (v2.0 / F7) ------------------------------------------------------------------
+app.get('/api/campanias/catalogos', (req, res) =>
+  res.json({ objetivos: db.OBJETIVOS_CAMPANIA, tipos: db.TIPOS_ACCION }));
+app.get('/api/campanias', async (req, res) => {
+  try { res.json({ campanias: await db.getCampanias(req.negocioId) }); }
+  catch (e) { console.error('campanias', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.get('/api/campanias/:id', async (req, res) => {
+  try {
+    const c = await db.getCampania(req.negocioId, req.params.id);
+    if (!c) return res.status(404).json({ error: 'no_existe' });
+    res.json(c);
+  } catch (e) { console.error('campania', e.message); res.status(500).json({ error: 'db' }); }
+});
+const guardarCamp = async (req, res) => {
+  try { res.json(await db.guardarCampania(req.negocioId, req.params.id || null, req.body || {})); }
+  catch (e) {
+    const msg = { falta_nombre: 'Poné un nombre.', falta_desde: 'Poné la fecha de inicio.',
+                  ventana_invalida: 'La campaña no puede terminar antes de empezar.',
+                  no_encontrado: 'Esa campaña no existe.' }[e.code];
+    if (msg) return res.status(400).json({ ok: false, mensaje: msg });
+    console.error('campania guardar', e.message); res.status(500).json({ ok: false, mensaje: 'Error del servidor.' });
+  }
+};
+app.post('/api/campanias', guardarCamp);
+app.put('/api/campanias/:id', guardarCamp);
+app.post('/api/campanias/:id/estado', async (req, res) => {
+  try { res.json(await db.estadoCampania(req.negocioId, req.params.id, (req.body || {}).estado)); }
+  catch (e) { res.status(400).json({ ok: false }); }
+});
+
+// Qué se le puede colgar a una acción de cada tipo: siempre cosas que el negocio YA tiene.
+app.get('/api/campanias/opciones/:tipo', async (req, res) => {
+  try { res.json({ opciones: await db.opcionesAccion(req.negocioId, String(req.params.tipo)) }); }
+  catch (e) { console.error('opciones accion', e.message); res.status(500).json({ error: 'db' }); }
+});
+const guardarAcc = async (req, res) => {
+  try { res.json(await db.guardarAccion(req.negocioId, req.params.id, req.params.accion || null, req.body || {})); }
+  catch (e) {
+    const msg = { falta_nombre: 'Poné un nombre para la acción.', tipo_invalido: 'Elegí un tipo.',
+                  no_encontrado: 'No existe.' }[e.code];
+    if (msg) return res.status(400).json({ ok: false, mensaje: msg });
+    console.error('accion guardar', e.message); res.status(500).json({ ok: false, mensaje: 'Error del servidor.' });
+  }
+};
+app.post('/api/campanias/:id/acciones', guardarAcc);
+app.put('/api/campanias/:id/acciones/:accion', guardarAcc);
+app.delete('/api/campanias/:id/acciones/:accion', async (req, res) => {
+  try { res.json(await db.borrarAccion(req.negocioId, req.params.id, req.params.accion)); }
+  catch (e) { res.status(500).json({ ok: false }); }
+});
+
+// Canje en el mostrador: el código en la mano, sin reserva. Lo usa el público de paso.
+app.post('/api/invitaciones/canjear', async (req, res) => {
+  try { res.json(await db.canjearEnMostrador(req.negocioId, (req.body || {}).codigo, req.body || {})); }
+  catch (e) { console.error('canjear', e.message); res.status(500).json({ ok: false, mensaje: 'Error del servidor.' }); }
+});
+
 // --- Landing del proyecto (cambios con borrador -> preview -> aprobación -> producción) ---
 app.get('/api/landing', async (req, res) => {
   try { res.json(await db.getLandingCambios(req.negocioId)); }

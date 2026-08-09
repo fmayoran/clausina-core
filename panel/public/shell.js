@@ -16,6 +16,9 @@
       { id: 'auditoria', label: 'Auditoría',         icon: 'chart-column', href: 'auditoria' },
     ],
     'Comunicación': [
+      // Primera del grupo: una campaña es el paraguas del que cuelgan las demás acciones de
+      // comunicación, así que se lee antes que las piezas sueltas.
+      { id: 'campanias', label: 'Campañas',          icon: 'target',      href: 'campanias' },
       { id: 'propuestas', label: 'Propuestas',       icon: 'lightbulb',   href: 'propuestas' },
       { id: 'cola',      label: 'Cola y aprobación', icon: 'inbox',       href: 'proyecto' },
       { id: 'instagram', label: 'Instagram',         icon: 'instagram',   href: 'instagram' },

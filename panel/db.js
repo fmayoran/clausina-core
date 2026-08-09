@@ -2012,6 +2012,211 @@ async function invitacionDeReserva(reservaId) {
   return r ? { ...r, texto: textoBeneficio(r) } : null;
 }
 
+/**
+ * Canje en el mostrador: alguien llega con el código en la mano y NO hay reserva. Es el caso del
+ * público de paso —el mediodía express, donde nadie reserva un sandwich— y el que justifica los
+ * códigos reutilizables repartidos en un folleto o publicados en la pantalla de la esquina.
+ *
+ * Va directo a `consumida`: acá no hay dos momentos que separar. La persona está parada frente a
+ * quien la carga, así que tomar y consumir pasan a la vez.
+ */
+async function canjearEnMostrador(negocioId, codigo, d = {}) {
+  const c = inv.limpiar(codigo);
+  if (!inv.formaValida(c)) return { ok: false, motivo: 'forma', mensaje: MOTIVOS.forma };
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    const { rows: [i] } = await cli.query(
+      `SELECT i.*, b.nombre AS beneficio, b.tipo, b.valor, b.activo AS beneficio_activo
+         FROM contenido.invitacion i JOIN contenido.beneficio b ON b.id=i.beneficio_id
+        WHERE i.codigo=$1 AND i.negocio_id=$2 FOR UPDATE OF i`, [c, negocioId]);
+    if (!i) { await cli.query('ROLLBACK'); return { ok: false, motivo: 'no_existe', mensaje: MOTIVOS.no_existe }; }
+    const est = estadoInvitacion(i);
+    if (est === 'anulada') { await cli.query('ROLLBACK'); return { ok: false, motivo: 'anulada', mensaje: MOTIVOS.anulada }; }
+    if (est === 'vencida') { await cli.query('ROLLBACK'); return { ok: false, motivo: 'vencida', mensaje: MOTIVOS.vencida }; }
+    if (est === 'agotada') { await cli.query('ROLLBACK'); return { ok: false, motivo: 'agotada', mensaje: MOTIVOS.agotada }; }
+    if (!i.beneficio_activo) { await cli.query('ROLLBACK'); return { ok: false, motivo: 'inactivo', mensaje: MOTIVOS.inactivo }; }
+
+    const { rows: [u] } = await cli.query(
+      `INSERT INTO contenido.invitacion_uso (invitacion_id, negocio_id, canal, estado, cerrada_en, notas)
+       VALUES ($1,$2,'mostrador','consumida', now(), $3) RETURNING id`,
+      [i.id, negocioId, String(d.notas || '').trim() || null]);
+    await cli.query('UPDATE contenido.invitacion SET usos = usos + 1 WHERE id=$1', [i.id]);
+    await cli.query('COMMIT');
+    return { ok: true, uso_id: u.id, codigo: c, beneficio: i.beneficio, texto: textoBeneficio(i),
+             restantes: Math.max(0, i.usos_max - (i.usos + 1)) };
+  } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
+}
+
+// --- Campañas (v2.0 / F7) ------------------------------------------------------------------
+// Una campaña agrupa acciones de marketing con un objetivo, una ventana y un público. Las
+// acciones no son entidades nuevas: apuntan a lo que ya existe. Ver core/planes/CAMPANIAS.md.
+
+const OBJETIVOS_CAMPANIA = [
+  { id: 'clientes_nuevos', label: 'Clientes nuevos', desc: 'gente que nunca vino' },
+  { id: 'reservas',        label: 'Reservas',        desc: 'volumen de reservas en la ventana' },
+  { id: 'visitas',         label: 'Visitas',         desc: 'reservas que se cumplieron' },
+  { id: 'alcance',         label: 'Alcance',         desc: 'que la conozcan; sin conversión directa' },
+];
+const TIPOS_ACCION = [
+  { id: 'invitaciones', label: 'Invitaciones',   desc: 'códigos con un beneficio', campo: 'beneficio_id' },
+  { id: 'instagram',    label: 'Publicación',    desc: 'una pieza del feed',       campo: 'pieza_id' },
+  { id: 'pantalla',     label: 'Aviso en pantalla', desc: 'la pantalla de calle',  campo: 'pieza_id' },
+  { id: 'impreso',      label: 'Impreso',        desc: 'folleto, afiche, tarjeta', campo: 'grafica_id' },
+  { id: 'pauta',        label: 'Pauta',          desc: 'publicidad paga en Meta',  campo: 'pauta_id' },
+  { id: 'link',         label: 'Link medible',   desc: 'un enlace propio con seguimiento', campo: 'link_id' },
+  { id: 'otra',         label: 'Otra',           desc: 'algo que no entra en las anteriores', campo: null },
+];
+
+async function getCampanias(negocioId) {
+  const { rows } = await pool.query(
+    `SELECT c.*,
+            (SELECT count(*)::int FROM contenido.campania_accion a WHERE a.campania_id=c.id) AS acciones
+       FROM contenido.campania c WHERE c.negocio_id=$1 ORDER BY c.desde DESC, c.creado_en DESC`,
+    [negocioId]);
+  return rows;
+}
+
+async function getCampania(negocioId, id) {
+  const { rows: [c] } = await pool.query(
+    'SELECT * FROM contenido.campania WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
+  if (!c) return null;
+  // Cada acción se muestra con el nombre de lo que apunta: una lista de acciones que dice
+  // "invitaciones" cinco veces no sirve para nada.
+  const { rows: acciones } = await pool.query(
+    `SELECT a.*,
+            b.nombre AS beneficio_nombre, b.tipo AS beneficio_tipo, b.valor AS beneficio_valor,
+            g.nombre AS grafica_nombre, g.numero AS grafica_numero,
+            p.titulo_interno AS pieza_nombre, p.numero AS pieza_numero, p.canal AS pieza_canal,
+            pc.nombre AS pauta_nombre,
+            l.etiqueta AS link_etiqueta, l.token AS link_token
+       FROM contenido.campania_accion a
+       LEFT JOIN contenido.beneficio b ON b.id = a.beneficio_id
+       LEFT JOIN contenido.grafica g ON g.id = a.grafica_id
+       LEFT JOIN contenido.piezas p ON p.id = a.pieza_id
+       LEFT JOIN contenido.pauta_campania pc ON pc.id = a.pauta_id
+       LEFT JOIN contenido.accion_link l ON l.id = a.link_id
+      WHERE a.campania_id=$1 ORDER BY a.orden, a.creado_en`, [id]);
+  return { ...c, acciones };
+}
+
+async function guardarCampania(negocioId, id, d) {
+  const nombre = String(d.nombre || '').trim().slice(0, 160);
+  if (!nombre) { const e = new Error('nombre'); e.code = 'falta_nombre'; throw e; }
+  const desde = /^\d{4}-\d{2}-\d{2}$/.test(d.desde || '') ? d.desde : null;
+  if (!desde) { const e = new Error('desde'); e.code = 'falta_desde'; throw e; }
+  const hasta = /^\d{4}-\d{2}-\d{2}$/.test(d.hasta || '') ? d.hasta : null;
+  if (hasta && hasta < desde) { const e = new Error('ventana'); e.code = 'ventana_invalida'; throw e; }
+  const objetivo_tipo = OBJETIVOS_CAMPANIA.some(o => o.id === d.objetivo_tipo) ? d.objetivo_tipo : 'clientes_nuevos';
+  const meta = Number(d.meta_valor) > 0 ? Number(d.meta_valor) : null;
+  const presu = Number(d.presupuesto) > 0 ? Number(d.presupuesto) : null;
+  const campos = [negocioId, nombre, String(d.objetivo || '').trim() || null, objetivo_tipo, meta,
+                  desde, hasta, String(d.publico || '').trim() || null, presu,
+                  String(d.notas || '').trim() || null];
+  if (id) {
+    const { rows: [r] } = await pool.query(
+      `UPDATE contenido.campania SET nombre=$2, objetivo=$3, objetivo_tipo=$4, meta_valor=$5,
+              desde=$6, hasta=$7, publico=$8, presupuesto=$9, notas=$10, actualizado_en=now()
+        WHERE id=$11 AND negocio_id=$1 RETURNING *`, [...campos, id]);
+    if (!r) { const e = new Error('no existe'); e.code = 'no_encontrado'; throw e; }
+    return { ok: true, campania: r };
+  }
+  const { rows: [r] } = await pool.query(
+    `INSERT INTO contenido.campania (negocio_id, nombre, objetivo, objetivo_tipo, meta_valor,
+                                     desde, hasta, publico, presupuesto, notas)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`, campos);
+  return { ok: true, campania: r };
+}
+
+async function estadoCampania(negocioId, id, estado) {
+  if (!['borrador','activa','pausada','cerrada'].includes(estado)) {
+    const e = new Error('estado'); e.code = 'estado_invalido'; throw e;
+  }
+  const { rowCount } = await pool.query(
+    'UPDATE contenido.campania SET estado=$3, actualizado_en=now() WHERE id=$1 AND negocio_id=$2',
+    [id, negocioId, estado]);
+  return { ok: rowCount > 0 };
+}
+
+/**
+ * Agrega o edita una acción. La referencia se escribe SÓLO en la columna que corresponde al
+ * tipo: mandar un beneficio en una acción de tipo 'impreso' es un error de quien llama, y
+ * guardarlo igual dejaría una acción que no se puede medir por ningún lado.
+ */
+async function guardarAccion(negocioId, campaniaId, id, d) {
+  const { rows: [c] } = await pool.query(
+    'SELECT id FROM contenido.campania WHERE id=$1 AND negocio_id=$2', [campaniaId, negocioId]);
+  if (!c) { const e = new Error('campaña'); e.code = 'no_encontrado'; throw e; }
+  const t = TIPOS_ACCION.find(x => x.id === d.tipo);
+  if (!t) { const e = new Error('tipo'); e.code = 'tipo_invalido'; throw e; }
+  const nombre = String(d.nombre || '').trim().slice(0, 160);
+  if (!nombre) { const e = new Error('nombre'); e.code = 'falta_nombre'; throw e; }
+
+  const refs = { pieza_id: null, grafica_id: null, beneficio_id: null, pauta_id: null, link_id: null };
+  if (t.campo && /^[0-9a-f-]{36}$/i.test(String(d.ref || ''))) refs[t.campo] = d.ref;
+  const num = v => (Number(v) >= 0 ? Number(v) : null);
+  const campos = [campaniaId, t.id, nombre, ['planificada','activa','terminada','descartada'].includes(d.estado) ? d.estado : 'planificada',
+                  Number(d.orden) || 0, refs.pieza_id, refs.grafica_id, refs.beneficio_id, refs.pauta_id, refs.link_id,
+                  num(d.costo_previsto), num(d.costo_real), String(d.costo_nota || '').trim() || null,
+                  num(d.volumen_declarado), String(d.notas || '').trim() || null];
+  if (id) {
+    const { rows: [r] } = await pool.query(
+      `UPDATE contenido.campania_accion SET tipo=$2, nombre=$3, estado=$4, orden=$5,
+              pieza_id=$6, grafica_id=$7, beneficio_id=$8, pauta_id=$9, link_id=$10,
+              costo_previsto=$11, costo_real=$12, costo_nota=$13, volumen_declarado=$14,
+              notas=$15, actualizado_en=now()
+        WHERE id=$16 AND campania_id=$1 RETURNING *`, [...campos, id]);
+    if (!r) { const e = new Error('no existe'); e.code = 'no_encontrado'; throw e; }
+    return { ok: true, accion: r };
+  }
+  const { rows: [r] } = await pool.query(
+    `INSERT INTO contenido.campania_accion (campania_id, tipo, nombre, estado, orden,
+       pieza_id, grafica_id, beneficio_id, pauta_id, link_id,
+       costo_previsto, costo_real, costo_nota, volumen_declarado, notas)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`, campos);
+  return { ok: true, accion: r };
+}
+
+async function borrarAccion(negocioId, campaniaId, id) {
+  const { rowCount } = await pool.query(
+    `DELETE FROM contenido.campania_accion a USING contenido.campania c
+      WHERE a.id=$3 AND a.campania_id=$1 AND c.id=a.campania_id AND c.negocio_id=$2`,
+    [campaniaId, negocioId, id]);
+  return { ok: rowCount > 0 };
+}
+
+/** Lo que se puede colgar de una acción, según el tipo. Sale de lo que el negocio YA tiene. */
+async function opcionesAccion(negocioId, tipo) {
+  if (tipo === 'invitaciones') {
+    const { rows } = await pool.query(
+      'SELECT id, nombre, tipo, valor FROM contenido.beneficio WHERE negocio_id=$1 AND activo ORDER BY creado_en DESC', [negocioId]);
+    return rows.map(r => ({ id: r.id, label: `${r.nombre} — ${textoBeneficio(r)}` }));
+  }
+  if (tipo === 'impreso') {
+    const { rows } = await pool.query(
+      "SELECT id, numero, nombre FROM contenido.grafica WHERE negocio_id=$1 AND estado <> 'descartada' ORDER BY numero DESC", [negocioId]);
+    return rows.map(r => ({ id: r.id, label: `${codigoPieza('grafica', r.numero)} · ${r.nombre}` }));
+  }
+  if (tipo === 'instagram' || tipo === 'pantalla') {
+    const canal = tipo === 'instagram' ? 'instagram' : 'aviso';
+    const { rows } = await pool.query(
+      `SELECT id, numero, titulo_interno FROM contenido.piezas
+        WHERE negocio_id=$1 AND canal=$2 AND estado <> 'descartada' ORDER BY creado_en DESC LIMIT 60`, [negocioId, canal]);
+    return rows.map(r => ({ id: r.id, label: `${codigoPieza(canal, r.numero)} · ${r.titulo_interno || 'sin título'}` }));
+  }
+  if (tipo === 'pauta') {
+    const { rows } = await pool.query(
+      'SELECT id, nombre FROM contenido.pauta_campania WHERE negocio_id=$1 ORDER BY creado_en DESC', [negocioId]);
+    return rows.map(r => ({ id: r.id, label: r.nombre }));
+  }
+  if (tipo === 'link') {
+    const { rows } = await pool.query(
+      'SELECT id, etiqueta, token FROM contenido.accion_link WHERE negocio_id=$1 AND activo ORDER BY creado_en DESC', [negocioId]);
+    return rows.map(r => ({ id: r.id, label: `${r.etiqueta || 'link'} (/a/${r.token})` }));
+  }
+  return [];
+}
+
 // --- El canal de WhatsApp como producto (v2.0 / F5f) --------------------------------------
 // El número deja de ser una configuración técnica: el negocio decide cómo saluda el bot y qué
 // operaciones ofrece. Lo que no encaja en ninguna operación cae en el inbox, para que lo lea
@@ -3586,7 +3791,10 @@ module.exports = {
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
   completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, clientePorTelefono,
   TIPOS_BENEFICIO, textoBeneficio, getBeneficios, guardarBeneficio,
-  muestraBeneficio,
+  muestraBeneficio, canjearEnMostrador,
+
+  OBJETIVOS_CAMPANIA, TIPOS_ACCION, getCampanias, getCampania, guardarCampania,
+  estadoCampania, guardarAccion, borrarAccion, opcionesAccion,
   emitirInvitaciones, getInvitaciones, anularInvitacion, consultarInvitacion,
   cerrarUso, liberarPorReserva, invitacionDeReserva, condicionesLegibles, piezasPublicadas, codigoPieza,
   reservaTarjeta, pedirTarjeta,

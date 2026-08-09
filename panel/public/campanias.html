@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Campañas</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<script>(function(){try{var m=localStorage.getItem('clausina-mode');if(m==='light')document.documentElement.classList.remove('dark');}catch(e){}})();</script>
+<link rel="stylesheet" href="panel.css">
+<link rel="stylesheet" href="campo-fecha.css">
+<style>
+  .barra{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
+  .ccard{border:1px solid var(--u-line);border-radius:14px;padding:16px 18px;background:var(--u-surf);
+         cursor:pointer;transition:.15s;display:flex;flex-direction:column;gap:8px;}
+  .ccard:hover{border-color:var(--u-acc);}
+  .ccard h3{font-size:1.02rem;font-weight:700;margin:0;}
+  .cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+  .pill{font-family:'JetBrains Mono',monospace;font-size:.58rem;text-transform:uppercase;
+        letter-spacing:.1em;padding:2px 8px;border-radius:99px;border:1px solid var(--u-line);}
+  .pill.activa{color:#CCF24D;border-color:#CCF24D;}
+  .pill.borrador{color:var(--u-mut);}
+  .pill.pausada,.pill.planificada{color:#E0A458;border-color:#E0A458;}
+  .pill.cerrada,.pill.terminada{color:var(--u-mut);opacity:.7;}
+  .meta{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--u-mut);line-height:1.7;}
+  /* La barra de avance hacia la meta. Sin número, "efectividad" es una opinión. */
+  .avance{height:6px;border-radius:99px;background:var(--u-bg);overflow:hidden;}
+  .avance i{display:block;height:100%;background:var(--u-acc);}
+  .ov{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;place-items:center;z-index:140;padding:20px;}
+  .ov.on{display:grid;}
+  .dlg{background:var(--u-surf);border:1px solid var(--u-line);border-radius:16px;padding:24px;
+       width:min(640px,100%);max-height:88vh;overflow:auto;}
+  label{display:block;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--u-mut);margin:14px 0 5px;}
+  input,select,textarea{width:100%;background:var(--u-bg);border:1px solid var(--u-line);
+        border-radius:9px;padding:9px 11px;color:var(--u-fg);font-size:.9rem;font-family:inherit;outline:none;}
+  input:focus,select:focus,textarea:focus{border-color:var(--u-acc);}
+  textarea{min-height:80px;resize:vertical;}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .hint{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-mut);margin-top:5px;line-height:1.6;}
+  .err{color:var(--u-mal);font-family:'JetBrains Mono',monospace;font-size:.7rem;margin-top:12px;min-height:1em;}
+  .arow{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-top:1px solid var(--u-line);}
+  .arow:first-child{border-top:0;}
+  .iconbtn{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px;
+           border:1px solid var(--u-line);background:none;color:var(--u-mut);cursor:pointer;}
+  .iconbtn:hover{border-color:var(--u-acc);color:var(--u-fg);}
+</style>
+</head>
+<body>
+<div class="shell">
+<main class="px-6 md:px-10 py-8 max-w-[1180px]">
+  <div class="flex items-baseline gap-3 flex-wrap mb-1">
+    <h1 class="display text-2xl font-extrabold tracking-tight">Campañas</h1>
+    <span class="mono text-[11px] text-pmut dark:text-mut" id="sub">cargando…</span>
+  </div>
+  <p class="mono text-[11px] text-pmut dark:text-mut mb-6" style="line-height:1.7;max-width:70ch">
+    Una campaña es un conjunto de <b>acciones</b> con un objetivo, una ventana y un público. Las
+    acciones no se crean acá: se enganchan a lo que el negocio ya tiene —invitaciones, piezas,
+    impresos, pauta— y de ahí sale la medición.
+  </p>
+
+  <div class="barra">
+    <select id="f-estado" style="width:auto" onchange="pintar()">
+      <option value="">Todas</option>
+      <option value="activa">Activas</option>
+      <option value="borrador">Borradores</option>
+      <option value="pausada">Pausadas</option>
+      <option value="cerrada">Cerradas</option>
+    </select>
+    <button class="btn" style="margin-left:auto" onclick="abrirCampania()">Nueva campaña</button>
+  </div>
+  <div class="cgrid" id="grid"></div>
+</main>
+</div>
+
+<!-- ══════════ Diálogo: campaña ══════════ -->
+<div class="ov" id="ov-camp"><div class="dlg">
+  <h2 class="display font-bold text-lg mb-1" id="c-tit">Nueva campaña</h2>
+  <p class="mono2" style="color:var(--u-mut);font-size:.66rem">Qué querés lograr, para cuándo y con quién.</p>
+  <input type="hidden" id="c-id">
+  <label for="c-nombre">Nombre</label>
+  <input type="text" id="c-nombre" placeholder="Lanzamiento">
+
+  <label for="c-objetivo">Objetivo</label>
+  <textarea id="c-objetivo" placeholder="Que la gente del barrio venga a conocer el local y vuelva."></textarea>
+
+  <div class="dos">
+    <div>
+      <label for="c-tipo">Qué se mide</label>
+      <select id="c-tipo"></select>
+      <div class="hint" id="c-tipo-hint"></div>
+    </div>
+    <div>
+      <label for="c-meta">Meta</label>
+      <input type="number" id="c-meta" min="1" placeholder="400">
+      <div class="hint">El número al que apuntás. Sin número no hay efectividad, hay opinión.</div>
+    </div>
+  </div>
+
+  <div class="dos">
+    <div><label for="c-desde">Desde</label>
+      <div class="fecha" id="w-desde">
+        <input type="text" class="fecha-txt" id="c-desde" readonly placeholder="dd/mm/aaaa">
+        <button type="button" class="fecha-btn" aria-label="Abrir calendario"><i data-lucide="calendar" class="w-4 h-4"></i></button>
+        <div class="fecha-pop"></div>
+      </div></div>
+    <div><label for="c-hasta">Hasta <span style="text-transform:none">— opcional</span></label>
+      <div class="fecha" id="w-hasta">
+        <input type="text" class="fecha-txt" id="c-hasta" readonly placeholder="dd/mm/aaaa">
+        <button type="button" class="fecha-btn" aria-label="Abrir calendario"><i data-lucide="calendar" class="w-4 h-4"></i></button>
+        <div class="fecha-pop"></div>
+      </div></div>
+  </div>
+  <div class="hint">Fuera de la ventana no se atribuye nada a la campaña.</div>
+
+  <label for="c-publico">Público al que le hablamos</label>
+  <textarea id="c-publico" placeholder="Vecinos de Ranelagh y Berazategui. Clientes de paso de la avenida. Gente de Ardora Sport."></textarea>
+  <div class="hint">Es lo que después le permite al creativo proponer acciones que sirvan.</div>
+
+  <div class="dos">
+    <div><label for="c-presu">Presupuesto previsto</label><input type="number" id="c-presu" min="0" placeholder="opcional"></div>
+    <div><label for="c-estado">Estado</label><select id="c-estado">
+      <option value="borrador">Borrador</option><option value="activa">Activa</option>
+      <option value="pausada">Pausada</option><option value="cerrada">Cerrada</option></select></div>
+  </div>
+
+  <div class="err" id="c-err"></div>
+  <div style="display:flex;gap:10px;margin-top:18px">
+    <button class="btn" onclick="guardarCampania()">Guardar</button>
+    <button class="btn2" onclick="cerrar('ov-camp')">Cancelar</button>
+  </div>
+</div></div>
+
+<!-- ══════════ Diálogo: detalle + acciones ══════════ -->
+<div class="ov" id="ov-det"><div class="dlg" style="width:min(760px,100%)">
+  <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+    <h2 class="display font-bold text-lg" id="d-nombre">Campaña</h2>
+    <span class="pill" id="d-estado"></span>
+    <button class="btn2" style="margin-left:auto" onclick="editarActual()">Editar</button>
+    <button class="iconbtn" onclick="cerrar('ov-det')" title="Cerrar">×</button>
+  </div>
+  <div class="meta" id="d-meta" style="margin-top:6px"></div>
+  <div id="d-avance" style="margin-top:12px"></div>
+
+  <div style="display:flex;align-items:baseline;gap:10px;margin-top:22px">
+    <div class="mono" style="font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--u-mut)">Acciones</div>
+    <button class="btn2" style="margin-left:auto" onclick="abrirAccion()">Agregar acción</button>
+  </div>
+  <div id="d-acciones" style="margin-top:8px"></div>
+</div></div>
+
+<!-- ══════════ Diálogo: acción ══════════ -->
+<div class="ov" id="ov-acc"><div class="dlg">
+  <h2 class="display font-bold text-lg mb-1" id="a-tit">Nueva acción</h2>
+  <p class="mono2" style="color:var(--u-mut);font-size:.66rem">Una acción se engancha a algo que el negocio ya tiene.</p>
+  <input type="hidden" id="a-id">
+  <label for="a-tipo">Tipo</label>
+  <select id="a-tipo" onchange="cambiarTipo()"></select>
+  <div class="hint" id="a-tipo-hint"></div>
+
+  <label for="a-nombre">Nombre</label>
+  <input type="text" id="a-nombre" placeholder="Invitaciones a comercios del paseo">
+
+  <div id="a-ref-box">
+    <label for="a-ref">A qué se engancha</label>
+    <select id="a-ref"></select>
+    <div class="hint" id="a-ref-hint"></div>
+  </div>
+
+  <div class="dos">
+    <div><label for="a-costo">Costo previsto</label><input type="number" id="a-costo" min="0" placeholder="opcional"></div>
+    <div><label for="a-volumen">Volumen declarado</label><input type="number" id="a-volumen" min="0" placeholder="ej. 500 folletos">
+      <div class="hint">Lo que nadie mide y alguien carga. Se muestra distinto de lo medido.</div></div>
+  </div>
+
+  <label for="a-estado">Estado</label>
+  <select id="a-estado">
+    <option value="planificada">Planificada</option><option value="activa">Activa</option>
+    <option value="terminada">Terminada</option><option value="descartada">Descartada</option>
+  </select>
+
+  <div class="err" id="a-err"></div>
+  <div style="display:flex;gap:10px;margin-top:18px">
+    <button class="btn" onclick="guardarAccion()">Guardar</button>
+    <button class="btn2" onclick="cerrar('ov-acc')">Cancelar</button>
+  </div>
+</div></div>
+
+<div id="toast" class="toast"></div>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="campo-fecha.js"></script>
+<script src="shell.js"></script>
+<script>ClausinaShell({active:'campanias'});</script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let _t; function toast(m,e){ const t=$('toast'); t.textContent=m; t.classList.toggle('err',!!e); t.classList.add('show'); clearTimeout(_t); _t=setTimeout(()=>t.classList.remove('show'),3400); }
+function cerrar(id){ $(id).classList.remove('on'); }
+
+let CAMPS=[], OBJETIVOS=[], TIPOS=[], DET=null;
+let fDesde, fHasta;   // los campos de fecha propios del panel
+
+const fecha = iso => iso ? String(iso).slice(0,10).split('-').reverse().join('/') : '';
+
+async function cargar(){
+  try{
+    const [cat, d] = await Promise.all([
+      fetch('api/campanias/catalogos').then(r=>r.json()),
+      fetch('api/campanias').then(r=>r.json()),
+    ]);
+    OBJETIVOS = cat.objetivos || []; TIPOS = cat.tipos || [];
+    CAMPS = d.campanias || [];
+    pintar();
+  }catch(e){ $('sub').textContent='sin conexión'; }
+}
+
+function pintar(){
+  const f = $('f-estado').value;
+  const lista = f ? CAMPS.filter(c=>c.estado===f) : CAMPS;
+  $('sub').textContent = CAMPS.length ? `${CAMPS.length} campaña(s)` : 'todavía no hay campañas';
+  $('grid').innerHTML = lista.length ? lista.map(c=>{
+    const o = OBJETIVOS.find(x=>x.id===c.objetivo_tipo);
+    return `<div class="ccard" onclick="abrirDet('${c.id}')">
+      <div style="display:flex;align-items:center;gap:8px">
+        <h3>${esc(c.nombre)}</h3><span class="pill ${esc(c.estado)}" style="margin-left:auto">${esc(c.estado)}</span>
+      </div>
+      <div class="meta">${fecha(c.desde)}${c.hasta?' → '+fecha(c.hasta):' → abierta'}
+        · ${c.acciones} acción(es)</div>
+      <div class="meta">${esc(o?o.label:c.objetivo_tipo)}${c.meta_valor?': meta '+Math.round(c.meta_valor):''}</div>
+    </div>`;
+  }).join('') : '<div class="mono" style="font-size:.7rem;color:var(--u-mut)">— nada con ese filtro —</div>';
+}
+
+/* ═══════ Campaña ═══════ */
+function abrirCampania(c){
+  c = c || null;
+  $('c-tit').textContent = c ? 'Editar campaña' : 'Nueva campaña';
+  $('c-id').value = c ? c.id : '';
+  $('c-nombre').value = c ? c.nombre : '';
+  $('c-objetivo').value = c ? (c.objetivo||'') : '';
+  $('c-tipo').innerHTML = OBJETIVOS.map(o=>`<option value="${esc(o.id)}">${esc(o.label)}</option>`).join('');
+  $('c-tipo').value = c ? c.objetivo_tipo : 'clientes_nuevos';
+  pintarHintTipo();
+  $('c-meta').value = c && c.meta_valor ? Math.round(c.meta_valor) : '';
+  $('c-publico').value = c ? (c.publico||'') : '';
+  $('c-presu').value = c && c.presupuesto ? Math.round(c.presupuesto) : '';
+  $('c-estado').value = c ? c.estado : 'borrador';
+  // Los campos de fecha son los del panel (dd/mm/aaaa con su propio calendario): el <input
+  // type=date> del navegador ya nos hizo guardar un 28/8 como 8/2.
+  if(!fDesde) fDesde = CampoFecha($('w-desde'), {});
+  if(!fHasta) fHasta = CampoFecha($('w-hasta'), {});
+  fDesde.valor = c ? c.desde : '';
+  fHasta.valor = c && c.hasta ? c.hasta : '';
+  if(window.lucide) lucide.createIcons();
+  $('c-err').textContent='';
+  $('ov-camp').classList.add('on');
+}
+$('c-tipo').addEventListener('change', pintarHintTipo);
+function pintarHintTipo(){
+  const o = OBJETIVOS.find(x=>x.id===$('c-tipo').value);
+  $('c-tipo-hint').textContent = o ? o.desc : '';
+}
+
+async function guardarCampania(){
+  const err=$('c-err'); err.textContent='';
+  const id=$('c-id').value;
+  const body={ nombre:$('c-nombre').value, objetivo:$('c-objetivo').value,
+    objetivo_tipo:$('c-tipo').value, meta_valor:$('c-meta').value,
+    desde:fDesde.valor, hasta:fHasta.valor, publico:$('c-publico').value,
+    presupuesto:$('c-presu').value };
+  try{
+    const r=await fetch('api/campanias'+(id?'/'+id:''),{method:id?'PUT':'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(x=>x.json());
+    if(!r.ok){ err.textContent=r.mensaje||'No se pudo guardar'; return; }
+    if(id && $('c-estado').value){
+      await fetch('api/campanias/'+id+'/estado',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({estado:$('c-estado').value})});
+    }
+    cerrar('ov-camp'); await cargar();
+    abrirDet(r.campania.id);
+  }catch(e){ err.textContent='Error de conexión'; }
+}
+
+/* ═══════ Detalle ═══════ */
+async function abrirDet(id){
+  DET=id;
+  const c = await fetch('api/campanias/'+id).then(r=>r.json());
+  if(c.error){ toast('No se pudo abrir',true); return; }
+  DET_DATA = c;
+  const o = OBJETIVOS.find(x=>x.id===c.objetivo_tipo);
+  $('d-nombre').textContent = c.nombre;
+  $('d-estado').className = 'pill '+c.estado; $('d-estado').textContent = c.estado;
+  $('d-meta').innerHTML = [
+    `${fecha(c.desde)}${c.hasta?' → '+fecha(c.hasta):' → abierta'}`,
+    o ? `${o.label}${c.meta_valor?': meta '+Math.round(c.meta_valor):''}` : '',
+    c.objetivo ? esc(c.objetivo) : '',
+    c.publico ? 'Público: '+esc(c.publico) : '',
+  ].filter(Boolean).join('<br>');
+  // El avance se muestra recién cuando haya medición (F7b): hoy sería un cero que confunde.
+  $('d-avance').innerHTML = '';
+  $('d-acciones').innerHTML = (c.acciones||[]).length ? c.acciones.map(a=>{
+    const t = TIPOS.find(x=>x.id===a.tipo);
+    const ref = a.beneficio_nombre || a.grafica_nombre || a.pieza_nombre || a.pauta_nombre || a.link_etiqueta;
+    return `<div class="arow">
+      <div style="min-width:0;flex:1">
+        <div style="font-size:.92rem;font-weight:600">${esc(a.nombre)}</div>
+        <div class="meta">${esc(t?t.label:a.tipo)}${ref?' · '+esc(ref):' · <span style="color:#E0A458">sin enganchar</span>'}
+          ${a.volumen_declarado?' · '+a.volumen_declarado+' declarado(s)':''}</div>
+      </div>
+      <span class="pill ${esc(a.estado)}">${esc(a.estado)}</span>
+      <button class="iconbtn" onclick='abrirAccion(${JSON.stringify(a)})' title="Editar">
+        <i data-lucide="pencil" class="w-4 h-4"></i></button>
+    </div>`;
+  }).join('') : '<div class="mono" style="font-size:.7rem;color:var(--u-mut);padding:10px 0">Todavía no hay acciones. Agregá la primera.</div>';
+  if(window.lucide) lucide.createIcons();
+  $('ov-det').classList.add('on');
+}
+let DET_DATA=null;
+function editarActual(){ if(DET_DATA){ cerrar('ov-det'); abrirCampania(DET_DATA); } }
+
+/* ═══════ Acción ═══════ */
+function abrirAccion(a){
+  a = a || null;
+  $('a-tit').textContent = a ? 'Editar acción' : 'Nueva acción';
+  $('a-id').value = a ? a.id : '';
+  $('a-tipo').innerHTML = TIPOS.map(t=>`<option value="${esc(t.id)}">${esc(t.label)}</option>`).join('');
+  $('a-tipo').value = a ? a.tipo : 'invitaciones';
+  $('a-nombre').value = a ? a.nombre : '';
+  $('a-costo').value = a && a.costo_previsto ? Math.round(a.costo_previsto) : '';
+  $('a-volumen').value = a && a.volumen_declarado ? a.volumen_declarado : '';
+  $('a-estado').value = a ? a.estado : 'planificada';
+  $('a-err').textContent='';
+  cambiarTipo(a ? (a.beneficio_id||a.grafica_id||a.pieza_id||a.pauta_id||a.link_id) : null);
+  $('ov-acc').classList.add('on');
+}
+
+async function cambiarTipo(preseleccion){
+  const t = TIPOS.find(x=>x.id===$('a-tipo').value);
+  $('a-tipo-hint').textContent = t ? t.desc : '';
+  // 'otra' no se engancha a nada: el selector sobra y confundiría.
+  const sinRef = !t || !t.campo;
+  $('a-ref-box').style.display = sinRef ? 'none' : '';
+  if(sinRef) return;
+  $('a-ref').innerHTML = '<option value="">cargando…</option>';
+  try{
+    const d = await fetch('api/campanias/opciones/'+encodeURIComponent(t.id)).then(r=>r.json());
+    const ops = d.opciones||[];
+    $('a-ref').innerHTML = '<option value="">— sin enganchar todavía —</option>' +
+      ops.map(o=>`<option value="${esc(o.id)}">${esc(o.label)}</option>`).join('');
+    if(preseleccion) $('a-ref').value = preseleccion;
+    $('a-ref-hint').textContent = ops.length ? 'Sale de lo que el negocio ya tiene.'
+      : 'Todavía no hay nada de este tipo. Podés crear la acción igual y engancharla después.';
+  }catch(e){ $('a-ref').innerHTML='<option value="">no se pudo cargar</option>'; }
+}
+
+async function guardarAccion(){
+  const err=$('a-err'); err.textContent='';
+  const id=$('a-id').value;
+  const body={ tipo:$('a-tipo').value, nombre:$('a-nombre').value, ref:$('a-ref').value||null,
+    costo_previsto:$('a-costo').value, volumen_declarado:$('a-volumen').value, estado:$('a-estado').value };
+  try{
+    const r=await fetch('api/campanias/'+DET+'/acciones'+(id?'/'+id:''),{method:id?'PUT':'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(x=>x.json());
+    if(!r.ok){ err.textContent=r.mensaje||'No se pudo guardar'; return; }
+    cerrar('ov-acc'); await cargar(); abrirDet(DET);
+  }catch(e){ err.textContent='Error de conexión'; }
+}
+
+cargar();
+</script>
+</body>
+</html>
