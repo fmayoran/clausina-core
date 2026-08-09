@@ -29,6 +29,15 @@ def psql(sql, cid):
     return r.stdout
 
 
+def _sin_frontmatter(t):
+    """Quita el bloque `---` inicial si lo hay. El frontmatter lo arma este script."""
+    t = t.lstrip("\n")
+    if not t.startswith("---"):
+        return t
+    fin = t.find("\n---", 3)
+    return t[fin + 4:].lstrip("\n") if fin > 0 else t
+
+
 def main():
     cid = _cid()
     if not cid:
@@ -50,6 +59,10 @@ def main():
         if not cuerpo.strip():
             print(f"  {slug}: vacío, no se escribe")
             continue
+        # El cuerpo puede traer su propio frontmatter (lo traía el que se migró de los archivos):
+        # se saca antes de escribir. Dos bloques `---` seguidos hacen que el segundo se lea como
+        # texto y la skill quede con una descripción que nadie puso.
+        cuerpo = _sin_frontmatter(cuerpo)
         d = os.path.join(DESTINO, slug)
         os.makedirs(d, exist_ok=True)
         # El frontmatter se arma acá y no se guarda en la base: es lo que hace invocable a la
