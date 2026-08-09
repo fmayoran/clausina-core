@@ -599,27 +599,34 @@ async function duplicarGrafica(negocioId, id, nombreNuevo) {
 // Nueva iteración: se parte del diseño anterior y se aplica la instrucción de cambio.
 async function iterarGrafica(negocioId, id, d) {
   const { rows: [g] } = await pool.query(
-    'SELECT id, version_actual FROM contenido.grafica WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
+    'SELECT id, version_actual, caras FROM contenido.grafica WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
   if (!g) return { ok: false, error: 'no_existe' };
   let txt = (d.instruccion || '').trim();
 
-  // Cambio de fondo opcional durante la iteración.
+  // Cambio de fondo opcional durante la iteración, en la cara que se pida. Sin la cara, cambiar
+  // la foto del dorso obligaba a pedirlo por texto y esperar que el creativo eligiera bien.
   const modo = ['biblioteca', 'subido', 'generar', 'sin_fondo'].includes(d.fondo_modo) ? d.fondo_modo : null;
   if (modo) {
+    const alDorso = d.cara === 'dorso' && g.caras === 2;
+    const col = alDorso
+      ? { modo: 'fondo_dorso_modo', url: 'fondo_dorso_url', prompt: 'fondo_dorso_prompt', campo: 'fondo_dorso_url' }
+      : { modo: 'fondo_modo', url: 'fondo_url', prompt: 'fondo_prompt', campo: 'fondo_url' };
     const url = (d.fondo_url || '').trim();
     const prompt = (d.fondo_prompt || '').trim();
-    // El job genera un fondo IA cuando modo='generar' y fondo_url viene vacío; para biblioteca/subido
+    // El job genera un fondo IA cuando modo='generar' y la url viene vacía; para biblioteca/subido
     // guardamos la URL elegida; sin_fondo limpia la imagen.
     await pool.query(
-      'UPDATE contenido.grafica SET fondo_modo=$2, fondo_url=$3, fondo_prompt=$4 WHERE id=$1',
+      `UPDATE contenido.grafica SET ${col.modo}=$2, ${col.url}=$3, ${col.prompt}=$4 WHERE id=$1`,
       [id, modo, (modo === 'biblioteca' || modo === 'subido') ? (url || null) : null, modo === 'generar' ? (prompt || null) : null]);
-    // El diseño anterior tiene el fondo viejo embebido: hay que decirle explícitamente que lo cambie.
+    // El diseño anterior tiene el fondo viejo embebido: hay que decirle explícitamente que lo
+    // cambie, y en qué cara — el HTML anterior trae las dos.
+    const donde = alDorso ? 'del DORSO' : (g.caras === 2 ? 'del FRENTE' : '');
     const nota = {
-      biblioteca: 'Cambiá la imagen de fondo por la nueva del contexto (fondo_url).',
-      subido: 'Cambiá la imagen de fondo por la nueva del contexto (fondo_url).',
-      generar: 'Se generó un fondo nuevo: usá esa imagen (fondo_url) en lugar del fondo anterior.',
-      sin_fondo: 'Quitá la imagen de fondo: rediseñá sin foto, con fondo de color de la marca.',
-    }[modo];
+      biblioteca: `Cambiá la imagen de fondo ${donde} por la nueva del contexto (${col.campo}).`,
+      subido: `Cambiá la imagen de fondo ${donde} por la nueva del contexto (${col.campo}).`,
+      generar: `Se generó un fondo nuevo ${donde}: usá esa imagen (${col.campo}) en lugar de la anterior.`,
+      sin_fondo: `Quitá la imagen de fondo ${donde}: rediseñá esa cara sin foto, con fondo de color de la marca.`,
+    }[modo].replace(/\s{2,}/g, ' ').replace(' :', ':');
     txt = txt ? `${txt}. ${nota}` : nota;
   }
   if (!txt) return { ok: false, error: 'sin_instruccion' };

@@ -168,6 +168,10 @@
         <textarea id="d-instr" placeholder="El título más grande. Sacá el QR."></textarea>
         <div class="gsub" id="d-caras-nota" style="display:none;margin-top:5px">Esta pieza tiene dos caras: decí en cuál — «en el dorso, agregá los horarios».</div></div>
       <div class="fl"><label>Imagen de fondo</label>
+        <div class="opts" id="d-cara" style="display:none;margin-bottom:7px">
+          <div class="opt on" data-cara="frente" onclick="dSetCara('frente')">Del frente</div>
+          <div class="opt" data-cara="dorso" onclick="dSetCara('dorso')">Del dorso</div>
+        </div>
         <div class="opts" id="d-fondo">
           <div class="opt on" data-modo="mantener" onclick="dSetFondo('mantener')">Mantener</div>
           <div class="opt" data-modo="biblioteca" onclick="dSetFondo('biblioteca')">Biblioteca</div>
@@ -203,7 +207,7 @@ function salir(){ fetch('api/logout',{method:'POST'}).then(()=>location.href='lo
 function cerrar(id){ document.getElementById(id).style.display='none'; if(id==='ov-det') DET=null; }
 
 const DATOS = [['direccion','Dirección'],['telefono','Teléfono'],['whatsapp','WhatsApp'],['instagram','Instagram'],['web','Web'],['qr','Código QR']];
-let FORMATOS=[], PIEZAS=[], FONDO_MODO='sin_fondo', FONDO_URL='', CARAS=1, DET=null, _poll=null;
+let FORMATOS=[], PIEZAS=[], FONDO_MODO='sin_fondo', FONDO_URL='', CARAS=1, DET=null, _poll=null, DCARA='frente';
 let QRDEST='web';
 function setQr(d){
   QRDEST=d;
@@ -383,9 +387,17 @@ async function crearPieza(){
 
 // --- Cambiar el fondo al iterar (aislado del alta) ---
 let DFONDO = { modo:'mantener', url:'', prompt:'' };
-function dResetFondo(){ DFONDO={modo:'mantener',url:'',prompt:''};
+function dResetFondo(){ DFONDO={modo:'mantener',url:'',prompt:''}; DCARA='frente';
   document.querySelectorAll('#d-fondo .opt').forEach(o=>o.classList.toggle('on',o.dataset.modo==='mantener'));
+  document.querySelectorAll('#d-cara .opt').forEach(o=>o.classList.toggle('on',o.dataset.cara==='frente'));
   const x=document.getElementById('d-fondo-extra'); if(x) x.innerHTML=''; }
+// A qué cara apunta el cambio de fondo. Cambiarla resetea la elección: arrastrar la imagen
+// elegida para el frente al dorso sería aplicar en un lado lo que se pidió para el otro.
+function dSetCara(c){
+  DCARA=c;
+  document.querySelectorAll('#d-cara .opt').forEach(o=>o.classList.toggle('on',o.dataset.cara===c));
+  dSetFondo('mantener');
+}
 function dSetFondo(m){
   DFONDO={modo:m,url:'',prompt:''};
   document.querySelectorAll('#d-fondo .opt').forEach(o=>o.classList.toggle('on',o.dataset.modo===m));
@@ -430,6 +442,7 @@ async function refrescarDet(){
   document.getElementById('d-nombre').textContent = (g.numero? cod(g.numero)+' · ':'') + g.nombre;
   document.getElementById('d-meta').textContent=`${f?f.label:g.formato} · ${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm · ${g.estado}`;
   document.getElementById('d-caras-nota').style.display = g.caras===2 ? '' : 'none';
+  document.getElementById('d-cara').style.display = g.caras===2 ? '' : 'none';
   const vs=g.versiones||[], activa=vs.find(v=>v.estado==='lista')||vs[0];
   const enCurso=vs.some(v=>v.estado==='pendiente'||v.estado==='procesando');
   if(enCurso){
@@ -459,7 +472,7 @@ async function iterar(){
   if(!txt && !cambiaFondo){ err.textContent='Escribí qué querés cambiar (o cambiá el fondo)'; return; }
   if(cambiaFondo && (DFONDO.modo==='biblioteca'||DFONDO.modo==='subido') && !DFONDO.url){ err.textContent='Elegí la imagen de fondo'; return; }
   const body={ instruccion:txt };
-  if(cambiaFondo){ body.fondo_modo=DFONDO.modo; body.fondo_url=DFONDO.url;
+  if(cambiaFondo){ body.fondo_modo=DFONDO.modo; body.fondo_url=DFONDO.url; body.cara=DCARA;
     body.fondo_prompt=(document.getElementById('d-prompt')||{}).value||''; }
   const b=document.getElementById('d-iter'); b.disabled=true; b.textContent='Enviando…';
   try{
