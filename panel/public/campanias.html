@@ -193,6 +193,8 @@
   <div class="meta" id="d-meta" style="margin-top:6px"></div>
   <div id="d-avance" style="margin-top:12px"></div>
 
+  <div id="d-propuesta" style="margin-top:22px"></div>
+
   <div style="display:flex;align-items:baseline;gap:10px;margin-top:22px">
     <div class="mono" style="font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--u-mut)">Acciones</div>
     <button class="btn2" style="margin-left:auto" onclick="abrirAccion()">Agregar acción</button>
@@ -246,7 +248,7 @@
 const $ = id => document.getElementById(id);
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let _t; function toast(m,e){ const t=$('toast'); t.textContent=m; t.classList.toggle('err',!!e); t.classList.add('show'); clearTimeout(_t); _t=setTimeout(()=>t.classList.remove('show'),3400); }
-function cerrar(id){ $(id).classList.remove('on'); }
+function cerrar(id){ $(id).classList.remove('on'); if(id==='ov-det'){ clearInterval(_pollProp); _pollProp=null; } }
 
 let CAMPS=[], OBJETIVOS=[], TIPOS=[], DET=null;
 let fDesde, fHasta;   // los campos de fecha propios del panel
@@ -364,7 +366,87 @@ async function abrirDet(id){
     </div>`;
   }).join('') : '<div class="mono" style="font-size:.7rem;color:var(--u-mut);padding:10px 0">Todavía no hay acciones. Agregá la primera.</div>';
   if(window.lucide) lucide.createIcons();
+  pintarPropuesta();
   $('ov-det').classList.add('on');
+}
+
+/* ═══════ La propuesta del creativo ═══════ */
+let _pollProp = null;
+
+async function pintarPropuesta(){
+  const box = $('d-propuesta'); if(!box || !DET) return;
+  let p = null;
+  try{ p = await fetch('api/campanias/'+DET+'/propuesta').then(r=>r.json()); }catch(e){ return; }
+  const enCurso = p && (p.estado==='pendiente' || p.estado==='procesando');
+  // Mientras corre se recarga solo: es un trabajo de minutos y nadie va a estar refrescando.
+  clearInterval(_pollProp); _pollProp = null;
+  if(enCurso) _pollProp = setInterval(pintarPropuesta, 8000);
+
+  if(!p || !p.estado){
+    box.innerHTML = `<div class="arow" style="border:1px dashed var(--u-line);border-radius:12px;padding:14px 16px">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:.94rem">¿Le pedimos las acciones al creativo?</div>
+        <div class="meta">Lee la identidad del negocio y esta campaña —objetivo, público, ventana y
+          presupuesto— y propone un plan por público. No crea nada: vos aceptás lo que sirva.</div>
+      </div>
+      <button class="btn" onclick="pedirPropuesta()">Pedir propuesta</button></div>`;
+    return;
+  }
+  if(enCurso){
+    box.innerHTML = `<div class="arow" style="border:1px dashed var(--u-line);border-radius:12px;padding:14px 16px">
+      <div class="meta">El creativo está armando la propuesta… puede tardar unos minutos.</div></div>`;
+    return;
+  }
+  if(p.estado==='error'){
+    box.innerHTML = `<div class="arow" style="border:1px solid var(--u-mal);border-radius:12px;padding:14px 16px">
+      <div style="flex:1"><div class="meta" style="color:var(--u-mal)">${esc(p.error||'No se pudo')}</div></div>
+      <button class="btn2" onclick="pedirPropuesta()">Reintentar</button></div>`;
+    return;
+  }
+  // Lista: el resumen y las acciones sugeridas, cada una con su porqué y cómo se mide.
+  const yaAceptadas = new Set((DET_DATA.acciones||[]).filter(a=>a.propuesta_id===p.id).map(a=>a.nombre));
+  box.innerHTML =
+    `<div style="border:1px solid var(--u-line);border-radius:12px;padding:16px 18px">
+      <div class="mono" style="font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--u-mut);margin-bottom:8px">Propuesta del creativo</div>
+      <div style="font-size:.9rem;line-height:1.6;white-space:pre-wrap">${esc(p.resumen||'')}</div>
+      <div style="margin-top:14px">${(p.acciones||[]).map((a,i)=>{
+        const ya = yaAceptadas.has(a.nombre);
+        return `<div class="arow">
+          <div style="min-width:0;flex:1">
+            <div style="font-size:.92rem;font-weight:600">${esc(a.nombre||'')}${a.hay_que_crear?' <span class="pill planificada">hay que crearlo</span>':''}</div>
+            <div class="meta">${esc(a.tipo||'')}${a.publico?' · '+esc(a.publico):''}</div>
+            <div class="meta" style="opacity:.85">${esc(a.por_que||'')}</div>
+            ${a.como_se_mide?`<div class="meta" style="opacity:.75">Se mide: ${esc(a.como_se_mide)}</div>`:''}
+            ${a.cuando?`<div class="meta" style="opacity:.75">Cuándo: ${esc(a.cuando)}</div>`:''}
+          </div>
+          ${ya ? '<span class="pill activa">aceptada</span>'
+               : `<button class="btn2" onclick="aceptarSugerencia('${p.id}',${i})">Aceptar</button>`}
+        </div>`;
+      }).join('')}</div>
+      <div style="margin-top:12px"><button class="btn2" onclick="pedirPropuesta()">Pedir otra propuesta</button></div>
+    </div>`;
+}
+
+async function pedirPropuesta(){
+  const extra = prompt('¿Algo que quieras aclararle al creativo? (opcional)', '');
+  if(extra===null) return;
+  try{
+    const r = await fetch('api/campanias/'+DET+'/propuesta',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({instruccion:extra})}).then(x=>x.json());
+    if(!r.ok){ toast(r.error==='ya_en_curso'?'Ya hay una propuesta en camino':'No se pudo pedir',true); return; }
+    toast('Pedido al creativo — tarda unos minutos');
+    pintarPropuesta();
+  }catch(e){ toast('Error de conexión',true); }
+}
+
+async function aceptarSugerencia(pid, i){
+  try{
+    const r = await fetch(`api/campanias/${DET}/propuesta/${pid}/aceptar`,{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({indice:i})}).then(x=>x.json());
+    if(!r.ok){ toast('No se pudo aceptar',true); return; }
+    toast('Acción agregada — elegí a qué se engancha');
+    await cargar(); abrirDet(DET);
+  }catch(e){ toast('Error de conexión',true); }
 }
 let DET_DATA=null;
 function editarActual(){ if(DET_DATA){ cerrar('ov-det'); abrirCampania(DET_DATA); } }

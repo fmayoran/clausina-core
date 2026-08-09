@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "skill_sync", "contexto_sync", "marca_capsula", "descubrimiento", "voz", "tarjeta", "marca_gen", "grafica"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "skill_sync", "contexto_sync", "campania_propuesta", "marca_capsula", "descubrimiento", "voz", "tarjeta", "marca_gen", "grafica"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -167,6 +167,24 @@ def det_skill_sync():
     return jobs
 
 
+def det_campania_propuesta():
+    # El creativo propone las acciones de una campaña. Recuperación primero: el reloj corre desde
+    # que arrancó, no desde que se pidió (ver iniciado_en).
+    psql("UPDATE contenido.campania_propuesta SET estado='error', "
+         "error='Se quedó colgado. Probá de nuevo.', procesado_en=now() "
+         "WHERE estado='procesando' AND COALESCE(iniciado_en, creado_en) < now() - interval '40 minutes'")
+    jobs = []
+    for row in _lines("SELECT p.id||'|'||COALESCE(n.slug,'') FROM contenido.campania_propuesta p "
+                      "JOIN contenido.campania c ON c.id=p.campania_id "
+                      "JOIN contenido.negocios n ON n.id=c.negocio_id "
+                      "WHERE p.estado='pendiente' ORDER BY p.creado_en"):
+        pid, slug = row.split('|', 1)
+        if pid and slug:
+            jobs.append({"tipo": "campania_propuesta", "negocio_slug": slug,
+                         "payload": {"propuesta_id": pid}, "lock_key": f"campania_propuesta:{pid}"})
+    return jobs
+
+
 def det_contexto_sync():
     # El contexto que lee el creativo (CONTEXTO_MARCA / ESTILO / REFERENCIAS) se regenera cuando
     # cambia la Identidad del negocio. Antes sólo se rehacía al correr un job del creativo, así
@@ -313,6 +331,7 @@ DETECTORS = {
     "secrets_sync": det_secrets_sync,
     "skill_sync": det_skill_sync,
     "contexto_sync": det_contexto_sync,
+    "campania_propuesta": det_campania_propuesta,
     "marca_capsula": det_marca_capsula,
     "descubrimiento": det_descubrimiento,
     "voz": det_voz,

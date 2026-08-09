@@ -1570,6 +1570,20 @@ app.post('/api/campanias/:id/estado', async (req, res) => {
   catch (e) { res.status(400).json({ ok: false }); }
 });
 
+// El creativo propone las acciones. Se pide con la campaña en borrador y sin acciones.
+app.post('/api/campanias/:id/propuesta', async (req, res) => {
+  try { res.json(await db.pedirPropuestaCampania(req.negocioId, req.params.id, (req.body || {}).instruccion)); }
+  catch (e) { console.error('propuesta campania', e.message); res.status(500).json({ ok: false }); }
+});
+app.get('/api/campanias/:id/propuesta', async (req, res) => {
+  try { res.json(await db.getPropuestaCampania(req.negocioId, req.params.id) || { estado: null }); }
+  catch (e) { console.error('propuesta campania', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/campanias/:id/propuesta/:pid/aceptar', async (req, res) => {
+  try { res.json(await db.aceptarSugerencia(req.negocioId, req.params.id, req.params.pid, Number((req.body || {}).indice))); }
+  catch (e) { console.error('aceptar sugerencia', e.message); res.status(500).json({ ok: false }); }
+});
+
 // Qué se le puede colgar a una acción de cada tipo: siempre cosas que el negocio YA tiene.
 app.get('/api/campanias/opciones/:tipo', async (req, res) => {
   try { res.json({ opciones: await db.opcionesAccion(req.negocioId, String(req.params.tipo)) }); }

@@ -2143,6 +2143,61 @@ const TIPOS_ACCION = [
   { id: 'otra',         label: 'Otra',           desc: 'algo que no entra en las anteriores', campo: null },
 ];
 
+/**
+ * Pide al creativo que proponga las acciones. El momento es con la campaña en BORRADOR y sin
+ * acciones: después, el creativo llega tarde a opinar sobre algo ya decidido.
+ * Nunca crea nada — deja sugerencias para aceptar de a una.
+ */
+async function pedirPropuestaCampania(negocioId, campaniaId, instruccion) {
+  const { rows: [c] } = await pool.query(
+    'SELECT id FROM contenido.campania WHERE id=$1 AND negocio_id=$2', [campaniaId, negocioId]);
+  if (!c) return { ok: false, error: 'no_existe' };
+  try {
+    const { rows: [p] } = await pool.query(
+      `INSERT INTO contenido.campania_propuesta (campania_id, instruccion)
+       VALUES ($1,$2) RETURNING id`, [campaniaId, String(instruccion || '').trim() || null]);
+    return { ok: true, id: p.id };
+  } catch (e) {
+    // El único parcial impide dos en curso: pedir de nuevo mientras una corre gasta el doble.
+    if (e.code === '23505') return { ok: false, error: 'ya_en_curso' };
+    throw e;
+  }
+}
+
+/** La última propuesta de una campaña, con su estado. */
+async function getPropuestaCampania(negocioId, campaniaId) {
+  const { rows: [p] } = await pool.query(
+    `SELECT pr.* FROM contenido.campania_propuesta pr
+       JOIN contenido.campania c ON c.id = pr.campania_id
+      WHERE pr.campania_id=$1 AND c.negocio_id=$2 ORDER BY pr.creado_en DESC LIMIT 1`,
+    [campaniaId, negocioId]);
+  return p || null;
+}
+
+/**
+ * Acepta UNA acción sugerida. Se crea sin enganche: la sugerencia dice a qué debería colgarse,
+ * pero atarla automáticamente por coincidencia de nombre es la clase de adivinanza que después
+ * mide mal. La persona elige el objeto al editar la acción.
+ */
+async function aceptarSugerencia(negocioId, campaniaId, propuestaId, indice) {
+  const p = await getPropuestaCampania(negocioId, campaniaId);
+  if (!p || p.id !== propuestaId) return { ok: false, error: 'no_existe' };
+  const sug = (p.acciones || [])[indice];
+  if (!sug) return { ok: false, error: 'no_existe' };
+  const tipo = TIPOS_ACCION.some(t => t.id === sug.tipo) ? sug.tipo : 'otra';
+  const notas = [sug.publico ? `Público: ${sug.publico}` : '', sug.por_que || '',
+                 sug.como_se_mide ? `Medición: ${sug.como_se_mide}` : '',
+                 sug.cuando ? `Cuándo: ${sug.cuando}` : '',
+                 sug.hay_que_crear && sug.enganche ? `Hay que crear: ${sug.enganche}` : '']
+                .filter(Boolean).join('\n');
+  const { rows: [a] } = await pool.query(
+    `INSERT INTO contenido.campania_accion (campania_id, tipo, nombre, notas, propuesta_id, orden)
+     VALUES ($1,$2,$3,$4,$5,(SELECT COALESCE(max(orden),0)+1 FROM contenido.campania_accion WHERE campania_id=$1))
+     RETURNING *`,
+    [campaniaId, tipo, String(sug.nombre || 'Acción').slice(0, 160), notas || null, propuestaId]);
+  return { ok: true, accion: a };
+}
+
 async function getCampanias(negocioId) {
   const { rows } = await pool.query(
     `SELECT c.*,
@@ -3869,6 +3924,7 @@ module.exports = {
   muestraBeneficio, canjearEnMostrador,
 
   getSkills, getSkill, guardarSkill, getSkillHistorial, getSkillVersion,
+  pedirPropuestaCampania, getPropuestaCampania, aceptarSugerencia,
   OBJETIVOS_CAMPANIA, TIPOS_ACCION, getCampanias, getCampania, guardarCampania,
   estadoCampania, guardarAccion, borrarAccion, opcionesAccion,
   emitirInvitaciones, getInvitaciones, anularInvitacion, consultarInvitacion,
