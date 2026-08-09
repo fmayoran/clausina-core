@@ -1,14 +1,66 @@
 <!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ClaUsina — Campañas</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<script>(function(){try{var m=localStorage.getItem('clausina-mode');if(m==='light')document.documentElement.classList.remove('dark');}catch(e){}})();</script>
-<link rel="stylesheet" href="panel.css">
+<link rel="apple-touch-icon" href="fonts/clausina-icono-180.png">
+<script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tw.css">
 <link rel="stylesheet" href="campo-fecha.css">
 <style>
+  :root{--u-surf:#FFFFFF;--u-bg:#F7F5F1;--u-line:#DEDDD3;--u-fg:#0c0c0a;--u-mut:#5A616A;
+        --u-acc:#4d6800;--u-accfg:#FFFFFF;--u-ok:#4d6800;--u-mal:#C4442A;--u-medio:#8A6410;}
+  .dark{--u-surf:#12151A;--u-bg:#0c0c0a;--u-line:#20242B;--u-fg:#F5F2EC;--u-mut:#8A8F98;
+        --u-acc:#CCF24D;--u-accfg:#0c0c0a;--u-ok:#7BC96F;--u-mal:#FF6B4A;--u-medio:#E8A33D;}
+  .mtx{width:100%;border-collapse:separate;border-spacing:0;min-width:720px;}
+  .mtx th,.mtx td{padding:12px;text-align:left;border-bottom:1px solid var(--u-line);vertical-align:middle;}
+  .mtx tbody tr:last-child td{border-bottom:0;}
+  .mtx thead th{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.12em;
+                text-transform:uppercase;font-weight:400;white-space:nowrap;color:var(--u-mut);}
+  .mtx tbody tr:hover{background:rgba(127,127,127,.06);}
+  .mono2{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--u-mut);}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;
+        font-size:.6rem;padding:3px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap;}
+  /* Convención del panel: coral mientras falta algo, verde cuando está. Acá "activa" es verde
+     porque todavía sirve; ámbar es la que está a medio camino y gris la que ya no juega. */
+  .e-activa{color:var(--u-ok);} .e-en_uso{color:var(--u-medio);}
+  .e-agotada,.e-vencida,.e-anulada{color:var(--u-mut);}
+  /* El código es lo que se copia y se dicta: grande, monoespaciado y con el guión de lectura. */
+  .cod{font-family:'JetBrains Mono',monospace;font-size:.9rem;font-weight:500;color:var(--u-fg);
+       letter-spacing:.06em;background:none;border:0;cursor:pointer;padding:0;}
+  .cod:hover{color:var(--u-acc);}
+  td.acciones{white-space:nowrap;}
+  td.acciones .iconbtn + .iconbtn{margin-left:4px;}
+  .iconbtn{display:inline-grid;vertical-align:middle;place-items:center;width:32px;height:32px;border-radius:8px;
+           border:1px solid var(--u-line);color:var(--u-mut);transition:.15s;background:none;cursor:pointer;}
+  .iconbtn:hover{color:var(--u-fg);border-color:var(--u-fg);}
+  .iconbtn.mal:hover{color:var(--u-mal);border-color:var(--u-mal);}
+  label{display:block;font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.12em;
+        text-transform:uppercase;color:var(--u-mut);margin:14px 0 6px;}
+  input[type=text],input[type=number],input[type=date],select,textarea{width:100%;background:var(--u-bg);
+        border:1px solid var(--u-line);border-radius:8px;padding:9px 11px;font-family:'Inter',sans-serif;
+        font-size:.95rem;color:var(--u-fg);outline:none;}
+  textarea{min-height:80px;resize:vertical;}
+  input:focus,select:focus,textarea:focus{border-color:var(--u-acc);}
+  .btn{background:var(--u-acc);color:var(--u-accfg);border:none;border-radius:8px;font-weight:700;
+       padding:9px 18px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .btn2{background:none;border:1px solid var(--u-line);color:var(--u-mut);border-radius:8px;
+        padding:9px 18px;cursor:pointer;font-family:'Inter Tight',sans-serif;}
+  .btn2:hover{color:var(--u-fg);border-color:var(--u-fg);}
+  .btn2.mal:hover{color:var(--u-mal);border-color:var(--u-mal);}
+  .btn2:disabled{opacity:.4;cursor:default;}
+  .btn2:disabled:hover{color:var(--u-mut);border-color:var(--u-line);}
+  #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--u-surf);
+         border:1px solid var(--u-line);color:var(--u-fg);font-family:'JetBrains Mono',monospace;
+         font-size:.78rem;padding:11px 18px;border-radius:8px;opacity:0;transition:opacity .25s;
+         pointer-events:none;z-index:200;}
+  #toast.show{opacity:1;}
+  #toast.err{border-color:var(--u-mal);color:var(--u-mal);}
   .barra{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;}
   .ccard{border:1px solid var(--u-line);border-radius:14px;padding:16px 18px;background:var(--u-surf);
          cursor:pointer;transition:.15s;display:flex;flex-direction:column;gap:8px;}
@@ -185,7 +237,7 @@
   </div>
 </div></div>
 
-<div id="toast" class="toast"></div>
+<div id="toast"></div>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="campo-fecha.js"></script>
 <script src="shell.js"></script>
