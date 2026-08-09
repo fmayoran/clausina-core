@@ -2191,8 +2191,8 @@ async function aceptarSugerencia(negocioId, campaniaId, propuestaId, indice) {
                  sug.hay_que_crear && sug.enganche ? `Hay que crear: ${sug.enganche}` : '']
                 .filter(Boolean).join('\n');
   const { rows: [a] } = await pool.query(
-    `INSERT INTO contenido.campania_accion (campania_id, tipo, nombre, notas, propuesta_id, orden)
-     VALUES ($1,$2,$3,$4,$5,(SELECT COALESCE(max(orden),0)+1 FROM contenido.campania_accion WHERE campania_id=$1))
+    `INSERT INTO contenido.campania_accion (campania_id, tipo, nombre, notas, propuesta_id, estado, orden)
+     VALUES ($1,$2,$3,$4,$5,'borrador',(SELECT COALESCE(max(orden),0)+1 FROM contenido.campania_accion WHERE campania_id=$1))
      RETURNING *`,
     [campaniaId, tipo, String(sug.nombre || 'Acción').slice(0, 160), notas || null, propuestaId]);
   return { ok: true, accion: a };
@@ -2285,7 +2285,7 @@ async function guardarAccion(negocioId, campaniaId, id, d) {
   const refs = { pieza_id: null, grafica_id: null, beneficio_id: null, pauta_id: null, link_id: null };
   if (t.campo && /^[0-9a-f-]{36}$/i.test(String(d.ref || ''))) refs[t.campo] = d.ref;
   const num = v => (Number(v) >= 0 ? Number(v) : null);
-  const campos = [campaniaId, t.id, nombre, ['planificada','activa','terminada','descartada'].includes(d.estado) ? d.estado : 'planificada',
+  const campos = [campaniaId, t.id, nombre, ['borrador','planificada','activa','terminada','descartada'].includes(d.estado) ? d.estado : 'borrador',
                   Number(d.orden) || 0, refs.pieza_id, refs.grafica_id, refs.beneficio_id, refs.pauta_id, refs.link_id,
                   num(d.costo_previsto), num(d.costo_real), String(d.costo_nota || '').trim() || null,
                   num(d.volumen_declarado), String(d.notas || '').trim() || null];
@@ -2305,6 +2305,19 @@ async function guardarAccion(negocioId, campaniaId, id, d) {
        costo_previsto, costo_real, costo_nota, volumen_declarado, notas)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`, campos);
   return { ok: true, accion: r };
+}
+
+async function confirmarAccion(negocioId, campaniaId, id) {
+  const { rows: [a] } = await pool.query(
+    `SELECT a.* FROM contenido.campania_accion a JOIN contenido.campania c ON c.id=a.campania_id
+      WHERE a.id=$1 AND a.campania_id=$2 AND c.negocio_id=$3`, [id, campaniaId, negocioId]);
+  if (!a) return { ok: false, error: 'no_existe' };
+  const t = TIPOS_ACCION.find(x => x.id === a.tipo);
+  const enganchada = !t || !t.campo || !!a[t.campo];
+  if (!enganchada) return { ok: false, error: 'sin_enganche' };
+  await pool.query(
+    "UPDATE contenido.campania_accion SET estado='planificada', actualizado_en=now() WHERE id=$1", [id]);
+  return { ok: true };
 }
 
 async function borrarAccion(negocioId, campaniaId, id) {
@@ -3924,6 +3937,7 @@ module.exports = {
   muestraBeneficio, canjearEnMostrador,
 
   getSkills, getSkill, guardarSkill, getSkillHistorial, getSkillVersion,
+  confirmarAccion,
   pedirPropuestaCampania, getPropuestaCampania, aceptarSugerencia,
   OBJETIVOS_CAMPANIA, TIPOS_ACCION, getCampanias, getCampania, guardarCampania,
   estadoCampania, guardarAccion, borrarAccion, opcionesAccion,

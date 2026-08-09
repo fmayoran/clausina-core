@@ -70,7 +70,7 @@
   .pill{font-family:'JetBrains Mono',monospace;font-size:.58rem;text-transform:uppercase;
         letter-spacing:.1em;padding:2px 8px;border-radius:99px;border:1px solid var(--u-line);}
   .pill.activa{color:#CCF24D;border-color:#CCF24D;}
-  .pill.borrador{color:var(--u-mut);}
+  .pill.borrador{color:var(--u-mut);border-style:dashed;}
   .pill.pausada,.pill.planificada{color:#E0A458;border-color:#E0A458;}
   .pill.cerrada,.pill.terminada{color:var(--u-mut);opacity:.7;}
   .meta{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--u-mut);line-height:1.7;}
@@ -228,7 +228,8 @@
 
   <label for="a-estado">Estado</label>
   <select id="a-estado">
-    <option value="planificada">Planificada</option><option value="activa">Activa</option>
+    <option value="borrador">Borrador — todavía se está armando</option>
+    <option value="planificada">Planificada — confirmada, entra al plan</option><option value="activa">Activa</option>
     <option value="terminada">Terminada</option><option value="descartada">Descartada</option>
   </select>
 
@@ -281,7 +282,8 @@ function pintar(){
         · ${c.acciones} acción(es)</div>
       <div class="meta">${esc(o?o.label:c.objetivo_tipo)}${c.meta_valor?': meta '+Math.round(c.meta_valor):''}</div>
     </div>`;
-  }).join('') : '<div class="mono" style="font-size:.7rem;color:var(--u-mut)">— nada con ese filtro —</div>';
+  }).join('') : `<div class="mono" style="font-size:.7rem;color:var(--u-mut)">${
+    CAMPS.length ? '— nada con ese filtro —' : '— todavía no hay campañas: creá la primera —'}</div>`;
 }
 
 /* ═══════ Campaña ═══════ */
@@ -354,13 +356,16 @@ async function abrirDet(id){
   $('d-acciones').innerHTML = (c.acciones||[]).length ? c.acciones.map(a=>{
     const t = TIPOS.find(x=>x.id===a.tipo);
     const ref = a.beneficio_nombre || a.grafica_nombre || a.pieza_nombre || a.pauta_nombre || a.link_etiqueta;
-    return `<div class="arow">
+    const esBorrador = a.estado === 'borrador';
+    return `<div class="arow"${esBorrador?' style="border-left:2px solid var(--u-mut);padding-left:10px"':''}>
       <div style="min-width:0;flex:1">
         <div style="font-size:.92rem;font-weight:600">${esc(a.nombre)}</div>
         <div class="meta">${esc(t?t.label:a.tipo)}${ref?' · '+esc(ref):' · <span style="color:#E0A458">sin enganchar</span>'}
           ${a.volumen_declarado?' · '+a.volumen_declarado+' declarado(s)':''}</div>
+        ${a.notas?`<div class="meta" style="opacity:.7;white-space:pre-wrap;margin-top:3px">${esc(a.notas)}</div>`:''}
       </div>
       <span class="pill ${esc(a.estado)}">${esc(a.estado)}</span>
+      ${esBorrador?`<button class="btn2" style="padding:5px 12px;font-size:.8rem" onclick="confirmarAccion('${a.id}')">Confirmar</button>`:''}
       <button class="iconbtn" onclick='abrirAccion(${JSON.stringify(a)})' title="Editar">
         <i data-lucide="pencil" class="w-4 h-4"></i></button>
     </div>`;
@@ -368,6 +373,22 @@ async function abrirDet(id){
   if(window.lucide) lucide.createIcons();
   pintarPropuesta();
   $('ov-det').classList.add('on');
+}
+
+// Confirmar: la acción pasa del borrador al plan. Se exige que apunte a algo — confirmar una
+// acción sin enganche es agendar algo que después no se puede medir.
+async function confirmarAccion(id){
+  try{
+    const r = await fetch(`api/campanias/${DET}/acciones/${id}/confirmar`,{method:'POST'}).then(x=>x.json());
+    if(!r.ok){
+      toast(r.error==='sin_enganche'
+        ? 'Elegí primero a qué se engancha (el lápiz)'
+        : 'No se pudo confirmar', true);
+      return;
+    }
+    toast('Acción confirmada');
+    await cargar(); abrirDet(DET);
+  }catch(e){ toast('Error de conexión',true); }
 }
 
 /* ═══════ La propuesta del creativo ═══════ */
@@ -444,7 +465,7 @@ async function aceptarSugerencia(pid, i){
     const r = await fetch(`api/campanias/${DET}/propuesta/${pid}/aceptar`,{method:'POST',
       headers:{'Content-Type':'application/json'},body:JSON.stringify({indice:i})}).then(x=>x.json());
     if(!r.ok){ toast('No se pudo aceptar',true); return; }
-    toast('Acción agregada — elegí a qué se engancha');
+    toast('Agregada en borrador — editala y después confirmala');
     await cargar(); abrirDet(DET);
   }catch(e){ toast('Error de conexión',true); }
 }
@@ -461,7 +482,7 @@ function abrirAccion(a){
   $('a-nombre').value = a ? a.nombre : '';
   $('a-costo').value = a && a.costo_previsto ? Math.round(a.costo_previsto) : '';
   $('a-volumen').value = a && a.volumen_declarado ? a.volumen_declarado : '';
-  $('a-estado').value = a ? a.estado : 'planificada';
+  $('a-estado').value = a ? a.estado : 'borrador';
   $('a-err').textContent='';
   cambiarTipo(a ? (a.beneficio_id||a.grafica_id||a.pieza_id||a.pauta_id||a.link_id) : null);
   $('ov-acc').classList.add('on');

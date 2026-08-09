@@ -1600,6 +1600,12 @@ const guardarAcc = async (req, res) => {
 };
 app.post('/api/campanias/:id/acciones', guardarAcc);
 app.put('/api/campanias/:id/acciones/:accion', guardarAcc);
+app.post('/api/campanias/:id/acciones/:accion/confirmar', async (req, res) => {
+  try {
+    const r = await db.confirmarAccion(req.negocioId, req.params.id, req.params.accion);
+    res.status(r.ok ? 200 : 400).json(r);
+  } catch (e) { console.error('confirmar accion', e.message); res.status(500).json({ ok: false }); }
+});
 app.delete('/api/campanias/:id/acciones/:accion', async (req, res) => {
   try { res.json(await db.borrarAccion(req.negocioId, req.params.id, req.params.accion)); }
   catch (e) { res.status(500).json({ ok: false }); }
