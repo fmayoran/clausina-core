@@ -1,6 +1,11 @@
 # Campañas — diseño (09/08/2026)
 
-> Estado: **propuesta**, para cerrar con Fer antes de construir.
+> Estado: **cerrado con Fer el 09/08/2026**. A construir.
+>
+> Decidido: (1) la campaña de Meta pasa a llamarse `pauta_campania`; (2) la campaña lleva fechas
+> y meta numérica; (3) una acción pertenece a una sola campaña; (4) **el total de la campaña son
+> todas las reservas del período**, atribuidas u orgánicas, con el desglose a la vista;
+> (5) una campaña es de un solo negocio.
 
 Fer: *"Una campaña son un conjunto de acciones que buscan un objetivo final y están compuestas por
 distintas acciones de marketing, tanto físico como digital. Cada campaña tiene entidad y nos
@@ -143,8 +148,21 @@ duro. En la pantalla: los declarados van en gris y con un rótulo.
 **Última acción identificable, dentro de la ventana de la campaña.**
 
 Una reserva se atribuye a una acción si llegó por su link, o si usó un código de sus invitaciones.
-Si no tiene ninguna de las dos marcas, es **orgánica** y se cuenta aparte — no se reparte entre
-las acciones "a ojo".
+Si no tiene ninguna de las dos marcas, es **orgánica**: no se reparte entre las acciones "a ojo",
+pero **sí suma al total de la campaña** (decisión de Fer, 09/08).
+
+**Por qué el total incluye lo orgánico.** En un lanzamiento el efecto real no pasa por un clic:
+la gente ve el cartel de la ochava, se entera por un vecino y viene. Contar sólo lo medible
+escondería la mayor parte de lo que la campaña produjo. Y en el caso de Cortafuego no hay
+ambigüedad posible: el local abre el 18/8 y no había negocio antes, así que toda reserva del
+período es de la campaña.
+
+**Dónde esto se vuelve engañoso, y qué se hace al respecto.** Sobre un negocio que ya funciona,
+"todo lo del período" le regala a la campaña reservas que hubieran existido igual, y el costo por
+cliente sale más barato de lo que fue. Por eso el desglose —*"75, de las cuales 45 medidas"*—
+**no es decorativo y no se puede esconder**: es lo único que permite leer el número con criterio.
+Y cuando un negocio tenga historia, el mismo dato permite mostrar la línea de base (qué pasaba
+antes de la campaña) sin cambiar el modelo: ya está todo guardado.
 
 Lo que **no** se hace ahora: atribución multi-toque (repartir una reserva entre la publicación que
 la persona vio y el folleto que recibió). Suena mejor y es indefendible: no hay forma de saberlo,
@@ -171,8 +189,12 @@ El costo de las invitaciones es el más interesante y el único que ClaUsina pue
 un 20% sobre un ticket de $30.000 son $6.000 por uso consumido. Con `ticket_min`/`ticket_max` ya
 cargados sale un rango, no un número falsamente exacto.
 
-**CAC = costo total de la campaña ÷ clientes nuevos atribuidos.** "Cliente nuevo" = cliente cuya
+**CAC = costo total de la campaña ÷ clientes nuevos del período.** "Cliente nuevo" = cliente cuya
 **primera** reserva cayó dentro de la campaña. Ya se puede calcular con lo que hay.
+
+Se muestran los dos: el CAC sobre todos los clientes nuevos —el número que pidió Fer— y el CAC
+sobre los atribuidos, que es el techo. La distancia entre ambos dice cuánto de la campaña se está
+midiendo de verdad: si son muy distintos, faltan links y códigos en las acciones.
 
 ---
 
@@ -195,11 +217,11 @@ Cerrar F7a antes de empezar F7b: sin el hilo, la medición es una pantalla vací
 
 ---
 
-## 8. Lo que hay que decidir antes de construir
+## 8. Decisiones (cerradas el 09/08/2026)
 
-1. **¿Renombramos la campaña de Meta a `pauta_campania`?** (recomendado: sí)
-2. **¿La campaña lleva fechas y una meta numérica?** (recomendado: sí — sin número no hay
-   efectividad)
-3. **¿Una acción puede estar en dos campañas?** (recomendado: no — duplica las conversiones)
-4. **¿Qué hacemos con las reservas orgánicas?** (recomendado: mostrarlas aparte, nunca repartirlas)
-5. **¿La campaña puede cruzar negocios?** (recomendado: no; una campaña es de un negocio)
+1. ~~¿Renombramos la campaña de Meta?~~ → **sí**, `pauta_campania`.
+2. ~~¿Fechas y meta numérica?~~ → **sí**.
+3. ~~¿Una acción en dos campañas?~~ → **no**.
+4. ~~¿Qué hacemos con las reservas orgánicas?~~ → **suman al total**, con el desglose siempre
+   visible. Nunca se reparten entre acciones.
+5. ~~¿Una campaña cruza negocios?~~ → **no**.

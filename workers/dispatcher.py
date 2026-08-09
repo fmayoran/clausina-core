@@ -249,7 +249,7 @@ def det_campania_meta():
     jobs = []
     for accion, cond in specs.items():
         for row in _lines("SELECT c.id||'|'||COALESCE(p.slug,'cortafuego') "
-                          "FROM contenido.campanias c LEFT JOIN contenido.negocios p ON p.id=c.negocio_id "
+                          "FROM contenido.pauta_campania c LEFT JOIN contenido.negocios p ON p.id=c.negocio_id "
                           f"WHERE {cond} ORDER BY c.actualizado_en"):
             cmid, slug = row.split('|', 1)
             jobs.append({"tipo": "campania_meta", "negocio_slug": slug,

@@ -50,7 +50,7 @@ def config_for_campania(cid):
     row = psql(
         "SELECT coalesce(pp.meta_ads_account_id,'')||'|'||coalesce(pp.meta_ads_page_id,'')||'|'||"
         "coalesce(pp.meta_ads_ig_id,'')||'|'||coalesce(pp.meta_ads_token_enc,'')||'|'||p.slug "
-        "FROM contenido.campanias c JOIN contenido.negocios p ON p.id=c.negocio_id "
+        "FROM contenido.pauta_campania c JOIN contenido.negocios p ON p.id=c.negocio_id "
         "JOIN contenido.negocio_perfil pp ON pp.negocio_id=c.negocio_id "
         f"WHERE c.id='{cid}'")
     if not row:
@@ -105,7 +105,7 @@ def set_estado(cid, estado, resumen=None, meta=None):
         sets.append(f"resumen={dq(resumen[:2000])}")
     for k, v in (meta or {}).items():
         sets.append(f"{k}={dq(v)}")
-    psql(f"UPDATE contenido.campanias SET {', '.join(sets)} WHERE id='{cid}';")
+    psql(f"UPDATE contenido.pauta_campania SET {', '.join(sets)} WHERE id='{cid}';")
 
 
 # --- Resolución de targeting ---
@@ -176,7 +176,7 @@ def crear(cid):
                "c.url_destino,c.cta,c.meta_campaign_id,"
                "(SELECT r.ig_post_id FROM contenido.revisiones r WHERE r.pieza_id=c.pieza_id AND r.estado='publicada' LIMIT 1) ig_media,"
                "(SELECT p.dominio_web FROM contenido.negocios p WHERE p.id=c.negocio_id) dominio "
-               f"FROM contenido.campanias c WHERE c.id='{cid}') t;")
+               f"FROM contenido.pauta_campania c WHERE c.id='{cid}') t;")
     if not row:
         raise RuntimeError("campaña inexistente")
     d = json.loads(row)
@@ -256,7 +256,7 @@ def crear(cid):
 def _set_status(cid, status, nuevo_estado):
     token = config_for_campania(cid)["token"]
     ids = psql("SELECT coalesce(meta_campaign_id,'')||'|'||coalesce(meta_adset_id,'')||'|'||coalesce(meta_ad_id,'') "
-               f"FROM contenido.campanias WHERE id='{cid}';").split("|")
+               f"FROM contenido.pauta_campania WHERE id='{cid}';").split("|")
     for oid in ids:
         if oid:
             try:
@@ -273,7 +273,7 @@ def _set_status(cid, status, nuevo_estado):
 def borrar(cid):
     """Descartar una campaña ya creada: la borra en Meta (cascada a conjunto/anuncio) y marca descartada."""
     token = config_for_campania(cid)["token"]
-    camp = psql(f"SELECT coalesce(meta_campaign_id,'') FROM contenido.campanias WHERE id='{cid}';")
+    camp = psql(f"SELECT coalesce(meta_campaign_id,'') FROM contenido.pauta_campania WHERE id='{cid}';")
     if camp:
         try:
             graph("POST", camp, {"status": "DELETED", "access_token": token})
@@ -281,7 +281,7 @@ def borrar(cid):
             if "does not exist" not in str(e).lower() and "cannot be loaded" not in str(e).lower():
                 set_estado(cid, "error", f"No se pudo borrar en Meta: {e}")
                 raise
-    psql("UPDATE contenido.campanias SET estado='descartada', meta_campaign_id=NULL, "
+    psql("UPDATE contenido.pauta_campania SET estado='descartada', meta_campaign_id=NULL, "
          f"meta_adset_id=NULL, meta_ad_id=NULL, actualizado_en=now() WHERE id='{cid}';")
     return "ok"
 

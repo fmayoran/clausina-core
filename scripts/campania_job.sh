@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Campaña: el creativo PROPONE una campaña de pauta. Mira el contexto de marca + las
-# publicaciones ya publicadas (posibles creativos) y deja un BORRADOR en contenido.campanias
+# publicaciones ya publicadas (posibles creativos) y deja un BORRADOR en contenido.pauta_campania
 # (estado='propuesta'). NO crea nada en Meta, NO publica, NO toca landing/base/git.
 # Uso: campania_job.sh <slug> <solicitud_id>
 set -uo pipefail
@@ -70,7 +70,7 @@ if [ ! -s "/tmp/camp_res_$sid.json" ]; then
   exit 1
 fi
 
-# Insertar el borrador en contenido.campanias (estado='propuesta') y enlazar la solicitud.
+# Insertar el borrador en contenido.pauta_campania (estado='propuesta') y enlazar la solicitud.
 res=$(CID="$CID" SID="$sid" PID="$pid" python3 - <<'PY'
 import json, os, secrets, subprocess
 sid=os.environ["SID"]; cid=os.environ["CID"]; pid=os.environ["PID"]
@@ -102,7 +102,7 @@ fi=(d.get("fecha_inicio") or "").strip(); ff=(d.get("fecha_fin") or "").strip()
 fi_sql=f"'{fi}'" if fi else "NULL"; ff_sql=f"'{ff}'" if ff else "NULL"
 url=(d.get("url_destino") or "").strip() or None
 cta=(d.get("cta") or "").strip() or None
-sql=("INSERT INTO contenido.campanias "
+sql=("INSERT INTO contenido.pauta_campania "
      "(negocio_id,estado,nombre,objetivo,pieza_id,razon,audiencia,presupuesto,fecha_inicio,fecha_fin,url_destino,cta,resumen) "
      f"VALUES ('{pid}','propuesta',{dq(nombre)},'{objetivo}',{pieza_sql},{dq(razon)},{dq(aud)}::jsonb,{dq(pres)}::jsonb,"
      f"{fi_sql},{ff_sql},{('NULL' if url is None else dq(url))},{('NULL' if cta is None else dq(cta))},{dq(resumen)}) "

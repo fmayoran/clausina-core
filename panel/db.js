@@ -3424,7 +3424,7 @@ async function getCampanias(negocioId) {
             c.meta_campaign_id, c.creado_en, c.aprobado_en,
             pz.numero AS pieza_numero, r.ig_permalink AS pieza_permalink, r.caption AS pieza_caption,
             m.url AS pieza_url, m.poster_url AS pieza_poster, m.tipo AS pieza_tipo
-       FROM contenido.campanias c
+       FROM contenido.pauta_campania c
        LEFT JOIN contenido.piezas pz ON pz.id = c.pieza_id
        LEFT JOIN contenido.revisiones r ON r.pieza_id = c.pieza_id AND r.estado='publicada'
        LEFT JOIN contenido.media m ON m.pieza_id = c.pieza_id AND m.orden = 1
@@ -3438,14 +3438,14 @@ async function getCampanias(negocioId) {
 
 async function aprobarCampania(negocioId, id) {
   const { rowCount } = await pool.query(
-    `UPDATE contenido.campanias SET estado='aprobada', aprobado_en=now(), actualizado_en=now()
+    `UPDATE contenido.pauta_campania SET estado='aprobada', aprobado_en=now(), actualizado_en=now()
       WHERE id=$1 AND negocio_id=$2 AND estado='propuesta'`, [id, negocioId]);
   return rowCount > 0;
 }
 
 async function rechazarCampania(negocioId, id, motivo) {
   const { rowCount } = await pool.query(
-    `UPDATE contenido.campanias SET estado='rechazada', resumen=$3, actualizado_en=now()
+    `UPDATE contenido.pauta_campania SET estado='rechazada', resumen=$3, actualizado_en=now()
       WHERE id=$1 AND negocio_id=$2 AND estado IN ('propuesta','aprobada')`,
     [id, negocioId, (motivo || 'rechazada').slice(0, 2000)]);
   return rowCount > 0;
@@ -3455,7 +3455,7 @@ async function descartarCampania(negocioId, id) {
   // Si ya existe en Meta, dejamos el pedido 'descartar' (el worker la borra allá y marca descartada).
   // Si no, se descarta directo.
   const { rowCount } = await pool.query(
-    `UPDATE contenido.campanias
+    `UPDATE contenido.pauta_campania
         SET estado = CASE WHEN meta_campaign_id IS NOT NULL THEN 'descartar' ELSE 'descartada' END,
             actualizado_en=now()
       WHERE id=$1 AND negocio_id=$2 AND estado NOT IN ('descartada','descartar')`, [id, negocioId]);
@@ -3465,13 +3465,13 @@ async function descartarCampania(negocioId, id) {
 // Activar/pausar: el panel deja un pedido ('activar'/'pausar'); el worker lo aplica en Meta.
 async function activarCampania(negocioId, id) {
   const { rowCount } = await pool.query(
-    `UPDATE contenido.campanias SET estado='activar', actualizado_en=now()
+    `UPDATE contenido.pauta_campania SET estado='activar', actualizado_en=now()
       WHERE id=$1 AND negocio_id=$2 AND estado='pausada' AND meta_campaign_id IS NOT NULL`, [id, negocioId]);
   return rowCount > 0;
 }
 async function pausarCampania(negocioId, id) {
   const { rowCount } = await pool.query(
-    `UPDATE contenido.campanias SET estado='pausar', actualizado_en=now()
+    `UPDATE contenido.pauta_campania SET estado='pausar', actualizado_en=now()
       WHERE id=$1 AND negocio_id=$2 AND estado='activa'`, [id, negocioId]);
   return rowCount > 0;
 }
@@ -3491,7 +3491,7 @@ async function getCreativosDisponibles(negocioId) {
 // Cambiar el creativo (pieza) de una propuesta — sólo antes de crearse en Meta.
 async function setCreativoCampania(negocioId, id, piezaId) {
   const { rowCount } = await pool.query(
-    `UPDATE contenido.campanias SET pieza_id=$3, actualizado_en=now()
+    `UPDATE contenido.pauta_campania SET pieza_id=$3, actualizado_en=now()
       WHERE id=$1 AND negocio_id=$2 AND estado='propuesta'
         AND EXISTS (SELECT 1 FROM contenido.piezas WHERE id=$3 AND negocio_id=$2)`,
     [id, negocioId, piezaId]);
@@ -3500,7 +3500,7 @@ async function setCreativoCampania(negocioId, id, piezaId) {
 
 async function reintentarCampania(negocioId, id) {
   const { rowCount } = await pool.query(
-    `UPDATE contenido.campanias SET estado='aprobada', resumen=NULL, actualizado_en=now()
+    `UPDATE contenido.pauta_campania SET estado='aprobada', resumen=NULL, actualizado_en=now()
       WHERE id=$1 AND negocio_id=$2 AND estado='error' AND meta_campaign_id IS NULL`, [id, negocioId]);
   return rowCount > 0;
 }
