@@ -344,6 +344,10 @@
         </div>
         <label for="estilo_md">Sistema de diseño <span class="hint">— markdown: tokens, tipografía, logo, layout, voz. Es la fuente de verdad; el creativo lo baja a la cápsula como ESTILO.md.</span></label>
         <textarea id="estilo_md" style="min-height:340px;"></textarea>
+        <label for="referencias_md" style="margin-top:22px">Referencias de estilo <span class="hint">— cuentas y piezas que tomamos de referencia: qué aprender, cómo se traduce, qué NO copiar</span></label>
+        <textarea id="referencias_md" style="min-height:260px;"></textarea>
+        <div class="hint">Lo lee el creativo antes de proponer piezas o campañas. Se guarda en la
+          base y se regenera en la cápsula del negocio; no se edita el archivo a mano.</div>
       </div>
       <div class="card2">
         <div class="sec">Vista previa</div>
@@ -596,7 +600,7 @@ async function guardarFicha(confirmar) {
 
 /* ═══════════ Perfil: marca, brief, estilo, redes ═══════════ */
 const CAMPOS = ['nombre','slogan','ig_handle','dominio_web','email','whatsapp','ig_user_id',
-                'telegram_chat_id','logo','logo_claro','brief_md','estilo_md',
+                'telegram_chat_id','logo','logo_claro','brief_md','estilo_md','referencias_md',
                 'meta_ads_account_id','meta_ads_page_id','meta_ads_ig_id'];
 function fval(id) { const e = $(id); return e ? String(e.value || '').trim() : ''; }
 

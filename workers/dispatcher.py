@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "skill_sync", "marca_capsula", "descubrimiento", "voz", "tarjeta", "marca_gen", "grafica"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "skill_sync", "contexto_sync", "marca_capsula", "descubrimiento", "voz", "tarjeta", "marca_gen", "grafica"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -167,6 +167,21 @@ def det_skill_sync():
     return jobs
 
 
+def det_contexto_sync():
+    # El contexto que lee el creativo (CONTEXTO_MARCA / ESTILO / REFERENCIAS) se regenera cuando
+    # cambia la Identidad del negocio. Antes sólo se rehacía al correr un job del creativo, así
+    # que editar en el panel no lo actualizaba y el agente trabajaba con una versión vieja.
+    jobs = []
+    for row in _lines("SELECT DISTINCT slug FROM contenido.contexto_sync_req WHERE NOT procesado"):
+        slug = row.strip()
+        if slug:
+            jobs.append({"tipo": "contexto_sync", "negocio_slug": slug,
+                         "payload": {"slug": slug}, "lock_key": f"contexto_sync:{slug}"})
+    if jobs:
+        psql("UPDATE contenido.contexto_sync_req SET procesado=true WHERE NOT procesado")
+    return jobs
+
+
 def det_marca_capsula():
     # La cápsula deriva de la DB: aplicar pedidos de scaffold/archivar (un job por pedido).
     jobs = []
@@ -297,6 +312,7 @@ DETECTORS = {
     "pauta_sync": det_pauta_sync,
     "secrets_sync": det_secrets_sync,
     "skill_sync": det_skill_sync,
+    "contexto_sync": det_contexto_sync,
     "marca_capsula": det_marca_capsula,
     "descubrimiento": det_descubrimiento,
     "voz": det_voz,

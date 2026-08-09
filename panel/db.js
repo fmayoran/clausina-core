@@ -227,7 +227,7 @@ async function getProyectoId(slug) {
 async function getPerfil(negocioId) {
   const { rows: [r] } = await pool.query(
     `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email, p.whatsapp, p.gestion, p.prefijo,
-            pp.slogan, pp.logo, pp.logo_claro, pp.brief_md, pp.estilo_md, pp.actualizado_en,
+            pp.slogan, pp.logo, pp.logo_claro, pp.brief_md, pp.estilo_md, pp.referencias_md, pp.actualizado_en,
             pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id,
             (pp.meta_ads_token_enc IS NOT NULL) AS meta_ads_token_set,
             (pp.ig_token_enc IS NOT NULL) AS ig_token_set
@@ -833,7 +833,7 @@ async function getIgToken(slug) {
  * Los umbrales apuntan a un caso concreto: perder de golpe la mayor parte de un texto escrito a
  * mano. Achicar un brief de 900 a 600 caracteres es edición normal y pasa sin molestar.
  */
-const TEXTOS_LARGOS = ['brief_md', 'estilo_md'];
+const TEXTOS_LARGOS = ['brief_md', 'estilo_md', 'referencias_md'];
 const RECORTE_MIN_CHARS = 400;   // por debajo de esto, cualquier cambio es edición normal
 const RECORTE_PROPORCION = 0.5;  // perder más de la mitad es la señal
 
@@ -892,11 +892,11 @@ async function guardarPerfil(negocioId, d) {
                                d.confirmar_recorte === true);
     }
     await cli.query(`
-      INSERT INTO contenido.negocio_perfil (negocio_id, slogan, logo, logo_claro, brief_md, estilo_md, actualizado_en)
-      VALUES ($1,$2,$3,$4,$5,$6, now())
+      INSERT INTO contenido.negocio_perfil (negocio_id, slogan, logo, logo_claro, brief_md, estilo_md, referencias_md, actualizado_en)
+      VALUES ($1,$2,$3,$4,$5,$6,$7, now())
       ON CONFLICT (negocio_id) DO UPDATE SET slogan=$2, logo=$3, logo_claro=$4,
-                                             brief_md=$5, estilo_md=$6, actualizado_en=now()`,
-      [negocioId, nn(d.slogan), nn(d.logo), nn(d.logo_claro), nn(d.brief_md), nn(d.estilo_md)]);
+                                             brief_md=$5, estilo_md=$6, referencias_md=$7, actualizado_en=now()`,
+      [negocioId, nn(d.slogan), nn(d.logo), nn(d.logo_claro), nn(d.brief_md), nn(d.estilo_md), nn(d.referencias_md)]);
     await cli.query('COMMIT');
   } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
   // Pauta: IDs en claro (COALESCE: vacío = no toca); token cifrado, write-only.
@@ -913,6 +913,11 @@ async function guardarPerfil(negocioId, d) {
     // La DB es la fuente de verdad: pedimos regenerar los secretos derivados (credencial de n8n).
     await pool.query('INSERT INTO contenido.secrets_sync_req (slug) SELECT slug FROM contenido.negocios WHERE id=$1', [negocioId]);
   }
+  // El contexto que lee el creativo es una copia derivada de esto: se pide regenerarlo. Sin
+  // esto, editar el brief en el panel no llegaba al agente hasta que corriera algún job.
+  await pool.query(
+    'INSERT INTO contenido.contexto_sync_req (slug) SELECT slug FROM contenido.negocios WHERE id=$1',
+    [negocioId]).catch(() => {});
   _negociosAt = 0;   // el nombre pudo cambiar -> refrescar cache de marcas
   return true;
 }
