@@ -37,12 +37,15 @@ titular, dejá lo esencial. Un afiche con un párrafo no lo lee nadie.
   .lienzo { break-after: page; }
   .lienzo:last-child { break-after: auto; }
   ```
-  - **Frente:** el mensaje principal (titular, imagen fuerte, el gancho).
-  - **Dorso:** el complemento — según la pieza: más información, el detalle de la propuesta, mapa/
-    cómo llegar, menú o listado, promociones, y los datos de contacto ampliados con el QR si va.
-    Misma identidad, misma paleta, pero puede ser más informativo y de lectura más cercana. El dorso
-    no repite el frente: lo completa. Si no hay contenido real para un dorso, decilo y hacé solo el
-    frente (una `.lienzo`).
+  - **Frente:** el `mensaje` del contexto (titular, imagen fuerte, el gancho).
+  - **Dorso:** si el contexto trae **`mensaje_dorso`**, ESE es el contenido del dorso — es lo que
+    el negocio pidió que vaya del otro lado, no una sugerencia. Editalo para que funcione
+    (jerarquía, síntesis, ortografía), pero no lo reemplaces por otra cosa ni lo dejes afuera.
+    Si `mensaje_dorso` viene vacío, proponelo vos: más información, el detalle de la propuesta,
+    mapa/cómo llegar, menú o listado, promociones, y los datos de contacto ampliados con el QR si
+    va. En los dos casos: misma identidad, misma paleta, más informativo y de lectura más cercana.
+    El dorso no repite el frente, lo completa. Si `mensaje_dorso` viene vacío y no hay contenido
+    real para un dorso, decilo y hacé solo el frente (una `.lienzo`).
 - **Sangre (bleed).** Los fondos, colores e imágenes que llegan al borde tienen que cubrir la
   `.lienzo` **completa** (hasta el filo), porque el corte se come el excedente.
 - **Zona de seguridad.** El contexto trae `seguridad_mm`: ningún texto ni el logo puede entrar en

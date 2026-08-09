@@ -46,7 +46,8 @@ def q(sql):
     return subprocess.run(["docker","exec","-i",pg,"psql","-U","postgres","-d","claude","-t","-A","-q","-c",sql],
                           capture_output=True, text=True).stdout.strip()
 g = json.loads(q(f"SELECT row_to_json(t) FROM (SELECT nombre, formato, ancho_mm, alto_mm, mensaje, "
-                 f"caras, fondo_modo, fondo_url, fondo_prompt, datos FROM contenido.grafica WHERE id='{gid}') t"))
+                 f"mensaje_dorso, caras, fondo_modo, fondo_url, fondo_prompt, datos "
+                 f"FROM contenido.grafica WHERE id='{gid}') t"))
 neg = json.loads(q(f"SELECT row_to_json(t) FROM (SELECT n.nombre, n.slug, n.dominio_web, n.ig_handle, n.email, "
                    f"n.whatsapp, p.logo, p.logo_claro, p.slogan, p.estilo_md FROM contenido.negocios n "
                    f"LEFT JOIN contenido.negocio_perfil p ON p.negocio_id=n.id "

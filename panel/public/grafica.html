@@ -113,8 +113,12 @@
       <div class="fl" style="flex:1"><label>Ancho (mm)</label><input id="n-ancho" type="number" min="20" max="6000" value="1000"></div>
       <div class="fl" style="flex:1"><label>Alto (mm)</label><input id="n-alto" type="number" min="20" max="6000" value="700"></div>
     </div>
-    <div class="fl"><label>Mensaje <span class="hint">— qué querés transmitir; el creativo lo edita para que funcione</span></label>
+    <div class="fl"><label id="n-lbl-mensaje">Mensaje <span class="hint">— qué querés transmitir; el creativo lo edita para que funcione</span></label>
       <textarea id="n-mensaje" placeholder="Apertura julio 2026. Asador urbano a leña en Paseo Ardora."></textarea></div>
+    <!-- Sólo con dorso. Vacío es una opción legítima: el creativo propone el reverso, que es lo
+         que hacía siempre antes de que este campo existiera. -->
+    <div class="fl" id="n-fl-dorso" style="display:none"><label>Dorso <span class="hint">— qué va del otro lado; vacío = lo propone el creativo</span></label>
+      <textarea id="n-dorso" placeholder="Menú del mediodía con precios. Cómo llegar. Horarios."></textarea></div>
     <div class="fl"><label>Fondo</label>
       <div class="opts" id="n-fondo">
         <div class="opt on" data-modo="sin_fondo" onclick="setFondo('sin_fondo')">Sin foto</div>
@@ -150,7 +154,8 @@
     <div>
       <div class="fl"><label>Versiones</label><div class="vlist" id="d-vers"></div></div>
       <div class="fl"><label>Pedir un cambio <span class="hint">— parte del diseño actual</span></label>
-        <textarea id="d-instr" placeholder="El título más grande. Sacá el QR."></textarea></div>
+        <textarea id="d-instr" placeholder="El título más grande. Sacá el QR."></textarea>
+        <div class="gsub" id="d-caras-nota" style="display:none;margin-top:5px">Esta pieza tiene dos caras: decí en cuál — «en el dorso, agregá los horarios».</div></div>
       <div class="fl"><label>Imagen de fondo</label>
         <div class="opts" id="d-fondo">
           <div class="opt on" data-modo="mantener" onclick="dSetFondo('mantener')">Mantener</div>
@@ -202,7 +207,15 @@ function toggleQrBox(){
   const c=document.getElementById('dt-qr');
   document.getElementById('n-qr').style.display = (c&&c.checked) ? 'block' : 'none';
 }
-function setCaras(n){ CARAS=n; document.querySelectorAll('#n-caras .opt').forEach(o=>o.classList.toggle('on',+o.dataset.caras===n)); }
+function setCaras(n){
+  CARAS=n;
+  document.querySelectorAll('#n-caras .opt').forEach(o=>o.classList.toggle('on',+o.dataset.caras===n));
+  // Con dos caras, "Mensaje" a secas es ambiguo: pasa a llamarse Frente y aparece el Dorso.
+  document.getElementById('n-fl-dorso').style.display = n===2 ? '' : 'none';
+  document.getElementById('n-lbl-mensaje').innerHTML = n===2
+    ? 'Frente <span class="hint">— el gancho: titular e imagen fuerte</span>'
+    : 'Mensaje <span class="hint">— qué querés transmitir; el creativo lo edita para que funcione</span>';
+}
 
 // ---- listado ----
 function card(g){
@@ -260,6 +273,7 @@ function abrirNueva(){
   FONDO_MODO='sin_fondo'; FONDO_URL=''; CARAS=1;
   document.querySelectorAll('#n-caras .opt').forEach(o=>o.classList.toggle('on',+o.dataset.caras===1));
   document.getElementById('n-nombre').value=''; document.getElementById('n-mensaje').value='';
+  document.getElementById('n-dorso').value=''; setCaras(1);
   document.getElementById('n-err').textContent='';
   document.getElementById('n-formato').innerHTML = FORMATOS.map(f=>
     `<option value="${f.id}">${esc(f.grupo)} — ${esc(f.label)}${f.ancho?` (${f.ancho}×${f.alto}mm)`:''}</option>`).join('');
@@ -326,7 +340,8 @@ async function crearPieza(){
   }
   const body={ nombre:document.getElementById('n-nombre').value, formato:document.getElementById('n-formato').value,
     ancho_mm:document.getElementById('n-ancho').value, alto_mm:document.getElementById('n-alto').value,
-    mensaje, caras:CARAS, fondo_modo:FONDO_MODO, fondo_url:FONDO_URL,
+    mensaje, mensaje_dorso:document.getElementById('n-dorso').value.trim(),
+    caras:CARAS, fondo_modo:FONDO_MODO, fondo_url:FONDO_URL,
     fondo_prompt:(document.getElementById('n-prompt')||{}).value||'', datos };
   const b=document.getElementById('n-go'); b.disabled=true; b.textContent='Enviando…';
   try{
@@ -387,6 +402,7 @@ async function refrescarDet(){
   const f=FORMATOS.find(x=>x.id===g.formato);
   document.getElementById('d-nombre').textContent = (g.numero? cod(g.numero)+' · ':'') + g.nombre;
   document.getElementById('d-meta').textContent=`${f?f.label:g.formato} · ${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm · ${g.estado}`;
+  document.getElementById('d-caras-nota').style.display = g.caras===2 ? '' : 'none';
   const vs=g.versiones||[], activa=vs.find(v=>v.estado==='lista')||vs[0];
   const enCurso=vs.some(v=>v.estado==='pendiente'||v.estado==='procesando');
   if(enCurso){

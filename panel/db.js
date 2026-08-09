@@ -520,11 +520,14 @@ async function crearGrafica(negocioId, d) {
   const cli = await pool.connect();
   try {
     await cli.query('BEGIN');
+    // El mensaje del dorso se guarda sólo si la pieza tiene dorso: si no, quedaría un texto
+    // invisible que reaparece el día que alguien la pasa a dos caras.
+    const dorso = caras === 2 ? ((d.mensaje_dorso || '').trim() || null) : null;
     const { rows: [g] } = await cli.query(
       `INSERT INTO contenido.grafica (negocio_id, nombre, formato, ancho_mm, alto_mm, caras, mensaje,
-                                      fondo_modo, fondo_url, fondo_prompt, datos)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb) RETURNING id`,
-      [negocioId, nombre, f.id, ancho, alto, caras, (d.mensaje || '').trim() || null,
+                                      mensaje_dorso, fondo_modo, fondo_url, fondo_prompt, datos)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb) RETURNING id`,
+      [negocioId, nombre, f.id, ancho, alto, caras, (d.mensaje || '').trim() || null, dorso,
        modo, (d.fondo_url || '').trim() || null, (d.fondo_prompt || '').trim() || null,
        JSON.stringify(d.datos || {})]);
     await cli.query(
@@ -559,9 +562,9 @@ async function duplicarGrafica(negocioId, id, nombreNuevo) {
     await cli.query('BEGIN');
     const { rows: [nueva] } = await cli.query(
       `INSERT INTO contenido.grafica (negocio_id, nombre, formato, ancho_mm, alto_mm, caras,
-                                      mensaje, fondo_modo, fondo_url, fondo_prompt, datos)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb) RETURNING id, numero`,
-      [negocioId, nombre, g.formato, g.ancho_mm, g.alto_mm, g.caras, g.mensaje,
+                                      mensaje, mensaje_dorso, fondo_modo, fondo_url, fondo_prompt, datos)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb) RETURNING id, numero`,
+      [negocioId, nombre, g.formato, g.ancho_mm, g.alto_mm, g.caras, g.mensaje, g.mensaje_dorso,
        g.fondo_modo, g.fondo_url, g.fondo_prompt, JSON.stringify(g.datos || {})]);
 
     const { rows: [v] } = await cli.query(
