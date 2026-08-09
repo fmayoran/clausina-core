@@ -224,4 +224,10 @@ Cerrar F7a antes de empezar F7b: sin el hilo, la medición es una pantalla vací
 3. ~~¿Una acción en dos campañas?~~ → **no**.
 4. ~~¿Qué hacemos con las reservas orgánicas?~~ → **suman al total**, con el desglose siempre
    visible. Nunca se reparten entre acciones.
+   **PENDIENTE (Fer, 09/08): revisar esta decisión más adelante.** Sirve para el lanzamiento de
+   Cortafuego, donde no hay negocio previo y toda reserva del período es de la campaña. Sobre un
+   negocio en marcha va a hacer falta cambiarla —o el total se lleva mérito ajeno y el costo por
+   cliente sale más barato de lo que fue—. Cuando pase, lo que se necesita ya está guardado: el
+   desglose atribuido/orgánico y la fecha de la primera reserva de cada cliente permiten calcular
+   la línea de base sin migrar nada.
 5. ~~¿Una campaña cruza negocios?~~ → **no**.
