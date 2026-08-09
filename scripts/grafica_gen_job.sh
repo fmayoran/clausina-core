@@ -32,11 +32,12 @@ DIRW="/tmp/graf_$vid"; rm -rf "$DIRW"; mkdir -p "$DIRW"
 # 1) Fondo generado con IA, si la pieza lo pide y todavía no tiene uno.
 modo=$(psql "SELECT fondo_modo FROM contenido.grafica WHERE id='$gid';")
 fondo=$(psql "SELECT coalesce(fondo_url,'') FROM contenido.grafica WHERE id='$gid';")
-if [ "$modo" = "generar" ] && [ -z "$fondo" ]; then
-  echo "$(ts) generando fondo con IA" >> "$LOG"
-  PROMPT_BG="Sos el BIBLIOTECARIO de ClaUsina. Leé $MOTOR/scripts/higgsfield/README.md. Generá UNA imagen de fondo para una pieza gráfica impresa del negocio '$slug'. El pedido y el estilo de marca están en /tmp/graf_ctx_$vid.json (campos 'fondo_prompt', 'mensaje', 'estilo_md', 'formato'). La imagen debe: ser apta como FONDO (sin texto, sin logos, composición con aire donde después irá el título), respetar la estética del estilo de marca, y usar la mayor resolución disponible. Guardala en $DIRW/fondo.jpg (o .png). No publiques nada, no toques la base."
-  # el contexto se arma abajo, pero el fondo lo necesita: lo generamos después del contexto
-fi
+modo_d=$(psql "SELECT coalesce(fondo_dorso_modo,'') FROM contenido.grafica WHERE id='$gid';")
+fondo_d=$(psql "SELECT coalesce(fondo_dorso_url,'') FROM contenido.grafica WHERE id='$gid';")
+# El fondo se genera DESPUES del contexto (lo necesita para leer el pedido y el estilo):
+# aca solo se deja constancia de que hay que generarlo.
+{ [ "$modo" = "generar" ] && [ -z "$fondo" ]; } && echo "$(ts) hay que generar el fondo del frente" >> "$LOG"
+{ [ "$modo_d" = "generar" ] && [ -z "$fondo_d" ]; } && echo "$(ts) hay que generar el fondo del dorso" >> "$LOG"
 
 # 2) Contexto para el director de arte (formato, mensaje, estilo, datos, fondo, iteración).
 PG="$PG" GID="$gid" VID="$vid" SLUG="$slug" DIRW="$DIRW" python3 - <<'PY' >> "$LOG" 2>&1
@@ -80,30 +81,42 @@ ctx = {
 }
 # Fondo ya elegido (biblioteca/subido) o el que generará la IA
 if g.get("fondo_url"): ctx["fondo_url"] = g["fondo_url"]
+if g.get("fondo_dorso_url"): ctx["fondo_dorso_url"] = g["fondo_dorso_url"]
+if g.get("fondo_dorso_prompt"): ctx["fondo_dorso_prompt"] = g["fondo_dorso_prompt"]
 json.dump(ctx, open(f"/tmp/graf_ctx_{vid}.json","w"), ensure_ascii=False)
 print(f"ctx: {g['formato']} {ctx['ancho_mm']}x{ctx['alto_mm']}mm (sangre {sangre}) iter={ctx['iteracion']}")
 PY
 [ -s "/tmp/graf_ctx_$vid.json" ] || fallar "No se pudo armar el contexto de la pieza."
 
-# 3) Fondo con IA (ahora que el contexto existe).
-if [ "$modo" = "generar" ] && [ -z "$fondo" ]; then
-  timeout 900 claude -p "$PROMPT_BG" --model sonnet --allowedTools Bash Read Write >> "$LOG" 2>&1
-  BG=$(ls "$DIRW"/fondo.* 2>/dev/null | head -1)
+# 3) Fondo con IA (ahora que el contexto existe). Puede haber dos: el de cada cara.
+#    Una funcion y no dos copias: el prompt y el manejo del archivo son identicos, y solo cambia
+#    de que campo del contexto sale el pedido y en cual se deja la URL.
+generar_fondo(){   # $1 = frente|dorso
+  local cara="$1" campo_prompt campo_url base
+  if [ "$cara" = "dorso" ]; then campo_prompt="fondo_dorso_prompt"; campo_url="fondo_dorso_url"; base="fondo-dorso";
+  else campo_prompt="fondo_prompt"; campo_url="fondo_url"; base="fondo"; fi
+  local P="Sos el BIBLIOTECARIO de ClaUsina. Lee $MOTOR/scripts/higgsfield/README.md. Genera UNA imagen de fondo para el $cara de una pieza grafica impresa del negocio '$slug'. El pedido y el estilo de marca estan en /tmp/graf_ctx_$vid.json (campos '$campo_prompt', 'mensaje', 'mensaje_dorso', 'estilo_md', 'formato'). La imagen debe: ser apta como FONDO (sin texto, sin logos, composicion con aire donde despues ira el titulo), respetar la estetica del estilo de marca, y usar la mayor resolucion disponible. Guardala en $DIRW/$base.jpg (o .png). No publiques nada, no toques la base."
+  timeout 900 claude -p "$P" --model sonnet --allowedTools Bash Read Write >> "$LOG" 2>&1
+  local BG ext rel url
+  BG=$(ls "$DIRW/$base".* 2>/dev/null | head -1)
   if [ -n "$BG" ] && [ -s "$BG" ]; then
-    ext="${BG##*.}"; rel="grafica/$slug/fondo-$vid.$ext"
+    ext="${BG##*.}"; rel="grafica/$slug/$base-$vid.$ext"
     mkdir -p "$MEDIA_HOST/grafica/$slug"; cp "$BG" "$MEDIA_HOST/$rel"
     url="$BASE_URL/$rel"
-    psql "UPDATE contenido.grafica SET fondo_url='$url' WHERE id='$gid';" >/dev/null
-    python3 - "$vid" "$url" <<'PY'
-import json,sys
-p=f"/tmp/graf_ctx_{sys.argv[1]}.json"; d=json.load(open(p)); d["fondo_url"]=sys.argv[2]
-json.dump(d, open(p,"w"), ensure_ascii=False)
-PY
-    echo "$(ts) fondo generado: $url" >> "$LOG"
+    psql "UPDATE contenido.grafica SET $campo_url='$url' WHERE id='$gid';" >/dev/null
+    # Comillas simples adentro: el snippet va entre comillas simples de bash, y escapar comillas
+    # dobles ahí produce una barra literal que Python rechaza.
+    CTXV="$vid" CAMPO="$campo_url" URLV="$url" python3 -c 'import json,os
+p = "/tmp/graf_ctx_" + os.environ["CTXV"] + ".json"
+d = json.load(open(p)); d[os.environ["CAMPO"]] = os.environ["URLV"]
+json.dump(d, open(p,"w"), ensure_ascii=False)'
+    echo "$(ts) fondo de $cara generado: $url" >> "$LOG"
   else
-    echo "$(ts) aviso: no se pudo generar el fondo, se diseña sin él" >> "$LOG"
+    echo "$(ts) aviso: no se pudo generar el fondo de $cara, se disena sin el" >> "$LOG"
   fi
-fi
+}
+[ "$modo" = "generar" ] && [ -z "$fondo" ] && generar_fondo frente
+[ "$modo_d" = "generar" ] && [ -z "$fondo_d" ] && generar_fondo dorso
 
 # 4) Si es iteración, pasarle el HTML de la versión anterior.
 ANT=$(psql "SELECT coalesce(html_url,'') FROM contenido.grafica_version WHERE grafica_id='$gid' AND estado='lista' ORDER BY nro DESC LIMIT 1;")

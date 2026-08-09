@@ -52,8 +52,12 @@ titular, dejá lo esencial. Un afiche con un párrafo no lo lee nadie.
   ese margen desde el borde. Ponelos dentro de un contenedor con ese `padding`.
 - `print-color-adjust: exact` y `-webkit-print-color-adjust: exact` en `html, body`, para que los
   fondos salgan impresos y no en blanco.
-- **Autocontenido**: todo el CSS embebido. Fuentes solo por Google Fonts (`<link>`). La única imagen
-  externa permitida es el fondo y el logo que vienen en el contexto.
+- **Autocontenido**: todo el CSS embebido. Fuentes solo por Google Fonts (`<link>`). Las únicas
+  imágenes externas permitidas son las que vienen en el contexto: `fondo_url`, `fondo_dorso_url`
+  y el logo.
+- **Una imagen por cara.** `fondo_url` es del FRENTE y `fondo_dorso_url` del DORSO: no se cruzan
+  ni se repite una en las dos caras. Si `fondo_dorso_url` no viene, el dorso se resuelve sin foto
+  —color de marca, tipografía y aire—, que para un reverso informativo suele leerse mejor.
 - **Nada de JS.**
 
 ## Identidad: la del NEGOCIO

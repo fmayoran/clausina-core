@@ -119,7 +119,7 @@
          que hacía siempre antes de que este campo existiera. -->
     <div class="fl" id="n-fl-dorso" style="display:none"><label>Dorso <span class="hint">— qué va del otro lado; vacío = lo propone el creativo</span></label>
       <textarea id="n-dorso" placeholder="Menú del mediodía con precios. Cómo llegar. Horarios."></textarea></div>
-    <div class="fl"><label>Fondo</label>
+    <div class="fl"><label id="n-lbl-fondo">Fondo</label>
       <div class="opts" id="n-fondo">
         <div class="opt on" data-modo="sin_fondo" onclick="setFondo('sin_fondo')">Sin foto</div>
         <div class="opt" data-modo="biblioteca" onclick="setFondo('biblioteca')">De la biblioteca</div>
@@ -127,6 +127,17 @@
         <div class="opt" data-modo="generar" onclick="setFondo('generar')">Que la genere el creativo</div>
       </div>
       <div id="n-fondo-extra" style="margin-top:9px"></div>
+    </div>
+    <!-- El dorso tiene su propia imagen: con un solo fondo, el creativo lo usaba en el frente y
+         atrás no quedaba nada que pedir. -->
+    <div class="fl" id="n-fl-fondod" style="display:none"><label>Imagen del dorso</label>
+      <div class="opts" id="nd-fondo">
+        <div class="opt on" data-modo="sin_fondo" onclick="setFondo('sin_fondo','dorso')">Sin foto</div>
+        <div class="opt" data-modo="biblioteca" onclick="setFondo('biblioteca','dorso')">De la biblioteca</div>
+        <div class="opt" data-modo="subido" onclick="setFondo('subido','dorso')">Subir una</div>
+        <div class="opt" data-modo="generar" onclick="setFondo('generar','dorso')">Que la genere el creativo</div>
+      </div>
+      <div id="nd-fondo-extra" style="margin-top:9px"></div>
     </div>
     <div class="fl"><label>Datos del negocio a incluir</label>
       <div class="chks" id="n-datos"></div>
@@ -212,6 +223,8 @@ function setCaras(n){
   document.querySelectorAll('#n-caras .opt').forEach(o=>o.classList.toggle('on',+o.dataset.caras===n));
   // Con dos caras, "Mensaje" a secas es ambiguo: pasa a llamarse Frente y aparece el Dorso.
   document.getElementById('n-fl-dorso').style.display = n===2 ? '' : 'none';
+  document.getElementById('n-fl-fondod').style.display = n===2 ? '' : 'none';
+  document.getElementById('n-lbl-fondo').textContent = n===2 ? 'Imagen del frente' : 'Fondo';
   document.getElementById('n-lbl-mensaje').innerHTML = n===2
     ? 'Frente <span class="hint">— el gancho: titular e imagen fuerte</span>'
     : 'Mensaje <span class="hint">— qué querés transmitir; el creativo lo edita para que funcione</span>';
@@ -273,7 +286,7 @@ function abrirNueva(){
   FONDO_MODO='sin_fondo'; FONDO_URL=''; CARAS=1;
   document.querySelectorAll('#n-caras .opt').forEach(o=>o.classList.toggle('on',+o.dataset.caras===1));
   document.getElementById('n-nombre').value=''; document.getElementById('n-mensaje').value='';
-  document.getElementById('n-dorso').value=''; setCaras(1);
+  document.getElementById('n-dorso').value=''; setFondo('sin_fondo','dorso'); setCaras(1);
   document.getElementById('n-err').textContent='';
   document.getElementById('n-formato').innerHTML = FORMATOS.map(f=>
     `<option value="${f.id}">${esc(f.grupo)} — ${esc(f.label)}${f.ancho?` (${f.ancho}×${f.alto}mm)`:''}</option>`).join('');
@@ -290,47 +303,59 @@ function onFormato(){
   const f=FORMATOS.find(x=>x.id===document.getElementById('n-formato').value);
   document.getElementById('n-medidas').style.display = (f && !f.ancho) ? 'flex' : 'none';
 }
-function setFondo(m){
-  FONDO_MODO=m; FONDO_URL='';
-  document.querySelectorAll('#n-fondo .opt').forEach(o=>o.classList.toggle('on',o.dataset.modo===m));
-  const x=document.getElementById('n-fondo-extra');
-  if(m==='biblioteca'){ x.innerHTML='<div class="gsub">cargando biblioteca…</div>'; cargarBiblio(); }
-  else if(m==='subido'){ x.innerHTML='<input type="file" accept="image/*" onchange="subirFondo(this)">'; }
-  else if(m==='generar'){ x.innerHTML='<textarea id="n-prompt" placeholder="Cómo querés la imagen: «fuego y brasas en primer plano, nocturno, sin texto»"></textarea>'; }
+// Frente y dorso comparten estas cuatro funciones: se les pasa la cara. Duplicarlas habría
+// dejado dos copias que se desincronizan en el primer arreglo.
+const CARA = { frente:{ pre:'n', modo:'sin_fondo', url:'' }, dorso:{ pre:'nd', modo:'sin_fondo', url:'' } };
+const cid_ = (cara, sufijo) => CARA[cara].pre + sufijo;
+
+function setFondo(m, cara='frente'){
+  const c=CARA[cara]; c.modo=m; c.url='';
+  if(cara==='frente'){ FONDO_MODO=m; FONDO_URL=''; }
+  document.querySelectorAll('#'+cid_(cara,'-fondo')+' .opt').forEach(o=>o.classList.toggle('on',o.dataset.modo===m));
+  const x=document.getElementById(cid_(cara,'-fondo-extra'));
+  if(m==='biblioteca'){ x.innerHTML='<div class="gsub">cargando biblioteca…</div>'; cargarBiblio(cara); }
+  else if(m==='subido'){ x.innerHTML=`<input type="file" accept="image/*" onchange="subirFondo(this,'${cara}')">`; }
+  else if(m==='generar'){ x.innerHTML=`<textarea id="${cid_(cara,'-prompt')}" placeholder="Cómo querés la imagen: «fuego y brasas en primer plano, nocturno, sin texto»"></textarea>`; }
   else x.innerHTML='';
 }
-async function cargarBiblio(){
+async function cargarBiblio(cara='frente'){
+  const dest=document.getElementById(cid_(cara,'-fondo-extra'));
   try{
     const d=await fetch('api/biblioteca').then(r=>r.json());
     const its=(d.items||[]).filter(i=>i.tipo==='image');
-    document.getElementById('n-fondo-extra').innerHTML = its.length
+    dest.innerHTML = its.length
       ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:6px;max-height:180px;overflow:auto">`
-        + its.map(i=>`<img src="media/${esc(i.media_path)}" data-u="media/${esc(i.media_path)}" onclick="elegirFondo(this)" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:7px;border:2px solid transparent;cursor:pointer">`).join('')
+        + its.map(i=>`<img src="media/${esc(i.media_path)}" data-u="media/${esc(i.media_path)}" onclick="elegirFondo(this,'${cara}')" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:7px;border:2px solid transparent;cursor:pointer">`).join('')
         + `</div>`
       : '<div class="gsub">la biblioteca no tiene imágenes</div>';
-  }catch(e){ document.getElementById('n-fondo-extra').innerHTML='<div class="gsub">no se pudo cargar</div>'; }
+  }catch(e){ dest.innerHTML='<div class="gsub">no se pudo cargar</div>'; }
 }
-function elegirFondo(el){
-  document.querySelectorAll('#n-fondo-extra img').forEach(i=>i.style.borderColor='transparent');
+function elegirFondo(el, cara='frente'){
+  document.querySelectorAll('#'+cid_(cara,'-fondo-extra')+' img').forEach(i=>i.style.borderColor='transparent');
   el.style.borderColor='#FF6A45';
-  FONDO_URL = new URL(el.dataset.u, location.href).href;
+  const u = new URL(el.dataset.u, location.href).href;
+  CARA[cara].url = u;
+  if(cara==='frente') FONDO_URL = u;
 }
-async function subirFondo(inp){
+async function subirFondo(inp, cara='frente'){
   const f=(inp.files||[])[0]; if(!f) return;
-  const x=document.getElementById('n-fondo-extra');
-  x.insertAdjacentHTML('beforeend','<div class="gsub" id="upst">subiendo…</div>');
+  const x=document.getElementById(cid_(cara,'-fondo-extra'));
+  const idEst=cid_(cara,'-upst');
+  x.insertAdjacentHTML('beforeend',`<div class="gsub" id="${idEst}">subiendo…</div>`);
   try{
     const dataUrl=await new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.onerror=j;rd.readAsDataURL(f);});
     const d=await fetch('api/grafica/fondo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,filename:f.name})}).then(r=>r.json());
-    if(d.ok){ FONDO_URL=d.url; document.getElementById('upst').textContent='listo ✓'; }
-    else document.getElementById('upst').textContent='no se pudo subir';
-  }catch(e){ document.getElementById('upst').textContent='error'; }
+    if(d.ok){ CARA[cara].url=d.url; if(cara==='frente') FONDO_URL=d.url; document.getElementById(idEst).textContent='listo ✓'; }
+    else document.getElementById(idEst).textContent='no se pudo subir';
+  }catch(e){ document.getElementById(idEst).textContent='error'; }
 }
 async function crearPieza(){
   const err=document.getElementById('n-err'); err.textContent='';
   const mensaje=document.getElementById('n-mensaje').value.trim();
   if(!mensaje){ err.textContent='Escribí el mensaje que querés transmitir'; return; }
   if((FONDO_MODO==='biblioteca'||FONDO_MODO==='subido') && !FONDO_URL){ err.textContent='Elegí la imagen de fondo'; return; }
+  const fd=CARA.dorso;
+  if(CARAS===2 && (fd.modo==='biblioteca'||fd.modo==='subido') && !fd.url){ err.textContent='Elegí la imagen del dorso'; return; }
   const datos={}; DATOS.forEach(([k])=>{ const c=document.getElementById('dt-'+k); if(c&&c.checked) datos[k]=true; });
   if(datos.qr){
     datos.qr_destino=QRDEST;
@@ -341,6 +366,8 @@ async function crearPieza(){
   const body={ nombre:document.getElementById('n-nombre').value, formato:document.getElementById('n-formato').value,
     ancho_mm:document.getElementById('n-ancho').value, alto_mm:document.getElementById('n-alto').value,
     mensaje, mensaje_dorso:document.getElementById('n-dorso').value.trim(),
+    fondo_dorso_modo:fd.modo, fondo_dorso_url:fd.url,
+    fondo_dorso_prompt:(document.getElementById('nd-prompt')||{}).value||'',
     caras:CARAS, fondo_modo:FONDO_MODO, fondo_url:FONDO_URL,
     fondo_prompt:(document.getElementById('n-prompt')||{}).value||'', datos };
   const b=document.getElementById('n-go'); b.disabled=true; b.textContent='Enviando…';

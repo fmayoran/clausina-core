@@ -523,12 +523,18 @@ async function crearGrafica(negocioId, d) {
     // El mensaje del dorso se guarda sólo si la pieza tiene dorso: si no, quedaría un texto
     // invisible que reaparece el día que alguien la pasa a dos caras.
     const dorso = caras === 2 ? ((d.mensaje_dorso || '').trim() || null) : null;
+    // El fondo del dorso, con el mismo criterio: sólo existe si la pieza tiene dorso.
+    const modoD = caras === 2 && ['biblioteca', 'subido', 'generar', 'sin_fondo'].includes(d.fondo_dorso_modo)
+      ? d.fondo_dorso_modo : null;
     const { rows: [g] } = await cli.query(
       `INSERT INTO contenido.grafica (negocio_id, nombre, formato, ancho_mm, alto_mm, caras, mensaje,
-                                      mensaje_dorso, fondo_modo, fondo_url, fondo_prompt, datos)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb) RETURNING id`,
+                                      mensaje_dorso, fondo_modo, fondo_url, fondo_prompt,
+                                      fondo_dorso_modo, fondo_dorso_url, fondo_dorso_prompt, datos)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb) RETURNING id`,
       [negocioId, nombre, f.id, ancho, alto, caras, (d.mensaje || '').trim() || null, dorso,
        modo, (d.fondo_url || '').trim() || null, (d.fondo_prompt || '').trim() || null,
+       modoD, modoD ? ((d.fondo_dorso_url || '').trim() || null) : null,
+       modoD === 'generar' ? ((d.fondo_dorso_prompt || '').trim() || null) : null,
        JSON.stringify(d.datos || {})]);
     await cli.query(
       `INSERT INTO contenido.grafica_version (grafica_id, nro, instruccion) VALUES ($1, 1, $2)`,
@@ -562,10 +568,12 @@ async function duplicarGrafica(negocioId, id, nombreNuevo) {
     await cli.query('BEGIN');
     const { rows: [nueva] } = await cli.query(
       `INSERT INTO contenido.grafica (negocio_id, nombre, formato, ancho_mm, alto_mm, caras,
-                                      mensaje, mensaje_dorso, fondo_modo, fondo_url, fondo_prompt, datos)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb) RETURNING id, numero`,
+                                      mensaje, mensaje_dorso, fondo_modo, fondo_url, fondo_prompt,
+                                      fondo_dorso_modo, fondo_dorso_url, fondo_dorso_prompt, datos)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb) RETURNING id, numero`,
       [negocioId, nombre, g.formato, g.ancho_mm, g.alto_mm, g.caras, g.mensaje, g.mensaje_dorso,
-       g.fondo_modo, g.fondo_url, g.fondo_prompt, JSON.stringify(g.datos || {})]);
+       g.fondo_modo, g.fondo_url, g.fondo_prompt,
+       g.fondo_dorso_modo, g.fondo_dorso_url, g.fondo_dorso_prompt, JSON.stringify(g.datos || {})]);
 
     const { rows: [v] } = await cli.query(
       `SELECT html_url, pdf_url, png_url, png_dorso_url FROM contenido.grafica_version
