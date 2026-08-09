@@ -74,6 +74,10 @@
   .pill.pausada,.pill.planificada{color:#E0A458;border-color:#E0A458;}
   .pill.cerrada,.pill.terminada{color:var(--u-mut);opacity:.7;}
   .meta{font-family:'JetBrains Mono',monospace;font-size:.66rem;color:var(--u-mut);line-height:1.7;}
+  .spin{width:16px;height:16px;border-radius:50%;border:2px solid var(--u-line);
+        border-top-color:var(--u-acc);animation:gira .9s linear infinite;flex:0 0 auto;}
+  @keyframes gira{to{transform:rotate(360deg)}}
+  @media(prefers-reduced-motion:reduce){.spin{animation:none}}
   /* La barra de avance hacia la meta. Sin número, "efectividad" es una opinión. */
   .avance{height:6px;border-radius:99px;background:var(--u-bg);overflow:hidden;}
   .avance i{display:block;height:100%;background:var(--u-acc);}
@@ -281,6 +285,10 @@ function pintar(){
       <div class="meta">${fecha(c.desde)}${c.hasta?' → '+fecha(c.hasta):' → abierta'}
         · ${c.acciones} acción(es)</div>
       <div class="meta">${esc(o?o.label:c.objetivo_tipo)}${c.meta_valor?': meta '+Math.round(c.meta_valor):''}</div>
+      ${c.propuesta_estado==='pendiente'||c.propuesta_estado==='procesando'
+        ? '<div class="meta" style="color:#E0A458">el creativo está armando una propuesta…</div>'
+        : (c.propuesta_estado==='lista' && !c.acciones
+           ? '<div class="meta" style="color:var(--u-acc)">hay una propuesta para revisar</div>' : '')}
     </div>`;
   }).join('') : `<div class="mono" style="font-size:.7rem;color:var(--u-mut)">${
     CAMPS.length ? '— nada con ese filtro —' : '— todavía no hay campañas: creá la primera —'}</div>`;
@@ -414,8 +422,22 @@ async function pintarPropuesta(){
     return;
   }
   if(enCurso){
-    box.innerHTML = `<div class="arow" style="border:1px dashed var(--u-line);border-radius:12px;padding:14px 16px">
-      <div class="meta">El creativo está armando la propuesta… puede tardar unos minutos.</div></div>`;
+    // Un "procesando" sin más no dice si avanza, si se colgó ni si hay que quedarse mirando.
+    const desde = new Date(p.iniciado_en || p.creado_en);
+    const min = Math.max(0, Math.floor((Date.now() - desde.getTime())/60000));
+    const tarda = min >= 8;   // lo normal son 3-5 minutos
+    box.innerHTML = `<div style="border:1px dashed var(--u-line);border-radius:12px;padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="spin"></span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:.94rem">El creativo está armando la propuesta</div>
+          <div class="meta">Lleva ${min === 0 ? 'menos de un minuto' : min + ' minuto' + (min===1?'':'s')} ·
+            suele tardar entre 3 y 5. <b>Podés cerrar esta ventana</b>: sigue trabajando y la
+            propuesta te espera acá.</div>
+          ${tarda ? `<div class="meta" style="color:#E0A458;margin-top:4px">Está tardando más de lo
+            normal. Si pasa de 40 minutos se corta solo y vas a poder reintentar.</div>` : ''}
+        </div>
+      </div></div>`;
     return;
   }
   if(p.estado==='error'){

@@ -2201,7 +2201,11 @@ async function aceptarSugerencia(negocioId, campaniaId, propuestaId, indice) {
 async function getCampanias(negocioId) {
   const { rows } = await pool.query(
     `SELECT c.*,
-            (SELECT count(*)::int FROM contenido.campania_accion a WHERE a.campania_id=c.id) AS acciones
+            (SELECT count(*)::int FROM contenido.campania_accion a WHERE a.campania_id=c.id) AS acciones,
+            -- El estado de la última propuesta viaja con la lista: sin esto hay que entrar a cada
+            -- campaña para saber si el creativo está trabajando o si dejó algo para revisar.
+            (SELECT p.estado FROM contenido.campania_propuesta p
+              WHERE p.campania_id=c.id ORDER BY p.creado_en DESC LIMIT 1) AS propuesta_estado
        FROM contenido.campania c WHERE c.negocio_id=$1 ORDER BY c.desde DESC, c.creado_en DESC`,
     [negocioId]);
   return rows;
