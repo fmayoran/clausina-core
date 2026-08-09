@@ -2148,20 +2148,40 @@ const TIPOS_ACCION = [
  * acciones: después, el creativo llega tarde a opinar sobre algo ya decidido.
  * Nunca crea nada — deja sugerencias para aceptar de a una.
  */
-async function pedirPropuestaCampania(negocioId, campaniaId, instruccion) {
+async function pedirPropuestaCampania(negocioId, campaniaId, instruccion, opts = {}) {
   const { rows: [c] } = await pool.query(
     'SELECT id FROM contenido.campania WHERE id=$1 AND negocio_id=$2', [campaniaId, negocioId]);
   if (!c) return { ok: false, error: 'no_existe' };
+  // Una iteración parte de la propuesta anterior: pedir "otra" desde cero tira las acciones que
+  // sí estaban bien, y una propuesta de siete donde molestan dos no se corrige tirándola.
+  const previa = opts.iterar ? await getPropuestaCampania(negocioId, campaniaId) : null;
+  if (opts.iterar && (!previa || previa.estado !== 'lista')) return { ok: false, error: 'sin_previa' };
+  const texto = String(instruccion || '').trim();
+  if (opts.iterar && !texto) return { ok: false, error: 'sin_instruccion' };
   try {
     const { rows: [p] } = await pool.query(
-      `INSERT INTO contenido.campania_propuesta (campania_id, instruccion)
-       VALUES ($1,$2) RETURNING id`, [campaniaId, String(instruccion || '').trim() || null]);
-    return { ok: true, id: p.id };
+      `INSERT INTO contenido.campania_propuesta (campania_id, instruccion, previa_id, sobre_accion, nro)
+       VALUES ($1,$2,$3,$4,
+         (SELECT COALESCE(max(nro),0)+1 FROM contenido.campania_propuesta WHERE campania_id=$1))
+       RETURNING id, nro`,
+      [campaniaId, texto || null, previa ? previa.id : null,
+       Number.isInteger(opts.sobre_accion) ? opts.sobre_accion : null]);
+    return { ok: true, id: p.id, nro: p.nro };
   } catch (e) {
     // El único parcial impide dos en curso: pedir de nuevo mientras una corre gasta el doble.
     if (e.code === '23505') return { ok: false, error: 'ya_en_curso' };
     throw e;
   }
+}
+
+/** Las iteraciones de una campaña, para poder volver a una anterior. */
+async function getPropuestasCampania(negocioId, campaniaId) {
+  const { rows } = await pool.query(
+    `SELECT pr.id, pr.nro, pr.estado, pr.instruccion, pr.sobre_accion, pr.creado_en,
+            jsonb_array_length(pr.acciones) AS acciones
+       FROM contenido.campania_propuesta pr JOIN contenido.campania c ON c.id=pr.campania_id
+      WHERE pr.campania_id=$1 AND c.negocio_id=$2 ORDER BY pr.nro DESC`, [campaniaId, negocioId]);
+  return rows;
 }
 
 /** La última propuesta de una campaña, con su estado. */
@@ -3942,6 +3962,7 @@ module.exports = {
 
   getSkills, getSkill, guardarSkill, getSkillHistorial, getSkillVersion,
   confirmarAccion,
+  getPropuestasCampania,
   pedirPropuestaCampania, getPropuestaCampania, aceptarSugerencia,
   OBJETIVOS_CAMPANIA, TIPOS_ACCION, getCampanias, getCampania, guardarCampania,
   estadoCampania, guardarAccion, borrarAccion, opcionesAccion,

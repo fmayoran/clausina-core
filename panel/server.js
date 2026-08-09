@@ -1572,8 +1572,15 @@ app.post('/api/campanias/:id/estado', async (req, res) => {
 
 // El creativo propone las acciones. Se pide con la campaña en borrador y sin acciones.
 app.post('/api/campanias/:id/propuesta', async (req, res) => {
-  try { res.json(await db.pedirPropuestaCampania(req.negocioId, req.params.id, (req.body || {}).instruccion)); }
-  catch (e) { console.error('propuesta campania', e.message); res.status(500).json({ ok: false }); }
+  try {
+    const b = req.body || {};
+    res.json(await db.pedirPropuestaCampania(req.negocioId, req.params.id, b.instruccion,
+      { iterar: b.iterar === true, sobre_accion: b.sobre_accion }));
+  } catch (e) { console.error('propuesta campania', e.message); res.status(500).json({ ok: false }); }
+});
+app.get('/api/campanias/:id/propuestas', async (req, res) => {
+  try { res.json({ versiones: await db.getPropuestasCampania(req.negocioId, req.params.id) }); }
+  catch (e) { res.status(500).json({ error: 'db' }); }
 });
 app.get('/api/campanias/:id/propuesta', async (req, res) => {
   try { res.json(await db.getPropuestaCampania(req.negocioId, req.params.id) || { estado: null }); }

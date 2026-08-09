@@ -50,8 +50,17 @@ disponible = {
   "turnos": json.loads(q(f"SELECT coalesce(json_agg(json_build_object('nombre',coalesce(nombre_publico,nombre),'desde',to_char(hora_desde,'HH24:MI'),'dias',dias)),'[]') FROM contenido.turno WHERE negocio_id='{neg}' AND activo")),
   "capacidades": json.loads(q(f"SELECT coalesce(json_agg(capacidad),'[]') FROM contenido.negocio_capacidad WHERE negocio_id='{neg}' AND habilitada")),
 }
-json.dump({"campania": camp, "el_negocio_ya_tiene": disponible},
-          open(f"{dirw}/pedido.json","w"), ensure_ascii=False, indent=1, default=str)
+# Si es una iteración, entra la propuesta anterior completa: el creativo tiene que PARTIR de
+# ella y tocar sólo lo que se pidió, no rehacer el plan.
+prev = q(f"""SELECT coalesce(row_to_json(t)::text,'') FROM (
+  SELECT pa.resumen, pa.acciones, p.instruccion AS que_cambiar, p.sobre_accion
+    FROM contenido.campania_propuesta p
+    JOIN contenido.campania_propuesta pa ON pa.id = p.previa_id
+   WHERE p.id='{pid}') t""")
+salida = {"campania": camp, "el_negocio_ya_tiene": disponible}
+if prev:
+    salida["propuesta_anterior"] = json.loads(prev)
+json.dump(salida, open(f"{dirw}/pedido.json","w"), ensure_ascii=False, indent=1, default=str)
 PY
 [ -s "$DIRW/pedido.json" ] || fallar "No se pudo armar el contexto de la campaña."
 
@@ -67,6 +76,13 @@ La campaña y lo que el negocio YA tiene están en $DIRW/pedido.json.
 TAREA: proponer las ACCIONES de esta campaña. Una acción es algo concreto y medible, dirigido a
 UNO de los públicos que declara la campaña. No propongas una lista de piezas sueltas: proponé un
 plan por público, con un orden y una razón.
+
+SI EL PEDIDO TRAE 'propuesta_anterior': NO empieces de cero. Es una iteración:
+- Partí de esas acciones y aplicá SÓLO lo que dice 'que_cambiar'.
+- Lo que no se cuestionó se mantiene TAL CUAL, con el mismo nombre — así se ve qué cambió.
+- Si 'sobre_accion' trae un número, el pedido es sobre esa acción (por su posición en la lista):
+  cambiá esa y dejá el resto intacto.
+- En el resumen, arrancá diciendo qué cambiaste respecto de la anterior y por qué.
 
 REGLAS:
 - Partí del objetivo, la meta, la ventana y el público de la campaña. Si la meta no es alcanzable

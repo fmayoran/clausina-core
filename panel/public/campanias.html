@@ -463,14 +463,24 @@ async function pintarPropuesta(){
             ${a.cuando?`<div class="meta" style="opacity:.75">Cuándo: ${esc(a.cuando)}</div>`:''}
           </div>
           ${ya ? '<span class="pill activa">aceptada</span>'
-               : `<button class="btn2" onclick="aceptarSugerencia('${p.id}',${i})">Aceptar</button>`}
+               : `<div style="display:flex;gap:6px;flex-shrink:0">
+                    <button class="btn2" style="padding:5px 11px;font-size:.8rem" onclick="ajustarSugerencia(${i})">Ajustar</button>
+                    <button class="btn2" style="padding:5px 11px;font-size:.8rem" onclick="aceptarSugerencia('${p.id}',${i})">Aceptar</button>
+                  </div>`}
         </div>`;
       }).join('')}</div>
-      <div style="margin-top:12px"><button class="btn2" onclick="pedirPropuesta()">Pedir otra propuesta</button></div>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn2" onclick="ajustarPropuesta()">Pedir cambios</button>
+        <button class="btn2" onclick="pedirPropuesta()">Empezar de cero</button>
+        <span class="meta" style="margin-left:auto">versión ${p.nro || 1}${p.instruccion?' · se pidió: '+esc(p.instruccion):''}</span>
+      </div>
     </div>`;
 }
 
 async function pedirPropuesta(){
+  // Sólo se avisa si hay algo que perder: en la primera no hay nada de qué advertir.
+  const hay = $('d-propuesta').innerText.includes('Propuesta del creativo');
+  if(hay && !confirm('Esto arranca un plan nuevo desde cero y descarta el actual.\n\nSi lo que querés es corregirlo, usá "Pedir cambios".\n\n¿Seguir?')) return;
   const extra = prompt('¿Algo que quieras aclararle al creativo? (opcional)', '');
   if(extra===null) return;
   try{
@@ -478,6 +488,36 @@ async function pedirPropuesta(){
       headers:{'Content-Type':'application/json'},body:JSON.stringify({instruccion:extra})}).then(x=>x.json());
     if(!r.ok){ toast(r.error==='ya_en_curso'?'Ya hay una propuesta en camino':'No se pudo pedir',true); return; }
     toast('Pedido al creativo — tarda unos minutos');
+    pintarPropuesta();
+  }catch(e){ toast('Error de conexión',true); }
+}
+
+// Iterar el plan entero: parte de la propuesta actual y toca sólo lo que se pide. Es distinto
+// de "empezar de cero", que tira las siete acciones para arreglar dos.
+async function ajustarPropuesta(){
+  const q = prompt('¿Qué querés cambiar del plan?\n\nEjemplos: «sacá la pauta, no vamos a invertir todavía» · «el folleto tiene que caer dentro de la ventana» · «faltan acciones para el mediodía»', '');
+  if(q===null || !q.trim()) return;
+  await lanzarIteracion(q.trim(), null);
+}
+
+// Iterar UNA acción: el creativo mantiene el resto igual.
+async function ajustarSugerencia(i){
+  const q = prompt('¿Qué querés cambiar de esta acción?', '');
+  if(q===null || !q.trim()) return;
+  await lanzarIteracion(q.trim(), i);
+}
+
+async function lanzarIteracion(instruccion, indice){
+  try{
+    const r = await fetch('api/campanias/'+DET+'/propuesta',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({instruccion, iterar:true, sobre_accion:indice})}).then(x=>x.json());
+    if(!r.ok){
+      toast({ya_en_curso:'Ya hay una propuesta en camino', sin_previa:'No hay una propuesta lista para ajustar',
+             sin_instruccion:'Escribí qué querés cambiar'}[r.error] || 'No se pudo pedir', true);
+      return;
+    }
+    toast('Pedido al creativo — parte de lo que ya hay');
     pintarPropuesta();
   }catch(e){ toast('Error de conexión',true); }
 }
