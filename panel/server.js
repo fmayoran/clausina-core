@@ -1603,7 +1603,7 @@ app.post('/api/pauta/refrescar', async (req, res) => {
 
 // Campañas de pauta: propuestas del creativo + su ciclo de aprobación.
 app.get('/api/campanias', async (req, res) => {
-  try { res.json(await db.getCampanias(req.negocioId)); }
+  try { res.json(await db.getPautaCampanias(req.negocioId)); }
   catch (e) { console.error('campanias', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/solicitar', async (req, res) => {

@@ -3694,7 +3694,7 @@ async function crearSolicitudCampania(negocioId, instruccion) {
   return r.id;
 }
 
-async function getCampanias(negocioId) {
+async function getPautaCampanias(negocioId) {
   const { rows } = await pool.query(
     `SELECT c.id, c.estado, c.nombre, c.objetivo, c.pieza_id, c.razon, c.audiencia, c.presupuesto,
             c.fecha_inicio, c.fecha_fin, c.url_destino, c.cta, c.resumen,
@@ -3828,6 +3828,6 @@ module.exports = {
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
   getLandingCambios, crearLandingCambio, aprobarLanding, rechazarLanding,
   getAuditoria, getPauta, getPautaEvolucion, pedirRefrescoPauta,
-  crearSolicitudCampania, getCampanias, aprobarCampania, rechazarCampania, descartarCampania,
+  crearSolicitudCampania, getPautaCampanias, aprobarCampania, rechazarCampania, descartarCampania,
   activarCampania, pausarCampania, reintentarCampania, getCreativosDisponibles, setCreativoCampania,
   health };
