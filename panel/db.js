@@ -2154,8 +2154,12 @@ async function pedirPropuestaCampania(negocioId, campaniaId, instruccion, opts =
   if (!c) return { ok: false, error: 'no_existe' };
   // Una iteración parte de la propuesta anterior: pedir "otra" desde cero tira las acciones que
   // sí estaban bien, y una propuesta de siete donde molestan dos no se corrige tirándola.
-  const previa = opts.iterar ? await getPropuestaCampania(negocioId, campaniaId) : null;
-  if (opts.iterar && (!previa || previa.estado !== 'lista')) return { ok: false, error: 'sin_previa' };
+  // Se itera sobre el último PLAN, no sobre la fila de acciones: lo que se discute en esta etapa
+  // es la estrategia. Vale también si ya estaba aprobado — cambiar de idea es legítimo; lo que
+  // sale es un plan nuevo que hay que volver a aprobar.
+  const previa = opts.iterar ? await _ultimoPlan(negocioId, campaniaId) : null;
+  if (opts.iterar && (!previa || !['lista', 'aprobada'].includes(previa.estado)))
+    return { ok: false, error: 'sin_previa' };
   const texto = String(instruccion || '').trim();
   if (opts.iterar && !texto) return { ok: false, error: 'sin_instruccion' };
   try {
@@ -2174,6 +2178,14 @@ async function pedirPropuestaCampania(negocioId, campaniaId, instruccion, opts =
   }
 }
 
+async function _ultimoPlan(negocioId, campaniaId) {
+  const { rows: [p] } = await pool.query(
+    `SELECT pr.* FROM contenido.campania_propuesta pr JOIN contenido.campania c ON c.id=pr.campania_id
+      WHERE pr.campania_id=$1 AND c.negocio_id=$2 AND pr.fase='plan'
+      ORDER BY pr.creado_en DESC LIMIT 1`, [campaniaId, negocioId]);
+  return p || null;
+}
+
 /** Las iteraciones de una campaña, para poder volver a una anterior. */
 async function getPropuestasCampania(negocioId, campaniaId) {
   const { rows } = await pool.query(
@@ -2182,6 +2194,20 @@ async function getPropuestasCampania(negocioId, campaniaId) {
        FROM contenido.campania_propuesta pr JOIN contenido.campania c ON c.id=pr.campania_id
       WHERE pr.campania_id=$1 AND c.negocio_id=$2 ORDER BY pr.nro DESC`, [campaniaId, negocioId]);
   return rows;
+}
+
+/**
+ * El estado del circuito completo: el último plan y, si ya se aprobó, la bajada a acciones que
+ * salió de ÉL. La pantalla necesita las dos cosas juntas para saber en qué paso está.
+ */
+async function getEstadoPropuesta(negocioId, campaniaId) {
+  const plan = await _ultimoPlan(negocioId, campaniaId);
+  if (!plan) return { plan: null, acc: null };
+  const { rows: [acc] } = await pool.query(
+    `SELECT * FROM contenido.campania_propuesta
+      WHERE campania_id=$1 AND fase='acciones' AND previa_id=$2 ORDER BY creado_en DESC LIMIT 1`,
+    [campaniaId, plan.id]);
+  return { plan, acc: acc || null };
 }
 
 /** La última propuesta de una campaña, con su estado. */
@@ -2195,15 +2221,91 @@ async function getPropuestaCampania(negocioId, campaniaId) {
 }
 
 /**
- * Acepta UNA acción sugerida. Se crea sin enganche: la sugerencia dice a qué debería colgarse,
- * pero atarla automáticamente por coincidencia de nombre es la clase de adivinanza que después
- * mide mal. La persona elige el objeto al editar la acción.
+ * Guarda el plan editado a mano. El texto del creativo queda aparte (resumen_original): saber qué
+ * escribió él y qué corrigió el negocio es la mitad del valor de dejarlo editar.
  */
-async function aceptarSugerencia(negocioId, campaniaId, propuestaId, indice) {
-  const p = await getPropuestaCampania(negocioId, campaniaId);
-  if (!p || p.id !== propuestaId) return { ok: false, error: 'no_existe' };
-  const sug = (p.acciones || [])[indice];
-  if (!sug) return { ok: false, error: 'no_existe' };
+async function guardarResumenPropuesta(negocioId, campaniaId, propuestaId, texto) {
+  const t = String(texto || '').trim();
+  if (!t) return { ok: false, error: 'vacio' };
+  const { rows: [p] } = await pool.query(
+    `SELECT pr.id, pr.estado, pr.fase, pr.resumen, pr.resumen_original
+       FROM contenido.campania_propuesta pr JOIN contenido.campania c ON c.id=pr.campania_id
+      WHERE pr.id=$1 AND pr.campania_id=$2 AND c.negocio_id=$3`, [propuestaId, campaniaId, negocioId]);
+  if (!p) return { ok: false, error: 'no_existe' };
+  // Editar un plan ya aprobado no cambiaría las acciones que salieron de él: sería mentir sobre
+  // qué se acordó. Para eso se pide una versión nueva.
+  if (p.estado !== 'lista' || p.fase !== 'plan') return { ok: false, error: 'no_editable' };
+  await pool.query(
+    `UPDATE contenido.campania_propuesta
+        SET resumen=$2, resumen_original=COALESCE(resumen_original, resumen) WHERE id=$1`,
+    [propuestaId, t]);
+  return { ok: true };
+}
+
+/**
+ * Aprueba el plan y recién ahí manda a bajarlo a acciones. Las acciones salen del texto APROBADO
+ * —editado o no—: es lo que hace que editarlo sirva de algo.
+ */
+async function aprobarPropuesta(negocioId, campaniaId, propuestaId) {
+  const { rows: [p] } = await pool.query(
+    `SELECT pr.id, pr.estado, pr.fase, pr.resumen
+       FROM contenido.campania_propuesta pr JOIN contenido.campania c ON c.id=pr.campania_id
+      WHERE pr.id=$1 AND pr.campania_id=$2 AND c.negocio_id=$3`, [propuestaId, campaniaId, negocioId]);
+  if (!p) return { ok: false, error: 'no_existe' };
+  // Vale también sobre un plan ya aprobado: es el camino de "reintentar" cuando la bajada a
+  // acciones falló, y el de las propuestas viejas que nacieron aprobadas sin fila de acciones.
+  if (p.fase !== 'plan' || !['lista', 'aprobada'].includes(p.estado)) return { ok: false, error: 'no_aprobable' };
+  const { rows: [ya] } = await pool.query(
+    `SELECT id FROM contenido.campania_propuesta
+      WHERE previa_id=$1 AND fase='acciones' AND estado IN ('pendiente','procesando','aprobada') LIMIT 1`,
+    [propuestaId]);
+  if (ya) return { ok: false, error: 'ya_en_curso' };
+  const cl = await pool.connect();
+  try {
+    await cl.query('BEGIN');
+    await cl.query(
+      `UPDATE contenido.campania_propuesta SET estado='aprobada',
+              aprobado_en=COALESCE(aprobado_en, now()) WHERE id=$1`, [propuestaId]);
+    // El plan aprobado viaja copiado en la fila de acciones: es el enunciado con el que el
+    // creativo tiene que trabajar, y queda congelado aunque después se pida otra versión.
+    const { rows: [a] } = await cl.query(
+      `INSERT INTO contenido.campania_propuesta (campania_id, previa_id, fase, resumen, nro)
+       VALUES ($1,$2,'acciones',$3,
+         (SELECT COALESCE(max(nro),0)+1 FROM contenido.campania_propuesta WHERE campania_id=$1))
+       RETURNING id, nro`, [campaniaId, propuestaId, p.resumen || '']);
+    await cl.query('COMMIT');
+    return { ok: true, id: a.id, nro: a.nro };
+  } catch (e) {
+    await cl.query('ROLLBACK');
+    if (e.code === '23505') return { ok: false, error: 'ya_en_curso' };
+    throw e;
+  } finally { cl.release(); }
+}
+
+/**
+ * Baja las acciones sugeridas a borradores, todas juntas. Antes se aceptaban de a una; con el plan
+ * ya aprobado eso es un trámite: lo que se revisa acción por acción es el contenido, y para eso
+ * hay que poder editarlas. Es idempotente: si ya se materializaron, no duplica.
+ */
+async function materializarPropuesta(negocioId, campaniaId, propuestaId) {
+  const { rows: [p] } = await pool.query(
+    `SELECT pr.id, pr.acciones, pr.fase
+       FROM contenido.campania_propuesta pr JOIN contenido.campania c ON c.id=pr.campania_id
+      WHERE pr.id=$1 AND pr.campania_id=$2 AND c.negocio_id=$3`, [propuestaId, campaniaId, negocioId]);
+  if (!p || p.fase !== 'acciones') return { ok: false, error: 'no_existe' };
+  const { rows: [y] } = await pool.query(
+    'SELECT count(*)::int AS n FROM contenido.campania_accion WHERE propuesta_id=$1', [propuestaId]);
+  if (y.n > 0) return { ok: true, creadas: 0 };
+  let creadas = 0;
+  for (let i = 0; i < (p.acciones || []).length; i++) {
+    const r = await _crearAccionDesdeSugerencia(campaniaId, propuestaId, (p.acciones || [])[i]);
+    if (r) creadas++;
+  }
+  return { ok: true, creadas };
+}
+
+async function _crearAccionDesdeSugerencia(campaniaId, propuestaId, sug) {
+  if (!sug) return null;
   const tipo = TIPOS_ACCION.some(t => t.id === sug.tipo) ? sug.tipo : 'otra';
   const notas = [sug.publico ? `Público: ${sug.publico}` : '', sug.por_que || '',
                  sug.como_se_mide ? `Medición: ${sug.como_se_mide}` : '',
@@ -2215,6 +2317,19 @@ async function aceptarSugerencia(negocioId, campaniaId, propuestaId, indice) {
      VALUES ($1,$2,$3,$4,$5,'borrador',(SELECT COALESCE(max(orden),0)+1 FROM contenido.campania_accion WHERE campania_id=$1))
      RETURNING *`,
     [campaniaId, tipo, String(sug.nombre || 'Acción').slice(0, 160), notas || null, propuestaId]);
+  return a;
+}
+
+/**
+ * Acepta UNA acción sugerida. Se crea sin enganche: la sugerencia dice a qué debería colgarse,
+ * pero atarla automáticamente por coincidencia de nombre es la clase de adivinanza que después
+ * mide mal. La persona elige el objeto al editar la acción.
+ */
+async function aceptarSugerencia(negocioId, campaniaId, propuestaId, indice) {
+  const p = await getPropuestaCampania(negocioId, campaniaId);
+  if (!p || p.id !== propuestaId) return { ok: false, error: 'no_existe' };
+  const a = await _crearAccionDesdeSugerencia(campaniaId, propuestaId, (p.acciones || [])[indice]);
+  if (!a) return { ok: false, error: 'no_existe' };
   return { ok: true, accion: a };
 }
 
@@ -3964,6 +4079,7 @@ module.exports = {
   confirmarAccion,
   getPropuestasCampania,
   pedirPropuestaCampania, getPropuestaCampania, aceptarSugerencia,
+  guardarResumenPropuesta, aprobarPropuesta, materializarPropuesta, getEstadoPropuesta,
   OBJETIVOS_CAMPANIA, TIPOS_ACCION, getCampanias, getCampania, guardarCampania,
   estadoCampania, guardarAccion, borrarAccion, opcionesAccion,
   emitirInvitaciones, getInvitaciones, anularInvitacion, consultarInvitacion,

@@ -22,6 +22,7 @@ exec 9>"/tmp/camp_prop_$pid.lock"; flock -n 9 || exit 0
 estado=$(psql "SELECT estado FROM contenido.campania_propuesta WHERE id='$pid';")
 case "$estado" in pendiente|procesando) ;; *) echo "$(ts) $pid sin estado procesable ($estado)" >> "$LOG"; exit 0;; esac
 psql "UPDATE contenido.campania_propuesta SET estado='procesando', iniciado_en=now() WHERE id='$pid';" >/dev/null
+fase=$(psql "SELECT fase FROM contenido.campania_propuesta WHERE id='$pid';")
 
 DIRW="/tmp/camp_prop_$pid"; rm -rf "$DIRW"; mkdir -p "$DIRW"
 
@@ -31,7 +32,7 @@ python3 "$MOTOR/scripts/contexto_a_md.py" "$slug" >> "$LOG" 2>&1
 
 # Todo lo que el creativo necesita saber, en un solo archivo: la campaña y lo que el negocio YA
 # tiene para enganchar. Sin esto propondría cosas que no existen.
-PG="$PG" PID="$pid" SLUG="$slug" DIRW="$DIRW" python3 - <<'PY' >> "$LOG" 2>&1
+PG="$PG" PID="$pid" SLUG="$slug" DIRW="$DIRW" FASE="$fase" python3 - <<'PY' >> "$LOG" 2>&1
 import json, os, subprocess
 pg=os.environ["PG"]; pid=os.environ["PID"]; slug=os.environ["SLUG"]; dirw=os.environ["DIRW"]
 def q(sql):
@@ -52,68 +53,89 @@ disponible = {
 }
 # Si es una iteración, entra la propuesta anterior completa: el creativo tiene que PARTIR de
 # ella y tocar sólo lo que se pidió, no rehacer el plan.
-prev = q(f"""SELECT coalesce(row_to_json(t)::text,'') FROM (
+# En fase de acciones el enunciado es el plan aprobado, y sólo ese: mandarle además la fila
+# anterior completa es repetirle lo mismo dos veces con otro nombre.
+prev = "" if os.environ.get("FASE") == "acciones" else q(f"""SELECT coalesce(row_to_json(t)::text,'') FROM (
   SELECT pa.resumen, pa.acciones, p.instruccion AS que_cambiar, p.sobre_accion
     FROM contenido.campania_propuesta p
     JOIN contenido.campania_propuesta pa ON pa.id = p.previa_id
    WHERE p.id='{pid}') t""")
 salida = {"campania": camp, "el_negocio_ya_tiene": disponible}
+plan = q(f"SELECT coalesce(resumen,'') FROM contenido.campania_propuesta WHERE id='{pid}' AND fase='acciones'")
+if plan:
+    salida["plan_aprobado"] = plan
 if prev:
     salida["propuesta_anterior"] = json.loads(prev)
 json.dump(salida, open(f"{dirw}/pedido.json","w"), ensure_ascii=False, indent=1, default=str)
 PY
 [ -s "$DIRW/pedido.json" ] || fallar "No se pudo armar el contexto de la campaña."
 
-PROMPT="Sos el DIRECTOR CREATIVO de ClaUsina. Seguí tu skill (/root/.claude/skills/creativo/SKILL.md).
+COMUN="Sos el DIRECTOR CREATIVO de ClaUsina. Seguí tu skill (/root/.claude/skills/creativo/SKILL.md).
 
-NEGOCIO ACTIVO: '$slug'. Leé su contexto ANTES de proponer nada:
+NEGOCIO ACTIVO: '$slug'. Leé su contexto ANTES de escribir nada:
   /root/clausina/marcas/$slug/contexto/CONTEXTO_MARCA.md
   /root/clausina/marcas/$slug/contexto/ESTILO.md
   /root/clausina/marcas/$slug/contexto/REFERENCIAS.md
 
-La campaña y lo que el negocio YA tiene están en $DIRW/pedido.json.
+La campaña y lo que el negocio YA tiene están en $DIRW/pedido.json."
 
-TAREA: proponer las ACCIONES de esta campaña. Una acción es algo concreto y medible, dirigido a
-UNO de los públicos que declara la campaña. No propongas una lista de piezas sueltas: proponé un
-plan por público, con un orden y una razón.
+if [ "$fase" = "acciones" ]; then
+  # Segunda fase: el plan ya está acordado (y puede haberlo editado el negocio). Las acciones
+  # salen de ESE texto, no de lo que el creativo hubiera propuesto por su cuenta.
+  PROMPT="$COMUN
 
-SI EL PEDIDO TRAE 'propuesta_anterior': NO empieces de cero. Es una iteración:
-- Partí de esas acciones y aplicá SÓLO lo que dice 'que_cambiar'.
-- Lo que no se cuestionó se mantiene TAL CUAL, con el mismo nombre — así se ve qué cambió.
-- Si 'sobre_accion' trae un número, el pedido es sobre esa acción (por su posición en la lista):
-  cambiá esa y dejá el resto intacto.
-- En el resumen, arrancá diciendo qué cambiaste respecto de la anterior y por qué.
+En 'plan_aprobado' está el plan que el negocio APROBÓ. Puede estar editado por ellos: es la
+decisión tomada y no se discute.
+
+TAREA: bajar ese plan a ACCIONES concretas. Cada acción es algo que alguien hace, dirigido a UNO
+de los públicos de la campaña, y medible.
 
 REGLAS:
-- Partí del objetivo, la meta, la ventana y el público de la campaña. Si la meta no es alcanzable
-  con lo que proponés, decilo.
-- Enganchá a lo que el negocio YA tiene cuando exista (beneficios, piezas gráficas). Si hace falta
-  algo que no existe, proponelo igual y marcá que hay que crearlo.
-- Cada acción tiene que ser MEDIBLE. Sin link propio ni código propio, sólo mide alcance: decilo.
-- Respetá los turnos y la capacidad reales. No invites a un turno que no corre.
-- Nada de fechas ni datos inventados: lo que no esté en el contexto, no existe.
+- Salí del plan aprobado. No agregues acciones que el plan no menciona ni saques las que sí.
+- Enganchá a lo que el negocio YA tiene (beneficios, piezas gráficas). Si hace falta algo que no
+  existe, proponelo y marcá que hay que crearlo.
+- Cada acción tiene que ser MEDIBLE. Sin link ni código propio, sólo mide alcance: decilo.
+- Respetá los turnos, la capacidad y la ventana reales. Nada inventado.
 
-SALIDA: escribí SOLO un JSON en $DIRW/resultado.json con esta forma exacta:
+SALIDA: escribí SOLO un JSON en $DIRW/resultado.json:
 {
-  \"resumen\": \"tu lectura de la campaña y el criterio del plan, en prosa, 2-3 párrafos\",
+  \"resumen\": \"una línea diciendo cómo bajaste el plan a acciones\",
   \"acciones\": [
-    {\"nombre\": \"...\",
-     \"tipo\": \"invitaciones|instagram|pantalla|impreso|pauta|link|otra\",
-     \"publico\": \"a cuál de los públicos de la campaña apunta\",
-     \"por_que\": \"por qué esta acción para ese público\",
-     \"como_se_mide\": \"qué se va a poder contar de esto\",
-     \"enganche\": \"nombre exacto de lo que ya existe, o vacío si hay que crearlo\",
-     \"hay_que_crear\": true|false,
-     \"cuando\": \"en qué momento de la ventana\"}
+    {\"nombre\": \"...\", \"tipo\": \"invitaciones|instagram|pantalla|impreso|pauta|link|otra\",
+     \"publico\": \"...\", \"por_que\": \"...\", \"como_se_mide\": \"...\",
+     \"enganche\": \"nombre exacto de lo que ya existe, o vacío\",
+     \"hay_que_crear\": true|false, \"cuando\": \"...\"}
   ]
 }
-Entre 4 y 8 acciones. No publiques nada, no toques la base, no crees piezas."
+Entre 4 y 8 acciones. No publiques nada, no toques la base."
+else
+  # Primera fase: el PLAN en prosa. Sin acciones: primero se acuerda la estrategia.
+  PROMPT="$COMUN
+
+TAREA: escribir el PLAN de esta campaña, en prosa. Todavía NO son acciones: es el criterio con
+el que se va a atacar el objetivo, para que el negocio lo lea, lo corrija y lo apruebe.
+
+Tiene que decir:
+- Cómo leés la campaña: el objetivo, la ventana, y si la meta es alcanzable con lo que hay
+  (capacidad, turnos, ticket). Si no lo es, decilo.
+- Cómo se ordena el trabajo por PÚBLICO: qué le hablás a cada uno y por qué a ese y no a otro.
+- Qué se puede medir y qué no. Decilo explícito: un embudo con huecos honestos vale más que uno
+  completo e inventado.
+- Qué de lo que el negocio ya tiene encaja, y qué falta crear.
+
+SI EL PEDIDO TRAE 'propuesta_anterior': es una iteración. Partí de ese plan y aplicá SÓLO lo que
+dice 'que_cambiar'; lo demás se mantiene. Arrancá diciendo qué cambiaste y por qué.
+
+SALIDA: escribí SOLO un JSON en $DIRW/resultado.json:
+{ \"resumen\": \"el plan, en prosa, 3 a 5 párrafos\", \"acciones\": [] }
+No propongas acciones todavía. No publiques nada, no toques la base."
+fi
 
 timeout 1500 claude -p "$PROMPT" --model sonnet --allowedTools Bash Read Write Glob Grep >> "$LOG" 2>&1
 
 [ -s "$DIRW/resultado.json" ] || fallar "El creativo no dejó una propuesta. Probá de nuevo."
 
-PID="$pid" PG="$PG" DIRW="$DIRW" python3 - <<'PY'
+PID="$pid" PG="$PG" DIRW="$DIRW" FASE="$fase" python3 - <<'PY'
 import json, os, secrets, subprocess
 pid=os.environ["PID"]; pg=os.environ["PG"]; dirw=os.environ["DIRW"]
 def dq(v):
@@ -122,12 +144,24 @@ try:
     d=json.load(open(f"{dirw}/resultado.json"))
 except Exception as e:
     d=None
-if not d or not isinstance(d.get("acciones"), list) or not d["acciones"]:
+fase = os.environ.get("FASE") or "plan"
+if fase == "acciones":
+    ok = bool(d) and isinstance(d.get("acciones"), list) and d["acciones"]
+    falta = "El creativo no bajó el plan a acciones."
+else:
+    ok = bool(d) and (d.get("resumen") or "").strip()
+    falta = "El creativo no dejó un plan."
+if not ok:
     sql=(f"UPDATE contenido.campania_propuesta SET estado='error', "
-         f"error='La propuesta no tenía acciones utilizables.', procesado_en=now() WHERE id='{pid}';")
+         f"error={dq(falta)}, procesado_en=now() WHERE id='{pid}';")
+elif fase == "acciones":
+    # El resumen del plan NO se pisa con la línea de la fase 2: es lo que el negocio aprobó.
+    sql=(f"UPDATE contenido.campania_propuesta SET estado='aprobada', "
+         f"acciones={dq(json.dumps(d['acciones'], ensure_ascii=False))}::jsonb, "
+         f"procesado_en=now() WHERE id='{pid}';")
 else:
     sql=(f"UPDATE contenido.campania_propuesta SET estado='lista', "
-         f"resumen={dq(d.get('resumen') or '')}, acciones={dq(json.dumps(d['acciones'], ensure_ascii=False))}::jsonb, "
+         f"resumen={dq(d.get('resumen') or '')}, resumen_original={dq(d.get('resumen') or '')}, "
          f"procesado_en=now() WHERE id='{pid}';")
 subprocess.run(["docker","exec","-i",pg,"psql","-U","postgres","-d","claude","-q","-c",sql])
 print("acciones propuestas:", len((d or {}).get("acciones") or []))

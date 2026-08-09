@@ -1586,6 +1586,23 @@ app.get('/api/campanias/:id/propuesta', async (req, res) => {
   try { res.json(await db.getPropuestaCampania(req.negocioId, req.params.id) || { estado: null }); }
   catch (e) { console.error('propuesta campania', e.message); res.status(500).json({ error: 'db' }); }
 });
+// El circuito en dos pasos: el plan se edita y se aprueba; recién ahí se piden las acciones.
+app.get('/api/campanias/:id/propuesta/estado', async (req, res) => {
+  try { res.json(await db.getEstadoPropuesta(req.negocioId, req.params.id)); }
+  catch (e) { console.error('estado propuesta', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.put('/api/campanias/:id/propuesta/:pid', async (req, res) => {
+  try { res.json(await db.guardarResumenPropuesta(req.negocioId, req.params.id, req.params.pid, (req.body || {}).resumen)); }
+  catch (e) { console.error('guardar propuesta', e.message); res.status(500).json({ ok: false }); }
+});
+app.post('/api/campanias/:id/propuesta/:pid/aprobar', async (req, res) => {
+  try { res.json(await db.aprobarPropuesta(req.negocioId, req.params.id, req.params.pid)); }
+  catch (e) { console.error('aprobar propuesta', e.message); res.status(500).json({ ok: false }); }
+});
+app.post('/api/campanias/:id/propuesta/:pid/materializar', async (req, res) => {
+  try { res.json(await db.materializarPropuesta(req.negocioId, req.params.id, req.params.pid)); }
+  catch (e) { console.error('materializar propuesta', e.message); res.status(500).json({ ok: false }); }
+});
 app.post('/api/campanias/:id/propuesta/:pid/aceptar', async (req, res) => {
   try { res.json(await db.aceptarSugerencia(req.negocioId, req.params.id, req.params.pid, Number((req.body || {}).indice))); }
   catch (e) { console.error('aceptar sugerencia', e.message); res.status(500).json({ ok: false }); }

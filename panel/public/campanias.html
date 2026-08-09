@@ -286,9 +286,9 @@ function pintar(){
         · ${c.acciones} acción(es)</div>
       <div class="meta">${esc(o?o.label:c.objetivo_tipo)}${c.meta_valor?': meta '+Math.round(c.meta_valor):''}</div>
       ${c.propuesta_estado==='pendiente'||c.propuesta_estado==='procesando'
-        ? '<div class="meta" style="color:#E0A458">el creativo está armando una propuesta…</div>'
-        : (c.propuesta_estado==='lista' && !c.acciones
-           ? '<div class="meta" style="color:var(--u-acc)">hay una propuesta para revisar</div>' : '')}
+        ? '<div class="meta" style="color:#E0A458">el creativo está trabajando…</div>'
+        : (c.propuesta_estado==='lista'
+           ? '<div class="meta" style="color:var(--u-acc)">hay un plan para revisar y aprobar</div>' : '')}
     </div>`;
   }).join('') : `<div class="mono" style="font-size:.7rem;color:var(--u-mut)">${
     CAMPS.length ? '— nada con ese filtro —' : '— todavía no hay campañas: creá la primera —'}</div>`;
@@ -346,7 +346,7 @@ async function guardarCampania(){
 
 /* ═══════ Detalle ═══════ */
 async function abrirDet(id){
-  DET=id;
+  DET=id; _editandoPlan=false;
   const c = await fetch('api/campanias/'+id).then(r=>r.json());
   if(c.error){ toast('No se pudo abrir',true); return; }
   DET_DATA = c;
@@ -400,137 +400,180 @@ async function confirmarAccion(id){
 }
 
 /* ═══════ La propuesta del creativo ═══════ */
-let _pollProp = null;
+// Son dos pasos y en ese orden: primero se acuerda el PLAN —se edita a mano si hace falta y se
+// aprueba—, y recién sobre el plan aprobado el creativo baja las acciones. Discutir estrategia y
+// ejecución al mismo tiempo deja acciones sobre la mesa que salen de un plan que nadie cerró.
+let _pollProp = null, _editandoPlan = false, _materializadas = new Set();
+
+const _enCurso = x => !!x && (x.estado === 'pendiente' || x.estado === 'procesando');
+
+// El "procesando" a secas no dice si avanza, si se colgó ni si hay que quedarse mirando.
+function _trabajando(titulo, x){
+  const desde = new Date(x.iniciado_en || x.creado_en);
+  const min = Math.max(0, Math.floor((Date.now() - desde.getTime())/60000));
+  return `<div style="border:1px dashed var(--u-line);border-radius:12px;padding:14px 16px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="spin"></span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:.94rem">${esc(titulo)}</div>
+        <div class="meta">Lleva ${min === 0 ? 'menos de un minuto' : min + ' minuto' + (min===1?'':'s')} ·
+          suele tardar entre 3 y 5. <b>Podés cerrar esta ventana</b>: sigue trabajando y te espera acá.</div>
+        ${min >= 8 ? `<div class="meta" style="color:#E0A458;margin-top:4px">Está tardando más de lo
+          normal. Si pasa de 40 minutos se corta solo y vas a poder reintentar.</div>` : ''}
+      </div>
+    </div></div>`;
+}
 
 async function pintarPropuesta(){
   const box = $('d-propuesta'); if(!box || !DET) return;
-  let p = null;
-  try{ p = await fetch('api/campanias/'+DET+'/propuesta').then(r=>r.json()); }catch(e){ return; }
-  const enCurso = p && (p.estado==='pendiente' || p.estado==='procesando');
+  let e = null;
+  try{ e = await fetch('api/campanias/'+DET+'/propuesta/estado').then(r=>r.json()); }catch(_){ return; }
+  const plan = e && e.plan, acc = e && e.acc;
   // Mientras corre se recarga solo: es un trabajo de minutos y nadie va a estar refrescando.
   clearInterval(_pollProp); _pollProp = null;
-  if(enCurso) _pollProp = setInterval(pintarPropuesta, 8000);
+  if(_enCurso(plan) || _enCurso(acc)) _pollProp = setInterval(pintarPropuesta, 8000);
 
-  if(!p || !p.estado){
+  if(!plan){
     box.innerHTML = `<div class="arow" style="border:1px dashed var(--u-line);border-radius:12px;padding:14px 16px">
       <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:.94rem">¿Le pedimos las acciones al creativo?</div>
+        <div style="font-weight:600;font-size:.94rem">¿Le pedimos el plan al creativo?</div>
         <div class="meta">Lee la identidad del negocio y esta campaña —objetivo, público, ventana y
-          presupuesto— y propone un plan por público. No crea nada: vos aceptás lo que sirva.</div>
+          presupuesto— y escribe cómo la atacaría. Primero el plan: las acciones salen después, de
+          lo que vos apruebes.</div>
       </div>
-      <button class="btn" onclick="pedirPropuesta()">Pedir propuesta</button></div>`;
+      <button class="btn" onclick="pedirPropuesta()">Pedir el plan</button></div>`;
     return;
   }
-  if(enCurso){
-    // Un "procesando" sin más no dice si avanza, si se colgó ni si hay que quedarse mirando.
-    const desde = new Date(p.iniciado_en || p.creado_en);
-    const min = Math.max(0, Math.floor((Date.now() - desde.getTime())/60000));
-    const tarda = min >= 8;   // lo normal son 3-5 minutos
-    box.innerHTML = `<div style="border:1px dashed var(--u-line);border-radius:12px;padding:14px 16px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span class="spin"></span>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:.94rem">El creativo está armando la propuesta</div>
-          <div class="meta">Lleva ${min === 0 ? 'menos de un minuto' : min + ' minuto' + (min===1?'':'s')} ·
-            suele tardar entre 3 y 5. <b>Podés cerrar esta ventana</b>: sigue trabajando y la
-            propuesta te espera acá.</div>
-          ${tarda ? `<div class="meta" style="color:#E0A458;margin-top:4px">Está tardando más de lo
-            normal. Si pasa de 40 minutos se corta solo y vas a poder reintentar.</div>` : ''}
-        </div>
-      </div></div>`;
-    return;
-  }
-  if(p.estado==='error'){
+  if(_enCurso(plan)){ box.innerHTML = _trabajando('El creativo está escribiendo el plan', plan); return; }
+  if(plan.estado === 'error'){
     box.innerHTML = `<div class="arow" style="border:1px solid var(--u-mal);border-radius:12px;padding:14px 16px">
-      <div style="flex:1"><div class="meta" style="color:var(--u-mal)">${esc(p.error||'No se pudo')}</div></div>
+      <div style="flex:1"><div class="meta" style="color:var(--u-mal)">${esc(plan.error||'No se pudo')}</div></div>
       <button class="btn2" onclick="pedirPropuesta()">Reintentar</button></div>`;
     return;
   }
-  // Lista: el resumen y las acciones sugeridas, cada una con su porqué y cómo se mide.
-  const yaAceptadas = new Set((DET_DATA.acciones||[]).filter(a=>a.propuesta_id===p.id).map(a=>a.nombre));
-  box.innerHTML =
-    `<div style="border:1px solid var(--u-line);border-radius:12px;padding:16px 18px">
-      <div class="mono" style="font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--u-mut);margin-bottom:8px">Propuesta del creativo</div>
-      <div style="font-size:.9rem;line-height:1.6;white-space:pre-wrap">${esc(p.resumen||'')}</div>
-      <div style="margin-top:14px">${(p.acciones||[]).map((a,i)=>{
-        const ya = yaAceptadas.has(a.nombre);
-        return `<div class="arow">
-          <div style="min-width:0;flex:1">
-            <div style="font-size:.92rem;font-weight:600">${esc(a.nombre||'')}${a.hay_que_crear?' <span class="pill planificada">hay que crearlo</span>':''}</div>
-            <div class="meta">${esc(a.tipo||'')}${a.publico?' · '+esc(a.publico):''}</div>
-            <div class="meta" style="opacity:.85">${esc(a.por_que||'')}</div>
-            ${a.como_se_mide?`<div class="meta" style="opacity:.75">Se mide: ${esc(a.como_se_mide)}</div>`:''}
-            ${a.cuando?`<div class="meta" style="opacity:.75">Cuándo: ${esc(a.cuando)}</div>`:''}
-          </div>
-          ${ya ? '<span class="pill activa">aceptada</span>'
-               : `<div style="display:flex;gap:6px;flex-shrink:0">
-                    <button class="btn2" style="padding:5px 11px;font-size:.8rem" onclick="ajustarSugerencia(${i})">Ajustar</button>
-                    <button class="btn2" style="padding:5px 11px;font-size:.8rem" onclick="aceptarSugerencia('${p.id}',${i})">Aceptar</button>
-                  </div>`}
-        </div>`;
-      }).join('')}</div>
-      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <button class="btn2" onclick="ajustarPropuesta()">Pedir cambios</button>
+
+  const aprobado = plan.estado === 'aprobada';
+  const editado = !!plan.resumen_original && plan.resumen_original !== plan.resumen;
+  let html = `<div style="border:1px solid var(--u-line);border-radius:12px;padding:16px 18px">
+    <div class="mono" style="font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--u-mut);margin-bottom:8px">
+      Plan del creativo${aprobado?' · aprobado':''}</div>`;
+
+  if(_editandoPlan && !aprobado){
+    html += `<textarea id="p-texto" style="width:100%;min-height:280px;background:var(--u-bg);
+        border:1px solid var(--u-acc);border-radius:9px;padding:11px 13px;color:var(--u-fg);
+        font-family:inherit;font-size:.9rem;line-height:1.6;outline:none;resize:vertical">${esc(plan.resumen||'')}</textarea>
+      <div class="meta" style="margin-top:6px">Lo que dejes acá es lo que se aprueba, y de ahí salen
+        las acciones. El texto original del creativo queda guardado.</div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="guardarPlan('${plan.id}')">Guardar</button>
+        <button class="btn2" onclick="_editandoPlan=false;pintarPropuesta()">Cancelar</button>
+      </div>`;
+  } else {
+    html += `<div style="font-size:.9rem;line-height:1.6;white-space:pre-wrap">${esc(plan.resumen||'')}</div>`;
+    if(editado) html += `<div class="meta" style="margin-top:6px;opacity:.8">Editado por ustedes sobre el original del creativo.</div>`;
+    if(!aprobado){
+      html += `<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn2" onclick="_editandoPlan=true;pintarPropuesta()">Editar propuesta</button>
+        <button class="btn2" onclick="ajustarPropuesta()">Pedir cambios al creativo</button>
         <button class="btn2" onclick="pedirPropuesta()">Empezar de cero</button>
-        <span class="meta" style="margin-left:auto">versión ${p.nro || 1}${p.instruccion?' · se pidió: '+esc(p.instruccion):''}</span>
+        <button class="btn" style="margin-left:auto" onclick="aprobarPlan('${plan.id}')">Aprobar y pedir las acciones</button>
       </div>
-    </div>`;
+      <div class="meta" style="margin-top:8px">Al aprobar, el creativo baja este plan —tal como quede— a
+        acciones concretas, que van a aparecer acá abajo en borrador para editar y confirmar de a una.</div>`;
+    }
+  }
+  html += `<div class="meta" style="margin-top:10px">versión ${plan.nro || 1}${plan.instruccion?' · se pidió: '+esc(plan.instruccion):''}</div></div>`;
+
+  // Segundo paso: la bajada a acciones.
+  if(aprobado){
+    if(_enCurso(acc)) html += `<div style="margin-top:12px">${_trabajando('El creativo está bajando el plan a acciones', acc)}</div>`;
+    else if(acc && acc.estado === 'error') html += `<div class="arow" style="margin-top:12px;border:1px solid var(--u-mal);border-radius:12px;padding:14px 16px">
+        <div style="flex:1"><div class="meta" style="color:var(--u-mal)">${esc(acc.error||'No se pudo')}</div></div>
+        <button class="btn2" onclick="aprobarPlan('${plan.id}',true)">Reintentar</button></div>`;
+    else if(acc && acc.estado === 'aprobada') html += `<div class="meta" style="margin-top:12px">
+        Las acciones que salieron de este plan están acá abajo, en borrador. Editá cada una, enganchala
+        a lo que corresponda y confirmala cuando estés convencido.
+        <a onclick="ajustarPropuesta()" style="cursor:pointer;text-decoration:underline">¿Querés cambiar el plan?</a></div>`;
+    else html += `<div class="arow" style="margin-top:12px;border:1px dashed var(--u-line);border-radius:12px;padding:14px 16px">
+        <div style="flex:1"><div class="meta">El plan está aprobado pero todavía no se pidieron las acciones.</div></div>
+        <button class="btn2" onclick="aprobarPlan('${plan.id}',true)">Pedir las acciones</button></div>`;
+  }
+  box.innerHTML = html;
+
+  // Las acciones se bajan a borrador todas juntas: con el plan ya acordado, aceptarlas de a una
+  // es un trámite. Lo que se revisa una por una es el contenido, y para eso hay que editarlas.
+  if(acc && acc.estado === 'aprobada' && !_materializadas.has(acc.id)
+     && !(DET_DATA.acciones||[]).some(a => a.propuesta_id === acc.id)){
+    _materializadas.add(acc.id);
+    try{
+      const r = await fetch(`api/campanias/${DET}/propuesta/${acc.id}/materializar`,{method:'POST'}).then(x=>x.json());
+      if(r.ok && r.creadas){ await cargar(); abrirDet(DET); }
+    }catch(_){}
+  }
+}
+
+async function guardarPlan(pid){
+  const t = ($('p-texto')||{}).value || '';
+  if(!t.trim()){ toast('El plan no puede quedar vacío',true); return; }
+  try{
+    const r = await fetch(`api/campanias/${DET}/propuesta/${pid}`,{method:'PUT',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({resumen:t})}).then(x=>x.json());
+    if(!r.ok){ toast(r.error==='no_editable'?'Este plan ya se aprobó':'No se pudo guardar',true); return; }
+    _editandoPlan = false; toast('Plan guardado'); pintarPropuesta();
+  }catch(e){ toast('Error de conexión',true); }
+}
+
+async function aprobarPlan(pid, silencioso){
+  if(!silencioso && !confirm('Se aprueba este plan y el creativo lo baja a acciones concretas.\n\n' +
+     'Las acciones van a quedar en borrador para que las edites y las confirmes de a una.\n\n¿Seguir?')) return;
+  try{
+    const r = await fetch(`api/campanias/${DET}/propuesta/${pid}/aprobar`,{method:'POST'}).then(x=>x.json());
+    if(!r.ok){
+      toast({ya_en_curso:'Ya hay un pedido en camino', no_aprobable:'Este plan ya se aprobó'}[r.error]
+            || 'No se pudo aprobar', true);
+      pintarPropuesta(); return;
+    }
+    toast('Plan aprobado — el creativo está armando las acciones');
+    pintarPropuesta();
+  }catch(e){ toast('Error de conexión',true); }
 }
 
 async function pedirPropuesta(){
   // Sólo se avisa si hay algo que perder: en la primera no hay nada de qué advertir.
-  const hay = $('d-propuesta').innerText.includes('Propuesta del creativo');
-  if(hay && !confirm('Esto arranca un plan nuevo desde cero y descarta el actual.\n\nSi lo que querés es corregirlo, usá "Pedir cambios".\n\n¿Seguir?')) return;
+  const hay = $('d-propuesta').innerText.includes('Plan del creativo');
+  if(hay && !confirm('Esto arranca un plan nuevo desde cero y descarta el actual.\n\nSi lo que querés es corregirlo, usá "Editar propuesta" o "Pedir cambios al creativo".\n\n¿Seguir?')) return;
   const extra = prompt('¿Algo que quieras aclararle al creativo? (opcional)', '');
   if(extra===null) return;
   try{
     const r = await fetch('api/campanias/'+DET+'/propuesta',{method:'POST',
       headers:{'Content-Type':'application/json'},body:JSON.stringify({instruccion:extra})}).then(x=>x.json());
-    if(!r.ok){ toast(r.error==='ya_en_curso'?'Ya hay una propuesta en camino':'No se pudo pedir',true); return; }
+    if(!r.ok){ toast(r.error==='ya_en_curso'?'Ya hay un pedido en camino':'No se pudo pedir',true); return; }
+    _editandoPlan = false;
     toast('Pedido al creativo — tarda unos minutos');
     pintarPropuesta();
   }catch(e){ toast('Error de conexión',true); }
 }
 
-// Iterar el plan entero: parte de la propuesta actual y toca sólo lo que se pide. Es distinto
-// de "empezar de cero", que tira las siete acciones para arreglar dos.
+// Iterar: el creativo parte del plan actual y toca sólo lo que se le pide. Es distinto de
+// "empezar de cero", que tira todo para corregir un párrafo.
 async function ajustarPropuesta(){
-  const q = prompt('¿Qué querés cambiar del plan?\n\nEjemplos: «sacá la pauta, no vamos a invertir todavía» · «el folleto tiene que caer dentro de la ventana» · «faltan acciones para el mediodía»', '');
+  const q = prompt('¿Qué querés cambiar del plan?\n\nEjemplos: «sacá la pauta, no vamos a invertir todavía» · «el foco tiene que estar en el mediodía» · «la meta no es realista, decilo»', '');
   if(q===null || !q.trim()) return;
-  await lanzarIteracion(q.trim(), null);
-}
-
-// Iterar UNA acción: el creativo mantiene el resto igual.
-async function ajustarSugerencia(i){
-  const q = prompt('¿Qué querés cambiar de esta acción?', '');
-  if(q===null || !q.trim()) return;
-  await lanzarIteracion(q.trim(), i);
-}
-
-async function lanzarIteracion(instruccion, indice){
   try{
     const r = await fetch('api/campanias/'+DET+'/propuesta',{method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({instruccion, iterar:true, sobre_accion:indice})}).then(x=>x.json());
+      body:JSON.stringify({instruccion:q.trim(), iterar:true})}).then(x=>x.json());
     if(!r.ok){
-      toast({ya_en_curso:'Ya hay una propuesta en camino', sin_previa:'No hay una propuesta lista para ajustar',
+      toast({ya_en_curso:'Ya hay un pedido en camino', sin_previa:'No hay un plan listo para ajustar',
              sin_instruccion:'Escribí qué querés cambiar'}[r.error] || 'No se pudo pedir', true);
       return;
     }
-    toast('Pedido al creativo — parte de lo que ya hay');
+    _editandoPlan = false;
+    toast('Pedido al creativo — parte del plan que ya hay');
     pintarPropuesta();
   }catch(e){ toast('Error de conexión',true); }
 }
 
-async function aceptarSugerencia(pid, i){
-  try{
-    const r = await fetch(`api/campanias/${DET}/propuesta/${pid}/aceptar`,{method:'POST',
-      headers:{'Content-Type':'application/json'},body:JSON.stringify({indice:i})}).then(x=>x.json());
-    if(!r.ok){ toast('No se pudo aceptar',true); return; }
-    toast('Agregada en borrador — editala y después confirmala');
-    await cargar(); abrirDet(DET);
-  }catch(e){ toast('Error de conexión',true); }
-}
 let DET_DATA=null;
 function editarActual(){ if(DET_DATA){ cerrar('ov-det'); abrirCampania(DET_DATA); } }
 
