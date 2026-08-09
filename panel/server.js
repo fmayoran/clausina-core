@@ -1454,8 +1454,28 @@ app.get('/api/perfil', async (req, res) => {
   catch (e) { console.error('perfil', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.put('/api/perfil', async (req, res) => {
-  try { res.json({ ok: await db.guardarPerfil(req.negocioId, req.body || {}) }); }
-  catch (e) { console.error('guardar perfil', e.message); res.status(500).json({ ok: false, error: e.code || 'db' }); }
+  try {
+    const cuerpo = { ...(req.body || {}), usuario_id: req.usuario && req.usuario.id };
+    res.json({ ok: await db.guardarPerfil(req.negocioId, cuerpo) });
+  } catch (e) {
+    // Un recorte grande no es un error del servidor: es una pregunta. 409 y el detalle, para que
+    // la pantalla pueda decir cuánto se está por perder antes de que se pierda.
+    if (e.code === 'recorte_grande') return res.status(409).json({ ok: false, error: e.code, detalle: e.detalle });
+    console.error('guardar perfil', e.message); res.status(500).json({ ok: false, error: e.code || 'db' });
+  }
+});
+
+// Versiones anteriores de un texto largo del perfil, y su contenido.
+app.get('/api/perfil/historial/:campo', async (req, res) => {
+  try { res.json({ versiones: await db.getTextoHistorial(req.negocioId, String(req.params.campo)) }); }
+  catch (e) { console.error('historial perfil', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.get('/api/perfil/version/:id', async (req, res) => {
+  try {
+    const v = await db.getTextoVersion(req.negocioId, Number(req.params.id));
+    if (!v) return res.status(404).json({ error: 'no_existe' });
+    res.json(v);
+  } catch (e) { console.error('version perfil', e.message); res.status(500).json({ error: 'db' }); }
 });
 
 // Subir/actualizar el logo de la marca activa: imagen (dataUrl base64) -> media store -> setea el campo logo.

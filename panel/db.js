@@ -820,6 +820,46 @@ async function getIgToken(slug) {
   } catch (e) { console.error('getIgToken', e.message); }
   return null;
 }
+/**
+ * Los textos largos del perfil (brief, estilo) se guardan con dos redes, porque en septiembre de
+ * un año cualquiera nadie se acuerda de que hubo un incidente:
+ *
+ *  1. GUARDA. Si lo que llega es drásticamente más corto que lo guardado, NO se escribe: se
+ *     devuelve el detalle y la persona confirma. Pasó de verdad —9018 caracteres reemplazados
+ *     por 342 sin que nada preguntara nada— y el texto sólo se recuperó del respaldo del día.
+ *  2. HISTORIAL. Antes de pisar, la versión anterior se archiva. Aun cuando alguien confirme el
+ *     recorte, volver atrás es un clic y no una restauración de base.
+ *
+ * Los umbrales apuntan a un caso concreto: perder de golpe la mayor parte de un texto escrito a
+ * mano. Achicar un brief de 900 a 600 caracteres es edición normal y pasa sin molestar.
+ */
+const TEXTOS_LARGOS = ['brief_md', 'estilo_md'];
+const RECORTE_MIN_CHARS = 400;   // por debajo de esto, cualquier cambio es edición normal
+const RECORTE_PROPORCION = 0.5;  // perder más de la mitad es la señal
+
+async function _guardarTextoLargo(cli, negocioId, campo, nuevo, usuarioId, confirmado) {
+  const { rows: [prev] } = await cli.query(
+    `SELECT ${campo} AS v FROM contenido.negocio_perfil WHERE negocio_id=$1`, [negocioId]);
+  const viejo = (prev && prev.v) || '';
+  if (viejo === (nuevo || '')) return null;              // sin cambios: ni guarda ni historial
+
+  const perdidos = viejo.length - (nuevo || '').length;
+  if (!confirmado && perdidos >= RECORTE_MIN_CHARS &&
+      (nuevo || '').length < viejo.length * RECORTE_PROPORCION) {
+    const e = new Error('recorte');
+    e.code = 'recorte_grande';
+    e.detalle = { campo, largo_actual: viejo.length, largo_nuevo: (nuevo || '').length, perdidos };
+    throw e;
+  }
+  // El historial guarda lo que se está por PISAR, no lo nuevo: es lo que hace falta para volver.
+  if (viejo) {
+    await cli.query(
+      `INSERT INTO contenido.perfil_texto_hist (negocio_id, campo, contenido, largo, usuario_id)
+       VALUES ($1,$2,$3,$4,$5)`, [negocioId, campo, viejo, viejo.length, usuarioId || null]);
+  }
+  return true;
+}
+
 async function guardarPerfil(negocioId, d) {
   const nn = s => (s != null && String(s).trim() !== '') ? String(s).trim() : null;
   // Cifrar los tokens ANTES de escribir nada (si falta la clave, falla limpio sin guardar a medias).
@@ -841,12 +881,24 @@ async function guardarPerfil(negocioId, d) {
     await pool.query('UPDATE contenido.negocios SET gestion=$2 WHERE id=$1', [negocioId, d.gestion]);
     _negociosAt = 0;   // el inicio agrupa por esto: invalidar el cache
   }
-  await pool.query(`
-    INSERT INTO contenido.negocio_perfil (negocio_id, slogan, logo, logo_claro, brief_md, estilo_md, actualizado_en)
-    VALUES ($1,$2,$3,$4,$5,$6, now())
-    ON CONFLICT (negocio_id) DO UPDATE SET slogan=$2, logo=$3, logo_claro=$4,
-                                           brief_md=$5, estilo_md=$6, actualizado_en=now()`,
-    [negocioId, nn(d.slogan), nn(d.logo), nn(d.logo_claro), nn(d.brief_md), nn(d.estilo_md)]);
+  // Los textos largos pasan por la guarda y dejan su versión anterior en el historial. Va antes
+  // del INSERT y en la misma conexión: si la guarda salta, no se escribe NADA del perfil — un
+  // guardado a medias con el brief pisado sería el peor de los dos mundos.
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    for (const campo of TEXTOS_LARGOS) {
+      await _guardarTextoLargo(cli, negocioId, campo, nn(d[campo]) || '', d.usuario_id,
+                               d.confirmar_recorte === true);
+    }
+    await cli.query(`
+      INSERT INTO contenido.negocio_perfil (negocio_id, slogan, logo, logo_claro, brief_md, estilo_md, actualizado_en)
+      VALUES ($1,$2,$3,$4,$5,$6, now())
+      ON CONFLICT (negocio_id) DO UPDATE SET slogan=$2, logo=$3, logo_claro=$4,
+                                             brief_md=$5, estilo_md=$6, actualizado_en=now()`,
+      [negocioId, nn(d.slogan), nn(d.logo), nn(d.logo_claro), nn(d.brief_md), nn(d.estilo_md)]);
+    await cli.query('COMMIT');
+  } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
   // Pauta: IDs en claro (COALESCE: vacío = no toca); token cifrado, write-only.
   await pool.query(
     `UPDATE contenido.negocio_perfil SET
@@ -864,6 +916,26 @@ async function guardarPerfil(negocioId, d) {
   _negociosAt = 0;   // el nombre pudo cambiar -> refrescar cache de marcas
   return true;
 }
+/** Las versiones anteriores de un texto largo, para poder volver sin ir al respaldo del día. */
+async function getTextoHistorial(negocioId, campo) {
+  if (!TEXTOS_LARGOS.includes(campo)) return [];
+  const { rows } = await pool.query(
+    `SELECT h.id, h.largo, h.guardado_en, u.nombre AS usuario
+       FROM contenido.perfil_texto_hist h
+       LEFT JOIN contenido.usuario u ON u.id = h.usuario_id
+      WHERE h.negocio_id=$1 AND h.campo=$2 ORDER BY h.guardado_en DESC LIMIT 20`,
+    [negocioId, campo]);
+  return rows;
+}
+
+/** El contenido de una versión, para verla antes de restaurarla. */
+async function getTextoVersion(negocioId, id) {
+  const { rows: [r] } = await pool.query(
+    `SELECT campo, contenido, largo, guardado_en FROM contenido.perfil_texto_hist
+      WHERE id=$1 AND negocio_id=$2`, [id, negocioId]);
+  return r || null;
+}
+
 // Actualiza SOLO el logo (sin tocar slogan/brief). Lo usa la subida de archivo del perfil.
 /**
  * El logo del negocio. `variante='claro'` guarda la versión PARA FONDO CLARO — un logo es una
@@ -3519,7 +3591,7 @@ module.exports = {
   cerrarUso, liberarPorReserva, invitacionDeReserva, condicionesLegibles, piezasPublicadas, codigoPieza,
   reservaTarjeta, pedirTarjeta,
   invitacionesActivas, guardarToken, getUsuarioPorToken, consumirToken,
-  getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, setLogo, getResumenAgencia,
+  getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, getTextoHistorial, getTextoVersion, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,
   getClientes, crearCliente, actualizarCliente, borrarCliente, exportarClientes, borrarTodosLosClientes,
   getConfigReservas, guardarConfigReservas, UNIDADES, getTurnos, guardarTurno, borrarTurno,

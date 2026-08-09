@@ -313,6 +313,7 @@
         <label for="brief_md">Contexto <span class="hint">— propuesta de valor, tono, público, lineamientos visuales, hacer/evitar, productos, datos clave</span></label>
         <textarea id="brief_md" style="min-height:420px;"></textarea>
         <div class="hint">Es la narrativa. Los mismos hechos, en formato consultable, van en la solapa Ficha.</div>
+        <div class="hint" id="hist-brief_md" style="margin-top:7px"></div>
       </div>
       <div class="bar"><button class="btn" onclick="guardarPerfil()">Guardar</button></div>
     </div>
@@ -607,6 +608,39 @@ function marcarSolapas() {
   set('estilo', fval('estilo_md').length > 20);
 }
 
+// Versiones anteriores. Se muestran siempre —no sólo cuando algo salió mal—: saber que existen
+// es la mitad del valor, porque es lo que permite editar sin miedo.
+async function cargarHistorial() {
+  const dest = $('hist-brief_md'); if (!dest) return;
+  try {
+    const d = await fetch('api/perfil/historial/brief_md').then(r => r.json());
+    const vs = d.versiones || [];
+    if (!vs.length) { dest.textContent = ''; return; }
+    const f = t => new Date(t).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
+    dest.innerHTML = 'Versiones anteriores: ' + vs.slice(0, 5).map(v =>
+      `<a onclick="verVersion(${v.id})" style="cursor:pointer;text-decoration:underline">${f(v.guardado_en)} (${v.largo})</a>`
+    ).join(' · ');
+  } catch (e) { dest.textContent = ''; }
+}
+
+// Ver antes de restaurar: pisar el texto actual con una versión vieja sin haberla leído sería
+// repetir el problema en el otro sentido.
+async function verVersion(id) {
+  try {
+    const v = await fetch('api/perfil/version/' + id).then(r => r.json());
+    if (!v || !v.contenido) { toast('No se pudo leer esa versión', true); return; }
+    const t = $('brief_md');
+    const ok = confirm(
+      `Versión del ${new Date(v.guardado_en).toLocaleString('es-AR')} — ${v.largo} caracteres.\n\n` +
+      v.contenido.slice(0, 400) + (v.contenido.length > 400 ? '\n[…]' : '') +
+      `\n\n¿Poner esta versión en el editor? (todavía no se guarda: revisala y después dale Guardar)`);
+    if (!ok) return;
+    t.value = v.contenido;
+    t.focus();
+    toast('Cargada en el editor — revisá y guardá');
+  } catch (e) { toast('Error de conexión', true); }
+}
+
 async function cargarPerfil() {
   try {
     const r = await fetch('api/perfil'); if (r.status === 401) { location.href = 'login'; return; }
@@ -619,6 +653,7 @@ async function cargarPerfil() {
     try { renderContactos(await fetch('api/contactos').then(r => r.json())); } catch (_) { renderContactos([]); }
     $('upd2').textContent = p.actualizado_en ? ('Última edición: ' + fecha(p.actualizado_en)) : 'Sin cargar todavía';
     marcarSolapas();
+    cargarHistorial();
   } catch (e) {}
 }
 
@@ -631,12 +666,29 @@ async function guardarPerfil() {
   const g = $('gestion'); if (g) body.gestion = g.value;
   const pf = $('prefijo'); if (pf) body.prefijo = pf.value;
   try {
-    const d = await fetch('api/perfil', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body) }).then(r => r.json());
+    let r = await fetch('api/perfil', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body) });
+    let d = await r.json();
+    // El servidor frena un recorte grande y devuelve cuánto se perdería. Se pregunta con el
+    // número a la vista: "vas a perder texto" no dice nada, "vas a perder 8.676 caracteres" sí.
+    if (r.status === 409 && d.error === 'recorte_grande') {
+      const x = d.detalle || {};
+      const campo = x.campo === 'estilo_md' ? 'el estilo' : 'el brief';
+      const ok = confirm(
+        `Cuidado: estás por dejar ${campo} en ${x.largo_nuevo} caracteres, cuando tenía ${x.largo_actual}.\n` +
+        `Se perderían ${x.perdidos}.\n\n` +
+        `Si no fue a propósito, cancelá: no se guardó nada y el texto sigue como estaba.\n` +
+        `¿Guardar igual?`);
+      if (!ok) { toast('No se guardó: el texto sigue como estaba'); return; }
+      body.confirmar_recorte = true;
+      r = await fetch('api/perfil', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body) });
+      d = await r.json();
+    }
     if (d.ok) await fetch('api/contactos', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contactos: leerContactos() }) });
     toast(d.ok ? 'Guardado' : (d.error === 'no_enc_key' ? 'Falta configurar APP_ENC_KEY en el panel' : 'No se pudo guardar'), !d.ok);
-    if (d.ok) cargarPerfil();
+    if (d.ok) { cargarPerfil(); cargarHistorial(); }
   } catch (e) { toast('Error de conexión', true); }
 }
 
