@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# El creativo propone las acciones de una campaña — ClaUsina v2.0 / F7.
+# El creativo trabaja una campaña — ClaUsina v2.0 / F7.
 # Uso: campania_propuesta_job.sh <negocio_slug> <propuesta_id>
 #
-# NO crea nada: deja acciones sugeridas en la propuesta para que una persona acepte de a una.
+# Dos fases, según la columna 'fase' de la propuesta:
+#   plan     → escribe el plan en prosa. Sin acciones: primero se acuerda la estrategia.
+#   acciones → baja a acciones concretas el plan que el negocio YA aprobó (editado o no).
+# NO crea nada en la campaña: deja el resultado en la propuesta y el panel lo baja a borradores.
 set -uo pipefail
 export HOME=/root
 export PATH="/root/.local/bin:/usr/local/bin:/usr/bin:/bin"
