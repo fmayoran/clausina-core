@@ -22,6 +22,13 @@
   .pase{width:min(430px,100%);background:var(--c-suave);border:1px solid var(--c-linea);
         border-radius:20px;padding:30px 28px 26px;text-align:center;position:relative;overflow:hidden;}
   .envoltorio{width:min(430px,100%);}
+  /* La invitación tiene dos caras: el frente es la pieza gráfica que eligió el beneficio y el
+     dorso es este pase. Mostrar sólo el dorso hace parecer que el frente no se guardó. */
+  .frente{width:100%;border:1px solid var(--c-linea);border-radius:20px;overflow:hidden;
+          margin-bottom:16px;background:var(--c-suave);line-height:0;}
+  .frente img{width:100%;height:auto;display:block;}
+  .cara-rot{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.22em;
+            text-transform:uppercase;opacity:.5;text-align:center;margin:0 0 7px;line-height:1.6;}
   /* El logo manda: es lo primero y lo más grande, y trae el nombre adentro. */
   .logo{max-height:104px;max-width:86%;width:auto;margin:0 auto 24px;display:block;}
   /* El logo de un negocio suele ser una sola pieza, pensada para fondo oscuro: sobre papel
@@ -80,6 +87,9 @@
     .cta,.acciones{display:none !important;}
     .envoltorio{width:100%;}
     .pie{opacity:.7;}
+    /* Cada cara en su hoja: es como se manda a imprenta y como se arma la tarjeta. */
+    .frente{border:0;border-radius:0;margin:0;page-break-after:always;}
+    .cara-rot{display:none !important;}
   }
   /* Inerte, pero con su color real: bajarle la opacidad haría dudar del botón que se está
      yendo a evaluar, que es justo lo que la muestra tiene que mostrar bien. */
@@ -99,6 +109,11 @@
 </head>
 <body>
 <div class="envoltorio">
+<div id="cara-frente" style="display:none">
+  <div class="cara-rot">Frente</div>
+  <div class="frente"><img id="frente-img" alt=""></div>
+  <div class="cara-rot">Dorso</div>
+</div>
 <div class="pase" id="pase" style="display:none">
   <!-- El nombre del negocio no va como texto: ya está en el logo, y repetirlo lo ensucia. -->
   <span id="banda"><img class="logo" id="logo" alt="" style="display:none"></span>
@@ -204,6 +219,13 @@ function marca(m, claro) {
     }
     // Sin logo cargado el nombre tiene que aparecer igual, si no la tarjeta no dice de quién es.
     else { $('titulo').textContent = j.negocio + ' te invita'; }
+    // El frente que definió el beneficio. Si no tiene, la invitación es de una sola cara y no
+    // se anuncian caras que no existen.
+    if (j.frente) {
+      $('frente-img').src = j.frente;
+      $('frente-img').alt = 'Frente de la invitación' + (j.frente_codigo ? ' (' + j.frente_codigo + ')' : '');
+      $('cara-frente').style.display = '';
+    }
     $('beneficio').textContent = j.texto;
     if (j.etiqueta) { $('para').textContent = 'Para ' + j.etiqueta; $('para').style.display = ''; }
     $('codigo').textContent = j.codigo.replace(/^(.{3})(.{3})$/, '$1-$2');
