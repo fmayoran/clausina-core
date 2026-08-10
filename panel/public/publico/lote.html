@@ -37,7 +37,7 @@
      pie queda anclado al borde. */
   .cara{width:105mm;height:148.5mm;background:var(--c-fondo);color:var(--c-tinta);
         display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
-        text-align:center;padding:8mm 7mm;position:relative;overflow:hidden;}
+        text-align:center;padding:7mm 7mm 9mm;position:relative;overflow:hidden;}
   /* Un hueco cuando la tanda no llena la hoja: hay que ocupar la celda igual para que las
      posiciones del dorso sigan calzando con las del frente. */
   .cara.hueca{background:#fff;}
@@ -55,7 +55,7 @@
   .frente .fallback img{width:auto;max-width:70%;max-height:34mm;object-fit:contain;}
   .frente .lema{font-family:var(--f-tit);font-weight:800;font-size:7.4mm;line-height:1.08;
                 text-transform:uppercase;color:var(--c-acento);}
-  .logo{max-height:16mm;max-width:70%;width:auto;margin-bottom:5mm;}
+  .logo{max-height:14mm;max-width:68%;width:auto;margin-bottom:4mm;}
   /* El logo del negocio está pensado para fondo oscuro: sobre papel blanco se borra. */
   .banda{background:var(--c-marca-fondo,#101014);border-radius:3mm;padding:4mm 5mm;
          margin-bottom:7mm;display:inline-block;max-width:86%;}
@@ -63,33 +63,33 @@
   .frente .fallback .banda{margin:0;}
   /* Con el nombre de la campaña adentro el título ya no es una línea fija: baja un punto y se
      lo deja partir, antes que desbordar la tarjeta. */
-  .titulo{font-family:var(--f-tit);font-weight:800;font-size:5.4mm;line-height:1.1;
+  .titulo{font-family:var(--f-tit);font-weight:800;font-size:5mm;line-height:1.08;
           text-transform:uppercase;color:var(--c-acento);text-wrap:balance;}
-  .detalle{font-size:3.1mm;font-weight:700;line-height:1.4;opacity:.9;margin-top:2mm;
+  .detalle{font-size:3mm;font-weight:700;line-height:1.35;opacity:.9;margin-top:1.8mm;
            white-space:pre-wrap;}
   /* El monto en el acento de la marca: es el dato por el que la persona guarda la tarjeta. */
   .beneficio{font-family:var(--f-tit);font-weight:700;font-size:4.6mm;line-height:1.25;
-             margin:2.5mm 0 0;color:var(--c-acento);}
+             margin:2mm 0 0;color:var(--c-acento);}
   .para{font-size:3.6mm;opacity:.75;margin-top:1.5mm;}
-  .codigo{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:8mm;
-          letter-spacing:.12em;padding:3.5mm 3mm;border:.4mm dashed var(--c-linea);
-          border-radius:3mm;margin:5mm 0 2mm;width:100%;}
+  .codigo{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:7mm;
+          letter-spacing:.12em;padding:3mm 3mm;border:.4mm dashed var(--c-linea);
+          border-radius:3mm;margin:4mm 0 1.5mm;width:100%;}
   .rotulo{font-family:'JetBrains Mono',monospace;font-size:2.4mm;letter-spacing:.22em;
           text-transform:uppercase;opacity:.6;}
-  .cond{font-family:'JetBrains Mono',monospace;font-size:2.6mm;line-height:1.7;opacity:.72;
-        margin-top:3mm;}
+  .cond{font-family:'JetBrains Mono',monospace;font-size:2.6mm;line-height:1.6;opacity:.72;
+        margin-top:2.5mm;}
   /* En papel esto reemplaza al botón: es el único camino para reservar, así que se lee. */
-  .otra{font-family:'JetBrains Mono',monospace;font-size:2.9mm;line-height:1.65;opacity:.85;
-        margin-top:4mm;}
+  .otra{font-family:'JetBrains Mono',monospace;font-size:2.9mm;line-height:1.55;opacity:.85;
+        margin-top:3mm;}
   .otra b{font-size:3.6mm;letter-spacing:.04em;color:var(--c-acento);}
   /* La letra chica es un párrafo, no una lista de advertencias sueltas: justificado se lee de
      corrido, igual que en la tarjeta individual. */
-  .pie{font-size:2.3mm;opacity:.62;line-height:1.5;margin-top:auto;padding-top:4mm;
+  .pie{font-size:2.3mm;opacity:.62;line-height:1.45;margin-top:auto;padding-top:3mm;
        text-align:justify;hyphens:auto;text-wrap:pretty;}
   .pie b{opacity:.9;}
   /* Los datos del negocio se separan de la letra chica: no son advertencias, son dónde encontrarlos. */
-  .datos{border-top:.25mm solid var(--c-linea);margin-top:3mm;padding-top:2.5mm;width:100%;
-         font-family:'JetBrains Mono',monospace;font-size:2.4mm;line-height:1.7;opacity:.78;}
+  .datos{border-top:.25mm solid var(--c-linea);margin-top:2.5mm;padding-top:2mm;width:100%;
+         font-family:'JetBrains Mono',monospace;font-size:2.3mm;line-height:1.6;opacity:.78;}
   .datos a{color:inherit;text-decoration:none;}
   .contactos{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
              gap:1mm 4mm;margin-top:.8mm;}
