@@ -17,6 +17,9 @@
   :root[data-tema="claro"]{--c-fondo:#F2F0EA;--c-tinta:#15150F;--c-acento:#B33A00;
                            --c-suave:#FFFFFF;--c-linea:#DCD8CC;}
   *{box-sizing:border-box;margin:0;}
+  /* Los colores se imprimen sí o sí. Sin esto depende de que quien imprime tenga tildado
+     "gráficos de fondo", y la tarjeta sale en blanco y negro sin que nadie se entere. */
+  html{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body{background:var(--c-fondo);color:var(--c-tinta);font-family:var(--f-txt);
        min-height:100vh;display:grid;place-items:center;padding:26px 18px;}
   .pase{width:min(430px,100%);background:var(--c-suave);border:1px solid var(--c-linea);
@@ -39,8 +42,9 @@
   .titulo{font-family:var(--f-tit);font-weight:800;font-size:1.5rem;line-height:1.1;
           letter-spacing:.02em;text-transform:uppercase;color:var(--c-acento);}
   /* El beneficio es lo que se lee de un vistazo: después del logo, es lo más grande de la pieza. */
-  .beneficio{font-family:var(--f-tit);font-weight:700;font-size:1.5rem;line-height:1.25;
-             margin:12px 0 4px;color:var(--c-tinta);}
+  /* El monto en el acento de la marca: es el dato por el que la persona guarda la tarjeta. */
+  .beneficio{font-family:var(--f-tit);font-weight:700;font-size:1.6rem;line-height:1.25;
+             margin:12px 0 4px;color:var(--c-acento);}
   .rotulo{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.24em;
           text-transform:uppercase;opacity:.62;}
   .para{font-size:.9rem;opacity:.75;margin-bottom:20px;}

@@ -15,15 +15,20 @@ if (!inHtml) salida({ ok: false, error: 'falta el html' });
 const MM_PX = 96 / 25.4;                       // 1mm en px CSS
 const W = Math.round(Number(anchoMM) * MM_PX);
 const H = Math.round(Number(altoMM) * MM_PX);
-const MAX_PREVIEW = 1600;                      // acota el PNG de un cartel grande, sin perder proporción
-const escala = Math.min(1, MAX_PREVIEW / Math.max(W, H));
+// El PNG no es sólo un preview: es lo que se imprime cuando la pieza va al frente de una
+// invitación. A escala 1 sale a 96 dpi —una A6 en 397x560 px— y en papel se ve blando. Se apunta
+// a 300 dpi reales, con un tope de lado para que un afiche A3 no termine en un archivo enorme:
+// ahí baja a ~150 dpi, que a distancia de cartel alcanza.
+const DPI_IMPRENTA = 300;
+const MAX_LADO = 3600;
+const escala = Math.max(1, Math.min(DPI_IMPRENTA / 96, MAX_LADO / Math.max(W, H)));
 const dorsoPath = outPng.replace(/(\.[^.]+)$/, '-dorso$1');
 
 (async () => {
   let b;
   try {
     b = await chromium.launch();
-    const ctx = await b.newContext({ deviceScaleFactor: Math.max(1, Math.min(2, 1 / escala)) });
+    const ctx = await b.newContext({ deviceScaleFactor: escala });
     const p = await ctx.newPage();
     await p.goto('file://' + path.resolve(inHtml), { waitUntil: 'networkidle', timeout: 60000 });
 
@@ -32,10 +37,11 @@ const dorsoPath = outPng.replace(/(\.[^.]+)$/, '-dorso$1');
     await p.pdf({ path: outPdf, printBackground: true, preferCSSPageSize: true,
       margin: { top: '0', bottom: '0', left: '0', right: '0' } });
 
-    // Preview: en pantalla, con zoom para acotar el tamaño; un screenshot por cara (.lienzo).
+    // El PNG por cara. Sin zoom: el tamaño lo da el deviceScaleFactor, y hacer las dos cosas
+    // encogía la pieza justo cuando se la quería más grande.
     await p.emulateMedia({ media: 'screen' });
     await p.addStyleTag({ content:
-      `html,body{margin:0!important;padding:0!important;background:#fff!important;zoom:${escala};}` });
+      'html,body{margin:0!important;padding:0!important;background:#fff!important;}' });
     await p.waitForTimeout(300);
     const caras = await p.locator('.lienzo').count();
     const salidas = [outPng, dorsoPath];
@@ -45,12 +51,13 @@ const dorsoPath = outPng.replace(/(\.[^.]+)$/, '-dorso$1');
       hechas++;
     }
     if (!hechas) {   // fallback: no encontró .lienzo, capturo el viewport
-      await p.setViewportSize({ width: Math.round(W * escala), height: Math.round(H * escala) });
+      await p.setViewportSize({ width: W, height: H });
       await p.screenshot({ path: outPng });
       hechas = 1;
     }
     await b.close();
-    salida({ ok: true, caras: hechas, px: `${W}x${H}` });
+    salida({ ok: true, caras: hechas, px: `${Math.round(W * escala)}x${Math.round(H * escala)}`,
+             dpi: Math.round(96 * escala) });
   } catch (e) {
     try { if (b) await b.close(); } catch (_) {}
     salida({ ok: false, error: String(e.message || e).slice(0, 200) });
