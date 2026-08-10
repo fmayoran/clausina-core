@@ -152,10 +152,13 @@ echo "$RJSON" | grep -q '"ok":true' || fallar "No se pudo renderizar la pieza (P
 # Dorso: el renderer lo escribe como <base>-dorso.png si la pieza tiene 2 caras.
 DORSO_SQL="png_dorso_url=NULL"
 if [ -s "$dir/$base-dorso.png" ]; then DORSO_SQL="png_dorso_url='$BASE_URL/$rel/$base-dorso.png'"; fi
+# La copia liviana para la pantalla; si no salió, la grilla cae al PNG grande.
+PREV_SQL="png_prev_url=NULL"
+if [ -s "$dir/$base-prev.jpg" ]; then PREV_SQL="png_prev_url='$BASE_URL/$rel/$base-prev.jpg'"; fi
 
 psql "UPDATE contenido.grafica_version SET estado='lista', error=NULL, procesado_en=now(),
         html_url='$BASE_URL/$rel/$base.html', pdf_url='$BASE_URL/$rel/$base.pdf',
-        png_url='$BASE_URL/$rel/$base.png', $DORSO_SQL
+        png_url='$BASE_URL/$rel/$base.png', $DORSO_SQL, $PREV_SQL
       WHERE id='$vid';" >/dev/null
 psql "UPDATE contenido.grafica SET version_actual=$nro, estado='lista', actualizado_en=now() WHERE id='$gid';" >/dev/null
 echo "$(ts) grafica $vid lista (v$nro)" >> "$LOG"

@@ -477,7 +477,8 @@ async function getGraficas(negocioId, { descartadas = false } = {}) {
   const { rows } = await pool.query(`
     SELECT g.id, g.numero, g.nombre, g.formato, g.ancho_mm, g.alto_mm, g.mensaje, g.estado, g.version_actual,
            g.caras, g.fondo_modo, g.fondo_url, g.datos, g.actualizado_en,
-           v.png_url, v.png_dorso_url, v.pdf_url, v.estado AS v_estado, v.error AS v_error, v.nro AS v_nro
+           COALESCE(v.png_prev_url, v.png_url) AS png_url,
+           v.png_dorso_url, v.pdf_url, v.estado AS v_estado, v.error AS v_error, v.nro AS v_nro
       FROM contenido.grafica g
       LEFT JOIN LATERAL (SELECT * FROM contenido.grafica_version x
                           WHERE x.grafica_id=g.id ORDER BY x.nro DESC LIMIT 1) v ON true
@@ -499,7 +500,8 @@ async function getGrafica(negocioId, id) {
     'SELECT * FROM contenido.grafica WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
   if (!g) return null;
   const { rows: vs } = await pool.query(
-    `SELECT id, nro, instruccion, png_url, png_dorso_url, pdf_url, html_url, estado, error, creado_en
+    `SELECT id, nro, instruccion, COALESCE(png_prev_url, png_url) AS png_url,
+            png_dorso_url, pdf_url, html_url, estado, error, creado_en
        FROM contenido.grafica_version WHERE grafica_id=$1 ORDER BY nro DESC`, [id]);
   g.versiones = vs;
   return g;
@@ -576,14 +578,14 @@ async function duplicarGrafica(negocioId, id, nombreNuevo) {
        g.fondo_dorso_modo, g.fondo_dorso_url, g.fondo_dorso_prompt, JSON.stringify(g.datos || {})]);
 
     const { rows: [v] } = await cli.query(
-      `SELECT html_url, pdf_url, png_url, png_dorso_url FROM contenido.grafica_version
+      `SELECT html_url, pdf_url, png_url, png_dorso_url, png_prev_url FROM contenido.grafica_version
         WHERE grafica_id=$1 AND estado='lista' ORDER BY nro DESC LIMIT 1`, [id]);
     if (v && v.html_url) {
       await cli.query(
         `INSERT INTO contenido.grafica_version
-           (grafica_id, nro, instruccion, estado, html_url, pdf_url, png_url, png_dorso_url, procesado_en)
-         VALUES ($1, 1, $2, 'lista', $3, $4, $5, $6, now())`,
-        [nueva.id, `Copia de ${g.nombre}`, v.html_url, v.pdf_url, v.png_url, v.png_dorso_url]);
+           (grafica_id, nro, instruccion, estado, html_url, pdf_url, png_url, png_dorso_url, png_prev_url, procesado_en)
+         VALUES ($1, 1, $2, 'lista', $3, $4, $5, $6, $7, now())`,
+        [nueva.id, `Copia de ${g.nombre}`, v.html_url, v.pdf_url, v.png_url, v.png_dorso_url, v.png_prev_url]);
       await cli.query('UPDATE contenido.grafica SET version_actual=1 WHERE id=$1', [nueva.id]);
     } else {
       // La original nunca llegó a diseñarse: la copia arranca igual que una pieza nueva, en cola.

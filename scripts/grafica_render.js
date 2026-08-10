@@ -7,6 +7,7 @@
 //   El PNG del dorso (si hay 2 caras) se escribe como <out sin ext>-dorso.<ext>.
 const { chromium } = require('/root/clausina/core/node_modules/playwright');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const [inHtml, outPdf, outPng, anchoMM, altoMM] = process.argv.slice(2);
 const salida = (o) => { console.log(JSON.stringify(o)); process.exit(o.ok ? 0 : 1); };
@@ -23,6 +24,7 @@ const DPI_IMPRENTA = 300;
 const MAX_LADO = 3600;
 const escala = Math.max(1, Math.min(DPI_IMPRENTA / 96, MAX_LADO / Math.max(W, H)));
 const dorsoPath = outPng.replace(/(\.[^.]+)$/, '-dorso$1');
+const prevPath = outPng.replace(/(\.[^.]+)$/, '-prev.jpg');
 
 (async () => {
   let b;
@@ -56,7 +58,16 @@ const dorsoPath = outPng.replace(/(\.[^.]+)$/, '-dorso$1');
       hechas = 1;
     }
     await b.close();
-    salida({ ok: true, caras: hechas, px: `${Math.round(W * escala)}x${Math.round(H * escala)}`,
+
+    // El PNG grande es para imprimir. La grilla del panel muestra nueve piezas: bajar 6 MB por
+    // cada una para dibujar una miniatura es la clase de cosa que hace pensar que el panel está
+    // roto. Sale una copia liviana del frente, y si falla no se cae el render.
+    try {
+      execFileSync('convert', [outPng, '-resize', '900x900>', '-strip', '-quality', '82', prevPath],
+                   { stdio: 'ignore' });
+    } catch (_) {}
+
+    salida({ ok: true, caras: hechas, prev: require('fs').existsSync(prevPath), px: `${Math.round(W * escala)}x${Math.round(H * escala)}`,
              dpi: Math.round(96 * escala) });
   } catch (e) {
     try { if (b) await b.close(); } catch (_) {}

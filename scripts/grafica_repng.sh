@@ -39,8 +39,10 @@ while IFS='|' read -r vid slug numero nro W H html; do
   echo "$r" | grep -q '"ok":true' || continue
   dorso="png_dorso_url=NULL"
   [ -s "$dir/$base-dorso.png" ] && dorso="png_dorso_url='$BASE_URL/$rel/$base-dorso.png'"
+  prev="png_prev_url=NULL"
+  [ -s "$dir/$base-prev.jpg" ] && prev="png_prev_url='$BASE_URL/$rel/$base-prev.jpg'"
   # El PDF no se toca: ya sale a tamaño físico real y con la imagen a su resolución nativa.
-  psql "UPDATE contenido.grafica_version SET png_url='$BASE_URL/$rel/$base.png', $dorso WHERE id='$vid';" >/dev/null
+  psql "UPDATE contenido.grafica_version SET png_url='$BASE_URL/$rel/$base.png', $dorso, $prev WHERE id='$vid';" >/dev/null
   rm -f "/tmp/repng_$vid.pdf"
   hechas=$((hechas+1))
 done < /tmp/repng_lista.txt
