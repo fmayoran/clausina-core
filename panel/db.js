@@ -2443,7 +2443,9 @@ async function guardarAccion(negocioId, campaniaId, id, d) {
   const eng = ENGANCHES.find(x => x.id === d.enganche)
            || ENGANCHES.find(x => x.id === ENGANCHE_POR_TIPO[t.id]);
   if (eng && /^[0-9a-f-]{36}$/i.test(String(d.ref || ''))) refs[eng.campo] = d.ref;
-  const num = v => (Number(v) >= 0 ? Number(v) : null);
+  // Un campo vacío es "no lo sé", no cero: Number('') da 0 y el costo previsto quedaba en $0.
+  const num = v => (v === '' || v === null || v === undefined ? null
+                    : (Number(v) >= 0 ? Number(v) : null));
   // Lo que el formulario no manda NO se pisa: el UPDATE escribía todas las columnas, así que
   // editar el nombre de una acción borraba las notas del creativo —el porqué, el público, cómo se
   // mide— y le ponía orden 0. Un campo ausente es "no lo toqués", no "vaciámelo".
