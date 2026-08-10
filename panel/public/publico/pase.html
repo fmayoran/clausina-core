@@ -30,10 +30,11 @@
   .frente{width:100%;border:1px solid var(--c-linea);border-radius:20px;overflow:hidden;
           margin-bottom:16px;background:var(--c-suave);line-height:0;}
   .frente img{width:100%;height:auto;display:block;}
-  /* El mismo filete que en el pliego: encuadra la foto y le da presencia de invitación. */
-  .frente{position:relative;}
-  .frente::after{content:'';position:absolute;inset:3.5%;border:1px solid rgba(255,255,255,.62);
-                 box-shadow:0 0 0 1px rgba(0,0,0,.16);pointer-events:none;}
+  /* La foto montada sobre la base, no a sangre: el margen y el filo la encuadran y le dan
+     presencia de invitación. Un filete DENTRO de la foto chocaría con la banda de datos que la
+     pieza gráfica ya trae abajo. */
+  .frente{padding:4mm;background:var(--c-suave);}
+  .frente img{border:1px solid rgba(0,0,0,.22);}
   .cara-rot{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.22em;
             text-transform:uppercase;opacity:.5;text-align:center;margin:0 0 7px;line-height:1.6;}
   /* El logo manda: es lo primero y lo más grande, y trae el nombre adentro. */
