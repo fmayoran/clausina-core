@@ -228,10 +228,14 @@ function marca(m, claro) {
     const mm = j.frente_mm && j.frente_mm[0] ? j.frente_mm : [105, 148];
     document.head.insertAdjacentHTML('beforeend',
       `<style>@page{size:${mm[0]}mm ${mm[1]}mm;margin:0}` +
-      `@media print{.envoltorio,.pase{width:${mm[0]}mm}` +
-      `.frente{width:${mm[0]}mm;height:${mm[1]}mm}` +
+      // La tipografía se achica en bloque: la tarjeta en pantalla es cómoda a 430px, y a 105mm
+      // el mismo cuerpo hace que el dorso se parta en dos hojas.
+      `@media print{html{font-size:11px}.envoltorio,.pase{width:${mm[0]}mm}` +
+      `.frente{width:${mm[0]}mm;height:${mm[1]}mm;margin:0}` +
       `.frente img{width:100%;height:100%;object-fit:cover}` +
-      `.pase{min-height:${mm[1]}mm;border-radius:0;border:0;padding:8mm 7mm}}</style>`);
+      `.pase{height:${mm[1]}mm;border-radius:0;border:0;padding:7mm 6mm;overflow:hidden}` +
+      `.logo{max-height:16mm;margin-bottom:4mm}.codigo{margin:4mm 0 2mm;padding:3mm 2mm}` +
+      `.pie{margin-top:4mm}.datos{margin-top:4mm;padding-top:3mm}}</style>`);
     const src = claro && j.logo_claro ? j.logo_claro : j.logo;
     if (src) {
       $('logo').src = src; $('logo').alt = j.negocio; $('logo').style.display = '';
