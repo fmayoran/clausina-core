@@ -30,6 +30,13 @@
   .gst.aprobada{color:var(--done);border-color:var(--done-line);}
   .gst.borrador,.gst.generando{color:var(--pend);border-color:var(--pend-line);}
   .gst.descartada{color:var(--ash);border-color:var(--line);}
+  /* Las aprobadas son las que se mandan a imprimir; las de arriba todavía se están discutiendo.
+     Mezcladas en una sola grilla no se distingue una cosa de la otra. */
+  .gsec{margin-bottom:26px;}
+  .gsec h2{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:.9rem;color:var(--white);
+           margin:0 0 2px;display:flex;align-items:baseline;gap:8px;}
+  .gsec h2 span{font-family:'JetBrains Mono',monospace;font-size:.6rem;font-weight:400;color:var(--ash);}
+  .gsec .nota{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--ash);margin-bottom:11px;line-height:1.6;}
   .gnew{border:1px dashed var(--line);border-radius:12px;display:grid;place-items:center;min-height:200px;cursor:pointer;transition:.15s;}
   .gnew:hover{border-color:var(--pend);}
   .gnew .in{text-align:center;color:var(--ash);font-family:'JetBrains Mono',monospace;font-size:.68rem;}
@@ -94,7 +101,7 @@
       <span class="gsub" id="sub">cargando…</span>
       <button class="abtn prim" style="margin-left:auto" onclick="abrirNueva()">+ Nueva pieza</button>
     </div>
-    <div class="ggrid" id="grid"></div>
+    <div id="grid"></div>
   </div>
 </main></div>
 
@@ -235,6 +242,10 @@ function setCaras(n){
 }
 
 // ---- listado ----
+function seccion(titulo, n, nota, cards){
+  return `<div class="gsec"><h2>${titulo} <span>${n}</span></h2>
+    <div class="nota">${nota}</div><div class="ggrid">${cards}</div></div>`;
+}
 function card(g){
   const st = g.v_estado==='pendiente'||g.v_estado==='procesando' ? 'generando' : (g.estado||'borrador');
   const lbl = st==='generando' ? 'diseñando…' : st;
@@ -263,13 +274,28 @@ async function cargar(){
     // objeto, .map explotaba, y la grilla se congelaba mostrando "diseñando…" para siempre.
     PIEZAS = Array.isArray(d) ? d : (d.piezas || []);
     const ocultas = Array.isArray(d) ? 0 : (d.descartadas || 0);
+    const nAprob = PIEZAS.filter(g => g.estado === 'aprobada').length;
+    const nPrep = PIEZAS.filter(g => g.estado !== 'aprobada' && g.estado !== 'descartada').length;
     document.getElementById('sub').innerHTML =
-      (PIEZAS.length ? `${PIEZAS.length} pieza(s)` : 'sin piezas todavía') +
+      (PIEZAS.length ? [nPrep ? `${nPrep} en preparación` : '', nAprob ? `${nAprob} aprobada(s)` : '']
+                        .filter(Boolean).join(' · ') : 'sin piezas todavía') +
       (ocultas ? ` · <a onclick="verDescartadas(${!VER_DESC})" style="cursor:pointer;text-decoration:underline">` +
         (VER_DESC ? (ocultas === 1 ? 'ocultar la descartada' : `ocultar las ${ocultas} descartadas`)
                   : (ocultas === 1 ? 'ver 1 descartada' : `ver ${ocultas} descartadas`)) + '</a>' : '');
-    document.getElementById('grid').innerHTML = PIEZAS.map(card).join('') +
-      `<div class="gnew" onclick="abrirNueva()"><div class="in"><div class="plus">+</div>Nueva pieza</div></div>`;
+    const nueva = `<div class="gnew" onclick="abrirNueva()"><div class="in"><div class="plus">+</div>Nueva pieza</div></div>`;
+    const enPrep = PIEZAS.filter(g => g.estado !== 'aprobada' && g.estado !== 'descartada');
+    const aprob  = PIEZAS.filter(g => g.estado === 'aprobada');
+    const desc   = PIEZAS.filter(g => g.estado === 'descartada');
+    document.getElementById('grid').innerHTML =
+      seccion('En preparación', enPrep.length,
+              'Se siguen iterando. Nada de acá sale a imprenta todavía.',
+              enPrep.map(card).join('') + nueva) +
+      (aprob.length ? seccion('Aprobadas', aprob.length,
+              'Listas para imprimir o para colgar de una acción de campaña.',
+              aprob.map(card).join('')) : '') +
+      (desc.length ? seccion('Descartadas', desc.length,
+              'No se borran: quedan como registro de lo que se probó.',
+              desc.map(card).join('')) : '');
     const trabajando = PIEZAS.some(g=>g.v_estado==='pendiente'||g.v_estado==='procesando');
     if(trabajando && !_poll) _poll=setInterval(cargar,6000);
     if(!trabajando && _poll){ clearInterval(_poll); _poll=null; }
