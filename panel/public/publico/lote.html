@@ -121,6 +121,8 @@
     <input type="checkbox" id="marcas" checked onchange="pintar()" style="width:auto"> marcas de corte
   </label>
   <button class="p" onclick="window.print()">Imprimir / Guardar PDF</button>
+  <span id="alerta" style="display:none;color:#FF6B4A">El texto no entra en la tarjeta: acortá la
+    descripción del beneficio o va a quedar pegado al corte.</span>
   <span class="nota">A4 · 4 por hoja · <b>doble faz girando por el borde largo</b> ·
     imprimí a <b>tamaño real</b>, sin "ajustar a la página"</span>
 </div>
@@ -253,6 +255,11 @@ function pintar() {
     html += `<div class="${cls}">${espejado.map(x => x || HUECA).join('')}${MARCAS}</div>`;
   }
   $('hojas').innerHTML = html;
+  // El dorso entra justo. Una descripción larga lo empuja y el pie vuelve a caer sobre el corte:
+  // se avisa en vez de dejar que salga mal de la imprenta.
+  const apretada = [...document.querySelectorAll('.cara')]
+    .some(c => c.querySelector('.pie') && c.scrollHeight > c.clientHeight + 2);
+  $('alerta').style.display = apretada ? '' : 'none';
   const hojas = Math.ceil(tarjetas.length / porHoja) * 2;
   $('cuenta').textContent = `${PASES.length} invitación(es)` +
     (copias > 1 ? ` × ${copias} copias = ${tarjetas.length} tarjetas` : '') +
