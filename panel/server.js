@@ -1547,7 +1547,8 @@ app.get('/api/skills/version/:id', soloAdmin, async (req, res) => {
 
 // --- Campañas (v2.0 / F7) ------------------------------------------------------------------
 app.get('/api/campanias/catalogos', (req, res) =>
-  res.json({ objetivos: db.OBJETIVOS_CAMPANIA, tipos: db.TIPOS_ACCION }));
+  res.json({ objetivos: db.OBJETIVOS_CAMPANIA, tipos: db.TIPOS_ACCION,
+             enganches: db.ENGANCHES, enganche_por_tipo: db.ENGANCHE_POR_TIPO }));
 app.get('/api/campanias', async (req, res) => {
   try { res.json({ campanias: await db.getCampanias(req.negocioId) }); }
   catch (e) { console.error('campanias', e.message); res.status(500).json({ error: 'db' }); }
@@ -1614,7 +1615,7 @@ app.post('/api/campanias/:id/propuesta/:pid/aceptar', async (req, res) => {
   catch (e) { console.error('aceptar sugerencia', e.message); res.status(500).json({ ok: false }); }
 });
 
-// Qué se le puede colgar a una acción de cada tipo: siempre cosas que el negocio YA tiene.
+// Qué se le puede colgar a una acción de cada clase: siempre cosas que el negocio YA tiene.
 app.get('/api/campanias/opciones/:tipo', async (req, res) => {
   try { res.json({ opciones: await db.opcionesAccion(req.negocioId, String(req.params.tipo)) }); }
   catch (e) { console.error('opciones accion', e.message); res.status(500).json({ error: 'db' }); }

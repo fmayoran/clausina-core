@@ -2440,7 +2440,9 @@ async function guardarAccion(negocioId, campaniaId, id, d) {
   if (!nombre) { const e = new Error('nombre'); e.code = 'falta_nombre'; throw e; }
 
   const refs = { pieza_id: null, grafica_id: null, beneficio_id: null, pauta_id: null, link_id: null };
-  if (t.campo && /^[0-9a-f-]{36}$/i.test(String(d.ref || ''))) refs[t.campo] = d.ref;
+  const eng = ENGANCHES.find(x => x.id === d.enganche)
+           || ENGANCHES.find(x => x.id === ENGANCHE_POR_TIPO[t.id]);
+  if (eng && /^[0-9a-f-]{36}$/i.test(String(d.ref || ''))) refs[eng.campo] = d.ref;
   const num = v => (Number(v) >= 0 ? Number(v) : null);
   // Lo que el formulario no manda NO se pisa: el UPDATE escribía todas las columnas, así que
   // editar el nombre de una acción borraba las notas del creativo —el porqué, el público, cómo se
@@ -2487,8 +2489,9 @@ async function confirmarAccion(negocioId, campaniaId, id) {
     `SELECT a.* FROM contenido.campania_accion a JOIN contenido.campania c ON c.id=a.campania_id
       WHERE a.id=$1 AND a.campania_id=$2 AND c.negocio_id=$3`, [id, campaniaId, negocioId]);
   if (!a) return { ok: false, error: 'no_existe' };
-  const t = TIPOS_ACCION.find(x => x.id === a.tipo);
-  const enganchada = !t || !t.campo || !!a[t.campo];
+  // Vale cualquier enganche, no sólo el que sugiere el tipo: un impreso colgado del beneficio que
+  // reparte está mejor medido que colgado de la pieza gráfica.
+  const enganchada = ENGANCHES.some(e => !!a[e.campo]);
   if (!enganchada) return { ok: false, error: 'sin_enganche' };
   await pool.query(
     "UPDATE contenido.campania_accion SET estado='planificada', actualizado_en=now() WHERE id=$1", [id]);
@@ -2504,7 +2507,32 @@ async function borrarAccion(negocioId, campaniaId, id) {
 }
 
 /** Lo que se puede colgar de una acción, según el tipo. Sale de lo que el negocio YA tiene. */
-async function opcionesAccion(negocioId, tipo) {
+/**
+ * A qué se puede colgar una acción. El tipo de acción sugiere uno, pero no lo impone: un impreso
+ * puede engancharse al BENEFICIO que reparte —que es lo medible— y no a la pieza gráfica. Antes
+ * el enganche salía del tipo y no había forma de elegir otra cosa.
+ */
+const ENGANCHES = [
+  { id: 'beneficio', label: 'Beneficio de invitación', campo: 'beneficio_id',
+    desc: 'se mide por los códigos que se canjean' },
+  { id: 'grafica',   label: 'Pieza gráfica',      campo: 'grafica_id',
+    desc: 'folleto, afiche o tarjeta de Gráfica' },
+  { id: 'instagram', label: 'Publicación de Instagram', campo: 'pieza_id',
+    desc: 'una pieza del feed' },
+  { id: 'pantalla',  label: 'Aviso en pantalla',  campo: 'pieza_id',
+    desc: 'un aviso de la pantalla de calle' },
+  { id: 'pauta',     label: 'Campaña de Meta',    campo: 'pauta_id',
+    desc: 'publicidad paga, con su propio reporte' },
+  { id: 'link',      label: 'Link medible',       campo: 'link_id',
+    desc: 'un enlace propio con seguimiento' },
+];
+/** El enganche que se propone según el tipo de acción. Es una sugerencia, no una regla. */
+const ENGANCHE_POR_TIPO = { invitaciones: 'beneficio', impreso: 'grafica', instagram: 'instagram',
+                            pantalla: 'pantalla', pauta: 'pauta', link: 'link', otra: 'beneficio' };
+
+async function opcionesAccion(negocioId, clase) {
+  // Se aceptan los dos vocabularios: el del enganche y, por compatibilidad, el del tipo de acción.
+  const tipo = ({ beneficio: 'invitaciones', grafica: 'impreso' })[clase] || clase;
   if (tipo === 'invitaciones') {
     const { rows } = await pool.query(
       'SELECT id, nombre, tipo, valor FROM contenido.beneficio WHERE negocio_id=$1 AND activo ORDER BY creado_en DESC', [negocioId]);
@@ -4106,6 +4134,7 @@ async function health() {
 }
 
 module.exports = {
+  ENGANCHES, ENGANCHE_POR_TIPO,
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
   completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, clientePorTelefono,
   TIPOS_BENEFICIO, textoBeneficio, getBeneficios, guardarBeneficio,

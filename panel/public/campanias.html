@@ -219,8 +219,10 @@
   <input type="text" id="a-nombre" placeholder="Invitaciones a comercios del paseo">
 
   <div id="a-ref-box">
-    <label for="a-ref">A qué se engancha</label>
-    <select id="a-ref"></select>
+    <label for="a-eng">A qué se engancha</label>
+    <select id="a-eng" onchange="cambiarEnganche()"></select>
+    <div class="hint" id="a-eng-hint"></div>
+    <select id="a-ref" style="margin-top:8px"></select>
     <div class="hint" id="a-ref-hint"></div>
   </div>
 
@@ -262,7 +264,7 @@ const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;
 let _t; function toast(m,e){ const t=$('toast'); t.textContent=m; t.classList.toggle('err',!!e); t.classList.add('show'); clearTimeout(_t); _t=setTimeout(()=>t.classList.remove('show'),3400); }
 function cerrar(id){ $(id).classList.remove('on'); if(id==='ov-det'){ clearInterval(_pollProp); _pollProp=null; } }
 
-let CAMPS=[], OBJETIVOS=[], TIPOS=[], DET=null;
+let CAMPS=[], OBJETIVOS=[], TIPOS=[], ENGANCHES=[], ENG_POR_TIPO={}, DET=null;
 let fDesde, fHasta;   // los campos de fecha propios del panel
 
 const fecha = iso => iso ? String(iso).slice(0,10).split('-').reverse().join('/') : '';
@@ -274,6 +276,7 @@ async function cargar(){
       fetch('api/campanias').then(r=>r.json()),
     ]);
     OBJETIVOS = cat.objetivos || []; TIPOS = cat.tipos || [];
+    ENGANCHES = cat.enganches || []; ENG_POR_TIPO = cat.enganche_por_tipo || {};
     CAMPS = d.campanias || [];
     pintar();
   }catch(e){ $('sub').textContent='sin conexión'; }
@@ -353,7 +356,7 @@ async function guardarCampania(){
 
 /* ═══════ Detalle ═══════ */
 async function abrirDet(id){
-  DET=id; _editandoPlan=false;
+  DET=id; _editandoPlan=false; _planAbierto=false;
   const c = await fetch('api/campanias/'+id).then(r=>r.json());
   if(c.error){ toast('No se pudo abrir',true); return; }
   DET_DATA = c;
@@ -411,6 +414,9 @@ async function confirmarAccion(id){
 // aprueba—, y recién sobre el plan aprobado el creativo baja las acciones. Discutir estrategia y
 // ejecución al mismo tiempo deja acciones sobre la mesa que salen de un plan que nadie cerró.
 let _pollProp = null, _editandoPlan = false, _materializadas = new Set();
+// Con el plan aprobado la discusión terminó: lo que se viene a hacer es trabajar las acciones, y
+// cinco párrafos por delante obligan a scrollear cada vez. Se despliega a pedido.
+let _planAbierto = false;
 
 const _enCurso = x => !!x && (x.estado === 'pendiente' || x.estado === 'procesando');
 
@@ -465,7 +471,16 @@ async function pintarPropuesta(){
     <div class="mono" style="font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--u-mut);margin-bottom:8px">
       Plan del creativo${aprobado?' · aprobado':''}</div>`;
 
-  if(_editandoPlan && !aprobado){
+  // Plegado sólo cuando ya está aprobado: mientras se discute, el texto es lo único que importa.
+  const plegado = aprobado && !_planAbierto;
+  if(plegado){
+    const largo = (plan.resumen || '').length;
+    html += `<div class="meta" style="line-height:1.6">${esc((plan.resumen||'').split('\n')[0].slice(0,150))}…</div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn2" onclick="_planAbierto=true;pintarPropuesta()">Ver el plan completo</button>
+        <span class="meta">versión ${plan.nro || 1} · ${largo} caracteres${editado?' · editado por ustedes':''}</span>
+      </div></div>`;
+  } else if(_editandoPlan && !aprobado){
     html += `<textarea id="p-texto" style="width:100%;min-height:280px;background:var(--u-bg);
         border:1px solid var(--u-acc);border-radius:9px;padding:11px 13px;color:var(--u-fg);
         font-family:inherit;font-size:.9rem;line-height:1.6;outline:none;resize:vertical">${esc(plan.resumen||'')}</textarea>
@@ -489,7 +504,11 @@ async function pintarPropuesta(){
         acciones concretas, que van a aparecer acá abajo en borrador para editar y confirmar de a una.</div>`;
     }
   }
-  html += `<div class="meta" style="margin-top:10px">versión ${plan.nro || 1}${plan.instruccion?' · se pidió: '+esc(plan.instruccion):''}</div></div>`;
+  if(!plegado){
+    html += `<div class="meta" style="margin-top:10px">versión ${plan.nro || 1}${plan.instruccion?' · se pidió: '+esc(plan.instruccion):''}` +
+      (aprobado ? ` · <a onclick="_planAbierto=false;pintarPropuesta()" style="cursor:pointer;text-decoration:underline">plegar</a>` : '') +
+      `</div></div>`;
+  }
 
   // Segundo paso: la bajada a acciones.
   if(aprobado){
@@ -600,26 +619,41 @@ function abrirAccion(id){
   $('a-notas').value = a ? (a.notas||'') : '';
   $('a-estado').value = a ? a.estado : 'borrador';
   $('a-err').textContent='';
-  cambiarTipo(a ? (a.beneficio_id||a.grafica_id||a.pieza_id||a.pauta_id||a.link_id) : null);
+  // El enganche guardado se deduce de la columna que esté cargada; si no hay ninguna, se propone
+  // el del tipo. 'pieza_id' lo comparten Instagram y pantalla: manda el tipo de la acción.
+  const cual = a && (a.beneficio_id ? 'beneficio' : a.grafica_id ? 'grafica'
+    : a.pieza_id ? (a.tipo==='pantalla' ? 'pantalla' : 'instagram')
+    : a.pauta_id ? 'pauta' : a.link_id ? 'link' : null);
+  cambiarTipo(a ? (a.beneficio_id||a.grafica_id||a.pieza_id||a.pauta_id||a.link_id) : null, cual);
   $('ov-acc').classList.add('on');
 }
 
-async function cambiarTipo(preseleccion){
+// El tipo sólo PROPONE un enganche. Un folleto puede colgarse del beneficio que reparte —que es
+// lo que se mide— y no de la pieza gráfica; antes el tipo decidía y no había forma de cambiarlo.
+function cambiarTipo(preseleccion, engPre){
   const t = TIPOS.find(x=>x.id===$('a-tipo').value);
   $('a-tipo-hint').textContent = t ? t.desc : '';
-  // 'otra' no se engancha a nada: el selector sobra y confundiría.
-  const sinRef = !t || !t.campo;
-  $('a-ref-box').style.display = sinRef ? 'none' : '';
-  if(sinRef) return;
+  const eng = engPre || ENG_POR_TIPO[$('a-tipo').value] || 'beneficio';
+  $('a-eng').innerHTML = ENGANCHES.map(e=>
+    `<option value="${esc(e.id)}">${esc(e.label)}</option>`).join('');
+  $('a-eng').value = eng;
+  return cambiarEnganche(preseleccion);
+}
+
+async function cambiarEnganche(preseleccion){
+  const e = ENGANCHES.find(x=>x.id===$('a-eng').value) || ENGANCHES[0];
+  if(!e) return;
+  $('a-eng-hint').textContent = e.desc || '';
+  $('a-ref-box').style.display = '';
   $('a-ref').innerHTML = '<option value="">cargando…</option>';
   try{
-    const d = await fetch('api/campanias/opciones/'+encodeURIComponent(t.id)).then(r=>r.json());
+    const d = await fetch('api/campanias/opciones/'+encodeURIComponent(e.id)).then(r=>r.json());
     const ops = d.opciones||[];
     $('a-ref').innerHTML = '<option value="">— sin enganchar todavía —</option>' +
       ops.map(o=>`<option value="${esc(o.id)}">${esc(o.label)}</option>`).join('');
     if(preseleccion) $('a-ref').value = preseleccion;
     $('a-ref-hint').textContent = ops.length ? 'Sale de lo que el negocio ya tiene.'
-      : 'Todavía no hay nada de este tipo. Podés crear la acción igual y engancharla después.';
+      : 'Todavía no hay nada de esto. Podés crear la acción igual y engancharla después.';
   }catch(e){ $('a-ref').innerHTML='<option value="">no se pudo cargar</option>'; }
 }
 
@@ -627,6 +661,7 @@ async function guardarAccion(){
   const err=$('a-err'); err.textContent='';
   const id=$('a-id').value;
   const body={ tipo:$('a-tipo').value, nombre:$('a-nombre').value, ref:$('a-ref').value||null,
+    enganche:$('a-eng').value,
     costo_previsto:$('a-costo').value, volumen_declarado:$('a-volumen').value,
     notas:$('a-notas').value, estado:$('a-estado').value };
   try{
