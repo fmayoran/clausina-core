@@ -46,8 +46,8 @@
   .para{font-size:.9rem;opacity:.75;margin-bottom:20px;}
   /* Lo que el nombre y el monto no dicen: qué incluye, qué no, cómo se usa. Lo escribe el
      negocio en el beneficio. */
-  .detalle{font-size:.84rem;line-height:1.55;opacity:.82;margin-top:9px;text-align:center;
-           white-space:pre-wrap;}
+  .detalle{font-size:.86rem;font-weight:700;line-height:1.5;opacity:.9;margin-top:9px;
+           text-align:center;white-space:pre-wrap;}
   .otra{font-family:'JetBrains Mono',monospace;font-size:.64rem;line-height:1.8;
         opacity:.72;margin-top:13px;}
   .otra a{color:inherit;}
@@ -223,6 +223,15 @@ function marca(m, claro) {
     if (claro) document.documentElement.dataset.tema = 'claro';
     marca(j.marca, claro);
     document.title = 'Invitación especial · ' + j.negocio;
+    // Al imprimir, la hoja es del tamaño de la invitación. Sin esto el navegador usa A4 y la
+    // tarjeta sale flotando en el medio de una hoja que después hay que recortar a ojo.
+    const mm = j.frente_mm && j.frente_mm[0] ? j.frente_mm : [105, 148];
+    document.head.insertAdjacentHTML('beforeend',
+      `<style>@page{size:${mm[0]}mm ${mm[1]}mm;margin:0}` +
+      `@media print{.envoltorio,.pase{width:${mm[0]}mm}` +
+      `.frente{width:${mm[0]}mm;height:${mm[1]}mm}` +
+      `.frente img{width:100%;height:100%;object-fit:cover}` +
+      `.pase{min-height:${mm[1]}mm;border-radius:0;border:0;padding:8mm 7mm}}</style>`);
     const src = claro && j.logo_claro ? j.logo_claro : j.logo;
     if (src) {
       $('logo').src = src; $('logo').alt = j.negocio; $('logo').style.display = '';
@@ -254,8 +263,6 @@ function marca(m, claro) {
       $('acciones').insertAdjacentHTML('beforebegin',
         '<div class="aviso">Así se va a ver la invitación. El código es de muestra: ' +
         'los reales se generan al emitir.</div>');
-    } else {
-      $('cta').href = '/i/' + j.codigo;
     }
 
     const c = j.condiciones || {};
@@ -267,14 +274,23 @@ function marca(m, claro) {
     // El otro camino: mucha gente prefiere escribir antes que llenar un formulario.
     if (j.whatsapp) {
       const wa = j.whatsapp.replace(/[^0-9]/g, '');
-      $('otra').innerHTML = 'o escribinos por WhatsApp a <a href="https://wa.me/' + wa +
-        '">' + j.whatsapp + '</a><br>y decinos tu código';
+      // Todas las reservas entran por WhatsApp: obliga a que el cliente inicie la conversación,
+      // que es lo que después permite confirmarle sola la reserva. El código va en el mensaje
+      // para que no tenga que copiarlo a mano.
+      if (!MUESTRA) {
+        $('cta').href = 'https://wa.me/' + wa + '?text=' +
+          encodeURIComponent('Hola, tengo la invitación ' + j.codigo + ' y quiero reservar.');
+      }
+      $('cta').textContent = 'Reservar por WhatsApp';
+      $('otra').innerHTML = 'o escribinos a <a href="https://wa.me/' + wa + '">' + j.whatsapp + '</a>';
       $('otra').style.display = '';
       // En papel el botón no se puede tocar: ahí la reserva se pide por WhatsApp, y decirlo como
       // camino principal —no como alternativa— es lo que hace que el cliente escriba primero.
       $('papel').innerHTML = 'Reservá por WhatsApp<br><b>' + j.whatsapp.replace(/</g, '') +
         '</b><br>y decinos tu código';
     } else {
+      // Sin WhatsApp configurado queda el camino viejo: un botón muerto es peor que uno menos bueno.
+      if (!MUESTRA) $('cta').href = '/i/' + j.codigo;
       $('papel').innerHTML = 'Reservá antes de venir' + (j.web ? '<br><b>' + j.web + '</b>' : '');
     }
     // El disclaimer que pidió Fer: la invitación se valida al llegar, no al reservar. Es la

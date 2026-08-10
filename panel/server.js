@@ -292,6 +292,9 @@ app.get('/api/publico/pase/:codigo', async (req, res) => {
       // El frente que el negocio indicó para esta campaña. El pliego lo usa por defecto.
       frente: i.frente_url || null,
       frente_codigo: i.frente_numero ? db.codigoPieza('grafica', i.frente_numero) : null,
+      // El formato del papel lo define la pieza del frente: sin esto el navegador imprime A4 y
+      // la tarjeta sale flotando en el medio de una hoja.
+      frente_mm: i.frente_ancho ? [Math.round(i.frente_ancho), Math.round(i.frente_alto)] : null,
     });
   } catch (e) { console.error('pase', e.message); res.status(500).json({ ok: false }); }
 });

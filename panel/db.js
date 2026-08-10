@@ -1552,7 +1552,7 @@ const codigoPieza = (canal, numero) =>
 async function muestraBeneficio(negocioId, beneficioId) {
   const { rows: [b] } = await pool.query(
     `SELECT b.*, gf.numero AS frente_numero,
-            gv.png_url AS frente_url,
+            gv.png_url AS frente_url, gf.ancho_mm AS frente_ancho, gf.alto_mm AS frente_alto,
             n.slug, n.nombre AS negocio, n.dominio_web, n.ig_handle,
             pp.logo, pp.logo_claro, COALESCE(ni.marca, '{}'::jsonb) AS marca
        FROM contenido.beneficio b
@@ -1584,6 +1584,7 @@ async function muestraBeneficio(negocioId, beneficioId) {
     web: b.dominio_web, instagram: b.ig_handle, sede: sede || null,
     frente: b.frente_url || null,
     frente_codigo: b.frente_numero ? codigoPieza('grafica', b.frente_numero) : null,
+    frente_mm: b.frente_ancho ? [Math.round(b.frente_ancho), Math.round(b.frente_alto)] : null,
   };
 }
 
@@ -1738,7 +1739,8 @@ async function consultarInvitacion(codigo, negocioId = null, telefono = null) {
             b.tipo, b.valor, b.condiciones, b.activo AS beneficio_activo, b.tema,
             n.slug AS negocio_slug, n.nombre AS negocio_nombre,
             -- El frente impreso lo define el beneficio: toda la campaña sale con el mismo.
-            gv.png_url AS frente_url, gf.numero AS frente_numero
+            gv.png_url AS frente_url, gf.numero AS frente_numero,
+            gf.ancho_mm AS frente_ancho, gf.alto_mm AS frente_alto
        FROM contenido.invitacion i
        JOIN contenido.beneficio b ON b.id=i.beneficio_id
        JOIN contenido.negocios n ON n.id=i.negocio_id
