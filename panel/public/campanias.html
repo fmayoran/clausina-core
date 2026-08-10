@@ -381,7 +381,7 @@ async function abrirDet(id){
       </div>
       <span class="pill ${esc(a.estado)}">${esc(a.estado)}</span>
       ${esBorrador?`<button class="btn2" style="padding:5px 12px;font-size:.8rem" onclick="confirmarAccion('${a.id}')">Confirmar</button>`:''}
-      <button class="iconbtn" onclick='abrirAccion(${JSON.stringify(a)})' title="Editar">
+      <button class="iconbtn" onclick="abrirAccion('${a.id}')" title="Editar">
         <i data-lucide="pencil" class="w-4 h-4"></i></button>
     </div>`;
   }).join('') : '<div class="mono" style="font-size:.7rem;color:var(--u-mut);padding:10px 0">Todavía no hay acciones. Agregá la primera.</div>';
@@ -585,8 +585,11 @@ let DET_DATA=null;
 function editarActual(){ if(DET_DATA){ cerrar('ov-det'); abrirCampania(DET_DATA); } }
 
 /* ═══════ Acción ═══════ */
-function abrirAccion(a){
-  a = a || null;
+// Llega el id y la acción se busca en lo que ya está cargado. Antes viajaba el objeto entero
+// serializado dentro del atributo: bastaba un apóstrofo en las notas —y el creativo escribe con
+// apóstrofos— para cerrar la comilla del onclick y romper el resto de la lista.
+function abrirAccion(id){
+  const a = id ? (DET_DATA.acciones || []).find(x => x.id === id) || null : null;
   $('a-tit').textContent = a ? 'Editar acción' : 'Nueva acción';
   $('a-id').value = a ? a.id : '';
   $('a-tipo').innerHTML = TIPOS.map(t=>`<option value="${esc(t.id)}">${esc(t.label)}</option>`).join('');
