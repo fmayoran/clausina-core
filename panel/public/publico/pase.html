@@ -307,7 +307,7 @@ function marca(m, claro) {
     // aplicado, es alguien que llega con la tarjeta y se encuentra sin mesa.
     $('pie').innerHTML = '<b>Válida sólo con reserva previa</b>, sin reserva no podemos ' +
       'garantizarte lugar. Presentá esta invitación al llegar al local para validarla. ' +
-      'El descuento se aplica al pagar.';
+      'Descuento válido para pago en efectivo o transferencia.';
     const sede = j.sede
       ? [j.sede.direccion, j.sede.localidad, j.sede.partido].filter(Boolean).join(', ') : '';
     const ig = j.instagram ? String(j.instagram).replace('@', '') : '';

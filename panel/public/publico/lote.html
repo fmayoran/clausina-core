@@ -168,7 +168,8 @@ function caraDorso(j) {
            : `<div class="otra">Reservá en ${esc(j.web || j.negocio_slug + '.ar')}</div>`}
       <div class="pie">
         <b>Con reserva previa.</b> Sin reserva no podemos garantizarte lugar.<br>
-        Presentá esta invitación al llegar para validarla · El descuento se aplica al pagar
+        Presentá esta invitación al llegar para validarla · Descuento válido para pago en
+        efectivo o transferencia
         ${sede || j.instagram ? '<br>' + [sede, j.instagram].filter(Boolean).map(esc).join(' · ') : ''}
       </div>
     </div>`;
