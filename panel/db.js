@@ -1575,6 +1575,7 @@ async function muestraBeneficio(negocioId, beneficioId) {
     ok: true, muestra: true,
     // Un código que no existe y que se nota que no existe: nadie lo va a confundir con uno real.
     codigo: 'MUESTRA', texto: textoBeneficio(b), etiqueta: b.etiqueta || null,
+    nombre: b.nombre, descripcion: b.descripcion || null,
     vence_en: null, usos_max: 1,
     condiciones: await condicionesLegibles(negocioId, b.condiciones),
     negocio: b.negocio, negocio_slug: b.slug,
@@ -1603,22 +1604,27 @@ async function guardarBeneficio(negocioId, id, d) {
   };
   const noShow = ['liberar', 'quemar'].includes(d.no_show) ? d.no_show : 'liberar';
   const frente = /^[0-9a-f-]{36}$/i.test(String(d.frente_grafica_id || '')) ? d.frente_grafica_id : null;
+  // Se imprime en la tarjeta: el tope es el que entra sin desarmar la pieza.
+  const descripcion = String(d.descripcion || '').trim().slice(0, 400) || null;
   // Sobre qué base se dibuja la invitación. No sale del modo de la marca: una marca oscura no
   // implica querer imprimir en negro, y lo impreso se piensa sobre papel blanco.
   const tema = d.tema === 'oscuro' ? 'oscuro' : 'claro';
   const campos = [negocioId, nombre, d.tipo, valor, JSON.stringify(cond), noShow,
-                  String(d.notas || '').trim().slice(0, 600) || null, d.activo !== false, frente, tema];
+                  String(d.notas || '').trim().slice(0, 600) || null, d.activo !== false, frente, tema,
+                  descripcion];
   if (id) {
     const { rows: [r] } = await pool.query(
       `UPDATE contenido.beneficio SET nombre=$2, tipo=$3, valor=$4, condiciones=$5::jsonb,
-              no_show=$6, notas=$7, activo=$8, frente_grafica_id=$9, tema=$10, actualizado_en=now()
-        WHERE id=$11 AND negocio_id=$1 RETURNING *`, [...campos, id]);
+              no_show=$6, notas=$7, activo=$8, frente_grafica_id=$9, tema=$10, descripcion=$11,
+              actualizado_en=now()
+        WHERE id=$12 AND negocio_id=$1 RETURNING *`, [...campos, id]);
     if (!r) { const e = new Error('no existe'); e.code = 'no_encontrado'; throw e; }
     return r;
   }
   const { rows: [r] } = await pool.query(
-    `INSERT INTO contenido.beneficio (negocio_id, nombre, tipo, valor, condiciones, no_show, notas, activo, frente_grafica_id, tema)
-     VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10) RETURNING *`, campos);
+    `INSERT INTO contenido.beneficio (negocio_id, nombre, tipo, valor, condiciones, no_show, notas,
+       activo, frente_grafica_id, tema, descripcion)
+     VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11) RETURNING *`, campos);
   return r;
 }
 
@@ -1728,7 +1734,8 @@ async function consultarInvitacion(codigo, negocioId = null, telefono = null) {
   const c = inv.limpiar(codigo);
   if (!inv.formaValida(c)) return { ok: false, motivo: 'forma', mensaje: MOTIVOS.forma };
   const { rows: [i] } = await pool.query(
-    `SELECT i.*, b.nombre AS beneficio, b.tipo, b.valor, b.condiciones, b.activo AS beneficio_activo, b.tema,
+    `SELECT i.*, b.nombre AS beneficio, b.descripcion AS beneficio_descripcion,
+            b.tipo, b.valor, b.condiciones, b.activo AS beneficio_activo, b.tema,
             n.slug AS negocio_slug, n.nombre AS negocio_nombre,
             -- El frente impreso lo define el beneficio: toda la campaña sale con el mismo.
             gv.png_url AS frente_url, gf.numero AS frente_numero
@@ -1826,15 +1833,22 @@ const FRANJA_FRASE = { 'Mediodía': 'al mediodía', 'Noche': 'a la noche' };
 
 function frasesCondicion(dias, franjas, c) {
   const f = [];
+  // Días y turno en una sola oración: "Válida de lunes a viernes, al mediodía". Antes el turno
+  // sólo se nombraba cuando había uno solo, así que una invitación de mediodía Y noche no decía
+  // nada del horario y había que preguntarlo en el mostrador.
+  let cuando = '';
   if (dias.length && dias.length < 7) {
     // Días corridos se dicen "de lunes a viernes"; sueltos, enumerados. Una tarjeta impresa con
     // "lunes, martes, miércoles, jueves, viernes" se lee peor y ocupa dos renglones.
     const corrido = dias.every((d, i) => i === 0 || d === dias[i - 1] + 1);
-    f.push('Válida ' + (corrido && dias.length > 2
+    cuando = corrido && dias.length > 2
       ? `de ${DIA_SINGULAR[dias[0]]} a ${DIA_SINGULAR[dias[dias.length - 1]]}`
-      : dias.map(d => DIA_PLURAL[d]).join(', ')));
-  }
-  if (franjas.length === 1) f.push('Sólo ' + FRANJA_FRASE[franjas[0]]);
+      : dias.map(d => DIA_PLURAL[d]).join(', ');
+  } else if (dias.length === 7) cuando = 'todos los días';
+  const horario = franjas.length === 1 ? FRANJA_FRASE[franjas[0]]
+    : (franjas.length > 1 ? franjas.map(x => FRANJA_FRASE[x]).join(' y ') : '');
+  const partes = [cuando, horario].filter(Boolean);
+  if (partes.length) f.push('Válida ' + partes.join(', '));
   if (c.cantidad_min) f.push('Desde ' + c.cantidad_min + ' personas');
   if (c.cantidad_max) f.push('Hasta ' + c.cantidad_max + ' personas');
   return f;

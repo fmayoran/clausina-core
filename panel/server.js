@@ -274,6 +274,9 @@ app.get('/api/publico/pase/:codigo', async (req, res) => {
     const n = await db.negocioPublico(i.negocio_slug);
     res.json({
       ok: true, codigo: i.codigo, texto: r.texto, etiqueta: i.etiqueta,
+      // El nombre del beneficio titula la invitación ("Invitación especial · Primeros Clientes")
+      // y la descripción explica qué incluye. Los dos salen impresos.
+      nombre: i.beneficio, descripcion: i.beneficio_descripcion || null,
       vence_en: i.vence_en, usos_max: i.usos_max,
       condiciones: await db.condicionesLegibles(i.negocio_id, i.condiciones),
       negocio: i.negocio_nombre, negocio_slug: i.negocio_slug,

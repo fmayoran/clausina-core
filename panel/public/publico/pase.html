@@ -44,6 +44,10 @@
   .rotulo{font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.24em;
           text-transform:uppercase;opacity:.62;}
   .para{font-size:.9rem;opacity:.75;margin-bottom:20px;}
+  /* Lo que el nombre y el monto no dicen: qué incluye, qué no, cómo se usa. Lo escribe el
+     negocio en el beneficio. */
+  .detalle{font-size:.84rem;line-height:1.55;opacity:.82;margin-top:9px;text-align:center;
+           white-space:pre-wrap;}
   .otra{font-family:'JetBrains Mono',monospace;font-size:.64rem;line-height:1.8;
         opacity:.72;margin-top:13px;}
   .otra a{color:inherit;}
@@ -84,7 +88,9 @@
   @media print{
     body{padding:0;display:block;background:var(--c-suave);}
     .pase{width:100%;max-width:none;margin:0;box-shadow:none;}
-    .cta,.acciones{display:none !important;}
+    .cta,.acciones,.otra{display:none !important;}
+    /* El reemplazo del botón en papel: mismo lugar, misma jerarquía, sin nada que tocar. */
+    .papel{display:block !important;}
     .envoltorio{width:100%;}
     .pie{opacity:.7;}
     /* Cada cara en su hoja: es como se manda a imprenta y como se arma la tarjeta. */
@@ -101,6 +107,10 @@
   :root[data-tema="claro"] .beneficio,
   :root[data-tema="claro"] .para{opacity:1;}
   .cta.inerte{pointer-events:none;cursor:default;}
+  /* Sólo existe en papel: en pantalla el botón es mejor que un teléfono para copiar a mano. */
+  .papel{display:none;margin-top:18px;font-family:var(--f-tit);font-size:1rem;line-height:1.45;}
+  .papel b{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:1.06rem;
+           letter-spacing:.04em;color:var(--c-acento);}
   .aviso{max-width:430px;margin:16px auto 0;padding:11px 14px;border-radius:11px;
          border:1px dashed var(--c-linea);font-size:.78rem;line-height:1.5;opacity:.8;
          text-align:center;}
@@ -117,13 +127,15 @@
 <div class="pase" id="pase" style="display:none">
   <!-- El nombre del negocio no va como texto: ya está en el logo, y repetirlo lo ensucia. -->
   <span id="banda"><img class="logo" id="logo" alt="" style="display:none"></span>
-  <div class="titulo">Invitación especial</div>
+  <div class="titulo" id="titulo">Invitación especial</div>
+  <div class="detalle" id="detalle" style="display:none"></div>
   <div class="beneficio" id="beneficio"></div>
   <div class="para" id="para" style="display:none"></div>
   <div class="codigo" id="codigo"></div>
   <div class="rotulo">Presentá este código al reservar</div>
   <div class="cond" id="cond"></div>
   <a class="cta" id="cta" href="#">Reservar aquí</a>
+  <div class="papel" id="papel"></div>
   <div class="otra" id="otra" style="display:none"></div>
   <div class="pie" id="pie"></div>
   <div class="datos" id="datos"></div>
@@ -226,6 +238,10 @@ function marca(m, claro) {
       $('frente-img').alt = 'Frente de la invitación' + (j.frente_codigo ? ' (' + j.frente_codigo + ')' : '');
       $('cara-frente').style.display = '';
     }
+    // El nombre del beneficio titula la invitación: "Primeros Clientes" dice para quién es, y
+    // "Invitación especial" a secas no distingue una campaña de otra.
+    if (j.nombre) $('titulo').textContent = 'Invitación especial · ' + j.nombre;
+    if (j.descripcion) { $('detalle').textContent = j.descripcion; $('detalle').style.display = ''; }
     $('beneficio').textContent = j.texto;
     if (j.etiqueta) { $('para').textContent = 'Para ' + j.etiqueta; $('para').style.display = ''; }
     $('codigo').textContent = j.codigo.replace(/^(.{3})(.{3})$/, '$1-$2');
@@ -245,7 +261,8 @@ function marca(m, claro) {
     const c = j.condiciones || {};
     const l = [...(c.frases || [])];
     if (j.vence_en) l.push('Vence el ' + fecha(j.vence_en));
-    if (j.usos_max > 1) l.push('Cupo: ' + j.usos_max + ' usos');
+    // Cuántos usos quedan es un dato de gestión: impreso invita a contar y a llegar último.
+    if (j.usos_max > 1) l.push('Cupos limitados');
     $('cond').innerHTML = l.join('<br>');
     // El otro camino: mucha gente prefiere escribir antes que llenar un formulario.
     if (j.whatsapp) {
@@ -253,6 +270,12 @@ function marca(m, claro) {
       $('otra').innerHTML = 'o escribinos por WhatsApp a <a href="https://wa.me/' + wa +
         '">' + j.whatsapp + '</a><br>y decinos tu código';
       $('otra').style.display = '';
+      // En papel el botón no se puede tocar: ahí la reserva se pide por WhatsApp, y decirlo como
+      // camino principal —no como alternativa— es lo que hace que el cliente escriba primero.
+      $('papel').innerHTML = 'Reservá por WhatsApp<br><b>' + j.whatsapp.replace(/</g, '') +
+        '</b><br>y decinos tu código';
+    } else {
+      $('papel').innerHTML = 'Reservá antes de venir' + (j.web ? '<br><b>' + j.web + '</b>' : '');
     }
     // El disclaimer que pidió Fer: la invitación se valida al llegar, no al reservar. Es la
     // diferencia entre tomarla y consumirla, dicha en el único lugar donde la lee el invitado.

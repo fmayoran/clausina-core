@@ -162,6 +162,15 @@
   <input type="hidden" id="b-id">
   <label for="b-nombre">Nombre</label>
   <input type="text" id="b-nombre" placeholder="Invitación prensa, 20% amigos del local…">
+  <div class="mono2" style="margin-top:6px;">Titula la invitación: sale impreso junto a "Invitación especial".</div>
+
+  <label for="b-descripcion">Descripción</label>
+  <textarea id="b-descripcion" style="min-height:74px"
+    placeholder="Qué incluye, qué no, cómo se usa. Se imprime en la tarjeta, debajo del título."></textarea>
+  <div class="mono2" style="margin-top:6px;">Opcional. Es texto público: lo lee el invitado en la
+    tarjeta. Las condiciones de días, turnos y personas se arman solas más abajo — acá va lo que
+    esas reglas no dicen.</div>
+
   <div class="dos">
     <div>
       <label for="b-tipo">Tipo</label>
@@ -374,6 +383,7 @@ function abrirBeneficio(id) {
   $('b-tema-nota').textContent = 'De qué color sale la invitación, digital e impresa. El acento y ' +
     'las tipografías del negocio se respetan en las dos.';
   $('b-frente').value = (b && b.frente_grafica_id) || '';
+  $('b-descripcion').value = (b && b.descripcion) || '';
   $('b-noshow').value = b ? b.no_show : 'liberar';
   $('b-activo').checked = b ? !!b.activo : true;
   $('b-err').textContent = '';
@@ -397,6 +407,7 @@ async function guardarBeneficio() {
     cantidad_min: $('b-cmin').value, cantidad_max: $('b-cmax').value,
     no_show: $('b-noshow').value, activo: $('b-activo').checked,
     frente_grafica_id: $('b-frente').value || null, tema: $('b-tema').value,
+    descripcion: $('b-descripcion').value,
   };
   const id = $('b-id').value;
   try {
