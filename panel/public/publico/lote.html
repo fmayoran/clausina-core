@@ -114,6 +114,9 @@
   <label>Frente:
     <select id="sel-frente" onchange="pintar()"><option value="">logo del negocio</option></select>
   </label>
+  <label id="l-copias">Copias de cada una:
+    <input type="number" id="copias" min="1" max="20" value="1" onchange="pintar()"
+           style="width:60px"></label>
   <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
     <input type="checkbox" id="marcas" checked onchange="pintar()" style="width:auto"> marcas de corte
   </label>
@@ -230,9 +233,15 @@ function pintar() {
   // no para tener que elegirla cada vez.
   const forzada = $('sel-frente').value;
   const porHoja = 4;
+  // Un código de uso múltiple se reparte entre varias personas, así que la MISMA tarjeta puede
+  // salir repetida y llenar la hoja. Con un solo código de un uso eso sería repartir tres
+  // tarjetas que no van a funcionar, y por eso ahí el control queda clavado en 1.
+  const copias = Math.max(1, Math.min(20, parseInt($('copias').value, 10) || 1));
+  const tarjetas = [];
+  PASES.forEach(j => { for (let k = 0; k < copias; k++) tarjetas.push(j); });
   let html = '';
-  for (let i = 0; i < PASES.length; i += porHoja) {
-    const tanda = PASES.slice(i, i + porHoja);
+  for (let i = 0; i < tarjetas.length; i += porHoja) {
+    const tanda = tarjetas.slice(i, i + porHoja);
     const frentes = tanda.map(j => caraFrente(j, forzada || j.frente));
     // EL DORSO VA ESPEJADO. Al imprimir a doble faz por el borde largo, la hoja gira sobre su eje
     // vertical: lo que estaba a la izquierda queda a la derecha. Sin intercambiar las columnas,
@@ -244,8 +253,10 @@ function pintar() {
     html += `<div class="${cls}">${espejado.map(x => x || HUECA).join('')}${MARCAS}</div>`;
   }
   $('hojas').innerHTML = html;
-  const hojas = Math.ceil(PASES.length / porHoja) * 2;
-  $('cuenta').textContent = `${PASES.length} invitación(es) · ${hojas} hoja(s) A4`;
+  const hojas = Math.ceil(tarjetas.length / porHoja) * 2;
+  $('cuenta').textContent = `${PASES.length} invitación(es)` +
+    (copias > 1 ? ` × ${copias} copias = ${tarjetas.length} tarjetas` : '') +
+    ` · ${hojas} hoja(s) A4`;
 }
 
 (async () => {
@@ -255,6 +266,18 @@ function pintar() {
   if (!PASES.length) { $('cuenta').textContent = 'No hay invitaciones para imprimir.'; return; }
   // Todas las invitaciones de un pliego salen del mismo beneficio en la práctica; si se mezclan,
   // manda la primera: una hoja no puede tener dos bases distintas.
+  // Repetir un código de UN uso sería repartir tarjetas muertas: el control sólo se habilita si
+  // todos los de la tanda admiten varios usos, y ahí arranca completando la hoja.
+  const multiple = PASES.every(j => (j.usos_max || 1) > 1);
+  const inp = $('copias');
+  if (multiple) {
+    inp.value = PASES.length < 4 ? Math.floor(4 / PASES.length) : 1;
+    $('l-copias').title = 'El mismo código en varias tarjetas. Vale porque admite varios usos.';
+  } else {
+    inp.value = 1; inp.disabled = true;
+    $('l-copias').style.opacity = '.45';
+    $('l-copias').title = 'Hay códigos de un solo uso: repetirlos sería repartir tarjetas que no funcionan.';
+  }
   const claro = (PASES[0].tema || 'claro') === 'claro';
   if (claro) document.documentElement.dataset.tema = 'claro';
   marca(PASES[0].marca, claro);
