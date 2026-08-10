@@ -2424,10 +2424,28 @@ async function guardarAccion(negocioId, campaniaId, id, d) {
   const refs = { pieza_id: null, grafica_id: null, beneficio_id: null, pauta_id: null, link_id: null };
   if (t.campo && /^[0-9a-f-]{36}$/i.test(String(d.ref || ''))) refs[t.campo] = d.ref;
   const num = v => (Number(v) >= 0 ? Number(v) : null);
+  // Lo que el formulario no manda NO se pisa: el UPDATE escribía todas las columnas, así que
+  // editar el nombre de una acción borraba las notas del creativo —el porqué, el público, cómo se
+  // mide— y le ponía orden 0. Un campo ausente es "no lo toqués", no "vaciámelo".
+  let prev = {};
+  if (id) {
+    const { rows: [x] } = await pool.query(
+      'SELECT * FROM contenido.campania_accion WHERE id=$1 AND campania_id=$2', [id, campaniaId]);
+    if (!x) { const e = new Error('no existe'); e.code = 'no_encontrado'; throw e; }
+    prev = x;
+  }
+  const dado = (k, v) => (d[k] === undefined ? (prev[k] === undefined ? null : prev[k]) : v);
+  // Una acción nueva va al final de la lista; una que se edita conserva su lugar.
+  const orden = d.orden !== undefined ? (Number(d.orden) || 0)
+    : (id ? (prev.orden || 0)
+          : (await pool.query('SELECT COALESCE(max(orden),0)+1 AS n FROM contenido.campania_accion WHERE campania_id=$1',
+                              [campaniaId])).rows[0].n);
   const campos = [campaniaId, t.id, nombre, ['borrador','planificada','activa','terminada','descartada'].includes(d.estado) ? d.estado : 'borrador',
-                  Number(d.orden) || 0, refs.pieza_id, refs.grafica_id, refs.beneficio_id, refs.pauta_id, refs.link_id,
-                  num(d.costo_previsto), num(d.costo_real), String(d.costo_nota || '').trim() || null,
-                  num(d.volumen_declarado), String(d.notas || '').trim() || null];
+                  orden, refs.pieza_id, refs.grafica_id, refs.beneficio_id, refs.pauta_id, refs.link_id,
+                  dado('costo_previsto', num(d.costo_previsto)), dado('costo_real', num(d.costo_real)),
+                  dado('costo_nota', String(d.costo_nota || '').trim() || null),
+                  dado('volumen_declarado', num(d.volumen_declarado)),
+                  dado('notas', String(d.notas || '').trim() || null)];
   if (id) {
     const { rows: [r] } = await pool.query(
       `UPDATE contenido.campania_accion SET tipo=$2, nombre=$3, estado=$4, orden=$5,

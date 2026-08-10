@@ -230,6 +230,13 @@
       <div class="hint">Lo que nadie mide y alguien carga. Se muestra distinto de lo medido.</div></div>
   </div>
 
+  <label for="a-notas">Notas</label>
+  <textarea id="a-notas" style="width:100%;min-height:130px;background:var(--u-bg);border:1px solid var(--u-line);
+      border-radius:9px;padding:10px 12px;color:var(--u-fg);font-family:inherit;font-size:.86rem;
+      line-height:1.55;outline:none;resize:vertical"></textarea>
+  <div class="hint">Lo que escribió el creativo: a quién le habla, por qué, cómo se mide y cuándo.
+    Editalo con libertad — es lo que vas a leer cuando la acción esté corriendo.</div>
+
   <label for="a-estado">Estado</label>
   <select id="a-estado">
     <option value="borrador">Borrador — todavía se está armando</option>
@@ -587,6 +594,7 @@ function abrirAccion(a){
   $('a-nombre').value = a ? a.nombre : '';
   $('a-costo').value = a && a.costo_previsto ? Math.round(a.costo_previsto) : '';
   $('a-volumen').value = a && a.volumen_declarado ? a.volumen_declarado : '';
+  $('a-notas').value = a ? (a.notas||'') : '';
   $('a-estado').value = a ? a.estado : 'borrador';
   $('a-err').textContent='';
   cambiarTipo(a ? (a.beneficio_id||a.grafica_id||a.pieza_id||a.pauta_id||a.link_id) : null);
@@ -616,7 +624,8 @@ async function guardarAccion(){
   const err=$('a-err'); err.textContent='';
   const id=$('a-id').value;
   const body={ tipo:$('a-tipo').value, nombre:$('a-nombre').value, ref:$('a-ref').value||null,
-    costo_previsto:$('a-costo').value, volumen_declarado:$('a-volumen').value, estado:$('a-estado').value };
+    costo_previsto:$('a-costo').value, volumen_declarado:$('a-volumen').value,
+    notas:$('a-notas').value, estado:$('a-estado').value };
   try{
     const r=await fetch('api/campanias/'+DET+'/acciones'+(id?'/'+id:''),{method:id?'PUT':'POST',
       headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(x=>x.json());
