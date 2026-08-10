@@ -11,11 +11,12 @@
   /* Los tokens los pisa la marca del negocio, igual que en la página de reservas: el pase es del
      negocio, no de ClaUsina. Sin marca cargada, cae en una paleta neutra. */
   :root{--f-tit:'Inter Tight',sans-serif;--f-txt:'Inter',sans-serif;
-        --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-suave:#1b1b21;--c-linea:#2a2a33;}
+        --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-suave:#1b1b21;--c-linea:#2a2a33;
+        --c-filete:rgba(255,255,255,.34);}
   /* La otra base. El beneficio elige cuál: en papel el blanco gana casi siempre, y el acento
      de la marca es lo único que se conserva de su paleta. */
   :root[data-tema="claro"]{--c-fondo:#F2F0EA;--c-tinta:#15150F;--c-acento:#B33A00;
-                           --c-suave:#FFFFFF;--c-linea:#DCD8CC;}
+                           --c-suave:#FFFFFF;--c-linea:#DCD8CC;--c-filete:rgba(0,0,0,.3);}
   *{box-sizing:border-box;margin:0;}
   /* Los colores se imprimen sí o sí. Sin esto depende de que quien imprime tenga tildado
      "gráficos de fondo", y la tarjeta sale en blanco y negro sin que nadie se entere. */
@@ -33,8 +34,12 @@
   /* La foto montada sobre la base, no a sangre: el margen y el filo la encuadran y le dan
      presencia de invitación. Un filete DENTRO de la foto chocaría con la banda de datos que la
      pieza gráfica ya trae abajo. */
-  .frente{padding:4mm;background:var(--c-suave);}
-  .frente img{border:1px solid rgba(0,0,0,.22);}
+  .frente{padding:2mm;background:var(--c-suave);}
+  .frente img{border:1px solid var(--c-filete);}
+  /* El dorso lleva el mismo filete: una tarjeta clara sobre papel blanco, sin borde, no muestra
+     dónde termina. En pantalla acompaña el redondeo de la tarjeta. */
+  .pase::after{content:'';position:absolute;inset:8px;border:1px solid var(--c-filete);
+               border-radius:13px;pointer-events:none;}
   .cara-rot{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:.22em;
             text-transform:uppercase;opacity:.5;text-align:center;margin:0 0 7px;line-height:1.6;}
   /* El logo manda: es lo primero y lo más grande, y trae el nombre adentro. */
@@ -243,6 +248,7 @@ function marca(m, claro) {
       `.frente{width:${mm[0]}mm;height:${mm[1]}mm;margin:0}` +
       `.frente img{width:100%;height:100%;object-fit:cover}` +
       `.pase{height:${mm[1]}mm;border-radius:0;border:0;padding:6mm 6mm 9mm;overflow:hidden}` +
+      `.pase::after{inset:2mm;border-radius:0}` +
       `.logo{max-height:16mm;margin-bottom:4mm}.codigo{margin:4mm 0 2mm;padding:3mm 2mm}` +
       `.pie{margin-top:4mm}.datos{margin-top:4mm;padding-top:3mm}}</style>`);
     const src = claro && j.logo_claro ? j.logo_claro : j.logo;

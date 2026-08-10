@@ -14,10 +14,11 @@
   /* Cuatro A6 por A4 para cortar. El A4 mide 210×297 y el A6 105×148,5: entran exactos, así que
      las marcas de corte son las propias uniones. */
   :root{--f-tit:'Inter Tight',sans-serif;--f-txt:'Inter',sans-serif;
-        --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-linea:#2a2a33;}
+        --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-linea:#2a2a33;
+        --c-filete:rgba(255,255,255,.34);}
   /* La base clara: la elige el beneficio y es la que ahorra tinta en papel común. */
   :root[data-tema="claro"]{--c-fondo:#FFFFFF;--c-tinta:#15150F;--c-acento:#B33A00;
-                           --c-linea:#DCD8CC;}
+                           --c-linea:#DCD8CC;--c-filete:rgba(0,0,0,.3);}
   *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body{background:#4a4a4a;font-family:var(--f-txt);overflow-x:hidden;}
   .hoja{width:210mm;height:297mm;display:grid;grid-template-columns:105mm 105mm;
@@ -51,8 +52,12 @@
   .frente img{width:100%;height:100%;object-fit:cover;display:block;}
   /* La foto montada sobre la base, no a sangre: el margen y el filo la encuadran, no chocan con
      la banda de datos que la pieza ya trae abajo, y de paso dan tolerancia al corte. */
-  .frente{padding:4mm;background:var(--c-fondo);}
-  .frente img{border:.25mm solid rgba(0,0,0,.22);}
+  .frente{padding:2mm;background:var(--c-fondo);}
+  .frente img{border:.25mm solid var(--c-filete);}
+  /* El dorso lleva el mismo filete. Sin él, una tarjeta clara sobre papel blanco no tiene
+     ningún borde visible: no se ve dónde termina ni por dónde cortarla. */
+  .cara:not(.frente):not(.hueca)::before{content:'';position:absolute;inset:2mm;
+        border:.25mm solid var(--c-filete);pointer-events:none;}
   .frente .fallback{display:flex;flex-direction:column;align-items:center;justify-content:center;
                     gap:7mm;width:100%;height:100%;padding:12mm;}
   .frente .fallback img{width:auto;max-width:70%;max-height:34mm;object-fit:contain;}
