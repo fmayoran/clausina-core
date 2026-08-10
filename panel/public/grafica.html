@@ -248,7 +248,9 @@ function seccion(titulo, n, nota, cards){
 }
 function card(g){
   const st = g.v_estado==='pendiente'||g.v_estado==='procesando' ? 'generando' : (g.estado||'borrador');
-  const lbl = st==='generando' ? 'diseñando…' : st;
+  // 'lista' es que el diseño se generó bien, no que la pieza esté cerrada. Dentro de "En
+  // preparación" esa palabra se lee al revés de lo que significa.
+  const lbl = st==='generando' ? 'diseñando…' : (st==='lista' ? 'sin aprobar' : st);
   const prev = g.png_url ? `<img src="${esc(g.png_url)}" loading="lazy">`
     : `<div class="ph">${st==='generando'?'<span class="spin"></span><br>el creativo está diseñando':(g.v_error?esc(g.v_error):'sin versión')}</div>`;
   const f = FORMATOS.find(x=>x.id===g.formato);
