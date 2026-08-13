@@ -62,6 +62,10 @@
 <script>ClausinaShell({active:'auditoria'});</script>
 <script src="panel.js"></script>
 <script>
+// Todo encerrado: este script comparte el ámbito global con panel.js, y un nombre repetido
+// —pasó con 'pct'— es un SyntaxError que mata la página entera antes de la primera línea. La
+// pantalla quedaba clavada en "Cargando auditoría…" sin llamar a la API ni dejar rastro.
+(() => {
 const nfmt=n=>(n==null?'—':new Intl.NumberFormat('es-AR').format(n));
 const pct=v=>(v==null?'—':v+'%');
 function md(t){ if(!t) return '';
@@ -149,6 +153,19 @@ async function load(){
   renderWeb(web); renderIg(ig);
 }
 load();
+})();
+</script>
+<script>
+// Red aparte del script de arriba, a propósito: si aquél no llega ni a parsear, este igual corre.
+// Una pantalla clavada en "Cargando…" para siempre no le dice a nadie que algo se rompió.
+setTimeout(() => {
+  const w = document.getElementById('wrap');
+  if (w && /Cargando auditoría/.test(w.textContent)) {
+    w.innerHTML = '<div class="empty">Esta pantalla no pudo cargar. ' +
+      '<a onclick="location.reload()" style="cursor:pointer;text-decoration:underline">Recargar</a>' +
+      ' — si sigue igual, avisá: es un error de la página, no de tus datos.</div>';
+  }
+}, 8000);
 </script>
 </body>
 </html>
