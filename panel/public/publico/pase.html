@@ -120,7 +120,10 @@
   :root[data-tema="claro"] .pie{opacity:.72;}
   :root[data-tema="claro"] .beneficio,
   :root[data-tema="claro"] .para{opacity:1;}
-  .cta.inerte{pointer-events:none;cursor:default;}
+  /* En la muestra el botón no puede llevar a ningún lado —el código no existe— pero se veía
+     idéntico al real: se clickeaba y no pasaba nada, que es peor que verlo apagado. */
+  .cta.inerte{pointer-events:none;cursor:default;opacity:.45;box-shadow:none;}
+  .cta.inerte::after{content:' (así se ve)';font-size:.72rem;font-weight:400;opacity:.8;}
   /* Sólo existe en papel: en pantalla el botón es mejor que un teléfono para copiar a mano. */
   .papel{display:none;margin-top:18px;font-family:var(--f-tit);font-size:1rem;line-height:1.45;}
   .papel b{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:1.06rem;
@@ -280,8 +283,8 @@ function marca(m, claro) {
       $('cta').removeAttribute('href');
       $('cta').classList.add('inerte');
       $('acciones').insertAdjacentHTML('beforebegin',
-        '<div class="aviso">Así se va a ver la invitación. El código es de muestra: ' +
-        'los reales se generan al emitir.</div>');
+        '<div class="aviso">Así se va a ver la invitación. El código es de muestra y por eso el ' +
+        'botón está apagado: en una invitación real abre WhatsApp con el código ya escrito.</div>');
     }
 
     const c = j.condiciones || {};

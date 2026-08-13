@@ -459,7 +459,9 @@ function pintarInv() {
       <td class="mono2">${i.vence_en ? escapar(fecha(i.vence_en)) : '—'}</td>
       <td style="white-space:nowrap;">
         <button class="iconbtn" onclick='copiarEnlace(${JSON.stringify(i.codigo)})'
-          title="Copiar el enlace de reserva" aria-label="Copiar enlace"><i data-lucide="link" class="w-4 h-4"></i></button>
+          title="Copiar el enlace de la invitación" aria-label="Copiar enlace"><i data-lucide="link" class="w-4 h-4"></i></button>
+        <button class="iconbtn" onclick='mandarPorWhatsApp(${JSON.stringify(i.codigo)},${JSON.stringify(i.texto || '')})'
+          title="Mandarla por WhatsApp" aria-label="Mandar por WhatsApp"><i data-lucide="send" class="w-4 h-4"></i></button>
         <a class="iconbtn" href="/pase/${escapar(i.codigo)}" target="_blank" rel="noopener"
           title="Ver el pase para imprimir o mandar" aria-label="Ver pase"><i data-lucide="ticket" class="w-4 h-4"></i></a>
         ${['activa','en_uso'].includes(i.estado) ? `<button class="iconbtn mal" onclick='anular(${JSON.stringify(i.id)})'
@@ -476,9 +478,22 @@ async function copiar(c) {
   try { await navigator.clipboard.writeText(c); avisar('código ' + bonito(c) + ' copiado'); }
   catch (e) { avisar('no pude copiar'); }
 }
+// El enlace que se comparte es la INVITACIÓN, no el formulario. Antes copiaba /i/<codigo>, que
+// redirige derecho a reservar: quien la recibía no veía la tarjeta, ni el beneficio, ni el botón
+// de WhatsApp. La invitación digital es la pieza; reservar es lo que pasa después.
+const enlaceDe = c => location.origin + '/pase/' + c;
+
 async function copiarEnlace(c) {
-  try { await navigator.clipboard.writeText(location.origin + '/i/' + c); avisar('enlace copiado'); }
+  try { await navigator.clipboard.writeText(enlaceDe(c)); avisar('enlace copiado'); }
   catch (e) { avisar('no pude copiar'); }
+}
+
+// Mandarla por WhatsApp desde el panel: abre WhatsApp con el mensaje escrito y el enlace adentro,
+// y la persona elige a quién. Es el camino real de "enviar una invitación en digital".
+function mandarPorWhatsApp(c, texto) {
+  const msg = `Te mando una invitación${texto ? ' — ' + texto : ''}.\n\n${enlaceDe(c)}\n\n` +
+    `Tu código es ${c}. Escribinos por WhatsApp y te reservamos.`;
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
 }
 function avisar(t) {
   const s = $('cuenta-cod'), previo = s.textContent;
