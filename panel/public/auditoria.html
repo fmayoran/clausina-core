@@ -22,6 +22,12 @@
   @keyframes gira{to{transform:rotate(360deg)}}
   @media(prefers-reduced-motion:reduce){.corriendo .sp{animation:none}}
   .malaud{color:#FF6B4A;}
+  .cabecera{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
+  .cabecera h1{font-family:'Barlow Condensed','Inter Tight',sans-serif;font-size:1.5rem;
+               font-weight:700;color:var(--white);margin:0;}
+  .cabecera .gen{margin-left:auto;}
+  .intro{font-family:'IBM Plex Mono','JetBrains Mono',monospace;font-size:.72rem;color:var(--ash);
+         line-height:1.7;max-width:76ch;margin:0 0 18px;}
 </style>
 <style>
   .wrap{padding:18px 28px 70px;max-width:1180px;margin:0 auto;}
@@ -56,18 +62,17 @@
 </style>
 </head>
 <body>
-  <header>
-    <a class="logo" href=".">CORTA<b>FUEGO</b></a>
-    <span class="sub">Auditoría · presencia digital</span>
-    <span class="upd" id="upd"></span>
-    <button class="gen" id="b-gen" onclick="generar()">Generar auditoría</button>
-    <nav>
-      <a href="proyecto">← Proyecto</a>
-      <button class="logout" onclick="salir()">Salir</button>
-    </nav>
-  </header>
 <div class="shell"><main class="min-w-0">
   <div id="toast"></div>
+  <!-- El encabezado propio se fue: era de la época anterior al shell, decía CORTAFUEGO fijo para
+       cualquier negocio y estaba oculto, así que el botón de generar nunca se veía. -->
+  <div class="cabecera">
+    <h1>Auditoría</h1>
+    <span class="upd" id="upd"></span>
+    <button class="gen" id="b-gen" onclick="generar()">Generar auditoría</button>
+  </div>
+  <p class="intro">Mide la web contra el sitio publicado y el Instagram contra lo que ya se
+    publicó, lo compara con el benchmark y deja recomendaciones priorizadas.</p>
   <div id="estado-aud"></div>
   <div class="wrap" id="wrap"><div class="empty">Cargando auditoría…</div></div>
 </main></div>
