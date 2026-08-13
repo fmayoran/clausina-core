@@ -239,6 +239,21 @@ app.get('/i/:codigo', async (req, res) => {
 // El pase: la invitación en versión imprimible o para mandar por mail. Es pública a propósito —
 // el código YA es el secreto, y quien lo tiene es su dueño. Pedir una sesión para ver la propia
 // invitación no protegería nada y la haría inservible como algo que se reenvía.
+// La pieza apaisada con la que se ve la invitación al compartirla. Es pública porque la
+// fotografía un navegador sin sesión, igual que el pase.
+app.get('/publico/og/:id', (req, res) =>
+  res.sendFile(path.join(__dirname, 'public', 'publico', 'og.html')));
+app.get('/api/publico/og/:id', async (req, res) => {
+  if (!limite(req, res, 60, 60e3)) return;
+  try {
+    const m = await db.muestraBeneficio(null, String(req.params.id));
+    if (!m) return res.status(404).json({ ok: false });
+    res.json({ ok: true, negocio: m.negocio, nombre: m.nombre, texto: m.texto, tema: m.tema,
+               logo: m.logo, logo_claro: m.logo_claro, marca: m.marca,
+               whatsapp: m.whatsapp, web: m.web, frente: m.frente_prev || m.frente });
+  } catch (e) { console.error('og', e.message); res.status(500).json({ ok: false }); }
+});
+
 // La invitación digital. WhatsApp, Instagram y el mail no ejecutan el JavaScript de la página:
 // arman la vista previa leyendo las etiquetas Open Graph del HTML crudo. Sin ellas, lo que llega
 // es una línea de texto con el dominio 'panel.clausina.ar' — o sea, la invitación la manda

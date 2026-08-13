@@ -1554,7 +1554,8 @@ const codigoPieza = (canal, numero) =>
 async function muestraBeneficio(negocioId, beneficioId) {
   const { rows: [b] } = await pool.query(
     `SELECT b.*, gf.numero AS frente_numero,
-            gv.png_url AS frente_url, gf.ancho_mm AS frente_ancho, gf.alto_mm AS frente_alto,
+            gv.png_url AS frente_url, gv.png_prev_url AS frente_prev,
+            gf.ancho_mm AS frente_ancho, gf.alto_mm AS frente_alto,
             n.slug, n.nombre AS negocio, n.dominio_web, n.ig_handle,
             pp.logo, pp.logo_claro, COALESCE(ni.marca, '{}'::jsonb) AS marca
        FROM contenido.beneficio b
@@ -1562,10 +1563,10 @@ async function muestraBeneficio(negocioId, beneficioId) {
        LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id = n.id
        LEFT JOIN contenido.negocio_identidad ni ON ni.negocio_id = n.id
        LEFT JOIN contenido.grafica gf ON gf.id = b.frente_grafica_id
-       LEFT JOIN LATERAL (SELECT png_url FROM contenido.grafica_version x
+       LEFT JOIN LATERAL (SELECT png_url, png_prev_url FROM contenido.grafica_version x
                            WHERE x.grafica_id = gf.id AND x.estado='lista' AND x.png_url IS NOT NULL
                            ORDER BY x.nro DESC LIMIT 1) gv ON true
-      WHERE b.id = $1 AND b.negocio_id = $2`, [beneficioId, negocioId]);
+      WHERE b.id = $1 AND ($2::uuid IS NULL OR b.negocio_id = $2)`, [beneficioId, negocioId]);
   if (!b) return null;
   const { rows: [sede] } = await pool.query(
     `SELECT direccion, localidad, partido FROM contenido.negocio_sede
@@ -1584,7 +1585,7 @@ async function muestraBeneficio(negocioId, beneficioId) {
     logo: b.logo, logo_claro: b.logo_claro, tema: b.tema || 'claro',
     marca: b.marca || {}, whatsapp: w ? w.n : null,
     web: b.dominio_web, instagram: b.ig_handle, sede: sede || null,
-    frente: b.frente_url || null,
+    frente: b.frente_url || null, frente_prev: b.frente_prev || null,
     frente_codigo: b.frente_numero ? codigoPieza('grafica', b.frente_numero) : null,
     frente_mm: b.frente_ancho ? [Math.round(b.frente_ancho), Math.round(b.frente_alto)] : null,
   };

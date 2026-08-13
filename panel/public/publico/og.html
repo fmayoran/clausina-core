@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Invitación · vista previa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link id="fuentes" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700;800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  /* 1200x630 exactos: es la medida que WhatsApp, Instagram y el mail muestran a ancho completo.
+     Una vertical la tratan como adjunto —miniatura al costado— y la pieza se pierde. */
+  :root{--f-tit:'Inter Tight',sans-serif;--f-txt:'Inter',sans-serif;
+        --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-suave:#1b1b21;--c-linea:#2a2a33;}
+  :root[data-tema="claro"]{--c-fondo:#F2F0EA;--c-tinta:#15150F;--c-acento:#B33A00;
+                           --c-suave:#FFFFFF;--c-linea:#DCD8CC;}
+  *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  body{width:1200px;height:630px;overflow:hidden;background:var(--c-suave);
+       font-family:var(--f-txt);color:var(--c-tinta);}
+  #og{width:1200px;height:630px;display:grid;grid-template-columns:472px 1fr;}
+  /* El arte, a sangre contra el borde izquierdo: es lo primero que se ve en la burbuja. */
+  .arte{position:relative;overflow:hidden;background:var(--c-fondo);}
+  .arte img{width:100%;height:100%;object-fit:cover;display:block;}
+  .arte::after{content:'';position:absolute;inset:0;box-shadow:inset -1px 0 0 var(--c-linea);}
+  .lado{padding:54px 58px;display:flex;flex-direction:column;justify-content:center;gap:0;}
+  .logo{max-height:78px;max-width:62%;width:auto;display:block;margin-bottom:30px;}
+  /* La banda sólo si el logo no tiene versión clara: sobre papel blanco un logo blanco se borra. */
+  .banda{background:var(--c-marca-fondo,#101014);border-radius:12px;padding:16px 22px;
+         display:inline-block;max-width:70%;margin-bottom:30px;}
+  .banda .logo{margin:0;max-width:100%;}
+  .rot{font-family:'JetBrains Mono',monospace;font-size:15px;letter-spacing:.24em;
+       text-transform:uppercase;color:var(--c-acento);margin-bottom:14px;}
+  .tit{font-family:var(--f-tit);font-weight:800;font-size:52px;line-height:1.03;
+       letter-spacing:-.01em;text-wrap:balance;}
+  .ben{font-family:var(--f-tit);font-weight:700;font-size:38px;line-height:1.15;
+       color:var(--c-acento);margin-top:18px;}
+  .pie{margin-top:auto;padding-top:26px;font-family:'JetBrains Mono',monospace;font-size:16px;
+       line-height:1.75;color:var(--c-tinta);opacity:.72;}
+  .sinarte{display:grid;place-items:center;color:var(--c-tinta);opacity:.25;
+           font-family:'JetBrains Mono',monospace;font-size:13px;}
+</style>
+</head>
+<body>
+<div id="og">
+  <div class="arte" id="arte"><div class="sinarte">—</div></div>
+  <div class="lado">
+    <span id="banda"><img class="logo" id="logo" alt="" style="display:none"></span>
+    <div class="rot" id="rot">Invitación especial</div>
+    <div class="tit" id="tit"></div>
+    <div class="ben" id="ben"></div>
+    <div class="pie" id="pie"></div>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const ID = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+// Mismos tokens que la invitación: la pieza que se comparte no puede tener otra paleta que la
+// que la persona va a ver al abrirla.
+function marca(m, claro) {
+  if (!m || !Object.keys(m).length) return;
+  const r = document.documentElement.style;
+  const set = (v, k) => { if (m[k]) r.setProperty(v, m[k]); };
+  if (m.fondo) r.setProperty('--c-marca-fondo', m.fondo);
+  set('--c-acento', 'acento');
+  if (!claro) { set('--c-fondo', 'fondo'); set('--c-tinta', 'texto');
+                set('--c-suave', 'superficie'); set('--c-linea', 'linea'); }
+  const fams = [m.fuente_titulo, m.fuente_texto].filter(Boolean);
+  if (fams.length) {
+    const q = fams.map(f => 'family=' + encodeURIComponent(f).replace(/%20/g, '+') + ':wght@400;600;700;800').join('&');
+    $('fuentes').href = `https://fonts.googleapis.com/css2?${q}&family=JetBrains+Mono:wght@500;700&display=swap`;
+    if (m.fuente_titulo) r.setProperty('--f-tit', `'${m.fuente_titulo}', sans-serif`);
+    if (m.fuente_texto) r.setProperty('--f-txt', `'${m.fuente_texto}', sans-serif`);
+  }
+}
+
+(async () => {
+  const j = await fetch('/api/publico/og/' + encodeURIComponent(ID)).then(r => r.json());
+  if (!j || !j.ok) { document.body.innerHTML = '<pre>sin datos</pre>'; return; }
+  const claro = (j.tema || 'claro') === 'claro';
+  if (claro) document.documentElement.dataset.tema = 'claro';
+  marca(j.marca, claro);
+
+  const src = claro && j.logo_claro ? j.logo_claro : j.logo;
+  if (src) {
+    $('logo').src = src; $('logo').alt = j.negocio; $('logo').style.display = '';
+    if (claro && !j.logo_claro) $('banda').className = 'banda';
+  }
+  // El nombre del negocio manda: es lo que tiene que quedar claro de un vistazo en la burbuja.
+  $('tit').textContent = j.negocio + ' te invita';
+  $('ben').textContent = j.texto || '';
+  if (j.nombre) $('rot').textContent = 'Invitación especial · ' + j.nombre;
+  const pie = [];
+  if (j.whatsapp) pie.push('Reservá por WhatsApp ' + j.whatsapp);
+  if (j.web) pie.push(j.web);
+  $('pie').innerHTML = pie.map(esc).join('<br>');
+  if (j.frente) $('arte').innerHTML = '<img src="' + esc(j.frente) + '" alt="">';
+
+  // El renderer espera esta marca: sin ella fotografía la pieza antes de que carguen la fuente de
+  // la marca o el arte, y sale una imagen a medio dibujar.
+  const listo = () => { document.body.dataset.listo = '1'; };
+  const img = document.querySelector('.arte img');
+  await (document.fonts ? document.fonts.ready : Promise.resolve());
+  if (img && !img.complete) img.onload = listo; else listo();
+})();
+</script>
+</body>
+</html>
