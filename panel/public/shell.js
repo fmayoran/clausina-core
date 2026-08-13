@@ -256,6 +256,26 @@
     location.href = 'login';
   };
 
+  // Sólo aparece cuando algo está roto: un cartel permanente se vuelve parte del fondo y deja de
+  // leerse a la semana.
+  function avisarCaidos(shell) {
+    fetch('api/salud-externa').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      var lista = (d && d.chequeos) || [];
+      var malos = lista.filter(function (x) { return x.estado === 'fallo'; });
+      if (!malos.length) return;
+      var main = shell.querySelector('main'); if (!main) return;
+      var que = malos.map(function (x) { return String(x.chequeo || '').split('·')[0].trim(); }).join(', ');
+      main.insertAdjacentHTML('afterbegin',
+        '<a href="maquinas" class="flex items-start gap-3 mb-5 rounded-xl px-4 py-3 no-underline" ' +
+        'style="border:1px solid rgba(196,68,42,.35);background:rgba(196,68,42,.09)">' +
+        '<span style="color:#E0503A;font-size:15px;line-height:1.3">●</span>' +
+        '<span class="mono text-[11px]" style="color:#E0503A;line-height:1.7">' +
+        '<b>' + (malos.length === 1 ? 'Un servicio caído' : malos.length + ' servicios caídos') +
+        ': ' + que + '.</b> Mientras esté así no se publica ni se mide. ' +
+        'Ver en la Sala de máquinas →</span></a>');
+    }).catch(function () {});
+  }
+
   window.ClausinaShell = function (opts) {
     opts = opts || {};
     var shell = document.querySelector('.shell');
@@ -347,6 +367,10 @@
     // Breadcrumb al tope del contenido
     var main = shell.querySelector('main');
     if (main) { var ch = crumb(opts.active || ''); if (ch) main.insertAdjacentHTML('afterbegin', ch); }
+    // Alarma de servicios caídos, en TODAS las pantallas. El monitor detecta estas cosas hace
+    // rato, pero vivía sólo en la Sala de máquinas: el token de Instagram estuvo vencido quince
+    // días sin que nadie lo viera. Una credencial caída no publica, no mide y no avisa sola.
+    avisarCaidos(shell);
     if (window.lucide) lucide.createIcons();
     // poblar el selector + dropdown de marcas
     fetch('api/negocios').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
