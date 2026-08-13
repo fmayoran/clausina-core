@@ -20,7 +20,7 @@
   .arte{position:relative;overflow:hidden;background:var(--c-fondo);}
   .arte img{width:100%;height:100%;object-fit:cover;display:block;}
   .arte::after{content:'';position:absolute;inset:0;box-shadow:inset -1px 0 0 var(--c-linea);}
-  .lado{padding:54px 58px;display:flex;flex-direction:column;justify-content:center;gap:0;}
+  .lado{padding:56px 58px;display:flex;flex-direction:column;justify-content:center;gap:0;}
   .logo{max-height:78px;max-width:62%;width:auto;display:block;margin-bottom:30px;}
   /* La banda sólo si el logo no tiene versión clara: sobre papel blanco un logo blanco se borra. */
   .banda{background:var(--c-marca-fondo,#101014);border-radius:12px;padding:16px 22px;
@@ -32,8 +32,9 @@
        letter-spacing:-.01em;text-wrap:balance;}
   .ben{font-family:var(--f-tit);font-weight:700;font-size:38px;line-height:1.15;
        color:var(--c-acento);margin-top:18px;}
-  .pie{margin-top:auto;padding-top:26px;font-family:'JetBrains Mono',monospace;font-size:16px;
-       line-height:1.75;color:var(--c-tinta);opacity:.72;}
+  /* Pegado al bloque, no al fondo: con margin-top:auto quedaba un hueco enorme en el medio. */
+  .pie{margin-top:30px;font-family:'JetBrains Mono',monospace;font-size:16px;
+       line-height:1.8;color:var(--c-tinta);opacity:.72;}
   .sinarte{display:grid;place-items:center;color:var(--c-tinta);opacity:.25;
            font-family:'JetBrains Mono',monospace;font-size:13px;}
 </style>

@@ -1568,6 +1568,10 @@ async function muestraBeneficio(negocioId, beneficioId) {
                            ORDER BY x.nro DESC LIMIT 1) gv ON true
       WHERE b.id = $1 AND ($2::uuid IS NULL OR b.negocio_id = $2)`, [beneficioId, negocioId]);
   if (!b) return null;
+  // Cuando la pide el renderer no viene negocioId (no hay sesión que validar), y las consultas de
+  // abajo lo usaban igual: la sede, el WhatsApp y las condiciones salían vacías. El negocio es el
+  // del beneficio, y ya lo tenemos.
+  negocioId = b.negocio_id;
   const { rows: [sede] } = await pool.query(
     `SELECT direccion, localidad, partido FROM contenido.negocio_sede
       WHERE negocio_id=$1 ORDER BY principal DESC, orden LIMIT 1`, [negocioId]);
