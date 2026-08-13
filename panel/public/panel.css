@@ -284,8 +284,17 @@ header .marcasel:hover{border-color:var(--fire);}
 .cfgsep{border-top:1px solid var(--line);padding-top:12px;margin-top:4px;}
 /* Barra de acciones de la página (el header propio lo oculta shell.js). */
 .pgacts{display:flex;justify-content:flex-end;gap:8px;margin:0 0 14px;}
-.pgacts .ibtn{font-family:'JetBrains Mono',monospace;font-size:.66rem;text-transform:uppercase;
+/* .ibtn se usa también en los pies de los modales, y ahí quedaba SIN estilo: los botones de
+   "Cuenta de Instagram" y "Credenciales de Ads" se veían como texto suelto. El estilo deja de
+   depender de estar dentro de .pgacts. */
+.ibtn{font-family:'JetBrains Mono',monospace;font-size:.66rem;text-transform:uppercase;
   letter-spacing:.06em;padding:7px 14px;border-radius:7px;border:1px solid var(--line);
   background:transparent;color:var(--ash);cursor:pointer;text-decoration:none;display:inline-flex;
-  align-items:center;gap:7px;}
-.pgacts .ibtn:hover{color:var(--white);border-color:var(--ember,var(--ember));}
+  align-items:center;justify-content:center;gap:7px;transition:.15s;}
+.ibtn:hover{color:var(--white);border-color:var(--ember,var(--ember));}
+/* En un pie de modal los dos botones no pesan igual: el que confirma es el que se ve. */
+.modal-foot .ibtn{flex:1;}
+.ibtn.prim{color:var(--bg);background:var(--fire);border-color:var(--fire);font-weight:700;}
+.ibtn.prim:hover{background:var(--ember);border-color:var(--ember);color:var(--bg);}
+.ibtn.ghost{color:var(--ash);}
+.ibtn:disabled{opacity:.45;cursor:default;}
