@@ -1306,7 +1306,8 @@ async function getReservas(negocioId, { desde, hasta, estado } = {}) {
             -- La invitación viaja con la reserva: quien mira la lista del día tiene que ver el
             -- beneficio SIN abrir nada, porque es lo que va a tener que aplicar en el mostrador.
             iu.id AS uso_id, iu.estado AS invitacion_estado, i.codigo AS invitacion_codigo,
-            bf.nombre AS invitacion_nombre, bf.tipo AS invitacion_tipo, bf.valor AS invitacion_valor
+            bf.nombre AS invitacion_nombre, bf.tipo AS invitacion_tipo, bf.valor AS invitacion_valor,
+            (bf.condiciones->>'cantidad_max')::int AS invitacion_cubre
        FROM contenido.reserva r
        LEFT JOIN contenido.invitacion_uso iu ON iu.reserva_id = r.id
        LEFT JOIN contenido.invitacion i ON i.id = iu.invitacion_id
@@ -1323,6 +1324,10 @@ async function getReservas(negocioId, { desde, hasta, estado } = {}) {
       uso_id: r.uso_id, estado: r.invitacion_estado, codigo: r.invitacion_codigo,
       nombre: r.invitacion_nombre,
       texto: textoBeneficio({ tipo: r.invitacion_tipo, valor: r.invitacion_valor }),
+      // A cuánta gente de la mesa alcanza el descuento. Sólo se dice cuando la mesa es más
+      // grande que la cobertura: es ahí donde quien cobra tiene que hacer la cuenta distinta.
+      cubre: r.invitacion_cubre || null,
+      cubre_parcial: !!(r.invitacion_cubre && r.cantidad > r.invitacion_cubre),
     } : null,
   }));
 }
@@ -1716,7 +1721,7 @@ const MOTIVOS = {
   repetida:  'Esa invitación ya la usaste.',
   dia:       'Esa invitación no aplica al día que elegiste.',
   turno:     'Esa invitación no aplica a ese turno.',
-  cantidad:  'Esa invitación no aplica para esa cantidad.',
+  cantidad:  'Esa invitación pide una mesa más grande.',
 };
 
 /**
@@ -1859,7 +1864,9 @@ function frasesCondicion(dias, franjas, c) {
   const partes = [cuando, horario].filter(Boolean);
   if (partes.length) f.push('Válida ' + partes.join(', '));
   if (c.cantidad_min) f.push('Desde ' + c.cantidad_min + ' personas');
-  if (c.cantidad_max) f.push('Hasta ' + c.cantidad_max + ' personas');
+  // "Hasta N personas" se leía como un tope para reservar. Es cuánta gente alcanza el descuento.
+  if (c.cantidad_max) f.push('El descuento cubre hasta ' +
+    (c.cantidad_max === 1 ? '1 persona' : c.cantidad_max + ' personas'));
   return f;
 }
 
@@ -1869,7 +1876,9 @@ function chocaCondicion(cond, { fecha, turnoId, cantidad, isodow }) {
   if ((c.dias || []).length && !c.dias.includes(isodow)) return 'dia';
   if ((c.turnos || []).length && !c.turnos.includes(turnoId)) return 'turno';
   if (c.cantidad_min && cantidad < c.cantidad_min) return 'cantidad';
-  if (c.cantidad_max && cantidad > c.cantidad_max) return 'cantidad';
+  // cantidad_max NO rechaza. Una invitación para 2 y una mesa de 4 no es un problema: el
+  // beneficio cubre a 2 y los otros 2 pagan lo suyo. Rechazar ahí es perder la reserva entera
+  // por querer cuidar el descuento, que es exactamente al revés de lo que conviene.
   return null;
 }
 
@@ -1918,8 +1927,12 @@ async function _tomarInvitacion(cli, negocioId, codigo, { reservaId, clienteId, 
     `UPDATE contenido.invitacion SET usos = usos + 1,
             telefono_norm = COALESCE(telefono_norm, $2) WHERE id=$1`,
     [i.id, telefonoNorm || null]);
+  // Cuánta gente cubre de las que vienen: es el dato que necesita quien hace la cuenta, y sin
+  // esto el mostrador tiene que ir a mirar la configuración del beneficio.
+  const cubre = (i.condiciones || {}).cantidad_max || null;
   return { id: i.id, codigo: c, beneficio: i.beneficio, tipo: i.tipo, valor: i.valor,
-           texto: textoBeneficio(i) };
+           texto: textoBeneficio(i),
+           cubre, cubre_parcial: !!(cubre && cantidad > cubre), personas: cantidad };
 }
 
 /**

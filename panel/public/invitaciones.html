@@ -193,12 +193,13 @@
   <select id="b-turnos" multiple size="4"></select>
   <div class="mono2" style="margin-top:6px;">Sin seleccionar ninguno, aplica a todos.</div>
 
-  <div class="mono2" style="margin-top:14px;">Cuánta gente puede entrar con una misma invitación.
-    NO es el cupo de la campaña: eso se define al emitir, en "usos". Si lo dejás vacío no se
-    imprime nada.</div>
+  <div class="mono2" style="margin-top:14px;">A cuánta gente alcanza el descuento. NO es el cupo de
+    la campaña —eso se define al emitir, en "usos"— ni un tope para reservar: si la invitación
+    cubre 2 y vienen 4, la reserva se toma igual y los otros 2 pagan completo. El mínimo, en
+    cambio, sí es una condición: sin esa cantidad el beneficio no aplica.</div>
   <div class="dos">
-    <div><label for="b-cmin">Mínimo de personas por reserva</label><input type="number" id="b-cmin" min="1" placeholder="sin mínimo"></div>
-    <div><label for="b-cmax">Máximo de personas por reserva</label><input type="number" id="b-cmax" min="1" placeholder="sin máximo"></div>
+    <div><label for="b-cmin">Mínimo de personas</label><input type="number" id="b-cmin" min="1" placeholder="sin mínimo"></div>
+    <div><label for="b-cmax">El descuento cubre hasta</label><input type="number" id="b-cmax" min="1" placeholder="toda la mesa"></div>
   </div>
 
   <label for="b-tema">Diseño base</label>
