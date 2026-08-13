@@ -1741,13 +1741,13 @@ async function consultarInvitacion(codigo, negocioId = null, telefono = null) {
             b.tipo, b.valor, b.condiciones, b.activo AS beneficio_activo, b.tema,
             n.slug AS negocio_slug, n.nombre AS negocio_nombre,
             -- El frente impreso lo define el beneficio: toda la campaña sale con el mismo.
-            gv.png_url AS frente_url, gf.numero AS frente_numero,
+            gv.png_url AS frente_url, gv.png_prev_url AS frente_prev, gf.numero AS frente_numero,
             gf.ancho_mm AS frente_ancho, gf.alto_mm AS frente_alto
        FROM contenido.invitacion i
        JOIN contenido.beneficio b ON b.id=i.beneficio_id
        JOIN contenido.negocios n ON n.id=i.negocio_id
        LEFT JOIN contenido.grafica gf ON gf.id = b.frente_grafica_id
-       LEFT JOIN LATERAL (SELECT png_url FROM contenido.grafica_version x
+       LEFT JOIN LATERAL (SELECT png_url, png_prev_url FROM contenido.grafica_version x
                            WHERE x.grafica_id = gf.id AND x.estado='lista' AND x.png_url IS NOT NULL
                            ORDER BY x.nro DESC LIMIT 1) gv ON true
       WHERE i.codigo=$1`, [c]);

@@ -259,9 +259,11 @@ app.get('/pase/:codigo', async (req, res) => {
     const negocio = (n && n.nombre) || i.negocio_nombre || '';
     const titulo = `${negocio} te invita`;
     const desc = [r.texto, i.beneficio, `Código ${i.codigo}`].filter(Boolean).join(' · ');
-    // La pieza del frente es la invitación diseñada. Sin frente cargado cae al logo, que al
-    // menos identifica al negocio; nunca a una imagen de ClaUsina.
-    const img = i.frente_url || (n && (n.logo_claro || n.logo)) || '';
+    // La pieza del frente es la invitación diseñada. Va la copia liviana: el PNG de imprenta pesa
+    // megas y WhatsApp descarta las previas pesadas, así que la de 300 dpi dejaría la burbuja sin
+    // imagen justo por ser demasiado buena. Sin frente cargado cae al logo, que al menos
+    // identifica al negocio; nunca a una imagen de ClaUsina.
+    const img = i.frente_prev || i.frente_url || (n && (n.logo_claro || n.logo)) || '';
     const meta = [
       `<meta property="og:type" content="website">`,
       `<meta property="og:site_name" content="${esc(negocio)}">`,
