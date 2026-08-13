@@ -278,7 +278,9 @@ app.get('/pase/:codigo', async (req, res) => {
     // megas y WhatsApp descarta las previas pesadas, así que la de 300 dpi dejaría la burbuja sin
     // imagen justo por ser demasiado buena. Sin frente cargado cae al logo, que al menos
     // identifica al negocio; nunca a una imagen de ClaUsina.
-    const img = i.frente_prev || i.frente_url || (n && (n.logo_claro || n.logo)) || '';
+    // La pieza apaisada, primero: es la única que WhatsApp muestra a ancho completo. Si todavía
+    // no se generó cae al frente —que se ve chico, pero se ve— y por último al logo.
+    const img = i.og_url || i.frente_prev || i.frente_url || (n && (n.logo_claro || n.logo)) || '';
     const meta = [
       `<meta property="og:type" content="website">`,
       `<meta property="og:site_name" content="${esc(negocio)}">`,

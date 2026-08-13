@@ -1742,7 +1742,7 @@ async function consultarInvitacion(codigo, negocioId = null, telefono = null) {
   const c = inv.limpiar(codigo);
   if (!inv.formaValida(c)) return { ok: false, motivo: 'forma', mensaje: MOTIVOS.forma };
   const { rows: [i] } = await pool.query(
-    `SELECT i.*, b.nombre AS beneficio, b.descripcion AS beneficio_descripcion,
+    `SELECT i.*, b.nombre AS beneficio, b.descripcion AS beneficio_descripcion, b.og_url,
             b.tipo, b.valor, b.condiciones, b.activo AS beneficio_activo, b.tema,
             n.slug AS negocio_slug, n.nombre AS negocio_nombre,
             -- El frente impreso lo define el beneficio: toda la campaña sale con el mismo.
