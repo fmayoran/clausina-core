@@ -70,6 +70,20 @@ except Exception: print('')" 2>/dev/null)
 fi
 IG_SEGUIDORES="$SEG" python3 "$MOTOR/scripts/auditoria_ig.py" "$slug" > "$DIRW/ig.json" 2>>"$LOG" || echo '{}' > "$DIRW/ig.json"
 
+# Sin nada medido no hay nada sobre lo que opinar: se corta acá antes de gastar una corrida del
+# creativo para que escriba sobre el vacío.
+hay=$(DIRW="$DIRW" python3 - <<'CALC'
+import json, os
+d = os.environ["DIRW"]
+def leer(p):
+    try: return json.load(open(p))
+    except Exception: return {}
+w, i = leer(f"{d}/web.json"), leer(f"{d}/ig.json")
+print("si" if (w.get("score") is not None or i.get("global")) else "no")
+CALC
+)
+[ "$hay" = "si" ] || fallar "No había nada para auditar: el negocio no tiene sitio cargado ni publicaciones con métricas."
+
 # ── 3) Las recomendaciones, del creativo y sobre los números medidos ──────────────────────────
 PROMPT="Sos el DIRECTOR CREATIVO de ClaUsina. Seguí tu skill (/root/.claude/skills/creativo/SKILL.md).
 
