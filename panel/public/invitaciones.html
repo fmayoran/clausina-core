@@ -285,6 +285,9 @@ const escapar = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
 const DIAS = [[1,'lun'],[2,'mar'],[3,'mié'],[4,'jue'],[5,'vie'],[6,'sáb'],[7,'dom']];
 const ESTADOS = { activa:'activa', en_uso:'en uso', agotada:'agotada', vencida:'vencida', anulada:'anulada' };
 let BENEFICIOS = [], TIPOS = [], TURNOS = [], INV = [], PIEZAS = [];
+// El nombre del negocio: los mensajes salen a su nombre, no al de la plataforma.
+let NEGOCIO = {};
+fetch('api/perfil').then(r => r.json()).then(d => { NEGOCIO = d || {}; }).catch(() => {});
 // El campo propio dd/mm/aaaa: el nativo lee los segmentos en el orden del navegador.
 let FD_VENCE = null;
 
@@ -491,8 +494,12 @@ async function copiarEnlace(c) {
 // Mandarla por WhatsApp desde el panel: abre WhatsApp con el mensaje escrito y el enlace adentro,
 // y la persona elige a quién. Es el camino real de "enviar una invitación en digital".
 function mandarPorWhatsApp(c, texto) {
-  const msg = `Te mando una invitación${texto ? ' — ' + texto : ''}.\n\n${enlaceDe(c)}\n\n` +
-    `Tu código es ${c}. Escribinos por WhatsApp y te reservamos.`;
+  // El mensaje lo escribe el NEGOCIO, no la plataforma, y va corto: lo que se ve grande en la
+  // burbuja es la vista previa del enlace —la pieza diseñada y el nombre del negocio—, así que el
+  // texto sólo tiene que dar el motivo y el código.
+  const quien = (NEGOCIO.nombre || '').toUpperCase();
+  const msg = `Te invitamos a ${quien}${texto ? ': ' + texto : ''}.\n` +
+    `Tu código es ${c}.\n\n${enlaceDe(c)}`;
   window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
 }
 function avisar(t) {

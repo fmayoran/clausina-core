@@ -239,9 +239,48 @@ app.get('/i/:codigo', async (req, res) => {
 // El pase: la invitación en versión imprimible o para mandar por mail. Es pública a propósito —
 // el código YA es el secreto, y quien lo tiene es su dueño. Pedir una sesión para ver la propia
 // invitación no protegería nada y la haría inservible como algo que se reenvía.
+// La invitación digital. WhatsApp, Instagram y el mail no ejecutan el JavaScript de la página:
+// arman la vista previa leyendo las etiquetas Open Graph del HTML crudo. Sin ellas, lo que llega
+// es una línea de texto con el dominio 'panel.clausina.ar' — o sea, la invitación la manda
+// ClaUsina y no el negocio, y la pieza diseñada no aparece por ningún lado.
+//
+// Por eso se inyectan acá, en el servidor: el título lleva el nombre del negocio y la imagen es
+// la pieza que el beneficio definió como frente.
+const PASE_HTML = path.join(__dirname, 'public', 'publico', 'pase.html');
 app.get('/pase/:codigo', async (req, res) => {
   if (!limite(req, res, 60, 60e3)) return;
-  res.sendFile(path.join(__dirname, 'public', 'publico', 'pase.html'));
+  try {
+    const r = await db.consultarInvitacion(String(req.params.codigo));
+    const i = r.invitacion;
+    if (!r.ok || !i) return res.sendFile(PASE_HTML);
+    const n = await db.negocioPublico(i.negocio_slug);
+    const esc = t => String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const negocio = (n && n.nombre) || i.negocio_nombre || '';
+    const titulo = `${negocio} te invita`;
+    const desc = [r.texto, i.beneficio, `Código ${i.codigo}`].filter(Boolean).join(' · ');
+    // La pieza del frente es la invitación diseñada. Sin frente cargado cae al logo, que al
+    // menos identifica al negocio; nunca a una imagen de ClaUsina.
+    const img = i.frente_url || (n && (n.logo_claro || n.logo)) || '';
+    const meta = [
+      `<meta property="og:type" content="website">`,
+      `<meta property="og:site_name" content="${esc(negocio)}">`,
+      `<meta property="og:title" content="${esc(titulo)}">`,
+      `<meta property="og:description" content="${esc(desc)}">`,
+      img ? `<meta property="og:image" content="${esc(img)}">` : '',
+      img ? `<meta property="og:image:alt" content="Invitación de ${esc(negocio)}">` : '',
+      `<meta name="twitter:card" content="${img ? 'summary_large_image' : 'summary'}">`,
+      `<meta name="twitter:title" content="${esc(titulo)}">`,
+      `<meta name="twitter:description" content="${esc(desc)}">`,
+      img ? `<meta name="twitter:image" content="${esc(img)}">` : '',
+      `<meta name="description" content="${esc(desc)}">`,
+    ].filter(Boolean).join('\n');
+    const html = fs.readFileSync(PASE_HTML, 'utf8')
+      .replace('<title>Invitación</title>', `<title>${esc(titulo)}</title>\n${meta}`);
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=300');
+    res.send(html);
+  } catch (e) { console.error('pase og', e.message); res.sendFile(PASE_HTML); }
 });
 
 // El pliego para imprenta: varias invitaciones en A6, frente y dorso. No genera el PDF acá —
