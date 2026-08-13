@@ -1672,6 +1672,15 @@ app.get('/api/auditoria', soloAdmin, async (req, res) => {
   try { res.json(await db.getAuditoria(req.negocioId, req.query.canal)); }
   catch (e) { console.error('auditoria', e.message); res.status(500).json({ error: 'db' }); }
 });
+// Generarla: el panel deja el pedido y un job del host la corre. Tarda minutos.
+app.post('/api/auditoria', soloAdmin, async (req, res) => {
+  try { res.json(await db.pedirAuditoria(req.negocioId, req.usuario && req.usuario.id)); }
+  catch (e) { console.error('pedir auditoria', e.message); res.status(500).json({ ok: false }); }
+});
+app.get('/api/auditoria/estado', soloAdmin, async (req, res) => {
+  try { res.json(await db.estadoAuditoria(req.negocioId) || { estado: null }); }
+  catch (e) { console.error('estado auditoria', e.message); res.status(500).json({ error: 'db' }); }
+});
 
 // Pauta (Meta Marketing API, read-only): último snapshot sincronizado por cf-pauta-sync.
 app.get('/api/pauta', async (req, res) => {

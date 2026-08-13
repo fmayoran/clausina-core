@@ -12,6 +12,18 @@
 <link rel="stylesheet" href="panel.css">
 <script src="vendor/chart.min.js"></script>
 <style>
+  .gen{margin-left:14px;background:var(--pend,#FF6A45);color:#0c0c0a;border:0;border-radius:8px;
+       font-family:'Inter Tight',sans-serif;font-weight:700;padding:7px 15px;cursor:pointer;}
+  .gen:disabled{opacity:.5;cursor:default;}
+  .corriendo{display:flex;align-items:center;gap:11px;border:1px dashed var(--line);
+             border-radius:12px;padding:15px 18px;margin-bottom:18px;}
+  .corriendo .sp{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);
+                 border-top-color:var(--pend,#FF6A45);animation:gira .9s linear infinite;flex:0 0 auto;}
+  @keyframes gira{to{transform:rotate(360deg)}}
+  @media(prefers-reduced-motion:reduce){.corriendo .sp{animation:none}}
+  .malaud{color:#FF6B4A;}
+</style>
+<style>
   .wrap{padding:18px 28px 70px;max-width:1180px;margin:0 auto;}
   .sect{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:26px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line);}
   .sect:first-child{margin-top:6px;}
@@ -48,6 +60,7 @@
     <a class="logo" href=".">CORTA<b>FUEGO</b></a>
     <span class="sub">Auditoría · presencia digital</span>
     <span class="upd" id="upd"></span>
+    <button class="gen" id="b-gen" onclick="generar()">Generar auditoría</button>
     <nav>
       <a href="proyecto">← Proyecto</a>
       <button class="logout" onclick="salir()">Salir</button>
@@ -55,6 +68,7 @@
   </header>
 <div class="shell"><main class="min-w-0">
   <div id="toast"></div>
+  <div id="estado-aud"></div>
   <div class="wrap" id="wrap"><div class="empty">Cargando auditoría…</div></div>
 </main></div>
 <script src="https://unpkg.com/lucide@latest"></script>
@@ -152,7 +166,51 @@ async function load(){
   w.innerHTML = webHTML(web) + igHTML(ig);
   renderWeb(web); renderIg(ig);
 }
+// ── Generarla ────────────────────────────────────────────────────────────────────────────────
+// Tarda minutos: mide la web contra el sitio vivo, calcula la serie de Instagram y recién ahí el
+// creativo escribe. Se avisa el tiempo transcurrido para que no parezca colgada.
+let _poll = null, _esperando = false;
+async function verEstado(){
+  let e = null;
+  try{ e = await fetch('api/auditoria/estado').then(r=>r.json()); }catch(_){ return; }
+  const caja = document.getElementById('estado-aud'), boton = document.getElementById('b-gen');
+  const corriendo = e && (e.estado === 'pendiente' || e.estado === 'procesando');
+  clearInterval(_poll); _poll = null;
+  if(corriendo) _poll = setInterval(verEstado, 8000);
+  if(boton){ boton.disabled = !!corriendo; boton.textContent = corriendo ? 'Generando…' : 'Generar auditoría'; }
+  if(!caja) return;
+  if(corriendo){
+    const min = Math.max(0, Math.floor((Date.now() - new Date(e.iniciado_en || e.creado_en).getTime())/60000));
+    caja.innerHTML = `<div class="corriendo"><span class="sp"></span><div>
+      <b>Auditando la presencia digital</b><br>
+      <span class="upd">Lleva ${min === 0 ? 'menos de un minuto' : min + ' minuto' + (min===1?'':'s')} ·
+      suele tardar entre 3 y 6. Podés cerrar esta ventana: sigue trabajando.</span></div></div>`;
+  } else if(e && e.estado === 'error'){
+    caja.innerHTML = `<div class="corriendo"><span class="malaud">${e.error||'No se pudo generar.'}</span></div>`;
+  } else {
+    caja.innerHTML = '';
+    // Al terminar hay datos nuevos que la pantalla todavía no tiene.
+    if(e && e.estado === 'lista' && _esperando){ _esperando = false; load(); }
+  }
+}
+async function generar(){
+  const boton = document.getElementById('b-gen');
+  boton.disabled = true;
+  try{
+    const r = await fetch('api/auditoria',{method:'POST'}).then(x=>x.json());
+    if(!r.ok){
+      alert(r.error === 'ya_en_curso' ? 'Ya hay una auditoría en camino.' : 'No se pudo pedir la auditoría.');
+      boton.disabled = false; return;
+    }
+    _esperando = true;
+    verEstado();
+  }catch(e){ boton.disabled = false; alert('Error de conexión.'); }
+}
+// El botón vive en el HTML, fuera del cierre: hay que exponerlo.
+window.generar = generar;
+
 load();
+verEstado();
 })();
 </script>
 <script>

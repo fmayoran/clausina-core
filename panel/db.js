@@ -4004,6 +4004,31 @@ async function rechazarLanding(negocioId, id, motivo) {
 }
 
 // --- Auditoría de presencia digital (snapshot más reciente por proyecto/canal) ---
+/**
+ * Pide una auditoría. La corre un job del host: es el único que puede salir a la web y hablar con
+ * la API de Meta. El panel sólo deja el pedido.
+ */
+async function pedirAuditoria(negocioId, usuarioId) {
+  try {
+    const { rows: [r] } = await pool.query(
+      'INSERT INTO contenido.auditoria_req (negocio_id, pedido_por) VALUES ($1,$2) RETURNING id',
+      [negocioId, usuarioId || null]);
+    return { ok: true, id: r.id };
+  } catch (e) {
+    // El único parcial impide dos en curso: pedir de nuevo mientras corre gasta el doble.
+    if (e.code === '23505') return { ok: false, error: 'ya_en_curso' };
+    throw e;
+  }
+}
+
+/** El estado del último pedido, para saber si hay que esperar o si algo falló. */
+async function estadoAuditoria(negocioId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT id, estado, error, resumen, creado_en, iniciado_en, procesado_en
+       FROM contenido.auditoria_req WHERE negocio_id=$1 ORDER BY creado_en DESC LIMIT 1`, [negocioId]);
+  return r || null;
+}
+
 async function getAuditoria(negocioId, canal) {
   const { rows: [r] } = await pool.query(
     `SELECT canal, periodo, kpis, recomendaciones, creada_en FROM contenido.auditorias
@@ -4181,7 +4206,7 @@ module.exports = {
   getPantallaActiva, getPantallaPorSlug, getPantallas, crearPantalla, actualizarPantalla, eliminarPantalla, getProgramaActivo,
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
   getLandingCambios, crearLandingCambio, aprobarLanding, rechazarLanding,
-  getAuditoria, getPauta, getPautaEvolucion, pedirRefrescoPauta,
+  getAuditoria, pedirAuditoria, estadoAuditoria, getPauta, getPautaEvolucion, pedirRefrescoPauta,
   crearSolicitudCampania, getPautaCampanias, aprobarCampania, rechazarCampania, descartarCampania,
   activarCampania, pausarCampania, reintentarCampania, getCreativosDisponibles, setCreativoCampania,
   health };
