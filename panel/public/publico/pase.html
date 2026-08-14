@@ -26,6 +26,15 @@
   .pase{width:min(430px,100%);background:var(--c-suave);border:1px solid var(--c-linea);
         border-radius:20px;padding:30px 28px 26px;text-align:center;position:relative;overflow:hidden;}
   .envoltorio{width:min(430px,100%);}
+  .caras{display:flex;flex-direction:column;}
+  .col{min-width:0;}
+  /* Con ancho suficiente, las dos caras se ven juntas: es una pieza de dos caras, no dos piezas
+     apiladas. El corte está donde dejan de entrar dos tarjetas de 430 con aire en el medio. */
+  @media screen and (min-width:980px){
+    .envoltorio{width:auto;max-width:none;}
+    .caras{flex-direction:row;align-items:flex-start;justify-content:center;gap:30px;}
+    .col{width:430px;flex:0 0 auto;}
+  }
   /* La invitación tiene dos caras: el frente es la pieza gráfica que eligió el beneficio y el
      dorso es este pase. Mostrar sólo el dorso hace parecer que el frente no se guardó. */
   .frente{width:100%;border:1px solid var(--c-linea);border-radius:20px;overflow:hidden;
@@ -103,6 +112,8 @@
     body{padding:0;display:block;background:var(--c-suave);}
     .pase{width:100%;max-width:none;margin:0;box-shadow:none;}
     .cta,.acciones,.otra{display:none !important;}
+    .caras{display:block !important;}
+    .col{width:auto !important;}
     /* El reemplazo del botón en papel: mismo lugar, misma jerarquía, sin nada que tocar. */
     .papel{display:block !important;}
     .envoltorio{width:100%;}
@@ -136,11 +147,15 @@
 </head>
 <body>
 <div class="envoltorio">
-<div id="cara-frente" style="display:none">
+<!-- Las dos caras, una al lado de la otra cuando hay ancho. En un teléfono no: dos A6 en paralelo
+     entran a 160px cada una y no se lee ni el código. -->
+<div class="caras">
+<div class="col" id="cara-frente" style="display:none">
   <div class="cara-rot">Frente</div>
   <div class="frente"><img id="frente-img" alt=""></div>
-  <div class="cara-rot">Dorso</div>
 </div>
+<div class="col">
+<div class="cara-rot" id="rot-dorso" style="display:none">Dorso</div>
 <div class="pase" id="pase" style="display:none">
   <!-- El nombre del negocio no va como texto: ya está en el logo, y repetirlo lo ensucia. -->
   <span id="banda"><img class="logo" id="logo" alt="" style="display:none"></span>
@@ -156,6 +171,8 @@
   <div class="otra" id="otra" style="display:none"></div>
   <div class="pie" id="pie"></div>
   <div class="datos" id="datos"></div>
+</div>
+</div>
 </div>
 <!-- Fuera de la tarjeta: son acciones de quien mira la pantalla, no parte de la invitación, y
      al imprimir no tienen que salir. -->
@@ -268,6 +285,8 @@ function marca(m, claro) {
       $('frente-img').src = j.frente;
       $('frente-img').alt = 'Frente de la invitación' + (j.frente_codigo ? ' (' + j.frente_codigo + ')' : '');
       $('cara-frente').style.display = '';
+      // El rótulo 'Dorso' sólo tiene sentido si hay un frente del que distinguirlo.
+      $('rot-dorso').style.display = '';
     }
     // El nombre del beneficio titula la invitación: "Primeros Clientes" dice para quién es, y
     // "Invitación especial" a secas no distingue una campaña de otra.
