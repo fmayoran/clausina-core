@@ -241,7 +241,9 @@ function igualarCaras() {
   if (!frente || !$('cara-frente') || $('cara-frente').style.display === 'none') return;
   const alto = frente.getBoundingClientRect().height;
   const ancho = marco.getBoundingClientRect().width;
-  if (!alto || !ancho) return;
+  // Menos que eso es que el frente todavía no cargó: igualar contra una altura fantasma dejaría
+  // el dorso reducido al mínimo para siempre.
+  if (alto < 80 || !ancho) return;
   marco.classList.add('marco');
 
   // El truco: la tarjeta se dibuja MÁS ANCHA y después se reduce. Escalar a secas la achicaría
@@ -406,6 +408,12 @@ function marca(m, claro) {
     $('pase').style.display = '';
     igualarCaras();
     addEventListener('resize', igualarCaras);
+    // Y de nuevo cuando la imagen del frente termine de cargar: hasta entonces mide cero y el
+    // cálculo se iba al piso. Es la clase de error que sólo aparece con la red lenta de un
+    // teléfono, así que se cubre siempre.
+    const fimg = $('frente-img');
+    if (fimg) { fimg.addEventListener('load', igualarCaras); fimg.addEventListener('error', igualarCaras); }
+    if (document.fonts) document.fonts.ready.then(igualarCaras);
   } catch (e) {
     $('error').style.display = '';
     $('error').textContent = 'No pude cargar esta invitación.';
