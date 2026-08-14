@@ -1524,13 +1524,16 @@ const TIPOS_BENEFICIO = [
 
 /** Cómo se le dice a una persona lo que le tocó. Se usa igual en el panel, la web y WhatsApp. */
 /**
- * "cubre a 2 de las 4 personas". Devuelve null cuando el beneficio alcanza a toda la mesa: decir
- * "cubre a 4 de 4" es ruido. Vive acá y no en cada pantalla porque el chat, la tarjeta y el panel
- * tienen que decir exactamente lo mismo — es la frase que evita la discusión en la mesa.
+ * "válido para 2 de las 4 personas". Devuelve null cuando el beneficio alcanza a toda la mesa:
+ * decir "para 4 de 4" es ruido. Vive acá y no en cada pantalla porque el chat, la tarjeta y el
+ * panel tienen que decir exactamente lo mismo — es la frase que evita la discusión en la mesa.
+ *
+ * Dice el hecho y se calla. Antes cerraba con "el resto paga completo": era exacto y sonaba a
+ * advertencia justo en el mensaje que confirma una invitación.
  */
 function textoCobertura(cubre, personas) {
   if (!cubre || !personas || personas <= cubre) return null;
-  return `cubre a ${cubre} de las ${personas} personas; el resto paga completo`;
+  return `válido para ${cubre} de las ${personas} personas`;
 }
 
 function textoBeneficio(b, unidad = 'personas') {

@@ -781,7 +781,7 @@ function verReserva(id) {
     ${r.invitacion ? `<dt>Invitación</dt><dd><b>${escapar(r.invitacion.texto)}</b>
         <span class="mono2">· ${escapar(r.invitacion.codigo)} · ${escapar(EST_USO[r.invitacion.estado] || r.invitacion.estado)}</span>
         ${r.invitacion.cobertura ? `<br><span class="mono2" style="color:var(--medio,#E0A458)">
-          El descuento ${escapar(r.invitacion.cobertura)}.</span>` : ''}
+          Descuento ${escapar(r.invitacion.cobertura)}.</span>` : ''}
         </dd>` : ''}
   </dl>`;
   const acc = [];
