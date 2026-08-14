@@ -129,14 +129,19 @@ async function atender(negocio, mensaje) {
   // Un código que existe pero no sirve (agotado, vencido, ya usado) NO es un código que no se
   // entendió: si se lo trata igual, el paso que pide el código contesta "no me figura" después
   // de que acá se dijo el motivo real, y la conversación queda dando vueltas sin avanzar.
-  let rechazo = null;
+  let rechazo = null, codigoTomado = false;
   if (codigo && codigo !== datos.invitacion) {
     const r = await db.consultarInvitacion(codigo, negocio.id, waId).catch(() => null);
     if (r && r.ok) {
       datos = { ...datos, invitacion: codigo };
       if (paso) await db.setConversacion(negocio.id, waId, paso, datos);
-      await decir(cfg, waId, `¡Bien! Tu invitación está activa: ${r.texto}. ` +
-        `La dejo aplicada a esta reserva.`, negocio.id);
+      // El nombre de pila si lo tenemos: quien llega con una invitación suele ser alguien a quien
+      // el negocio ya invitó por su nombre.
+      const cli = await db.clientePorTelefono(negocio.id, waId).catch(() => null);
+      const pila = String((cli && cli.nombre) || mensaje.perfil || '').trim().split(/\s+/)[0] || '';
+      await decir(cfg, waId, `¡Bien${pila ? ', ' + pila : ''}! Tu invitación está activa: ` +
+        `${r.texto}. La dejo aplicada a esta reserva.`, negocio.id);
+      codigoTomado = true;
     } else if (r) {
       rechazo = r.mensaje;
       // En el paso del código, la salida la ofrece ese paso —con sus dos botones—. En cualquier
@@ -149,6 +154,14 @@ async function atender(negocio, mensaje) {
 
   try {
     if (!paso) {
+      // Con una invitación válida en el primer mensaje no hay nada que preguntar: la persona ya
+      // dijo a qué viene. Presentarse ahí —"soy el asistente, ¿en qué te puedo ayudar?"— después
+      // de haberle dicho que le aplicamos la invitación a "esta reserva" suena a que no la
+      // estábamos escuchando. Se va derecho a elegir el día.
+      if (codigoTomado && ofreceReservas) {
+        await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
+        return await elegirDia(cfg, negocio, waId, entrada, datos);
+      }
       // Si el primer mensaje ya es una pregunta que el negocio tiene contestada, se contesta y
       // recién después se ofrece el menú: hacerlo al revés obliga a repetir la pregunta.
       if (await responderFaq(cfg, negocio, waId, entrada, canal)) {
@@ -170,6 +183,8 @@ async function atender(negocio, mensaje) {
       if (!datos.invitacion && await db.invitacionesActivas(negocio.id)) {
         return await preguntarCodigo(cfg, negocio, waId, datos);
       }
+      // Si el código vino pegado en este mismo mensaje, ya se confirmó arriba: preguntar por él
+      // otra vez sería no haber leído lo que acaba de escribir.
       return await elegirDia(cfg, negocio, waId, entrada, datos);
     }
     if (paso === 'codigo') return await recibirCodigo(cfg, negocio, waId, entrada, datos, rechazo);
