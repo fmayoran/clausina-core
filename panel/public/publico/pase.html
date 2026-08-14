@@ -28,6 +28,12 @@
   .envoltorio{width:min(430px,100%);}
   .caras{display:flex;flex-direction:column;}
   .col{min-width:0;}
+  /* Las dos caras son la MISMA pieza: tienen que medir lo mismo. El dorso lleva el doble de
+     contenido que el frente, así que en vez de achicarle la tipografía —que desarma el diseño—
+     se lo muestra a escala, igual que mirar la tarjeta de verdad desde más lejos. El alto lo fija
+     el marco y adentro la pieza se dibuja entera. */
+  .marco{position:relative;width:100%;overflow:hidden;}
+  .marco > .pase{position:absolute;top:0;left:0;transform-origin:top left;}
   /* Con ancho suficiente, las dos caras se ven juntas: es una pieza de dos caras, no dos piezas
      apiladas. El corte está donde dejan de entrar dos tarjetas de 430 con aire en el medio. */
   @media screen and (min-width:980px){
@@ -114,6 +120,8 @@
     .cta,.acciones,.otra{display:none !important;}
     .caras{display:block !important;}
     .col{width:auto !important;}
+    .marco{overflow:visible !important;height:auto !important;}
+    .marco > .pase{position:static !important;transform:none !important;}
     /* El reemplazo del botón en papel: mismo lugar, misma jerarquía, sin nada que tocar. */
     .papel{display:block !important;}
     .envoltorio{width:100%;}
@@ -156,6 +164,7 @@
 </div>
 <div class="col">
 <div class="cara-rot" id="rot-dorso" style="display:none">Dorso</div>
+<div id="marco">
 <div class="pase" id="pase" style="display:none">
   <!-- El nombre del negocio no va como texto: ya está en el logo, y repetirlo lo ensucia. -->
   <span id="banda"><img class="logo" id="logo" alt="" style="display:none"></span>
@@ -171,6 +180,7 @@
   <div class="otra" id="otra" style="display:none"></div>
   <div class="pie" id="pie"></div>
   <div class="datos" id="datos"></div>
+</div>
 </div>
 </div>
 </div>
@@ -214,6 +224,28 @@ async function compartir() {
     $('b-compartir').textContent = 'copiado ✓';
     setTimeout(() => { $('b-compartir').textContent = 'Compartir'; }, 2200);
   } catch (e) {}
+}
+
+/**
+ * Deja el dorso del mismo tamaño que el frente. La escala se calcula acá y no en CSS porque
+ * depende del texto real —una descripción larga necesita más reducción que una corta—.
+ * Hay un piso: por debajo de eso la pieza se vuelve ilegible y es preferible que las dos caras
+ * no midan exactamente lo mismo antes que no se pueda leer el código.
+ */
+const PISO_ESCALA = 0.58;
+function igualarCaras() {
+  const marco = $('marco'), pase = $('pase'), frente = document.querySelector('.frente');
+  if (!marco || !pase) return;
+  marco.classList.remove('marco'); pase.style.transform = ''; marco.style.height = '';
+  if (!frente || !$('cara-frente') || $('cara-frente').style.display === 'none') return;
+  const alto = frente.getBoundingClientRect().height;
+  const ancho = marco.getBoundingClientRect().width;
+  if (!alto || !ancho) return;
+  marco.classList.add('marco');
+  pase.style.width = ancho + 'px';
+  const k = Math.max(PISO_ESCALA, Math.min(1, alto / pase.scrollHeight));
+  pase.style.transform = 'scale(' + k + ')';
+  marco.style.height = Math.round(pase.scrollHeight * k) + 'px';
 }
 
 function marca(m, claro) {
@@ -354,6 +386,8 @@ function marca(m, claro) {
     // Imprimir o compartir una muestra sería repartir un código que no existe.
     if (!MUESTRA) $('acciones').style.display = '';
     $('pase').style.display = '';
+    igualarCaras();
+    addEventListener('resize', igualarCaras);
   } catch (e) {
     $('error').style.display = '';
     $('error').textContent = 'No pude cargar esta invitación.';
