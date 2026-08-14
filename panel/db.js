@@ -1327,7 +1327,7 @@ async function getReservas(negocioId, { desde, hasta, estado } = {}) {
       // A cuánta gente de la mesa alcanza el descuento. Sólo se dice cuando la mesa es más
       // grande que la cobertura: es ahí donde quien cobra tiene que hacer la cuenta distinta.
       cubre: r.invitacion_cubre || null,
-      cubre_parcial: !!(r.invitacion_cubre && r.cantidad > r.invitacion_cubre),
+      cobertura: textoCobertura(r.invitacion_cubre, r.cantidad),
     } : null,
   }));
 }
@@ -1523,6 +1523,16 @@ const TIPOS_BENEFICIO = [
 ];
 
 /** Cómo se le dice a una persona lo que le tocó. Se usa igual en el panel, la web y WhatsApp. */
+/**
+ * "cubre a 2 de las 4 personas". Devuelve null cuando el beneficio alcanza a toda la mesa: decir
+ * "cubre a 4 de 4" es ruido. Vive acá y no en cada pantalla porque el chat, la tarjeta y el panel
+ * tienen que decir exactamente lo mismo — es la frase que evita la discusión en la mesa.
+ */
+function textoCobertura(cubre, personas) {
+  if (!cubre || !personas || personas <= cubre) return null;
+  return `cubre a ${cubre} de las ${personas} personas; el resto paga completo`;
+}
+
 function textoBeneficio(b, unidad = 'personas') {
   if (!b) return '';
   const n = Number(b.valor);
@@ -2005,6 +2015,7 @@ async function reservaTarjeta(negocioId, reservaId) {
             pp.logo, pp.logo_claro, p.nombre AS negocio, p.dominio_web, p.ig_handle,
             COALESCE(ni.marca, '{}'::jsonb) AS marca,
             i.codigo AS invitacion_codigo, b.tipo AS invitacion_tipo, b.valor AS invitacion_valor,
+            (b.condiciones->>'cantidad_max')::int AS invitacion_cubre,
             -- La tarjeta de una reserva CON invitación tiene que verse como la invitación que la
             -- persona ya tiene en la mano: mismo tema, mismos colores. Sin invitación es una
             -- pieza de marca y va sobre el fondo del negocio.
@@ -2038,7 +2049,9 @@ async function reservaTarjeta(negocioId, reservaId) {
     marca: r.marca || {}, sede: sede || null,
     web: r.dominio_web || null, instagram: r.ig_handle || null,
     invitacion: r.invitacion_codigo
-      ? { codigo: r.invitacion_codigo, texto: textoBeneficio({ tipo: r.invitacion_tipo, valor: r.invitacion_valor }) }
+      ? { codigo: r.invitacion_codigo,
+          texto: textoBeneficio({ tipo: r.invitacion_tipo, valor: r.invitacion_valor }),
+          cobertura: textoCobertura(r.invitacion_cubre, r.cantidad) }
       : null,
   };
 }
@@ -4182,7 +4195,7 @@ module.exports = {
   ENGANCHES, ENGANCHE_POR_TIPO,
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
   completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, clientePorTelefono,
-  TIPOS_BENEFICIO, textoBeneficio, getBeneficios, guardarBeneficio,
+  TIPOS_BENEFICIO, textoBeneficio, textoCobertura, getBeneficios, guardarBeneficio,
   muestraBeneficio, canjearEnMostrador,
 
   getSkills, getSkill, guardarSkill, getSkillHistorial, getSkillVersion,

@@ -500,7 +500,11 @@ async function confirmar(cfg, negocio, waId, entrada, datos) {
   // sin plantilla y en el momento.
   // Se repite el beneficio en la confirmación: es lo que la persona va a mostrar al llegar, y
   // tenerlo por escrito en el chat evita la discusión en la mesa.
-  const conInv = r.invitacion ? `\nInvitación aplicada: ${r.invitacion.texto}` : '';
+  // Y con la cobertura pegada: "100% de descuento" a secas, en una mesa de 4 con una invitación
+  // para 2, es una promesa que el mostrador después tiene que desdecir.
+  const cob = r.invitacion && db.textoCobertura(r.invitacion.cubre, r.invitacion.personas);
+  const conInv = r.invitacion
+    ? `\nInvitación aplicada: ${r.invitacion.texto}${cob ? ` — ${cob}` : ''}` : '';
   await decir(cfg, waId, r.estado === 'confirmada'
     ? `¡Listo! Reserva confirmada en ${negocio.nombre}.\n\n${cuando}\n${cant}\nA nombre de ${nombre}${conInv}\n\nTe esperamos.`
     : `Anotado. Tu pedido quedó registrado en ${negocio.nombre}.\n\n${cuando}\n${cant}\nA nombre de ${nombre}${conInv}\n\nQueda pendiente de confirmación; te aviso por acá.`,

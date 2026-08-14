@@ -42,6 +42,9 @@
   .beneficio{margin-top:42px;border:2px dashed var(--c-linea);border-radius:24px;
              padding:24px 40px 28px;}
   .beneficio .que{font-family:var(--f-tit);font-weight:700;font-size:38px;line-height:1.25;}
+  /* A cuánta gente alcanza. Pegado al monto y no al pie: "100% de descuento" solo, en una mesa de
+     cuatro con una invitación para dos, es una promesa que el mostrador tiene que desdecir. */
+  .beneficio .cubre{display:block;margin-top:8px;font-size:22px;line-height:1.35;opacity:.8;}
   /* El código es lo que van a pedir en el mostrador: sin él la tarjeta no valida nada. */
   .beneficio .codigo{display:block;margin-top:10px;font-family:'JetBrains Mono',monospace;
           font-weight:700;font-size:44px;letter-spacing:.08em;color:var(--c-acento);}
@@ -124,6 +127,7 @@ function marca(m, claro) {
   if (j.invitacion) {
     $('beneficio').innerHTML =
       '<div class="que">' + esc(j.invitacion.texto) + '</div>' +
+      (j.invitacion.cobertura ? '<span class="cubre">' + esc(j.invitacion.cobertura) + '</span>' : '') +
       '<span class="codigo">' + esc(j.invitacion.codigo.replace(/^(.{3})(.{3})$/, '$1-$2')) + '</span>';
     $('beneficio').style.display = '';
   }

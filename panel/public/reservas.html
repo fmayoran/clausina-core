@@ -780,8 +780,8 @@ function verReserva(id) {
     ${fila('Cargada', cuando(r.creado_en))}
     ${r.invitacion ? `<dt>Invitación</dt><dd><b>${escapar(r.invitacion.texto)}</b>
         <span class="mono2">· ${escapar(r.invitacion.codigo)} · ${escapar(EST_USO[r.invitacion.estado] || r.invitacion.estado)}</span>
-        ${r.invitacion.cubre_parcial ? `<br><span class="mono2" style="color:var(--medio,#E0A458)">
-          El descuento cubre ${r.invitacion.cubre} de ${r.cantidad} personas — el resto paga completo.</span>` : ''}
+        ${r.invitacion.cobertura ? `<br><span class="mono2" style="color:var(--medio,#E0A458)">
+          El descuento ${escapar(r.invitacion.cobertura)}.</span>` : ''}
         </dd>` : ''}
   </dl>`;
   const acc = [];
