@@ -232,18 +232,30 @@ async function compartir() {
  * Hay un piso: por debajo de eso la pieza se vuelve ilegible y es preferible que las dos caras
  * no midan exactamente lo mismo antes que no se pueda leer el código.
  */
-const PISO_ESCALA = 0.58;
+const PISO_ESCALA = 0.5;
 function igualarCaras() {
   const marco = $('marco'), pase = $('pase'), frente = document.querySelector('.frente');
   if (!marco || !pase) return;
-  marco.classList.remove('marco'); pase.style.transform = ''; marco.style.height = '';
+  marco.classList.remove('marco'); pase.style.transform = ''; pase.style.width = '';
+  marco.style.height = '';
   if (!frente || !$('cara-frente') || $('cara-frente').style.display === 'none') return;
   const alto = frente.getBoundingClientRect().height;
   const ancho = marco.getBoundingClientRect().width;
   if (!alto || !ancho) return;
   marco.classList.add('marco');
-  pase.style.width = ancho + 'px';
-  const k = Math.max(PISO_ESCALA, Math.min(1, alto / pase.scrollHeight));
+
+  // El truco: la tarjeta se dibuja MÁS ANCHA y después se reduce. Escalar a secas la achicaría
+  // también de ancho —quedaría una tarjetita al costado, no la misma pieza—. Dibujada al doble
+  // de ancho y reducida a la mitad, el ancho visible es el mismo y el alto entra.
+  // Se itera porque al ensancharla el texto ocupa menos renglones y hace falta menos reducción.
+  let k = 1;
+  for (let i = 0; i < 4; i++) {
+    pase.style.width = (ancho / k) + 'px';
+    const nuevo = Math.max(PISO_ESCALA, Math.min(1, alto / pase.scrollHeight * k));
+    if (Math.abs(nuevo - k) < 0.005) { k = nuevo; break; }
+    k = nuevo;
+  }
+  pase.style.width = (ancho / k) + 'px';
   pase.style.transform = 'scale(' + k + ')';
   marco.style.height = Math.round(pase.scrollHeight * k) + 'px';
 }
