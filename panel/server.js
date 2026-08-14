@@ -248,9 +248,12 @@ app.get('/api/publico/og/:id', async (req, res) => {
   try {
     const m = await db.muestraBeneficio(null, String(req.params.id));
     if (!m) return res.status(404).json({ ok: false });
+    const sede = m.sede ? [m.sede.direccion, m.sede.localidad].filter(Boolean).join(', ') : null;
     res.json({ ok: true, negocio: m.negocio, nombre: m.nombre, texto: m.texto, tema: m.tema,
+               descripcion: m.descripcion, condiciones: m.condiciones,
                logo: m.logo, logo_claro: m.logo_claro, marca: m.marca,
-               whatsapp: m.whatsapp, web: m.web, frente: m.frente_prev || m.frente });
+               whatsapp: m.whatsapp, web: m.web, sede,
+               frente: m.frente_prev || m.frente });
   } catch (e) { console.error('og', e.message); res.status(500).json({ ok: false }); }
 });
 

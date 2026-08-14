@@ -7,46 +7,59 @@
 <link id="fuentes" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;700;800&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   /* 1200x630 exactos: es la medida que WhatsApp, Instagram y el mail muestran a ancho completo.
-     Una vertical la tratan como adjunto —miniatura al costado— y la pieza se pierde. */
+     Una vertical la tratan como adjunto —miniatura al costado— y la pieza se pierde.
+     Adentro van las DOS caras de la invitación, lado a lado: es la pieza entera de un vistazo,
+     como si te la pusieran sobre la mesa dada vuelta. */
   :root{--f-tit:'Inter Tight',sans-serif;--f-txt:'Inter',sans-serif;
-        --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-suave:#1b1b21;--c-linea:#2a2a33;}
+        --c-fondo:#101014;--c-tinta:#F5F2EC;--c-acento:#CCF24D;--c-suave:#1b1b21;--c-linea:#2a2a33;
+        --c-filete:rgba(255,255,255,.34);}
   :root[data-tema="claro"]{--c-fondo:#F2F0EA;--c-tinta:#15150F;--c-acento:#B33A00;
-                           --c-suave:#FFFFFF;--c-linea:#DCD8CC;}
+                           --c-suave:#FFFFFF;--c-linea:#DCD8CC;--c-filete:rgba(0,0,0,.3);}
   *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  body{width:1200px;height:630px;overflow:hidden;background:var(--c-suave);
-       font-family:var(--f-txt);color:var(--c-tinta);}
-  #og{width:1200px;height:630px;display:grid;grid-template-columns:472px 1fr;}
-  /* El arte, a sangre contra el borde izquierdo: es lo primero que se ve en la burbuja. */
-  .arte{position:relative;overflow:hidden;background:var(--c-fondo);}
-  .arte img{width:100%;height:100%;object-fit:cover;display:block;}
-  .arte::after{content:'';position:absolute;inset:0;box-shadow:inset -1px 0 0 var(--c-linea);}
-  .lado{padding:56px 58px;display:flex;flex-direction:column;justify-content:center;gap:0;}
-  .logo{max-height:78px;max-width:62%;width:auto;display:block;margin-bottom:30px;}
-  /* La banda sólo si el logo no tiene versión clara: sobre papel blanco un logo blanco se borra. */
-  .banda{background:var(--c-marca-fondo,#101014);border-radius:12px;padding:16px 22px;
-         display:inline-block;max-width:70%;margin-bottom:30px;}
+  body{width:1200px;height:630px;overflow:hidden;font-family:var(--f-txt);color:var(--c-tinta);}
+  /* El fondo es el de la marca, no el de la tarjeta: las dos caras tienen que despegarse. */
+  #og{width:1200px;height:630px;background:var(--c-fondo);display:flex;align-items:center;
+      justify-content:center;gap:36px;padding:40px;}
+  /* Proporción A6, la misma que se imprime: 105x148. */
+  .cara{width:390px;height:550px;background:var(--c-suave);position:relative;overflow:hidden;
+        border-radius:6px;box-shadow:0 14px 40px rgba(0,0,0,.35);}
+  .cara::after{content:'';position:absolute;inset:7px;border:1px solid var(--c-filete);
+               pointer-events:none;}
+  .frente{padding:7px;background:var(--c-fondo);}
+  .frente img{width:100%;height:100%;object-fit:cover;display:block;border:1px solid var(--c-filete);}
+  .frente .vacio{width:100%;height:100%;display:grid;place-items:center;color:var(--c-tinta);
+                 opacity:.25;font-family:'JetBrains Mono',monospace;font-size:12px;}
+  /* El dorso: los mismos elementos y el mismo orden que la invitación real, a escala. */
+  .dorso{display:flex;flex-direction:column;align-items:center;text-align:center;
+         padding:26px 24px 22px;}
+  .logo{max-height:52px;max-width:66%;width:auto;display:block;margin-bottom:14px;}
+  .banda{background:var(--c-marca-fondo,#101014);border-radius:8px;padding:9px 14px;
+         display:inline-block;max-width:80%;margin-bottom:14px;}
   .banda .logo{margin:0;max-width:100%;}
-  .rot{font-family:'JetBrains Mono',monospace;font-size:15px;letter-spacing:.24em;
-       text-transform:uppercase;color:var(--c-acento);margin-bottom:14px;}
-  .tit{font-family:var(--f-tit);font-weight:800;font-size:52px;line-height:1.03;
-       letter-spacing:-.01em;text-wrap:balance;}
-  .ben{font-family:var(--f-tit);font-weight:700;font-size:38px;line-height:1.15;
-       color:var(--c-acento);margin-top:18px;}
-  /* Pegado al bloque, no al fondo: con margin-top:auto quedaba un hueco enorme en el medio. */
-  .pie{margin-top:30px;font-family:'JetBrains Mono',monospace;font-size:16px;
-       line-height:1.8;color:var(--c-tinta);opacity:.72;}
-  .sinarte{display:grid;place-items:center;color:var(--c-tinta);opacity:.25;
-           font-family:'JetBrains Mono',monospace;font-size:13px;}
+  .rot{font-family:var(--f-tit);font-weight:800;font-size:16px;line-height:1.15;
+       text-transform:uppercase;color:var(--c-acento);text-wrap:balance;}
+  .desc{font-size:11.5px;font-weight:700;line-height:1.4;opacity:.9;margin-top:8px;}
+  .ben{font-family:var(--f-tit);font-weight:700;font-size:25px;line-height:1.15;
+       color:var(--c-acento);margin-top:12px;}
+  .cond{font-family:'JetBrains Mono',monospace;font-size:9.5px;line-height:1.7;opacity:.75;
+        margin-top:12px;}
+  .wa{margin-top:16px;font-family:var(--f-tit);font-weight:700;font-size:14px;line-height:1.45;}
+  .wa b{font-family:'JetBrains Mono',monospace;font-size:15px;color:var(--c-acento);
+        letter-spacing:.03em;display:block;margin-top:2px;}
+  .pie{margin-top:auto;font-family:'JetBrains Mono',monospace;font-size:8.5px;line-height:1.7;
+       opacity:.6;}
 </style>
 </head>
 <body>
 <div id="og">
-  <div class="arte" id="arte"><div class="sinarte">—</div></div>
-  <div class="lado">
+  <div class="cara frente" id="frente"><div class="vacio">—</div></div>
+  <div class="cara dorso">
     <span id="banda"><img class="logo" id="logo" alt="" style="display:none"></span>
     <div class="rot" id="rot">Invitación especial</div>
-    <div class="tit" id="tit"></div>
+    <div class="desc" id="desc"></div>
     <div class="ben" id="ben"></div>
+    <div class="cond" id="cond"></div>
+    <div class="wa" id="wa"></div>
     <div class="pie" id="pie"></div>
   </div>
 </div>
@@ -64,8 +77,10 @@ function marca(m, claro) {
   const set = (v, k) => { if (m[k]) r.setProperty(v, m[k]); };
   if (m.fondo) r.setProperty('--c-marca-fondo', m.fondo);
   set('--c-acento', 'acento');
-  if (!claro) { set('--c-fondo', 'fondo'); set('--c-tinta', 'texto');
-                set('--c-suave', 'superficie'); set('--c-linea', 'linea'); }
+  // El fondo de la marca se usa SIEMPRE de lienzo, aunque la tarjeta sea clara: es lo que hace
+  // que las dos caras se despeguen en la burbuja en vez de fundirse con el blanco.
+  if (m.fondo) r.setProperty('--c-fondo', m.fondo);
+  if (!claro) { set('--c-tinta', 'texto'); set('--c-suave', 'superficie'); set('--c-linea', 'linea'); }
   const fams = [m.fuente_titulo, m.fuente_texto].filter(Boolean);
   if (fams.length) {
     const q = fams.map(f => 'family=' + encodeURIComponent(f).replace(/%20/g, '+') + ':wght@400;600;700;800').join('&');
@@ -87,20 +102,21 @@ function marca(m, claro) {
     $('logo').src = src; $('logo').alt = j.negocio; $('logo').style.display = '';
     if (claro && !j.logo_claro) $('banda').className = 'banda';
   }
-  // El nombre del negocio manda: es lo que tiene que quedar claro de un vistazo en la burbuja.
-  $('tit').textContent = j.negocio + ' te invita';
+  $('rot').textContent = 'Invitación especial' + (j.nombre ? ' · ' + j.nombre : '');
+  if (j.descripcion) $('desc').textContent = j.descripcion;
   $('ben').textContent = j.texto || '';
-  if (j.nombre) $('rot').textContent = 'Invitación especial · ' + j.nombre;
-  const pie = [];
-  if (j.whatsapp) pie.push('Reservá por WhatsApp ' + j.whatsapp);
-  if (j.web) pie.push(j.web);
-  $('pie').innerHTML = pie.map(esc).join('<br>');
-  if (j.frente) $('arte').innerHTML = '<img src="' + esc(j.frente) + '" alt="">';
+  // El código NO va: esta pieza es del beneficio y la comparten todas sus invitaciones. El código
+  // es personal y viaja en el mensaje y en la invitación que se abre.
+  $('cond').innerHTML = ((j.condiciones || {}).frases || []).map(esc).join('<br>');
+  if (j.whatsapp) $('wa').innerHTML = 'Reservá por WhatsApp<br><b>' + esc(j.whatsapp) + '</b>';
+  const pie = [j.sede, j.web].filter(Boolean).map(esc);
+  $('pie').innerHTML = pie.join(' · ');
+  if (j.frente) $('frente').innerHTML = '<img src="' + esc(j.frente) + '" alt="">';
 
   // El renderer espera esta marca: sin ella fotografía la pieza antes de que carguen la fuente de
   // la marca o el arte, y sale una imagen a medio dibujar.
   const listo = () => { document.body.dataset.listo = '1'; };
-  const img = document.querySelector('.arte img');
+  const img = document.querySelector('.frente img');
   await (document.fonts ? document.fonts.ready : Promise.resolve());
   if (img && !img.complete) img.onload = listo; else listo();
 })();
