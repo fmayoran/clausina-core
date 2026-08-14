@@ -247,17 +247,23 @@ function igualarCaras() {
   // El truco: la tarjeta se dibuja MÁS ANCHA y después se reduce. Escalar a secas la achicaría
   // también de ancho —quedaría una tarjetita al costado, no la misma pieza—. Dibujada al doble
   // de ancho y reducida a la mitad, el ancho visible es el mismo y el alto entra.
-  // Se itera porque al ensancharla el texto ocupa menos renglones y hace falta menos reducción.
-  let k = 1;
-  for (let i = 0; i < 4; i++) {
-    pase.style.width = (ancho / k) + 'px';
-    const nuevo = Math.max(PISO_ESCALA, Math.min(1, alto / pase.scrollHeight * k));
-    if (Math.abs(nuevo - k) < 0.005) { k = nuevo; break; }
-    k = nuevo;
-  }
+  // Búsqueda por bisección y no un despeje: el alto del texto no es una función lineal del ancho
+  // —una palabra que entra o no entra en el renglón lo cambia de golpe—, así que iterar sobre la
+  // fórmula oscila en vez de converger.
+  const altoCon = (k) => { pase.style.width = (ancho / k) + 'px'; return pase.scrollHeight * k; };
+  let lo = PISO_ESCALA, hi = 1;
+  if (altoCon(hi) > alto) {
+    for (let i = 0; i < 12 && hi - lo > 0.004; i++) {
+      const mid = (lo + hi) / 2;
+      if (altoCon(mid) > alto) hi = mid; else lo = mid;
+    }
+  } else { lo = hi; }
+  const k = lo;
   pase.style.width = (ancho / k) + 'px';
   pase.style.transform = 'scale(' + k + ')';
-  marco.style.height = Math.round(pase.scrollHeight * k) + 'px';
+  // El marco toma el alto del frente, no el de la pieza escalada: los últimos píxeles de
+  // diferencia se resuelven acá y las dos caras quedan exactamente iguales.
+  marco.style.height = Math.round(k < 1 ? alto : pase.scrollHeight) + 'px';
 }
 
 function marca(m, claro) {
