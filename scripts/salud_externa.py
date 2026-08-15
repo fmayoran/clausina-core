@@ -226,6 +226,51 @@ def _legible(msg):
     return m[:140]
 
 
+# Cómo se arregla cada cosa. Va acá y no en la pantalla porque el chequeo es el que sabe QUÉ
+# falló: el panel sólo lo muestra. Un aviso que dice "el token venció" y no dice dónde se renueva
+# obliga a buscar en el historial de un chat cada vez que pasa — y pasa cada 60 días.
+GUIAS = {
+    "instagram_vencido": [
+        "Entrá a developers.facebook.com con la cuenta que administra la app.",
+        "Elegí la app y andá a Instagram → Configuración de la API con inicio de sesión de Instagram.",
+        "En «Generar tokens de acceso» elegí la cuenta del negocio y generá uno nuevo.",
+        "Copialo (empieza con IGAA) y pegalo en el panel: Comunicación → Instagram → Configurar → Token.",
+        "Al guardar, el panel avisa solo a n8n, que publica con una copia de ese token.",
+    ],
+    "whatsapp_vencido": [
+        "Entrá a developers.facebook.com → tu app → WhatsApp → Configuración de la API.",
+        "Generá un token permanente desde el usuario del sistema en Business Settings.",
+        "Pegalo en el panel: Comunicación → WhatsApp → Configurar → Token.",
+    ],
+    "ads_vencido": [
+        "Entrá a business.facebook.com → Configuración del negocio → Usuarios del sistema.",
+        "Generá un token nuevo con permisos ads_read para la cuenta publicitaria del negocio.",
+        "Pegalo en el panel: Pauta → Configurar → Credenciales de Ads.",
+    ],
+    "higgsfield": [
+        "En el VPS, corré: higgsfield auth login",
+        "Abrí el link que imprime, autorizá con la cuenta del plan, y volvé a la consola.",
+        "El chequeo se pone en verde en la próxima corrida (cada 20 minutos).",
+    ],
+}
+
+
+def _guia(nombre, msg):
+    """Qué pasos siguen para arreglarlo. Depende del servicio Y del error: un token vencido y una
+    red caída no se arreglan igual, y ofrecer los pasos equivocados es peor que no ofrecer nada."""
+    m = (msg or "").lower()
+    vencido = "expired" in m or "invalid oauth" in m or "cannot parse" in m or "venció" in m or "no es válido" in m
+    if not vencido:
+        return []
+    if nombre.startswith("Instagram"):
+        return GUIAS["instagram_vencido"]
+    if nombre.startswith("WhatsApp"):
+        return GUIAS["whatsapp_vencido"]
+    if nombre.startswith("Meta Ads"):
+        return GUIAS["ads_vencido"]
+    return []
+
+
 def _grupo(nombre, items, vacio):
     """Un servicio con varios negocios: el estado del grupo es el peor de sus negocios. Si uno
     de cinco está caído, el grupo NO puede decir 'ok' — es justo el que hay que mirar."""
@@ -234,8 +279,11 @@ def _grupo(nombre, items, vacio):
     caidos = [(n, m) for n, e, m in items if e == CAIDO]
     detalle = [f"{n['nombre']}: {_legible(m)}" for n, m in caidos]
     if caidos:
+        # La guía sale del primer caído: cuando fallan varios suele ser el mismo motivo, y dos
+        # instructivos distintos en el mismo cartel no los lee nadie.
         return {"chequeo": nombre, "estado": CAIDO,
-                "mensaje": f"{len(caidos)} de {len(items)} con problemas", "detalle": detalle}
+                "mensaje": f"{len(caidos)} de {len(items)} con problemas", "detalle": detalle,
+                "guia": _guia(nombre, caidos[0][1])}
     return {"chequeo": nombre, "estado": OK,
             "mensaje": " · ".join(f"{n['nombre']}: {m}" for n, _, m in items)[:180], "detalle": []}
 
@@ -250,7 +298,10 @@ def main():
             e, m, d = fn()
         except Exception as ex:
             e, m, d = AVISO, f"el chequeo falló: {str(ex)[:90]}", []
-        res.append({"chequeo": nombre, "estado": e, "mensaje": m, "detalle": d})
+        # Higgsfield sin credencial es el caso que dio origen a todo este chequeo: dos semanas
+        # caído. Que el aviso traiga los pasos evita el viaje al historial del chat.
+        guia = GUIAS["higgsfield"] if (e == CAIDO and nombre.startswith("Higgsfield")) else []
+        res.append({"chequeo": nombre, "estado": e, "mensaje": m, "detalle": d, "guia": guia})
 
     try:
         meta = chk_meta(negocios)

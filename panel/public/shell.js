@@ -272,7 +272,11 @@
         '<span class="mono text-[11px]" style="color:#E0503A;line-height:1.7">' +
         '<b>' + (malos.length === 1 ? 'Un servicio caído' : malos.length + ' servicios caídos') +
         ': ' + que + '.</b> Mientras esté así no se publica ni se mide. ' +
-        'Ver en la Sala de máquinas →</span></a>');
+        // El cartel dice qué pasa; los pasos están del otro lado del enlace. Prometerlos acá es
+        // lo que hace que valga la pena entrar.
+        ((malos.some(function (x) { return (x.guia || []).length; }))
+          ? 'Ver cómo se arregla →' : 'Ver en la Sala de máquinas →') +
+        '</span></a>');
     }).catch(function () {});
   }
 

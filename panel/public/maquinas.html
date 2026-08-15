@@ -406,6 +406,11 @@ setInterval(cargar,20000);
         <div style="min-width:0"><div class="text-sm">${c.chequeo}</div>
           <div class="mono text-[11px] text-pmut dark:text-mut" style="line-height:1.5">${(c.mensaje||'').replace(/</g,'&lt;')}</div>
           ${(c.detalle||[]).slice(0,5).map(x=>`<div class="mono text-[10px]" style="color:${col[c.estado]||col.fallo};line-height:1.5">— ${String(x).replace(/</g,'&lt;')}</div>`).join('')}
+          ${(c.guia||[]).length ? `<details style="margin-top:7px">
+            <summary class="mono text-[10px]" style="cursor:pointer;color:var(--pmut,#8A8F98)">Cómo se arregla</summary>
+            <ol class="mono text-[10px]" style="margin:6px 0 2px 16px;line-height:1.75;color:var(--pfg,#ECEEF0)">
+              ${c.guia.map(g=>`<li>${String(g).replace(/</g,'&lt;')}</li>`).join('')}
+            </ol></details>` : ''}
         </div></div>`).join('');
 })();
 </script>
