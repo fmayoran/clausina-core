@@ -265,18 +265,33 @@
       if (!malos.length) return;
       var main = shell.querySelector('main'); if (!main) return;
       var que = malos.map(function (x) { return String(x.chequeo || '').split('·')[0].trim(); }).join(', ');
-      main.insertAdjacentHTML('afterbegin',
-        '<a href="maquinas" class="flex items-start gap-3 mb-5 rounded-xl px-4 py-3 no-underline" ' +
+      var det = malos.reduce(function (a, x) { return a.concat(x.detalle || []); }, []);
+      // Los pasos van ACÁ, no del otro lado de un enlace. Mandarlo a la Sala de máquinas —que
+      // tiene el circuito, los signos vitales y la integridad— para encontrar cinco renglones es
+      // hacerle buscar la aguja: el problema se arregla donde se ve.
+      var pasos = malos.reduce(function (a, x) { return a.concat(x.guia || []); }, []);
+      var C = '#E0503A';
+      var html = '<div class="mb-5 rounded-xl px-4 py-3" ' +
         'style="border:1px solid rgba(196,68,42,.35);background:rgba(196,68,42,.09)">' +
-        '<span style="color:#E0503A;font-size:15px;line-height:1.3">●</span>' +
-        '<span class="mono text-[11px]" style="color:#E0503A;line-height:1.7">' +
+        '<div class="flex items-start gap-3">' +
+        '<span style="color:' + C + ';font-size:15px;line-height:1.3">●</span>' +
+        '<div class="mono text-[11px]" style="color:' + C + ';line-height:1.7">' +
         '<b>' + (malos.length === 1 ? 'Un servicio caído' : malos.length + ' servicios caídos') +
-        ': ' + que + '.</b> Mientras esté así no se publica ni se mide. ' +
-        // El cartel dice qué pasa; los pasos están del otro lado del enlace. Prometerlos acá es
-        // lo que hace que valga la pena entrar.
-        ((malos.some(function (x) { return (x.guia || []).length; }))
-          ? 'Ver cómo se arregla →' : 'Ver en la Sala de máquinas →') +
-        '</span></a>');
+        ': ' + que + '.</b> Mientras esté así no se publica ni se mide.' +
+        det.map(function (x) {
+          return '<br><span style="opacity:.85">' + String(x).replace(/</g, '&lt;') + '</span>';
+        }).join('') +
+        '</div></div>';
+      if (pasos.length) {
+        html += '<details style="margin:8px 0 0 27px">' +
+          '<summary class="mono text-[11px]" style="cursor:pointer;color:' + C + '">Cómo se arregla</summary>' +
+          '<ol class="mono text-[11px] text-pfg dark:text-fg" style="margin:7px 0 3px 16px;line-height:1.85">' +
+          pasos.map(function (g) { return '<li>' + String(g).replace(/</g, '&lt;') + '</li>'; }).join('') +
+          '</ol></details>';
+      }
+      html += '<div class="mono text-[10px]" style="margin:8px 0 0 27px">' +
+        '<a href="maquinas" class="text-pmut dark:text-mut hover:underline">Ver el estado completo en la Sala de máquinas →</a></div>';
+      main.insertAdjacentHTML('afterbegin', html + '</div>');
     }).catch(function () {});
   }
 
