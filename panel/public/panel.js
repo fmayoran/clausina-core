@@ -982,8 +982,12 @@ initMarca();
    perfil, así que mandar un cuerpo parcial borraría el brief, el estilo y los
    contactos. Por eso se relee el perfil completo y se fusionan sólo los campos
    editados justo antes de escribir. */
+// TODO lo que guardarPerfil escribe tiene que viajar: el backend pisa todas las columnas, así
+// que un campo que falta acá se guarda vacío. Faltaban referencias_md y logo_claro, y como el
+// brief y las referencias pasan por la guarda de recorte, el guardado fallaba ENTERO —con el
+// aviso tapado por el modal, parecía que no hacía nada—.
 const CFG_CAMPOS_TODOS = ['nombre','slogan','ig_handle','dominio_web','email','whatsapp',
-  'ig_user_id','telegram_chat_id','logo','brief_md','estilo_md',
+  'ig_user_id','telegram_chat_id','logo','logo_claro','brief_md','estilo_md','referencias_md',
   'meta_ads_account_id','meta_ads_page_id','meta_ads_ig_id'];
 async function cfgCargar(ids, tokens) {
   try {
@@ -1010,8 +1014,11 @@ async function cfgGuardar(ids, tokens) {
     });
     const d = await fetch('api/perfil', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body) }).then(r => r.json());
-    toast(d.ok ? 'Configuración guardada'
-      : (d.error === 'no_enc_key' ? 'Falta configurar APP_ENC_KEY en el panel' : 'No se pudo guardar'), !d.ok);
+    // El motivo real, no un "no se pudo": el error que llegaba era el de la guarda de textos
+    // largos y no había forma de saberlo desde la pantalla.
+    const porque = { no_enc_key: 'Falta configurar APP_ENC_KEY en el panel',
+                     recorte_grande: 'No se guardó: el pedido llegaba con el brief vacío' }[d.error];
+    toast(d.ok ? 'Configuración guardada' : (porque || ('No se pudo guardar' + (d.error ? ' (' + d.error + ')' : ''))), !d.ok);
     return !!d.ok;
   } catch (e) { toast('Error de conexión', true); return false; }
 }

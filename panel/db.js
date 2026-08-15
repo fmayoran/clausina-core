@@ -885,9 +885,23 @@ async function guardarPerfil(negocioId, d) {
     if (nn(d.ig_token)) igTokEnc = cryptoAds.encrypt(nn(d.ig_token));
   }
   if (nn(d.nombre)) await pool.query('UPDATE contenido.negocios SET nombre=$2 WHERE id=$1', [negocioId, nn(d.nombre)]);
+  // Un campo que NO viene en el pedido no se toca; uno que viene vacío sí se borra, que es lo que
+  // pasa cuando alguien limpia el campo a propósito. La diferencia importa: los modales chicos
+  // mandan sólo lo suyo, y sin esto guardar el token de Instagram borraba el IG User ID.
+  const q = (k) => (d[k] === undefined ? undefined : nn(d[k]));
   await pool.query(
-    `UPDATE contenido.negocios SET ig_handle=$2, dominio_web=$3, ig_user_id=$4, telegram_chat_id=$5, email=$6, whatsapp=$7 WHERE id=$1`,
-    [negocioId, nn(d.ig_handle), nn(d.dominio_web), nn(d.ig_user_id), nn(d.telegram_chat_id), nn(d.email), nn(d.whatsapp)]);
+    `UPDATE contenido.negocios SET
+       ig_handle = CASE WHEN $8 THEN $2 ELSE ig_handle END,
+       dominio_web = CASE WHEN $9 THEN $3 ELSE dominio_web END,
+       ig_user_id = CASE WHEN $10 THEN $4 ELSE ig_user_id END,
+       telegram_chat_id = CASE WHEN $11 THEN $5 ELSE telegram_chat_id END,
+       email = CASE WHEN $12 THEN $6 ELSE email END,
+       whatsapp = CASE WHEN $13 THEN $7 ELSE whatsapp END
+     WHERE id=$1`,
+    [negocioId, q('ig_handle'), q('dominio_web'), q('ig_user_id'), q('telegram_chat_id'),
+     q('email'), q('whatsapp'),
+     d.ig_handle !== undefined, d.dominio_web !== undefined, d.ig_user_id !== undefined,
+     d.telegram_chat_id !== undefined, d.email !== undefined, d.whatsapp !== undefined]);
   if (typeof d.prefijo === 'string') {
     const pf = d.prefijo.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
     if (pf) { await pool.query('UPDATE contenido.negocios SET prefijo=$2 WHERE id=$1', [negocioId, pf]); _negociosAt = 0; }
