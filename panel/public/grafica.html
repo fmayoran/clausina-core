@@ -171,14 +171,17 @@
     <div class="dprev" id="d-prev"></div>
     <div>
       <div class="fl"><label>Versiones</label><div class="vlist" id="d-vers"></div></div>
+      <div class="fl" id="d-caras-box" style="display:none">
+        <label>¿En qué cara? <span class="hint">— la otra no se toca</span></label>
+        <div class="opts" id="d-cara">
+          <div class="opt on" data-cara="frente" onclick="dSetCara('frente')">Frente</div>
+          <div class="opt" data-cara="dorso" onclick="dSetCara('dorso')">Dorso</div>
+          <div class="opt" data-cara="ambas" onclick="dSetCara('ambas')">Las dos</div>
+        </div></div>
       <div class="fl"><label>Pedir un cambio <span class="hint">— parte del diseño actual</span></label>
-        <textarea id="d-instr" placeholder="El título más grande. Sacá el QR."></textarea>
-        <div class="gsub" id="d-caras-nota" style="display:none;margin-top:5px">Esta pieza tiene dos caras: decí en cuál — «en el dorso, agregá los horarios».</div></div>
+        <textarea id="d-instr" placeholder="El título más grande. Sacá el QR."></textarea></div>
       <div class="fl"><label>Imagen de fondo</label>
-        <div class="opts" id="d-cara" style="display:none;margin-bottom:7px">
-          <div class="opt on" data-cara="frente" onclick="dSetCara('frente')">Del frente</div>
-          <div class="opt" data-cara="dorso" onclick="dSetCara('dorso')">Del dorso</div>
-        </div>
+        <div class="gsub" id="d-fondo-cara" style="display:none;margin-bottom:7px"></div>
         <div class="opts" id="d-fondo">
           <div class="opt on" data-modo="mantener" onclick="dSetFondo('mantener')">Mantener</div>
           <div class="opt" data-modo="biblioteca" onclick="dSetFondo('biblioteca')">Biblioteca</div>
@@ -415,16 +418,38 @@ async function crearPieza(){
 
 // --- Cambiar el fondo al iterar (aislado del alta) ---
 let DFONDO = { modo:'mantener', url:'', prompt:'' };
-function dResetFondo(){ DFONDO={modo:'mantener',url:'',prompt:''}; DCARA='frente';
+function dResetFondo(){ DFONDO={modo:'mantener',url:'',prompt:''};
   document.querySelectorAll('#d-fondo .opt').forEach(o=>o.classList.toggle('on',o.dataset.modo==='mantener'));
   document.querySelectorAll('#d-cara .opt').forEach(o=>o.classList.toggle('on',o.dataset.cara==='frente'));
   const x=document.getElementById('d-fondo-extra'); if(x) x.innerHTML=''; }
-// A qué cara apunta el cambio de fondo. Cambiarla resetea la elección: arrastrar la imagen
-// elegida para el frente al dorso sería aplicar en un lado lo que se pidió para el otro.
+// A qué cara apunta TODO el pedido: el texto y también el fondo. Cambiarla resetea la elección
+// de fondo, porque arrastrar la imagen elegida para el frente al dorso sería aplicar en un lado
+// lo que se pidió para el otro.
 function dSetCara(c){
+  dCaraUI(c);
+  dSetFondo('mantener');
+}
+// Sólo pinta el estado. Se separa de dSetCara porque el detalle se refresca cada 6 segundos
+// mientras hay una pieza generándose: si el refresco reseteara el fondo, borraría la imagen que
+// la persona acaba de elegir mientras escribía el pedido.
+function dCaraUI(c){
   DCARA=c;
   document.querySelectorAll('#d-cara .opt').forEach(o=>o.classList.toggle('on',o.dataset.cara===c));
-  dSetFondo('mantener');
+  const n=document.getElementById('d-fondo-cara');
+  if(n){
+    // Con "las dos" no se puede cambiar el fondo: son dos imágenes distintas y habría que
+    // adivinar cuál va en cada cara.
+    const dosCaras=document.getElementById('d-caras-box').style.display!=='none';
+    n.style.display = dosCaras ? '' : 'none';
+    n.textContent = c==='ambas'
+      ? 'Elegí Frente o Dorso para cambiar la imagen de fondo.'
+      : 'Se cambia la del ' + c + '.';
+    document.querySelectorAll('#d-fondo .opt').forEach(o=>{
+      const bloq = c==='ambas' && o.dataset.modo!=='mantener';
+      o.style.opacity = bloq ? '.4' : '';
+      o.style.pointerEvents = bloq ? 'none' : '';
+    });
+  }
 }
 function dSetFondo(m){
   DFONDO={modo:m,url:'',prompt:''};
@@ -469,15 +494,17 @@ async function refrescarDet(){
   const f=FORMATOS.find(x=>x.id===g.formato);
   document.getElementById('d-nombre').textContent = (g.numero? cod(g.numero)+' · ':'') + g.nombre;
   document.getElementById('d-meta').textContent=`${f?f.label:g.formato} · ${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm · ${g.estado}`;
-  document.getElementById('d-caras-nota').style.display = g.caras===2 ? '' : 'none';
-  document.getElementById('d-cara').style.display = g.caras===2 ? '' : 'none';
+  // Con una sola cara no hay nada que elegir: el selector no aparece y el pedido va sin alcance.
+  document.getElementById('d-caras-box').style.display = g.caras===2 ? '' : 'none';
+  if(g.caras!==2) DCARA='ambas'; else if(!['frente','dorso','ambas'].includes(DCARA)) DCARA='frente';
+  dCaraUI(DCARA);
   const vs=g.versiones||[], activa=vs.find(v=>v.estado==='lista')||vs[0];
   const enCurso=vs.some(v=>v.estado==='pendiente'||v.estado==='procesando');
   if(enCurso){
     document.getElementById('d-prev').innerHTML='<div class="ph" style="color:#FF6A45"><span class="spin"></span><br>diseñando…</div>';
   } else if(activa&&activa.png_url){
     const dorso = activa.png_dorso_url;
-    const tabs = dorso ? `<div class="caratabs"><button class="ctab on" onclick="verCara(this,'${esc(activa.png_url)}')">Frente</button><button class="ctab" onclick="verCara(this,'${esc(dorso)}')">Dorso</button></div>` : '';
+    const tabs = dorso ? `<div class="caratabs"><button class="ctab on" onclick="verCara(this,'${esc(activa.png_url)}','frente')">Frente</button><button class="ctab" onclick="verCara(this,'${esc(dorso)}','dorso')">Dorso</button></div>` : '';
     document.getElementById('d-prev').innerHTML = `${tabs}<img id="d-img" src="${esc(activa.png_url)}">`;
   } else {
     document.getElementById('d-prev').innerHTML = `<div class="ph">${esc((activa&&activa.error)||'sin versión')}</div>`;
@@ -492,15 +519,21 @@ async function refrescarDet(){
   const it=document.getElementById('d-iter'); it.disabled=enCurso; it.textContent=enCurso?'Diseñando…':'Generar nueva versión';
 }
 function verVersion(u){ if(u){ const i=document.getElementById('d-img'); if(i) i.src=u; else document.getElementById('d-prev').innerHTML=`<img id="d-img" src="${esc(u)}">`; } }
-function verCara(btn,u){ document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('on')); btn.classList.add('on'); const i=document.getElementById('d-img'); if(i) i.src=u; }
+// Mirar una cara cambia a qué cara apunta el pedido: pedir un cambio mientras se mira el dorso
+// y que salga en el frente es exactamente el error que esto viene a evitar.
+function verCara(btn,u,cara){
+  document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('on')); btn.classList.add('on');
+  const i=document.getElementById('d-img'); if(i) i.src=u;
+  if(cara && document.getElementById('d-caras-box').style.display!=='none') dSetCara(cara);
+}
 async function iterar(){
   const t=document.getElementById('d-instr'), err=document.getElementById('d-err');
   const txt=t.value.trim(); err.textContent='';
   const cambiaFondo = DFONDO.modo!=='mantener';
   if(!txt && !cambiaFondo){ err.textContent='Escribí qué querés cambiar (o cambiá el fondo)'; return; }
   if(cambiaFondo && (DFONDO.modo==='biblioteca'||DFONDO.modo==='subido') && !DFONDO.url){ err.textContent='Elegí la imagen de fondo'; return; }
-  const body={ instruccion:txt };
-  if(cambiaFondo){ body.fondo_modo=DFONDO.modo; body.fondo_url=DFONDO.url; body.cara=DCARA;
+  const body={ instruccion:txt, cara:DCARA };
+  if(cambiaFondo){ body.fondo_modo=DFONDO.modo; body.fondo_url=DFONDO.url;
     body.fondo_prompt=(document.getElementById('d-prompt')||{}).value||''; }
   const b=document.getElementById('d-iter'); b.disabled=true; b.textContent='Enviando…';
   try{

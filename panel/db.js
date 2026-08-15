@@ -605,11 +605,22 @@ async function iterarGrafica(negocioId, id, d) {
   if (!g) return { ok: false, error: 'no_existe' };
   let txt = (d.instruccion || '').trim();
 
+  // En qué cara. Antes había que escribirlo dentro del pedido ("en el dorso, agregá los
+  // horarios") y el director de arte adivinaba: pedir "el título más grande" en una pieza de dos
+  // caras terminaba tocando las dos. Ahora es una elección explícita y se le dice con qué NO
+  // meterse, que es la mitad que faltaba.
+  const cara = ['frente', 'dorso', 'ambas'].includes(d.cara) ? d.cara : 'ambas';
+  const alcance = g.caras === 2 && cara !== 'ambas'
+    ? (cara === 'dorso'
+        ? 'SÓLO EL DORSO. El frente queda EXACTAMENTE igual, sin tocar una coma.'
+        : 'SÓLO EL FRENTE. El dorso queda EXACTAMENTE igual, sin tocar una coma.')
+    : null;
+
   // Cambio de fondo opcional durante la iteración, en la cara que se pida. Sin la cara, cambiar
   // la foto del dorso obligaba a pedirlo por texto y esperar que el creativo eligiera bien.
   const modo = ['biblioteca', 'subido', 'generar', 'sin_fondo'].includes(d.fondo_modo) ? d.fondo_modo : null;
   if (modo) {
-    const alDorso = d.cara === 'dorso' && g.caras === 2;
+    const alDorso = cara === 'dorso' && g.caras === 2;
     const col = alDorso
       ? { modo: 'fondo_dorso_modo', url: 'fondo_dorso_url', prompt: 'fondo_dorso_prompt', campo: 'fondo_dorso_url' }
       : { modo: 'fondo_modo', url: 'fondo_url', prompt: 'fondo_prompt', campo: 'fondo_url' };
@@ -632,6 +643,8 @@ async function iterarGrafica(negocioId, id, d) {
     txt = txt ? `${txt}. ${nota}` : nota;
   }
   if (!txt) return { ok: false, error: 'sin_instruccion' };
+  // El alcance va adelante: es lo primero que tiene que leer, no una aclaración al final.
+  if (alcance) txt = `${alcance} ${txt}`;
 
   try {
     await pool.query(
