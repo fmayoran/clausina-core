@@ -123,7 +123,11 @@ ANT=$(psql "SELECT coalesce(html_url,'') FROM contenido.grafica_version WHERE gr
 PREV=""
 if [ -n "$ANT" ]; then
   rel="${ANT#$BASE_URL/}"
-  [ -f "$MEDIA_HOST/$rel" ] && { cp "$MEDIA_HOST/$rel" "$DIRW/anterior.html"; PREV=" La version anterior esta en $DIRW/anterior.html: PARTI DE ESE DISEÑO y aplica SOLO el cambio pedido."; }
+  [ -f "$MEDIA_HOST/$rel" ] && { cp "$MEDIA_HOST/$rel" "$DIRW/anterior.html"; PREV=" La version anterior esta en $DIRW/anterior.html: PARTI DE ESE DISEÑO y aplica SOLO el cambio pedido. Lo que el pedido no menciona queda IDENTICO, incluida la cara que no se toca."; }
+# Con dos caras hay que recordarlo con el HTML anterior delante: iterando sobre una pieza de
+# frente y dorso, el diseño volvia con UNA sola .lienzo y el dorso desaparecia sin aviso.
+[ "$(python3 -c "import json;print(json.load(open('/tmp/graf_ctx_$vid.json'))['caras'])")" = "2" ] &&
+  PREV="$PREV La pieza tiene DOS caras: el HTML tiene que salir con las DOS .lienzo, siempre, aunque el cambio sea de una sola." 
 fi
 
 rm -f "/tmp/graf_res_$vid.html"
@@ -149,6 +153,12 @@ cp "/tmp/graf_res_$vid.html" "$dir/$base.html"
 RJSON=$(node "$MOTOR/scripts/grafica_render.js" "$dir/$base.html" "$dir/$base.pdf" "$dir/$base.png" "$W" "$H" 2>>"$LOG")
 echo "$RJSON" >> "$LOG"
 echo "$RJSON" | grep -q '"ok":true' || fallar "No se pudo renderizar la pieza (PDF/PNG)."
+# Guarda: una pieza de dos caras que vuelve con una es una cara perdida, no una versión nueva.
+# Guardarla igual deja la pieza mutilada y nadie se entera hasta mandarla a imprimir.
+CARAS_PIDE=$(python3 -c "import json;print(json.load(open('/tmp/graf_ctx_$vid.json'))['caras'])")
+CARAS_HAY=$(echo "$RJSON" | python3 -c "import json,sys;print(json.load(sys.stdin).get('caras',0))")
+[ "$CARAS_PIDE" = "2" ] && [ "$CARAS_HAY" != "2" ] &&
+  fallar "El diseño volvió con una sola cara y la pieza tiene dos. No se guardó para no perder el dorso; probá de nuevo."
 # Dorso: el renderer lo escribe como <base>-dorso.png si la pieza tiene 2 caras.
 DORSO_SQL="png_dorso_url=NULL"
 if [ -s "$dir/$base-dorso.png" ]; then DORSO_SQL="png_dorso_url='$BASE_URL/$rel/$base-dorso.png'"; fi
