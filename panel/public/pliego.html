@@ -47,10 +47,11 @@
 <body>
 <div class="ctrl">
   <span id="cuenta">cargando…</span>
-  <label>Hoja: <select id="hoja" onchange="pintar()">
+  <label>Hoja: <select id="hoja" onchange="opcionesHoja(); pintar()">
     <option value="a4">A4 · 210×297</option>
     <option value="a3">A3 · 297×420</option>
   </select></label>
+  <label>Por hoja: <select id="porhoja" onchange="pintar()"></select></label>
   <label>Copias: <input type="number" id="copias" min="1" max="500" value="0" style="width:70px"
     oninput="pintarPronto()" onchange="pintarPronto()"></label>
   <label><input type="checkbox" id="marcas" checked onchange="pintar()"> marcas de corte</label>
@@ -66,15 +67,38 @@ const ID = new URLSearchParams(location.search).get('id') || '';
 const HOJAS = { a4: [210, 297], a3: [297, 420] };
 let G = null, ACTIVA = null;
 
-// Cuántas entran y en qué orientación. Se prueban las dos —la pieza acostada suele rendir más— y
-// gana la que más piezas mete; con empate, la que no rota, que es la que espera cualquiera.
-function acomodo(pw, ph, hw, hh) {
-  const derecho = { cols: Math.floor(hw / pw), filas: Math.floor(hh / ph), rot: false };
-  const girado  = { cols: Math.floor(hw / ph), filas: Math.floor(hh / pw), rot: true };
-  derecho.n = derecho.cols * derecho.filas;
-  girado.n = girado.cols * girado.filas;
-  return girado.n > derecho.n ? girado : derecho;
+// Todas las grillas que entran, en las dos orientaciones. No sólo la que más mete: a veces
+// conviene poner menos por hoja —para cortar más cómodo, o para una prueba— y eso antes no se
+// podía elegir porque el máximo se calculaba solo.
+function acomodos(pw, ph, hw, hh) {
+  const out = [];
+  for (const rot of [false, true]) {
+    const w = rot ? ph : pw, h = rot ? pw : ph;
+    const maxC = Math.floor(hw / w), maxF = Math.floor(hh / h);
+    for (let c = 1; c <= maxC; c++) for (let f = 1; f <= maxF; f++) out.push({ cols: c, filas: f, rot, n: c * f });
+  }
+  // Una sola opción por cantidad: la que aprovecha mejor la hoja. Dos filas de la misma cifra en
+  // el desplegable obligan a adivinar en qué se diferencian.
+  const mejor = new Map();
+  for (const a of out) {
+    const p = mejor.get(a.n);
+    if (!p || (a.rot === false && p.rot === true)) mejor.set(a.n, a);
+  }
+  return [...mejor.values()].sort((x, y) => y.n - x.n);
 }
+
+/** Llena el desplegable con lo que entra en la hoja elegida, conservando la elección si sigue valiendo. */
+function opcionesHoja() {
+  const [hw, hh] = HOJAS[$('hoja').value] || HOJAS.a4;
+  const ops = acomodos(+G.ancho_mm, +G.alto_mm, hw, hh);
+  const previo = $('porhoja').value;
+  $('porhoja').innerHTML = ops.map(a =>
+    `<option value="${a.n}">${a.n} por hoja · ${a.cols}×${a.filas}${a.rot ? ' giradas' : ''}</option>`).join('')
+    || '<option value="0">no entra</option>';
+  if (ops.some(a => String(a.n) === previo)) $('porhoja').value = previo;
+  ACOMODOS = ops;
+}
+let ACOMODOS = [];
 
 function marcasDe(a, pw, ph) {
   // Una marca por cada línea de corte interna, arriba/abajo y a los costados.
@@ -104,7 +128,7 @@ function pintar() {
   if (!G || !ACTIVA) return;
   const [hw, hh] = HOJAS[$('hoja').value] || HOJAS.a4;
   const pw = +G.ancho_mm, ph = +G.alto_mm;
-  const a = acomodo(pw, ph, hw, hh);
+  const a = ACOMODOS.find(x => String(x.n) === $('porhoja').value) || ACOMODOS[0] || { n: 0 };
   if (!a.n) {
     $('cuenta').textContent = `La pieza (${pw}×${ph}mm) no entra en esa hoja.`;
     $('hojas').innerHTML = ''; return;
@@ -165,9 +189,8 @@ function pintar() {
   if (!ACTIVA) { $('cuenta').textContent = 'Esa pieza todavía no tiene una versión lista.'; return; }
   // La imagen de imprenta, no la liviana de la grilla: esto va a papel.
   ACTIVA.png_url = ACTIVA.png_imprenta || ACTIVA.png_url;
-  const [hw, hh] = HOJAS.a4;
-  const a = acomodo(+G.ancho_mm, +G.alto_mm, hw, hh);
-  $('copias').value = a.n || 1;
+  opcionesHoja();
+  $('copias').value = (ACOMODOS[0] && ACOMODOS[0].n) || 1;
   document.title = `Pliego · ${G.nombre || ''}`;
   pintar();
 })();
