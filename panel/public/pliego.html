@@ -15,8 +15,11 @@
   @page { size: A4; margin: 0; }
   *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   body{background:#4a4a4a;font-family:'Inter Tight',sans-serif;overflow-x:hidden;}
-  .hoja{background:#fff;margin:0 auto 8mm;position:relative;display:grid;page-break-after:always;
-        break-after:page;}
+  /* La hoja centra el BLOQUE de piezas: sin esto todo se apila arriba a la izquierda y el sobrante
+     queda todo junto en un borde. Centrado, el margen es parejo y da tolerancia al corte. */
+  .hoja{background:#fff;margin:0 auto 8mm;display:flex;align-items:center;justify-content:center;
+        page-break-after:always;break-after:page;}
+  .bloque{position:relative;display:grid;}
   .celda{overflow:hidden;display:block;}
   .celda img{width:100%;height:100%;object-fit:cover;display:block;}
   .celda.hueca{background:#fff;}
@@ -106,8 +109,12 @@ function pintar() {
   // Ancho y alto de cada celda según si la pieza va girada.
   const cw = a.rot ? ph : pw, ch = a.rot ? pw : ph;
   const cls = 'hoja' + ($('marcas').checked ? '' : ' sin-marcas');
-  const estilo = `width:${hw}mm;height:${hh}mm;grid-template-columns:repeat(${a.cols},${cw}mm);` +
-                 `grid-template-rows:repeat(${a.filas},${ch}mm);`;
+  const hojaEstilo = `width:${hw}mm;height:${hh}mm`;
+  const blqEstilo = `grid-template-columns:repeat(${a.cols},${cw}mm);` +
+                    `grid-template-rows:repeat(${a.filas},${ch}mm);`;
+  // Las marcas van sobre el BLOQUE, no sobre la hoja: es el bloque lo que se corta.
+  const hoja = (celdas) => `<div class="${cls}" style="${hojaEstilo}">` +
+    `<div class="bloque" style="${blqEstilo}">${celdas}${marcasDe(a, cw, ch)}</div></div>`;
   const img = (src) => `<div class="celda">${src
     ? `<img src="${src}"${a.rot ? ' style="transform:rotate(90deg);transform-origin:center;' +
         `width:${ch}mm;height:${cw}mm;position:relative;left:${(cw - ch) / 2}mm;top:${(ch - cw) / 2}mm"` : ''}>`
@@ -118,7 +125,7 @@ function pintar() {
     const enEsta = Math.min(a.n, pedidas - h * a.n);
     const celdas = [];
     for (let i = 0; i < a.n; i++) celdas.push(i < enEsta ? img(ACTIVA.png_url) : '<div class="celda hueca"></div>');
-    html += `<div class="${cls}" style="${estilo}">${celdas.join('')}${marcasDe(a, cw, ch)}</div>`;
+    html += hoja(celdas.join(''));
     if (dorso) {
       // EL DORSO VA ESPEJADO POR FILA. Al imprimir doble faz por el borde largo la hoja gira sobre
       // su eje vertical: sin invertir cada fila, cada dorso cae detrás de OTRA pieza.
@@ -131,7 +138,7 @@ function pintar() {
         }
         d.push(...fila.reverse());
       }
-      html += `<div class="${cls}" style="${estilo}">${d.join('')}${marcasDe(a, cw, ch)}</div>`;
+      html += hoja(d.join(''));
     }
   }
   $('hojas').innerHTML = html;
