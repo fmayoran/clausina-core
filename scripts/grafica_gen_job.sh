@@ -29,6 +29,11 @@ echo "$(ts) grafica $vid ($slug)" >> "$LOG"
 
 DIRW="/tmp/graf_$vid"; rm -rf "$DIRW"; mkdir -p "$DIRW"
 
+# ¿Es sólo un reencuadre? Se lee acá arriba porque cambia lo que hay que hacer: un reencuadre
+# trabaja sobre el diseño ANTERIOR, que ya tiene su foto embebida. Generar una imagen nueva sería
+# cambiarle justo la foto que se está encuadrando, y gastar créditos para tirarla.
+AJUSTE=$(psql "SELECT coalesce(ajuste::text,'') FROM contenido.grafica_version WHERE id='$vid';")
+
 # 1) Fondo generado con IA, si la pieza lo pide y todavía no tiene uno.
 modo=$(psql "SELECT fondo_modo FROM contenido.grafica WHERE id='$gid';")
 fondo=$(psql "SELECT coalesce(fondo_url,'') FROM contenido.grafica WHERE id='$gid';")
@@ -115,8 +120,10 @@ json.dump(d, open(p,"w"), ensure_ascii=False)'
     echo "$(ts) aviso: no se pudo generar el fondo de $cara, se disena sin el" >> "$LOG"
   fi
 }
-[ "$modo" = "generar" ] && [ -z "$fondo" ] && generar_fondo frente
-[ "$modo_d" = "generar" ] && [ -z "$fondo_d" ] && generar_fondo dorso
+if [ -z "$AJUSTE" ]; then
+  [ "$modo" = "generar" ] && [ -z "$fondo" ] && generar_fondo frente
+  [ "$modo_d" = "generar" ] && [ -z "$fondo_d" ] && generar_fondo dorso
+fi
 
 # 4) Si es iteración, pasarle el HTML de la versión anterior.
 ANT=$(psql "SELECT coalesce(html_url,'') FROM contenido.grafica_version WHERE grafica_id='$gid' AND estado='lista' ORDER BY nro DESC LIMIT 1;")
@@ -135,7 +142,6 @@ rm -f "/tmp/graf_res_$vid.html"
 # ── Atajo: si la versión sólo pide reencuadrar la foto, no hace falta el director de arte ──────
 # Es una propiedad de CSS. Pedírsela a un modelo cuesta minutos, gasta cupo de sesión y a veces no
 # acierta: en G-0003 hicieron falta ocho versiones para mover una foto, y dos murieron sin cupo.
-AJUSTE=$(psql "SELECT coalesce(ajuste::text,'') FROM contenido.grafica_version WHERE id='$vid';")
 if [ -n "$AJUSTE" ]; then
   [ -f "$DIRW/anterior.html" ] || fallar "No hay un diseño anterior para reencuadrar."
   RE=$(node "$MOTOR/scripts/grafica_encuadre.js" "$DIRW/anterior.html" "/tmp/graf_res_$vid.html" "$AJUSTE" </dev/null)
