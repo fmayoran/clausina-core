@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaUsina — Pliego de imprenta</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* El PDF de una pieza trae UNA pieza por página: para mandar 200 tarjetas a la imprenta eso son
+     200 hojas. Acá se repite la pieza tantas veces como entre en la hoja, que es como se imprime
+     de verdad. Sin margen: las piezas van pegadas y el corte pasa por las uniones, igual que en
+     el pliego de invitaciones. */
+  @page { size: A4; margin: 0; }
+  *{box-sizing:border-box;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  body{background:#4a4a4a;font-family:'Inter Tight',sans-serif;overflow-x:hidden;}
+  .hoja{background:#fff;margin:0 auto 8mm;position:relative;display:grid;page-break-after:always;
+        break-after:page;}
+  .celda{overflow:hidden;display:block;}
+  .celda img{width:100%;height:100%;object-fit:cover;display:block;}
+  .celda.hueca{background:#fff;}
+  /* Marcas de corte: no hay margen donde ponerlas "afuera", así que van sobre la línea de corte,
+     cortas y en gris claro. La guillotina se lleva casi toda la tinta. */
+  .marcas{position:absolute;inset:0;pointer-events:none;z-index:3;}
+  .marcas i{position:absolute;background:#9a9a9a;}
+  .marcas .v{width:.2mm;height:6mm;}
+  .marcas .h{height:.2mm;width:6mm;}
+  .hoja.sin-marcas .marcas{display:none;}
+  /* Barra de control: sólo en pantalla. */
+  .ctrl{position:sticky;top:0;z-index:5;background:#17171b;color:#eee;padding:12px 16px;
+        display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:.86rem;
+        font-family:'JetBrains Mono',monospace;}
+  .ctrl select,.ctrl input{background:#0c0c0a;color:#eee;border:1px solid #2a2a33;border-radius:6px;
+        padding:6px 9px;font-family:inherit;font-size:.82rem;}
+  .ctrl .p{background:#CCF24D;color:#0c0c0a;border:0;border-radius:7px;padding:8px 16px;
+        font-weight:700;cursor:pointer;font-family:'Inter Tight',sans-serif;}
+  .ctrl .nota{color:#8A8F98;font-size:.72rem;}
+  .ctrl b{color:#CCF24D;}
+  .ctrl label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;}
+  @media print{ .ctrl{display:none;} body{background:#fff;} .hoja{margin:0;box-shadow:none;} }
+</style>
+</head>
+<body>
+<div class="ctrl">
+  <span id="cuenta">cargando…</span>
+  <label>Hoja: <select id="hoja" onchange="pintar()">
+    <option value="a4">A4 · 210×297</option>
+    <option value="a3">A3 · 297×420</option>
+  </select></label>
+  <label>Copias: <input type="number" id="copias" min="1" max="500" value="0" style="width:70px" onchange="pintar()"></label>
+  <label><input type="checkbox" id="marcas" checked onchange="pintar()"> marcas de corte</label>
+  <button class="p" onclick="window.print()">Imprimir / Guardar PDF</button>
+  <span class="nota">imprimí a <b>tamaño real</b>, sin "ajustar a la página"<span id="doblefaz"></span></span>
+</div>
+<div id="hojas"></div>
+
+<script src="panel.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const ID = new URLSearchParams(location.search).get('id') || '';
+const HOJAS = { a4: [210, 297], a3: [297, 420] };
+let G = null, ACTIVA = null;
+
+// Cuántas entran y en qué orientación. Se prueban las dos —la pieza acostada suele rendir más— y
+// gana la que más piezas mete; con empate, la que no rota, que es la que espera cualquiera.
+function acomodo(pw, ph, hw, hh) {
+  const derecho = { cols: Math.floor(hw / pw), filas: Math.floor(hh / ph), rot: false };
+  const girado  = { cols: Math.floor(hw / ph), filas: Math.floor(hh / pw), rot: true };
+  derecho.n = derecho.cols * derecho.filas;
+  girado.n = girado.cols * girado.filas;
+  return girado.n > derecho.n ? girado : derecho;
+}
+
+function marcasDe(a, pw, ph) {
+  // Una marca por cada línea de corte interna, arriba/abajo y a los costados.
+  let h = '<div class="marcas">';
+  for (let c = 1; c < a.cols; c++) {
+    const x = (c * pw).toFixed(2) + 'mm';
+    h += `<i class="v" style="left:${x};top:0"></i><i class="v" style="left:${x};bottom:0"></i>`;
+  }
+  for (let f = 1; f < a.filas; f++) {
+    const y = (f * ph).toFixed(2) + 'mm';
+    h += `<i class="h" style="top:${y};left:0"></i><i class="h" style="top:${y};right:0"></i>`;
+  }
+  // Y las esquinas: si salen corridas, la impresora escaló la hoja.
+  h += '<i class="v" style="left:0;top:0"></i><i class="h" style="top:0;left:0"></i>' +
+       '<i class="v" style="right:0;top:0"></i><i class="h" style="top:0;right:0"></i>' +
+       '<i class="v" style="left:0;bottom:0"></i><i class="h" style="bottom:0;left:0"></i>' +
+       '<i class="v" style="right:0;bottom:0"></i><i class="h" style="bottom:0;right:0"></i>';
+  return h + '</div>';
+}
+
+function pintar() {
+  if (!G || !ACTIVA) return;
+  const [hw, hh] = HOJAS[$('hoja').value] || HOJAS.a4;
+  const pw = +G.ancho_mm, ph = +G.alto_mm;
+  const a = acomodo(pw, ph, hw, hh);
+  if (!a.n) {
+    $('cuenta').textContent = `La pieza (${pw}×${ph}mm) no entra en esa hoja.`;
+    $('hojas').innerHTML = ''; return;
+  }
+  const pedidas = Math.max(1, Math.min(500, +$('copias').value || a.n));
+  const hojas = Math.ceil(pedidas / a.n);
+  const dorso = ACTIVA.png_dorso_url;
+  // Ancho y alto de cada celda según si la pieza va girada.
+  const cw = a.rot ? ph : pw, ch = a.rot ? pw : ph;
+  const cls = 'hoja' + ($('marcas').checked ? '' : ' sin-marcas');
+  const estilo = `width:${hw}mm;height:${hh}mm;grid-template-columns:repeat(${a.cols},${cw}mm);` +
+                 `grid-template-rows:repeat(${a.filas},${ch}mm);`;
+  const img = (src) => `<div class="celda">${src
+    ? `<img src="${src}"${a.rot ? ' style="transform:rotate(90deg);transform-origin:center;' +
+        `width:${ch}mm;height:${cw}mm;position:relative;left:${(cw - ch) / 2}mm;top:${(ch - cw) / 2}mm"` : ''}>`
+    : ''}</div>`;
+
+  let html = '';
+  for (let h = 0; h < hojas; h++) {
+    const enEsta = Math.min(a.n, pedidas - h * a.n);
+    const celdas = [];
+    for (let i = 0; i < a.n; i++) celdas.push(i < enEsta ? img(ACTIVA.png_url) : '<div class="celda hueca"></div>');
+    html += `<div class="${cls}" style="${estilo}">${celdas.join('')}${marcasDe(a, cw, ch)}</div>`;
+    if (dorso) {
+      // EL DORSO VA ESPEJADO POR FILA. Al imprimir doble faz por el borde largo la hoja gira sobre
+      // su eje vertical: sin invertir cada fila, cada dorso cae detrás de OTRA pieza.
+      const d = [];
+      for (let f = 0; f < a.filas; f++) {
+        const fila = [];
+        for (let c = 0; c < a.cols; c++) {
+          const i = f * a.cols + c;
+          fila.push(i < enEsta ? img(dorso) : '<div class="celda hueca"></div>');
+        }
+        d.push(...fila.reverse());
+      }
+      html += `<div class="${cls}" style="${estilo}">${d.join('')}${marcasDe(a, cw, ch)}</div>`;
+    }
+  }
+  $('hojas').innerHTML = html;
+  $('cuenta').innerHTML = `<b>${G.numero ? 'G-' + String(G.numero).padStart(4, '0') : ''}</b> · ` +
+    `${pedidas} copia(s) · ${a.n} por hoja${a.rot ? ' (giradas)' : ''} · ` +
+    `${hojas * (dorso ? 2 : 1)} hoja(s)`;
+  $('doblefaz').innerHTML = dorso
+    ? ' · <b>doble faz girando por el borde largo</b>' : '';
+}
+
+(async () => {
+  try {
+    G = await fetch('api/grafica/' + encodeURIComponent(ID)).then(r => r.json());
+    if (!G || G.error) { $('cuenta').textContent = 'No pude abrir esa pieza.'; return; }
+  } catch (e) { $('cuenta').textContent = 'Error de conexión.'; return; }
+  const vs = G.versiones || [];
+  ACTIVA = vs.find(v => v.estado === 'lista' && v.png_url) || null;
+  if (!ACTIVA) { $('cuenta').textContent = 'Esa pieza todavía no tiene una versión lista.'; return; }
+  // La imagen de imprenta, no la liviana de la grilla: esto va a papel.
+  ACTIVA.png_url = ACTIVA.png_imprenta || ACTIVA.png_url;
+  const [hw, hh] = HOJAS.a4;
+  const a = acomodo(+G.ancho_mm, +G.alto_mm, hw, hh);
+  $('copias').value = a.n || 1;
+  document.title = `Pliego · ${G.nombre || ''}`;
+  pintar();
+})();
+</script>
+</body>
+</html>

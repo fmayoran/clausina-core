@@ -501,6 +501,9 @@ async function getGrafica(negocioId, id) {
   if (!g) return null;
   const { rows: vs } = await pool.query(
     `SELECT id, nro, instruccion, COALESCE(png_prev_url, png_url) AS png_url,
+            -- La de imprenta va aparte: la de arriba es la copia liviana que dibuja la grilla, y
+            -- el pliego que se manda a imprimir necesita los 300 dpi.
+            png_url AS png_imprenta,
             png_dorso_url, pdf_url, html_url, estado, error, creado_en
        FROM contenido.grafica_version WHERE grafica_id=$1 ORDER BY nro DESC`, [id]);
   g.versiones = vs;
