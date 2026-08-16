@@ -51,7 +51,8 @@
     <option value="a4">A4 · 210×297</option>
     <option value="a3">A3 · 297×420</option>
   </select></label>
-  <label>Copias: <input type="number" id="copias" min="1" max="500" value="0" style="width:70px" onchange="pintar()"></label>
+  <label>Copias: <input type="number" id="copias" min="1" max="500" value="0" style="width:70px"
+    oninput="pintarPronto()" onchange="pintarPronto()"></label>
   <label><input type="checkbox" id="marcas" checked onchange="pintar()"> marcas de corte</label>
   <button class="p" onclick="window.print()">Imprimir / Guardar PDF</button>
   <span class="nota">imprimí a <b>tamaño real</b>, sin "ajustar a la página"<span id="doblefaz"></span></span>
@@ -93,6 +94,11 @@ function marcasDe(a, pw, ph) {
        '<i class="v" style="right:0;bottom:0"></i><i class="h" style="bottom:0;right:0"></i>';
   return h + '</div>';
 }
+
+// Con oninput el número cambia tecla a tecla: escribir "120" pasaría por 1 y por 12, y cada
+// paso redibuja hojas enteras. Se espera a que la mano se detenga.
+let _t = null;
+function pintarPronto() { clearTimeout(_t); _t = setTimeout(pintar, 180); }
 
 function pintar() {
   if (!G || !ACTIVA) return;
@@ -145,8 +151,8 @@ function pintar() {
   $('cuenta').innerHTML = `<b>${G.numero ? 'G-' + String(G.numero).padStart(4, '0') : ''}</b> · ` +
     `${pedidas} copia(s) · ${a.n} por hoja${a.rot ? ' (giradas)' : ''} · ` +
     `${hojas * (dorso ? 2 : 1)} hoja(s)`;
-  $('doblefaz').innerHTML = dorso
-    ? ' · <b>doble faz girando por el borde largo</b>' : '';
+  $('doblefaz').innerHTML = (dorso ? ' · <b>doble faz girando por el borde largo</b>' : '') +
+    (hojas > 20 ? ' · <b>son ' + hojas + ' hojas</b>: el navegador puede tardar en dibujarlas' : '');
 }
 
 (async () => {
