@@ -143,10 +143,20 @@ rm -f "/tmp/graf_res_$vid.html"
 # Es una propiedad de CSS. Pedírsela a un modelo cuesta minutos, gasta cupo de sesión y a veces no
 # acierta: en G-0003 hicieron falta ocho versiones para mover una foto, y dos murieron sin cupo.
 if [ -n "$AJUSTE" ]; then
-  [ -f "$DIRW/anterior.html" ] || fallar "No hay un diseño anterior para reencuadrar."
-  RE=$(node "$MOTOR/scripts/grafica_encuadre.js" "$DIRW/anterior.html" "/tmp/graf_res_$vid.html" "$AJUSTE" </dev/null)
-  echo "$(ts) encuadre: $RE" >> "$LOG"
-  echo "$RE" | grep -q '"ok":true' || fallar "No se pudo reencuadrar esa cara."
+  [ -f "$DIRW/anterior.html" ] || fallar "No hay un diseño anterior para ajustar."
+  # Dos ajustes determinísticos, los dos sin director de arte: reencuadrar la foto de una cara, o
+  # cambiar el tamaño de la pieza entera. El segundo se reconoce por la marca 'reformato'.
+  if echo "$AJUSTE" | grep -q '"reformato"'; then
+    RE=$(node "$MOTOR/scripts/grafica_reformato.js" "$DIRW/anterior.html" "/tmp/graf_res_$vid.html" \
+         "$(python3 -c "import json;print(json.load(open('/tmp/graf_ctx_$vid.json'))['ancho_mm'])")" \
+         "$(python3 -c "import json;print(json.load(open('/tmp/graf_ctx_$vid.json'))['alto_mm'])")" </dev/null)
+    echo "$(ts) reformato: $RE" >> "$LOG"
+    echo "$RE" | grep -q '"ok":true' || fallar "No se pudo cambiar el tamaño de la pieza."
+  else
+    RE=$(node "$MOTOR/scripts/grafica_encuadre.js" "$DIRW/anterior.html" "/tmp/graf_res_$vid.html" "$AJUSTE" </dev/null)
+    echo "$(ts) encuadre: $RE" >> "$LOG"
+    echo "$RE" | grep -q '"ok":true' || fallar "No se pudo reencuadrar esa cara."
+  fi
 else
 
 PROMPT="Sos el DIRECTOR DE ARTE de ClaUsina. Segui EXACTAMENTE $MOTOR/scripts/grafica_gen.md. El contexto (formato, medidas con sangre, mensaje, estilo_md del negocio, datos de contacto, fondo) esta en /tmp/graf_ctx_$vid.json. Si hay fondo_url, USALO como imagen de fondo.$PREV Escribi UNA sola pagina HTML autocontenida en /tmp/graf_res_$vid.html, a la medida exacta que indica el contexto. No toques la base, ni git, ni publiques nada."
