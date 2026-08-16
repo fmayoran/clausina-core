@@ -616,7 +616,9 @@ async function ajustarEncuadre(negocioId, id, d) {
     cara: (d.cara === 'dorso' && g.caras === 2) ? 'dorso' : 'frente',
     size: ['cover', 'ancho', 'alto', 'contain'].includes(d.size) ? d.size : 'cover',
     pos_x: num(d.pos_x, 50, 0, 100), pos_y: num(d.pos_y, 50, 0, 100),
-    zoom: num(d.zoom, 100, 100, 300),
+    // Por debajo de 100 la foto no llega a los bordes y se ve el color de la pieza alrededor.
+    // Es una decisión de diseño, no un error: el tope en 100 era una suposición mía.
+    zoom: num(d.zoom, 100, 40, 300),
   };
   const COMO = { cover: 'que cubra toda la cara', ancho: 'a todo el ancho',
                  alto: 'a todo el alto', contain: 'entera, sin recortar' };

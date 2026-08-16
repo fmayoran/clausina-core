@@ -197,7 +197,7 @@
           <label style="flex:1;text-transform:none;letter-spacing:0;font-size:.66rem">Vertical
             <input type="range" id="d-py" min="0" max="100" value="50" oninput="dEncNum()"></label>
           <label style="flex:1;text-transform:none;letter-spacing:0;font-size:.66rem">Zoom
-            <input type="range" id="d-zoom" min="100" max="200" step="5" value="100" oninput="dEncNum()"></label>
+            <input type="range" id="d-zoom" min="40" max="200" step="5" value="100" oninput="dEncNum()"></label>
         </div>
         <div class="gsub" id="d-enc-nota" style="margin-top:6px"></div>
         <button class="abtn" id="d-enc-btn" onclick="aplicarEncuadre()" style="margin-top:8px">Aplicar encuadre</button>
@@ -566,8 +566,12 @@ function dEncNum(){
                  ancho:'la foto llega a los dos bordes; se recorta arriba y abajo',
                  alto:'la foto llega arriba y abajo; se recorta a los costados',
                  contain:'la foto entra entera, sin recortar' };
-  n.textContent = COMO[DENC] + (z!==100 ? ` · zoom ${z}%` : '') +
-    ` · se aplica al ${DCARA==='dorso'?'dorso':'frente'}`;
+  // Debajo de 100 la foto deja de llegar a los bordes: hay que decirlo antes, no descubrirlo al
+  // ver el resultado. Y con 'Entera' el zoom no hace nada, porque dejaría de entrar entera.
+  const aviso = DENC==='contain' && z!==100 ? ' · el zoom no aplica con «Entera»'
+    : (z<100 ? ` · zoom ${z}% — se va a ver el fondo de la pieza alrededor`
+             : (z!==100 ? ` · zoom ${z}%` : ''));
+  n.textContent = COMO[DENC] + aviso + ` · se aplica al ${DCARA==='dorso'?'dorso':'frente'}`;
 }
 async function aplicarEncuadre(){
   const b=document.getElementById('d-enc-btn'), err=document.getElementById('d-err');

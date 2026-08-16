@@ -62,10 +62,10 @@ const OBJ = { cover: 'cover', ancho: 'cover', alto: 'cover', contain: 'contain' 
 
     const nx = Math.max(0, Math.min(100, Number(aj.pos_x ?? 50)));
     const ny = Math.max(0, Math.min(100, Number(aj.pos_y ?? 50)));
-    const zoom = Math.max(100, Math.min(300, Number(aj.zoom ?? 100)));
+    const zoom = Math.max(40, Math.min(300, Number(aj.zoom ?? 100)));
     const base = SIZE[aj.size] || 'cover';
-    // El zoom multiplica el encuadre elegido. Con 'contain' no aplica: agrandarlo lo convierte en
-    // otro encuadre, y entonces el control diría una cosa y haría otra.
+    // El zoom multiplica el encuadre elegido. Con 'contain' no aplica: escalarlo deja de ser
+    // 'entera' y el control diría una cosa y haría otra.
     let size = base;
     if (zoom !== 100 && base !== 'contain') {
       size = base === '100% auto' ? `${zoom}% auto`
