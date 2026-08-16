@@ -147,6 +147,18 @@ if [ -n "$AJUSTE" ]; then
   # Dos ajustes determinísticos, los dos sin director de arte: reencuadrar la foto de una cara, o
   # cambiar el tamaño de la pieza entera. El segundo se reconoce por la marca 'reformato'.
   if echo "$AJUSTE" | grep -q '"reformato"'; then
+    # Un reformato parte del diseño COMO FUE DIBUJADO, no de una copia ya escalada: encadenar
+    # escalas apila CSS y multiplica errores. Se busca la última versión que no sea, ella misma,
+    # un reformato. Los reencuadres sí valen como base: no tocan el tamaño.
+    BASE=$(psql "SELECT coalesce(html_url,'') FROM contenido.grafica_version
+                  WHERE grafica_id='$gid' AND estado='lista' AND html_url IS NOT NULL
+                    AND (ajuste IS NULL OR ajuste->'reformato' IS NULL)
+                  ORDER BY nro DESC LIMIT 1;")
+    if [ -n "$BASE" ]; then
+      relb="${BASE#$BASE_URL/}"
+      [ -f "$MEDIA_HOST/$relb" ] && cp "$MEDIA_HOST/$relb" "$DIRW/anterior.html"
+      echo "$(ts) reformato desde $BASE" >> "$LOG"
+    fi
     RE=$(node "$MOTOR/scripts/grafica_reformato.js" "$DIRW/anterior.html" "/tmp/graf_res_$vid.html" \
          "$(python3 -c "import json;print(json.load(open('/tmp/graf_ctx_$vid.json'))['ancho_mm'])")" \
          "$(python3 -c "import json;print(json.load(open('/tmp/graf_ctx_$vid.json'))['alto_mm'])")" </dev/null)
