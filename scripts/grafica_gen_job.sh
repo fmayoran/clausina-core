@@ -131,8 +131,21 @@ if [ -n "$ANT" ]; then
 fi
 
 rm -f "/tmp/graf_res_$vid.html"
+
+# ── Atajo: si la versión sólo pide reencuadrar la foto, no hace falta el director de arte ──────
+# Es una propiedad de CSS. Pedírsela a un modelo cuesta minutos, gasta cupo de sesión y a veces no
+# acierta: en G-0003 hicieron falta ocho versiones para mover una foto, y dos murieron sin cupo.
+AJUSTE=$(psql "SELECT coalesce(ajuste::text,'') FROM contenido.grafica_version WHERE id='$vid';")
+if [ -n "$AJUSTE" ]; then
+  [ -f "$DIRW/anterior.html" ] || fallar "No hay un diseño anterior para reencuadrar."
+  RE=$(node "$MOTOR/scripts/grafica_encuadre.js" "$DIRW/anterior.html" "/tmp/graf_res_$vid.html" "$AJUSTE" </dev/null)
+  echo "$(ts) encuadre: $RE" >> "$LOG"
+  echo "$RE" | grep -q '"ok":true' || fallar "No se pudo reencuadrar esa cara."
+else
+
 PROMPT="Sos el DIRECTOR DE ARTE de ClaUsina. Segui EXACTAMENTE $MOTOR/scripts/grafica_gen.md. El contexto (formato, medidas con sangre, mensaje, estilo_md del negocio, datos de contacto, fondo) esta en /tmp/graf_ctx_$vid.json. Si hay fondo_url, USALO como imagen de fondo.$PREV Escribi UNA sola pagina HTML autocontenida en /tmp/graf_res_$vid.html, a la medida exacta que indica el contexto. No toques la base, ni git, ni publiques nada."
 timeout 900 claude -p "$PROMPT" --model sonnet --allowedTools Read Write >> "$LOG" 2>&1
+fi
 [ -s "/tmp/graf_res_$vid.html" ] || fallar "El director de arte no dejó un diseño. Suele ser un límite temporal de uso; probá de nuevo."
 
 # 4b) QR: si la pieza lo pidió, lo generamos y lo metemos en el hueco que dejó el diseño.

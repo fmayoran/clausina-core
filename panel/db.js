@@ -599,6 +599,42 @@ async function duplicarGrafica(negocioId, id, nombreNuevo) {
 }
 
 // Nueva iteración: se parte del diseño anterior y se aplica la instrucción de cambio.
+/**
+ * Reencuadrar la foto de una cara. NO pasa por el director de arte: es una propiedad de CSS y
+ * pedírsela a un modelo cuesta minutos, gasta cupo y a veces no acierta —en G-0003 hicieron falta
+ * ocho versiones para mover una foto—. Se guarda como una versión más, así queda en el historial
+ * y se puede volver atrás igual que cualquier otra.
+ */
+async function ajustarEncuadre(negocioId, id, d) {
+  const { rows: [g] } = await pool.query(
+    'SELECT id, caras FROM contenido.grafica WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
+  if (!g) return { ok: false, error: 'no_existe' };
+  const num = (v, def, min, max) => {
+    const n = Number(v); return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.round(n))) : def;
+  };
+  const aj = {
+    cara: (d.cara === 'dorso' && g.caras === 2) ? 'dorso' : 'frente',
+    size: ['cover', 'ancho', 'alto', 'contain'].includes(d.size) ? d.size : 'cover',
+    pos_x: num(d.pos_x, 50, 0, 100), pos_y: num(d.pos_y, 50, 0, 100),
+    zoom: num(d.zoom, 100, 100, 300),
+  };
+  const COMO = { cover: 'que cubra toda la cara', ancho: 'a todo el ancho',
+                 alto: 'a todo el alto', contain: 'entera, sin recortar' };
+  const texto = `Encuadre de la foto del ${aj.cara}: ${COMO[aj.size]}` +
+    (aj.zoom !== 100 ? `, zoom ${aj.zoom}%` : '') +
+    ((aj.pos_x !== 50 || aj.pos_y !== 50) ? `, posición ${aj.pos_x}%/${aj.pos_y}%` : '') + '.';
+  try {
+    await pool.query(
+      `INSERT INTO contenido.grafica_version (grafica_id, nro, instruccion, ajuste)
+         VALUES ($1, (SELECT coalesce(max(nro),0)+1 FROM contenido.grafica_version WHERE grafica_id=$1), $2, $3::jsonb)`,
+      [id, texto, JSON.stringify(aj)]);
+    return { ok: true };
+  } catch (e) {
+    if (e.code === '23505') return { ok: false, error: 'ya_en_curso' };
+    throw e;
+  }
+}
+
 async function iterarGrafica(negocioId, id, d) {
   const { rows: [g] } = await pool.query(
     'SELECT id, version_actual, caras FROM contenido.grafica WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
@@ -4258,7 +4294,7 @@ module.exports = {
   getLente, getLenteToken, guardarLente, getVerificacion, getSaludExterna,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,
   pedirGeneracion, getGeneracion,
-  FORMATOS, getGraficas, contarGraficasDescartadas, getGrafica, crearGrafica, iterarGrafica, duplicarGrafica, estadoGrafica,
+  FORMATOS, getGraficas, contarGraficasDescartadas, getGrafica, crearGrafica, iterarGrafica, ajustarEncuadre, duplicarGrafica, estadoGrafica,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,

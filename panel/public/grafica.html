@@ -180,6 +180,28 @@
         </div></div>
       <div class="fl"><label>Pedir un cambio <span class="hint">— parte del diseño actual</span></label>
         <textarea id="d-instr" placeholder="El título más grande. Sacá el QR."></textarea></div>
+      <!-- Encuadre: no pasa por el director de arte, así que sale en segundos y no gasta cupo.
+           Está antes del pedido por texto a propósito: mover o agrandar la foto es lo que más se
+           pide, y hacerlo por texto costaba ocho versiones. -->
+      <div class="fl" id="d-enc-box" style="display:none">
+        <label>Encuadre de la foto <span class="hint">— sale en segundos, sin gastar diseño</span></label>
+        <div class="opts" id="d-enc">
+          <div class="opt on" data-size="cover" onclick="dSetEnc('cover')">Cubrir</div>
+          <div class="opt" data-size="ancho" onclick="dSetEnc('ancho')">Todo el ancho</div>
+          <div class="opt" data-size="alto" onclick="dSetEnc('alto')">Todo el alto</div>
+          <div class="opt" data-size="contain" onclick="dSetEnc('contain')">Entera</div>
+        </div>
+        <div class="row2" style="margin-top:9px;gap:14px">
+          <label style="flex:1;text-transform:none;letter-spacing:0;font-size:.66rem">Horizontal
+            <input type="range" id="d-px" min="0" max="100" value="50" oninput="dEncNum()"></label>
+          <label style="flex:1;text-transform:none;letter-spacing:0;font-size:.66rem">Vertical
+            <input type="range" id="d-py" min="0" max="100" value="50" oninput="dEncNum()"></label>
+          <label style="flex:1;text-transform:none;letter-spacing:0;font-size:.66rem">Zoom
+            <input type="range" id="d-zoom" min="100" max="200" step="5" value="100" oninput="dEncNum()"></label>
+        </div>
+        <div class="gsub" id="d-enc-nota" style="margin-top:6px"></div>
+        <button class="abtn" id="d-enc-btn" onclick="aplicarEncuadre()" style="margin-top:8px">Aplicar encuadre</button>
+      </div>
       <div class="fl"><label>Imagen de fondo</label>
         <div class="gsub" id="d-fondo-cara" style="display:none;margin-bottom:7px"></div>
         <div class="opts" id="d-fondo">
@@ -498,6 +520,10 @@ async function refrescarDet(){
   document.getElementById('d-caras-box').style.display = g.caras===2 ? '' : 'none';
   if(g.caras!==2) DCARA='ambas'; else if(!['frente','dorso','ambas'].includes(DCARA)) DCARA='frente';
   dCaraUI(DCARA);
+  // Sin foto no hay nada que reencuadrar: el bloque no aparece.
+  const conFoto = !!(g.fondo_url || (DCARA==='dorso' && g.fondo_dorso_url));
+  document.getElementById('d-enc-box').style.display = conFoto ? '' : 'none';
+  if(conFoto) dEncNum();
   const vs=g.versiones||[], activa=vs.find(v=>v.estado==='lista')||vs[0];
   const enCurso=vs.some(v=>v.estado==='pendiente'||v.estado==='procesando');
   if(enCurso){
@@ -526,6 +552,38 @@ function verCara(btn,u,cara){
   const i=document.getElementById('d-img'); if(i) i.src=u;
   if(cara && document.getElementById('d-caras-box').style.display!=='none') dSetCara(cara);
 }
+// ── Encuadre ───────────────────────────────────────────────────────────────────────────────
+let DENC = 'cover';
+function dSetEnc(x){
+  DENC = x;
+  document.querySelectorAll('#d-enc .opt').forEach(o=>o.classList.toggle('on',o.dataset.size===x));
+  dEncNum();
+}
+function dEncNum(){
+  const z = +document.getElementById('d-zoom').value;
+  const n = document.getElementById('d-enc-nota');
+  const COMO = { cover:'la foto cubre toda la cara y se recorta lo que sobra',
+                 ancho:'la foto llega a los dos bordes; se recorta arriba y abajo',
+                 alto:'la foto llega arriba y abajo; se recorta a los costados',
+                 contain:'la foto entra entera, sin recortar' };
+  n.textContent = COMO[DENC] + (z!==100 ? ` · zoom ${z}%` : '') +
+    ` · se aplica al ${DCARA==='dorso'?'dorso':'frente'}`;
+}
+async function aplicarEncuadre(){
+  const b=document.getElementById('d-enc-btn'), err=document.getElementById('d-err');
+  err.textContent=''; b.disabled=true; b.textContent='Aplicando…';
+  try{
+    const d=await fetch('api/grafica/'+DET+'/encuadre',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ cara: DCARA==='dorso'?'dorso':'frente', size:DENC,
+        pos_x:+document.getElementById('d-px').value, pos_y:+document.getElementById('d-py').value,
+        zoom:+document.getElementById('d-zoom').value })}).then(r=>r.json());
+    if(d.ok){ toast('Reencuadrando — tarda segundos'); cargar(); refrescarDet(); }
+    else err.textContent = d.error==='ya_en_curso'?'Ya hay una versión generándose':'No se pudo aplicar';
+  }catch(e){ err.textContent='Error de conexión'; }
+  b.disabled=false; b.textContent='Aplicar encuadre';
+}
+
 async function iterar(){
   const t=document.getElementById('d-instr'), err=document.getElementById('d-err');
   const txt=t.value.trim(); err.textContent='';
