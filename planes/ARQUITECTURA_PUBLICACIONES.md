@@ -42,7 +42,8 @@ Disparador de publicación: **pendiente_aprobacion → aprobada**.
 - **PostgreSQL** (motor `crm_pgvector`, base propia **`claude`**, schema **`contenido`**): modelo multi-proyecto `proyectos`/`piezas`/`revisiones`/`media` (ver `scripts/db/README.md`). n8n se conecta nativamente. La base `claude` es independiente de `crm` (que usan otras apps).
 - **n8n** (proyecto `crm`): workflows de aprobación/publicación (ver `scripts/n8n/README.md`).
 - **Preview visual**: HTML servido en `cortafuego.ar/preview/<token>` con mockup del post de IG + tarjeta de novedades.
-- **Publicador**: n8n con la Instagram Graph API. El MCP actual (`tools/instagram-mcp/server.js`) usa `https://graph.instagram.com/v19.0` con `IG_TOKEN` + `IG_USER_ID`; ese mismo token/flujo se reutiliza en n8n.
+- **Publicador**: n8n con la Instagram Graph API, con la credencial derivada del token que vive cifrado en el perfil del negocio (ver la regla de secretos en CLAUDE.md).
+  El MCP `tools/instagram-mcp/` se dio de baja el 16/08/2026: no lo usaba ningún proceso y tenía el token escrito en el código. Nunca entró a git —el .gitignore lo excluía justamente por eso—, así que no quedó en el historial.
 
 ## Decisiones de diseño cerradas
 - **Novedades = regeneradas desde la DB** (no dinámicas): al publicar, n8n regenera `novedades.html` desde PostgreSQL y lo deploya. Así se mantiene el hosting estático y el SEO/performance logrado (100 SEO, 89 Perf).
