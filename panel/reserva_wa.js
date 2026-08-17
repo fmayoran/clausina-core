@@ -153,15 +153,15 @@ async function atender(negocio, mensaje) {
   }
 
   try {
+    // Un código aceptado REINICIA la elección de día, esté donde esté la conversación: la
+    // invitación redefine qué días y qué turnos valen. Sin esto, quien mandaba el código estando
+    // en el paso del día recibía "elegí un día de la lista" —de una lista que ya no correspondía—
+    // y no había forma de salir: el mismo mensaje, una y otra vez.
+    if (codigoTomado && ofreceReservas) {
+      await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
+      return await elegirDia(cfg, negocio, waId, '', datos);
+    }
     if (!paso) {
-      // Con una invitación válida en el primer mensaje no hay nada que preguntar: la persona ya
-      // dijo a qué viene. Presentarse ahí —"soy el asistente, ¿en qué te puedo ayudar?"— después
-      // de haberle dicho que le aplicamos la invitación a "esta reserva" suena a que no la
-      // estábamos escuchando. Se va derecho a elegir el día.
-      if (codigoTomado && ofreceReservas) {
-        await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
-        return await elegirDia(cfg, negocio, waId, entrada, datos);
-      }
       // Si el primer mensaje ya es una pregunta que el negocio tiene contestada, se contesta y
       // recién después se ofrece el menú: hacerlo al revés obliga a repetir la pregunta.
       if (await responderFaq(cfg, negocio, waId, entrada, canal)) {
@@ -430,7 +430,9 @@ async function elegirDia(cfg, negocio, waId, entrada, datos = {}) {
 
 async function elegirTurno(cfg, negocio, waId, entrada, datos) {
   const fecha = entrada.startsWith('d:') ? entrada.slice(2) : null;
-  if (!fecha) { await decir(cfg, waId, 'Elegí un día de la lista, por favor.', negocio.id); return true; }
+  // Sin la lista a mano, "elegí un día de la lista" es un callejón: la persona no tiene de dónde
+  // elegir. Se vuelve a ofrecer en vez de repetir el reproche.
+  if (!fecha) return await elegirDia(cfg, negocio, waId, entrada, datos);
   let turnos = (await db.disponibilidadPublica(negocio.id, fecha, fecha));
   const lim = await limiteInvitacion(negocio, datos);
   if (lim && lim.turnos.length) turnos = turnos.filter(t => lim.turnos.includes(t.turno_id));
