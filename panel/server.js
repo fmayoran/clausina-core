@@ -950,6 +950,11 @@ app.post('/api/grafica', async (req, res) => {
   } catch (e) { console.error('grafica-crear', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 // Iterar: nueva versión con la instrucción de cambio (parte del diseño anterior).
+// Renombrar: no genera versión ni toca el diseño.
+app.post('/api/grafica/:id/nombre', async (req, res) => {
+  try { res.json(await db.renombrarGrafica(req.negocioId, req.params.id, (req.body || {}).nombre)); }
+  catch (e) { console.error('grafica-nombre', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
 // Reencuadre de la foto: instantáneo y sin director de arte.
 app.post('/api/grafica/:id/encuadre', async (req, res) => {
   try { res.json(await db.ajustarEncuadre(req.negocioId, req.params.id, req.body || {})); }

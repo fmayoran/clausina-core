@@ -169,7 +169,13 @@
 
 <!-- Detalle / iteración -->
 <div id="ov-det" class="gov"><div class="gbox wide">
-  <div class="ghd"><b id="d-nombre">Pieza</b><span id="d-meta"></span><button class="x" onclick="cerrar('ov-det')">×</button></div>
+  <div class="ghd"><b id="d-nombre" title="Tocá para renombrar" onclick="editarNombre()"
+        style="cursor:text">Pieza</b>
+    <input id="d-nombre-inp" style="display:none;background:#0c0c0a;border:1px solid var(--pend);
+        border-radius:6px;color:var(--white);font-family:'Inter Tight',sans-serif;font-size:16px;
+        padding:3px 8px;max-width:340px" onblur="guardarNombre()"
+        onkeydown="if(event.key==='Enter')this.blur(); if(event.key==='Escape'){this.dataset.cancel='1';this.blur();}">
+    <span id="d-meta"></span><button class="x" onclick="cerrar('ov-det')">×</button></div>
   <div class="gbd"><div class="dwrap">
     <div class="dprev" id="d-prev"></div>
     <div>
@@ -246,6 +252,8 @@ function cerrar(id){ document.getElementById(id).style.display='none'; if(id==='
 
 const DATOS = [['direccion','Dirección'],['telefono','Teléfono'],['whatsapp','WhatsApp'],['instagram','Instagram'],['web','Web'],['qr','Código QR']];
 let FORMATOS=[], PIEZAS=[], FONDO_MODO='sin_fondo', FONDO_URL='', CARAS=1, DET=null, _poll=null, DCARA='frente';
+// La pieza abierta, para poder renombrarla sin volver a pedirla.
+let DET_G=null;
 let QRDEST='web';
 function setQr(d){
   QRDEST=d;
@@ -519,6 +527,7 @@ async function refrescarDet(){
   if(!DET) return;
   let g; try{ g=await fetch('api/grafica/'+DET).then(r=>r.json()); }catch(e){ return; }
   if(g.error) return;
+  DET_G = g;
   const f=FORMATOS.find(x=>x.id===g.formato);
   document.getElementById('d-nombre').textContent = (g.numero? cod(g.numero)+' · ':'') + g.nombre;
   document.getElementById('d-meta').textContent=`${f?f.label:g.formato} · ${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm · ${g.estado}`;
@@ -596,6 +605,27 @@ async function aplicarEncuadre(){
     else err.textContent = d.error==='ya_en_curso'?'Ya hay una versión generándose':'No se pudo aplicar';
   }catch(e){ err.textContent='Error de conexión'; }
   b.disabled=false; b.textContent='Aplicar encuadre';
+}
+
+// Renombrar en el lugar: el nombre es una etiqueta del panel, no parte del diseño, así que
+// cambiarlo no genera una versión ni vuelve a dibujar nada.
+function editarNombre(){
+  const b=document.getElementById('d-nombre'), i=document.getElementById('d-nombre-inp');
+  i.value = (DET_G && DET_G.nombre) || b.textContent.replace(/^G-\d+\s·\s/, '');
+  b.style.display='none'; i.style.display=''; i.focus(); i.select();
+}
+async function guardarNombre(){
+  const b=document.getElementById('d-nombre'), i=document.getElementById('d-nombre-inp');
+  const nuevo = i.value.trim();
+  i.style.display='none'; b.style.display='';
+  if(i.dataset.cancel){ delete i.dataset.cancel; return; }
+  if(!nuevo || !DET_G || nuevo === DET_G.nombre) return;
+  try{
+    const d=await fetch('api/grafica/'+DET+'/nombre',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({nombre:nuevo})}).then(r=>r.json());
+    if(d.ok){ toast('Renombrada'); cargar(); refrescarDet(); }
+    else toast(d.error==='sin_nombre'?'El nombre no puede quedar vacío':'No se pudo renombrar',true);
+  }catch(e){ toast('Error de conexión',true); }
 }
 
 async function iterar(){

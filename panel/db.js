@@ -640,6 +640,20 @@ async function ajustarEncuadre(negocioId, id, d) {
   }
 }
 
+/**
+ * Renombrar una pieza. Es lo único que se puede cambiar sin generar una versión: el nombre es
+ * cómo la llama el negocio en su panel y no aparece en ninguna parte del diseño, así que
+ * rediseñarla para cambiarlo sería tirar el trabajo hecho por una etiqueta.
+ */
+async function renombrarGrafica(negocioId, id, nombre) {
+  const n = String(nombre || '').trim().slice(0, 120);
+  if (!n) return { ok: false, error: 'sin_nombre' };
+  const { rows: [g] } = await pool.query(
+    'UPDATE contenido.grafica SET nombre=$3, actualizado_en=now() WHERE id=$1 AND negocio_id=$2 RETURNING numero, nombre',
+    [id, negocioId, n]);
+  return g ? { ok: true, nombre: g.nombre } : { ok: false, error: 'no_existe' };
+}
+
 async function iterarGrafica(negocioId, id, d) {
   const { rows: [g] } = await pool.query(
     'SELECT id, version_actual, caras FROM contenido.grafica WHERE id=$1 AND negocio_id=$2', [id, negocioId]);
@@ -4299,7 +4313,7 @@ module.exports = {
   getLente, getLenteToken, guardarLente, getVerificacion, getSaludExterna,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,
   pedirGeneracion, getGeneracion,
-  FORMATOS, getGraficas, contarGraficasDescartadas, getGrafica, crearGrafica, iterarGrafica, ajustarEncuadre, duplicarGrafica, estadoGrafica,
+  FORMATOS, getGraficas, contarGraficasDescartadas, getGrafica, crearGrafica, iterarGrafica, ajustarEncuadre, renombrarGrafica, duplicarGrafica, estadoGrafica,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
   ensureCarpetasBiblioteca, crearCarpetaBiblioteca, delCarpetaBiblioteca, crearItemBiblioteca, moverItemBiblioteca, delItemBiblioteca,
   pedirPropuestas, addMaterial, getMateriales, getMaterialFile, delMaterial,
