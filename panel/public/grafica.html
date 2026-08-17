@@ -232,9 +232,13 @@
         <a class="abtn" id="d-png" target="_blank" rel="noopener" style="display:none">PNG</a>
       </div>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="abtn ok" style="flex:1" onclick="setEstado('aprobada')">Aprobar</button>
+        <!-- Aprobar aparecía también en las ya aprobadas: un botón que no hace nada enseña a
+             desconfiar del resto. En su lugar va la vuelta atrás, que es la acción que queda. -->
+        <button class="abtn ok" style="flex:1" id="d-aprobar" onclick="setEstado('aprobada')">Aprobar</button>
+        <button class="abtn" style="flex:1;display:none" id="d-desaprobar"
+          onclick="setEstado('lista')" title="Vuelve a quedar sin aprobar">Quitar aprobación</button>
         <button class="abtn" onclick="duplicar()" title="Crear una pieza nueva igual a esta">Duplicar</button>
-        <button class="abtn" onclick="setEstado('descartada')">Descartar</button>
+        <button class="abtn" id="d-descartar" onclick="setEstado('descartada')">Descartar</button>
       </div>
     </div>
   </div></div>
@@ -562,6 +566,11 @@ async function refrescarDet(){
   pdf.style.display = activa&&activa.pdf_url ? '' : 'none'; if(activa&&activa.pdf_url) pdf.href=activa.pdf_url;
   png.style.display = activa&&activa.png_url ? '' : 'none'; if(activa&&activa.png_url) png.href=activa.png_url;
   const it=document.getElementById('d-iter'); it.disabled=enCurso; it.textContent=enCurso?'Diseñando…':'Generar nueva versión';
+  // Los botones de estado muestran sólo lo que se puede hacer desde donde está la pieza.
+  const ap = g.estado === 'aprobada', des = g.estado === 'descartada';
+  document.getElementById('d-aprobar').style.display = ap ? 'none' : '';
+  document.getElementById('d-desaprobar').style.display = ap ? '' : 'none';
+  document.getElementById('d-descartar').style.display = des ? 'none' : '';
 }
 function verVersion(u){ if(u){ const i=document.getElementById('d-img'); if(i) i.src=u; else document.getElementById('d-prev').innerHTML=`<img id="d-img" src="${esc(u)}">`; } }
 // Mirar una cara cambia a qué cara apunta el pedido: pedir un cambio mientras se mira el dorso
@@ -666,10 +675,13 @@ async function duplicar(){
 
 async function setEstado(e){
   if(!DET) return;
-  if(e==='descartada' && !confirm('¿Descartar esta pieza?')) return;
+  if(e==='descartada' && !confirm('¿Descartar esta pieza?\n\nSale de la grilla pero no se borra: se puede ver de nuevo con "ver descartadas".')) return;
   try{
     await fetch('api/grafica/'+DET+'/estado',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({estado:e})});
-    toast(e==='aprobada'?'Pieza aprobada':'Pieza descartada'); cerrar('ov-det'); cargar();
+    toast({aprobada:'Pieza aprobada', descartada:'Pieza descartada',
+           lista:'Aprobación quitada — vuelve a En preparación'}[e] || 'Listo');
+    // Quitar la aprobación no es una salida: la pieza sigue abierta para seguir trabajándola.
+    if(e==='lista'){ cargar(); refrescarDet(); } else { cerrar('ov-det'); cargar(); }
   }catch(_){ toast('No se pudo',true); }
 }
 
