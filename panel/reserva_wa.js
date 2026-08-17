@@ -343,6 +343,48 @@ async function recibirConsulta(cfg, negocio, waId, texto, canal) {
 
 // Los días que se ofrecen salen de la MISMA disponibilidad que la página pública: ya viene
 // filtrada por anticipación, bloqueos y lugar libre.
+/**
+ * Qué deja hacer la invitación que la persona ya presentó: hasta qué día, qué días de la semana,
+ * qué turnos y desde cuántas personas. Devuelve null si no hay invitación en juego.
+ *
+ * Se relee en cada paso y no se guarda en la conversación: una invitación puede vencer o agotarse
+ * entre que se elige el día y se confirma, y el chat no puede seguir ofreciendo lo que ya no vale.
+ */
+async function limiteInvitacion(negocio, datos) {
+  if (!datos || !datos.invitacion) return null;
+  const r = await db.consultarInvitacion(datos.invitacion, negocio.id).catch(() => null);
+  if (!r || !r.ok) return null;
+  const c = (r.invitacion && r.invitacion.condiciones) || {};
+  return {
+    vence: soloFecha(r.invitacion.vence_en),
+    dias: Array.isArray(c.dias) ? c.dias : [],
+    turnos: Array.isArray(c.turnos) ? c.turnos : [],
+    minimo: c.cantidad_min || null,
+    texto: r.texto,
+  };
+}
+
+/**
+ * AAAA-MM-DD de lo que venga. Una columna `date` vuelve de la base como objeto Date, y recortarla
+ * como texto da "Tue Aug 18": comparado contra "2026-08-18" no coincide nunca y el filtro se
+ * llevaba puestos TODOS los días.
+ */
+function soloFecha(v) {
+  if (!v) return null;
+  if (v instanceof Date) {
+    const p = (n) => String(n).padStart(2, '0');
+    return `${v.getFullYear()}-${p(v.getMonth() + 1)}-${p(v.getDate())}`;
+  }
+  return String(v).slice(0, 10);
+}
+
+/** El isodow de una fecha, sin pasar por zonas horarias: la fecha ya viene como AAAA-MM-DD. */
+function isodow(fecha) {
+  const [a, m, d] = String(fecha).split('-').map(Number);
+  const n = new Date(Date.UTC(a, m - 1, d)).getUTCDay();
+  return n === 0 ? 7 : n;
+}
+
 async function elegirDia(cfg, negocio, waId, entrada, datos = {}) {
   if (entrada === 'no') {
     await db.borrarConversacion(negocio.id, waId);
@@ -352,10 +394,23 @@ async function elegirDia(cfg, negocio, waId, entrada, datos = {}) {
   const hoy = new Date().toISOString().slice(0, 10);
   const hasta = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
   const turnos = await db.disponibilidadPublica(negocio.id, hoy, hasta);
-  const fechas = [...new Set(turnos.map(t => t.fecha))].sort().slice(0, 10);
+  // La invitación acota el calendario ANTES de mostrarlo. Ofrecer treinta días y rechazar al final
+  // el que la persona eligió es hacerle perder el tiempo con una regla que ya conocíamos.
+  const lim = await limiteInvitacion(negocio, datos);
+  let libres = turnos;
+  if (lim) {
+    libres = turnos.filter(t =>
+      (!lim.vence || t.fecha <= lim.vence) &&
+      (!lim.dias.length || lim.dias.includes(isodow(t.fecha))) &&
+      (!lim.turnos.length || lim.turnos.includes(t.turno_id)));
+  }
+  const fechas = [...new Set(libres.map(t => t.fecha))].sort().slice(0, 10);
   if (!fechas.length) {
     await db.borrarConversacion(negocio.id, waId);
-    await decir(cfg, waId, 'Por ahora no tengo días disponibles. Probá más adelante.', negocio.id);
+    await decir(cfg, waId, lim
+      ? 'Tu invitación no tiene días disponibles: puede que ya haya pasado la fecha en la que valía. ' +
+        'Si querés reservar igual, escribime "reservar" sin el código.'
+      : 'Por ahora no tengo días disponibles. Probá más adelante.', negocio.id);
     return true;
   }
   // Se conserva lo ya sabido: la fecha y el turno se descartan porque son justamente lo que se
@@ -364,15 +419,21 @@ async function elegirDia(cfg, negocio, waId, entrada, datos = {}) {
     { cantidad: datos.cantidad, nombre: datos.nombre, pedir_nombre: datos.pedir_nombre,
       invitacion: datos.invitacion });
   const filas = fechas.map(f => ({ id: 'd:' + f, titulo: dia(f) }));
-  await decirOpciones(cfg, waId, '¿Para qué día?', filas.map(f => f.titulo), negocio.id,
-    () => wa.enviarLista(waId, '¿Para qué día?', 'Ver días', filas, cfg));
+  // Con la lista recortada hay que decir por qué: si no, parece que el local no tiene lugar.
+  const pregunta = lim && fechas.length <= 3
+    ? `Tu invitación vale ${fechas.length === 1 ? 'sólo el ' + dia(fechas[0]) : 'para estos días'}. ¿Te sirve?`
+    : '¿Para qué día?';
+  await decirOpciones(cfg, waId, pregunta, filas.map(f => f.titulo), negocio.id,
+    () => wa.enviarLista(waId, pregunta, 'Ver días', filas, cfg));
   return true;
 }
 
 async function elegirTurno(cfg, negocio, waId, entrada, datos) {
   const fecha = entrada.startsWith('d:') ? entrada.slice(2) : null;
   if (!fecha) { await decir(cfg, waId, 'Elegí un día de la lista, por favor.', negocio.id); return true; }
-  const turnos = (await db.disponibilidadPublica(negocio.id, fecha, fecha));
+  let turnos = (await db.disponibilidadPublica(negocio.id, fecha, fecha));
+  const lim = await limiteInvitacion(negocio, datos);
+  if (lim && lim.turnos.length) turnos = turnos.filter(t => lim.turnos.includes(t.turno_id));
   if (!turnos.length) {
     await decir(cfg, waId, 'Ese día se quedó sin lugar. Escribime "reservar" y elegimos otro.', negocio.id);
     await db.borrarConversacion(negocio.id, waId);
@@ -404,6 +465,14 @@ async function pedirNombre(cfg, negocio, waId, entrada, datos) {
   const cfgRes = await db.getConfigReservas(negocio.id);
   if (!n || n < cfgRes.cantidad_min) {
     await decir(cfg, waId, `Necesito un número. ¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}?`, negocio.id);
+    return true;
+  }
+  // El mínimo del beneficio se avisa acá y no al confirmar: enterarse al final de que la
+  // invitación pedía más gente obliga a rehacer toda la conversación.
+  const lim = await limiteInvitacion(negocio, datos);
+  if (lim && lim.minimo && n < lim.minimo) {
+    await decir(cfg, waId, `Tu invitación aplica desde ${lim.minimo} ${plural(cfgRes.unidad, lim.minimo)}. ` +
+      `¿Van a ser ${lim.minimo} o más? Si preferís reservar para ${n}, escribime "reservar" sin el código.`, negocio.id);
     return true;
   }
   return await avanzar(cfg, negocio, waId, { ...datos, cantidad: n });
