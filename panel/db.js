@@ -1701,6 +1701,25 @@ async function muestraBeneficio(negocioId, beneficioId) {
   };
 }
 
+/**
+ * Las reservas que trajo un beneficio. Es el detrás del número de "reservadas": sin poder abrirlo,
+ * un 3 no dice quiénes son, ni si ya vinieron, ni si el descuento se llegó a aplicar.
+ */
+async function reservasDeBeneficio(negocioId, beneficioId) {
+  const { rows } = await pool.query(
+    `SELECT r.id, r.fecha::text, r.cantidad, r.estado,
+            coalesce(t.nombre_publico, t.nombre) AS turno, to_char(t.hora_desde,'HH24:MI') AS hora,
+            c.nombre AS cliente, c.telefono, i.codigo, u.estado AS uso, u.tomada_en
+       FROM contenido.invitacion_uso u
+       JOIN contenido.invitacion i ON i.id = u.invitacion_id
+       JOIN contenido.reserva r ON r.id = u.reserva_id
+       JOIN contenido.turno t ON t.id = r.turno_id
+       JOIN contenido.cliente c ON c.id = r.cliente_id
+      WHERE i.beneficio_id = $1 AND u.negocio_id = $2 AND u.estado IN ('tomada','consumida')
+      ORDER BY r.fecha DESC, t.hora_desde DESC`, [beneficioId, negocioId]);
+  return rows;
+}
+
 async function guardarBeneficio(negocioId, id, d) {
   const nombre = String(d.nombre || '').trim().slice(0, 120);
   if (!nombre) { const e = new Error('nombre'); e.code = 'falta_nombre'; throw e; }
@@ -4287,6 +4306,7 @@ module.exports = {
   getUsuarioPorEmail, getUsuario, getUsuarios, tocarAcceso, crearUsuario, actualizarUsuario, setNegociosDeUsuario,
   completarPerfil, marcarInvitado, getUsuarioPorWhatsapp, whatsappEnUso, logWhatsapp, whatsappYaVisto, transcripcionDe, fichaNegocio, clientePorTelefono,
   TIPOS_BENEFICIO, textoBeneficio, textoCobertura, getBeneficios, guardarBeneficio,
+  reservasDeBeneficio,
   muestraBeneficio, canjearEnMostrador,
 
   getSkills, getSkill, guardarSkill, getSkillHistorial, getSkillVersion,

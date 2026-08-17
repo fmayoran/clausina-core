@@ -1130,6 +1130,11 @@ app.put('/api/invitaciones/beneficios/:id', guardarBen);
 // Ver cómo va a quedar la invitación ANTES de emitir códigos e imprimirlos. Devuelve lo mismo
 // que el pase real, armado desde el beneficio, con un código de mentira bien marcado: descubrir
 // que el frente o las condiciones estaban mal después de la tirada sale caro.
+// El detrás del número de "reservadas": quiénes son y en qué estado están.
+app.get('/api/invitaciones/beneficios/:id/reservas', async (req, res) => {
+  try { res.json({ reservas: await db.reservasDeBeneficio(req.negocioId, String(req.params.id)) }); }
+  catch (e) { console.error('reservas beneficio', e.message); res.status(500).json({ error: 'db' }); }
+});
 app.get('/api/invitaciones/beneficios/:id/muestra', async (req, res) => {
   try {
     const m = await db.muestraBeneficio(req.negocioId, String(req.params.id));

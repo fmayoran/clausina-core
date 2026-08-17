@@ -229,6 +229,16 @@
   </div>
 </div></div>
 
+<!-- ══════════ Diálogo: las reservas que trajo un beneficio ══════════ -->
+<div class="ov" id="ov-res"><div class="dlg" style="width:min(860px,100%)">
+  <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px">
+    <h2 class="display font-bold text-lg" id="res-tit">Reservas</h2>
+    <button class="iconbtn" style="margin-left:auto" onclick="cerrar('ov-res')" title="Cerrar"
+      aria-label="Cerrar">×</button>
+  </div>
+  <div style="overflow:auto" id="res-cuerpo"></div>
+</div></div>
+
 <!-- ══════════ Diálogo: cómo queda la invitación ══════════ -->
 <div class="ov" id="ov-previo"><div class="dlg previo">
   <h2 class="display font-bold text-lg mb-1">Así queda la invitación</h2>
@@ -341,7 +351,10 @@ async function cargarBeneficios() {
       <!-- Reservadas y usadas son cosas distintas: la primera es que alguien vino a reservar con
            el código, la segunda que en el mostrador lo aplicaron de verdad. Mezclarlas escondía
            justamente la brecha que hay que mirar. -->
-      <td class="mono2">${b.reservadas || 0}${b.consumidas ? ` · ${b.consumidas} usada${b.consumidas === 1 ? '' : 's'}` : ''}</td>
+      <td class="mono2">${b.reservadas
+        ? `<button class="cod" style="font-size:.8rem" onclick='verReservas(${JSON.stringify(b.id)},${JSON.stringify(b.nombre)})'
+             title="Ver las reservas">${b.reservadas}</button>` : '0'}${
+        b.consumidas ? ` · ${b.consumidas} usada${b.consumidas === 1 ? '' : 's'}` : ''}</td>
       <td class="acciones">
         <button class="iconbtn" onclick='verMuestra(${JSON.stringify(b.id)})'
           title="Ver cómo queda la invitación" aria-label="Ver cómo queda la invitación">
@@ -401,6 +414,29 @@ function abrirBeneficio(id) {
   $('b-err').textContent = '';
   pintarAyudaTipo();
   $('ov-ben').classList.add('on');
+}
+
+// Las reservas que trajo el beneficio. El número solo no dice quiénes son ni si ya vinieron.
+async function verReservas(id, nombre) {
+  $('res-tit').textContent = 'Reservas · ' + nombre;
+  $('res-cuerpo').innerHTML = '<div class="vacio">buscando…</div>';
+  $('ov-res').classList.add('on');
+  try {
+    const d = await fetch(`api/invitaciones/beneficios/${encodeURIComponent(id)}/reservas`).then(r => r.json());
+    const l = d.reservas || [];
+    if (!l.length) { $('res-cuerpo').innerHTML = '<div class="vacio">Todavía no hay reservas con este beneficio.</div>'; return; }
+    const EST = { tomada: 'sin aplicar', consumida: 'aplicada' };
+    $('res-cuerpo').innerHTML = `<table class="mtx"><thead><tr>
+        <th>Cuándo</th><th>Cliente</th><th>Personas</th><th>Código</th><th>Reserva</th><th>Descuento</th>
+      </tr></thead><tbody>` + l.map(r => `<tr>
+        <td class="mono2">${escapar(fecha(r.fecha))} · ${escapar(r.turno)} ${escapar(r.hora)}</td>
+        <td>${escapar(r.cliente || '—')}<div class="mono2">${escapar(r.telefono || '')}</div></td>
+        <td class="mono2">${r.cantidad}</td>
+        <td class="mono2">${escapar(bonito(r.codigo))}</td>
+        <td><span class="pill e-${r.estado === 'confirmada' ? 'activa' : 'en_uso'}">${escapar(r.estado)}</span></td>
+        <td><span class="pill ${r.uso === 'consumida' ? 'e-activa' : 'e-en_uso'}">${EST[r.uso] || r.uso}</span></td>
+      </tr>`).join('') + '</tbody></table>';
+  } catch (e) { $('res-cuerpo').innerHTML = '<div class="vacio">No pude cargarlas.</div>'; }
 }
 
 function verMuestra(id) {
