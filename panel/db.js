@@ -1633,7 +1633,13 @@ async function getBeneficios(negocioId) {
             (SELECT count(*)::int FROM contenido.invitacion i WHERE i.beneficio_id=b.id) AS invitaciones,
             (SELECT count(*)::int FROM contenido.invitacion_uso u
                WHERE u.invitacion_id IN (SELECT id FROM contenido.invitacion WHERE beneficio_id=b.id)
-                 AND u.estado='consumida') AS consumidas
+                 AND u.estado='consumida') AS consumidas,
+            -- Reservadas: las que ya trajeron una reserva. Incluye las que todavía no se
+            -- aplicaron en el mostrador, porque el cupo ya está comprometido; quedan afuera las
+            -- que se liberaron o se perdieron por no-show.
+            (SELECT count(*)::int FROM contenido.invitacion_uso u
+               WHERE u.invitacion_id IN (SELECT id FROM contenido.invitacion WHERE beneficio_id=b.id)
+                 AND u.estado IN ('tomada','consumida')) AS reservadas
        FROM contenido.beneficio b
        LEFT JOIN contenido.grafica gf ON gf.id = b.frente_grafica_id
       WHERE b.negocio_id=$1 ORDER BY b.activo DESC, b.creado_en DESC`,

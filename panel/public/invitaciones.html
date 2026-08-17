@@ -148,7 +148,7 @@
       <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card scrollx">
         <table class="mtx">
           <thead><tr><th>Nombre</th><th>Beneficio</th><th>Cuándo aplica</th>
-                     <th>Si no viene</th><th>Invitaciones</th><th></th></tr></thead>
+                     <th>Si no viene</th><th>Emitidas</th><th>Reservadas</th><th></th></tr></thead>
           <tbody id="tb-ben"></tbody>
         </table>
       </div>
@@ -337,7 +337,11 @@ async function cargarBeneficios() {
       <td>${escapar(b.texto)}</td>
       <td class="mono2">${escapar(condicionesTxt(b))}</td>
       <td class="mono2">${b.no_show === 'quemar' ? 'se pierde' : 'se libera'}</td>
-      <td class="mono2">${b.invitaciones} emitidos${b.consumidas ? ' · ' + b.consumidas + ' usados' : ''}</td>
+      <td class="mono2">${b.invitaciones}</td>
+      <!-- Reservadas y usadas son cosas distintas: la primera es que alguien vino a reservar con
+           el código, la segunda que en el mostrador lo aplicaron de verdad. Mezclarlas escondía
+           justamente la brecha que hay que mirar. -->
+      <td class="mono2">${b.reservadas || 0}${b.consumidas ? ` · ${b.consumidas} usada${b.consumidas === 1 ? '' : 's'}` : ''}</td>
       <td class="acciones">
         <button class="iconbtn" onclick='verMuestra(${JSON.stringify(b.id)})'
           title="Ver cómo queda la invitación" aria-label="Ver cómo queda la invitación">
@@ -345,7 +349,7 @@ async function cargarBeneficios() {
         <button class="iconbtn" onclick='abrirBeneficio(${JSON.stringify(b.id)})' title="Editar"
           aria-label="Editar"><i data-lucide="pencil" class="w-4 h-4"></i></button>
       </td>
-    </tr>`).join('') : '<tr><td colspan="6" class="vacio">Todavía no hay beneficios. Creá uno para poder emitir códigos.</td></tr>';
+    </tr>`).join('') : '<tr><td colspan="7" class="vacio">Todavía no hay beneficios. Creá uno para poder emitir códigos.</td></tr>';
 
   // Los selectores de beneficio de las dos pantallas salen de la misma lista.
   const activos = BENEFICIOS.filter(b => b.activo);
