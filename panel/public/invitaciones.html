@@ -116,7 +116,8 @@
       <div class="barra">
         <select id="f-ben" style="width:auto;min-width:190px" onchange="cargarInv()"></select>
         <select id="f-estado" style="width:auto" onchange="pintarInv()">
-          <option value="">Todos los estados</option>
+          <option value="">Todos, menos las anuladas</option>
+          <option value="todas">Todos los estados</option>
           <option value="activa">Activas</option>
           <option value="en_uso">En uso</option>
           <option value="agotada">Agotadas</option>
@@ -441,16 +442,26 @@ async function cargarInv() {
 function filtradas() {
   const est = $('f-estado').value;
   const q = $('f-txt').value.trim().toLowerCase();
+  // Sin estado elegido se ocultan las anuladas: son las que alguien ya decidió sacar de circulación,
+  // y con una campaña grande tapan a las que sí están vivas. Se ven pidiéndolas.
   return INV.filter(i =>
-    (!est || i.estado === est) &&
+    (est === 'todas' ? true : (est ? i.estado === est : i.estado !== 'anulada')) &&
     (!q || [i.beneficio, i.etiqueta, i.codigo, i.texto].some(x =>
       String(x || '').toLowerCase().includes(q))));
 }
 
+function verAnuladas() { $('f-estado').value = 'anulada'; pintarInv(); }
+
 function pintarInv() {
   const lista = filtradas();
-  $('cuenta-cod').textContent = lista.length === INV.length
-    ? INV.length + ' invitación(es)' : lista.length + ' de ' + INV.length;
+  // Cuántas quedaron fuera y por qué: un contador que dice "3 de 12" sin explicar la diferencia
+  // hace pensar que se perdieron nueve.
+  const anuladas = INV.filter(i => i.estado === 'anulada').length;
+  const ocultas = !$('f-estado').value && anuladas;
+  $('cuenta-cod').innerHTML = (lista.length === INV.length
+    ? INV.length + ' invitación(es)' : lista.length + ' de ' + INV.length) +
+    (ocultas ? ` · <a onclick="verAnuladas()" style="cursor:pointer;text-decoration:underline">` +
+      (anuladas === 1 ? 'ver 1 anulada' : `ver ${anuladas} anuladas`) + '</a>' : '');
   $('tb-cod').innerHTML = lista.length ? lista.map(i => `
     <tr>
       <td><button class="cod" onclick='copiar(${JSON.stringify(i.codigo)})'
