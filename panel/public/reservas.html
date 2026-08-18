@@ -118,6 +118,14 @@
   .tcup{font-family:'JetBrains Mono',monospace;font-size:.68rem;min-width:74px;text-align:right;color:var(--u-mut);}
   .tcup b{color:var(--u-fg);}
   .tbloq{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-medio);}
+  /* Un día cerrado tiene que leerse como cerrado antes de leer los turnos. */
+  .dia.cerrado{opacity:.9;}
+  .dcerrado{font-family:'JetBrains Mono',monospace;font-size:.6rem;text-transform:uppercase;
+            letter-spacing:.08em;color:var(--u-medio);border:1px solid var(--u-medio);
+            border-radius:99px;padding:2px 8px;}
+  .diahead .der{margin-left:auto;}
+  /* En la grilla del mes el día cerrado va rayado: se distingue del día sin turnos, que está vacío. */
+  .celda.cerr{background:repeating-linear-gradient(135deg,transparent 0 5px,var(--u-medio-suave) 5px 10px);}
   .vacio{font-family:'JetBrains Mono',monospace;font-size:.64rem;color:var(--u-mut);padding:6px 0;}
   /* Selector de vista: mes / semana / día */
   .vistas{display:inline-flex;border:1px solid var(--u-line);border-radius:8px;overflow:hidden;}
@@ -379,7 +387,10 @@
       </div>
 
       <div class="card2">
-        <div class="sec">Bloqueos <span class="der mono2">excepciones: feriados, eventos privados</span></div>
+        <div class="sec">Bloqueos <span class="der mono2">no toca las reservas ya tomadas</span></div>
+        <p class="mono2" style="margin:-6px 0 14px;line-height:1.6;">Cierra un día entero o un solo
+          turno para <b>nuevas</b> reservas —panel, WhatsApp y la página pública—. Lo que ya estaba
+          reservado sigue en pie. También se cierra un día desde el calendario.</p>
         <div class="grid3" style="align-items:end;margin-bottom:16px;">
           <div><label for="b-fecha-txt">Fecha</label>
             <div class="fecha" id="fd-bloqueo">
@@ -595,6 +606,7 @@ document.addEventListener('click', e => {
 // cómo se navega. La vista mes agrega arriba la grilla compacta para el pantallazo rápido.
 let MES = null, SEL = null, VISTA = 'mes';
 let RESV = {};   // reservas indexadas por `fecha|turno_id`
+let BLOQ = {};   // fecha -> { dia: bloqueo|null, turnos: {turno_id: bloqueo} }
 
 const primerDia = iso => iso.slice(0, 8) + '01';
 const lunesDe = iso => { const d = new Date(iso + 'T12:00:00Z');
@@ -663,7 +675,10 @@ function pintarGrilla() {
              `${t.capacidad - t.ocupado} libre de ${t.capacidad}">` +
              `<i style="width:${conf}%"></i><u style="left:${conf}%;width:${pend}%"></u></span>`;
     }).join('');
-    celdas.push(`<button class="celda${f === hoy() ? ' hoy' : ''}${f === SEL ? ' sel' : ''}" onclick="verDia('${f}')">
+    // Un día cerrado se tiene que ver en la grilla del mes: es donde uno busca "qué días cerramos".
+    const cerrado = ((BLOQ[f] || {}).dia) ? ' cerr' : '';
+    celdas.push(`<button class="celda${f === hoy() ? ' hoy' : ''}${f === SEL ? ' sel' : ''}${cerrado}"
+      onclick="verDia('${f}')" ${cerrado ? 'title="Cerrado para nuevas reservas"' : ''}>
       <span class="num">${d}</span><span class="minis">${minis}</span></button>`);
   }
   $('mes').innerHTML = celdas.join('');
@@ -691,9 +706,16 @@ function tarjetaDia(f) {
       ${f === hoy() ? '<span class="disem">hoy</span>' : ''}</div>
       <div class="vacio">Ningún turno corre este día.</div></div>`;
   }
-  return `<div class="dia${f === hoy() ? ' hoy' : ''}">
+  const bd = (BLOQ[f] || {}).dia || null;
+  // Cuántas personas hay ya tomadas ese día: es el número que tranquiliza al cerrarlo, porque
+  // cerrar NO cancela nada y sin verlo escrito parece que sí.
+  const tomadas = ts.reduce((n, t) => n + (t.ocupado || 0), 0);
+  return `<div class="dia${f === hoy() ? ' hoy' : ''}${bd ? ' cerrado' : ''}">
     <div class="diahead"><span class="difecha">${escapar(fechaTxt(f))}</span>
-      ${f === hoy() ? '<span class="disem">hoy</span>' : ''}</div>
+      ${f === hoy() ? '<span class="disem">hoy</span>' : ''}
+      ${bd ? `<span class="dcerrado">cerrado${bd.motivo ? ' · ' + escapar(bd.motivo) : ''}</span>` : ''}
+      <button class="btn2 chico der" onclick="alternarDia('${f}', ${tomadas})">
+        ${bd ? 'Reabrir el día' : 'Cerrar el día'}</button></div>
     ${ts.map(t => {
       const pct = Math.min(100, Math.round(t.ocupado / t.capacidad * 100));
       const pendPct = Math.min(100, Math.round((t.pendiente || 0) / t.capacidad * 100));
@@ -705,7 +727,10 @@ function tarjetaDia(f) {
           <span class="tnom">${escapar(t.nombre)}</span>
           <span class="thora">${t.hora_desde}–${t.hora_hasta}</span>
           ${t.bloqueado
-            ? `<span class="tbloq">bloqueado${t.motivo_bloqueo ? ' · ' + escapar(t.motivo_bloqueo) : ''}</span>`
+            // Cerrado NO es vacío: si ya había gente anotada hay que verla acá, o el que mira el
+            // día cree que cerrarlo le borró las reservas.
+            ? `<span class="tbloq">cerrado${t.motivo_bloqueo ? ' · ' + escapar(t.motivo_bloqueo) : ''}` +
+              `${t.ocupado ? ` · <b>${t.ocupado}</b> ya reservadas, siguen en pie` : ''}</span>`
             : `<span class="barra" title="${t.ocupado} ocupado${t.pendiente ? ` (${t.pendiente} sin confirmar)` : ''} · ${libre} disponible">` +
                  `<i style="width:${confPct}%"></i><u style="left:${confPct}%;width:${pendPct}%"></u></span>
                <span class="tcup"><b>${libre}</b> libre</span>`}
@@ -749,6 +774,16 @@ async function cargarCal() {
       fetch(`api/reservas?desde=${desde}&hasta=${hasta}`),
     ]);
     DISP = (await rd.json()).dias || [];
+    // Los bloqueos del MISMO rango: hacen falta acá y no sólo en Configuración, porque el día se
+    // cierra desde el calendario, que es donde uno está parado cuando lo decide.
+    BLOQ = {};
+    try {
+      const rb = await fetch(`api/reservas/bloqueos?desde=${desde}&hasta=${hasta}`);
+      ((await rb.json()).bloqueos || []).forEach(b => {
+        const e = BLOQ[b.fecha] = BLOQ[b.fecha] || { dia: null, turnos: {} };
+        if (b.turno_id) e.turnos[b.turno_id] = b; else e.dia = b;
+      });
+    } catch (e) {}
     RESV = {};
     ((await rr.json()).reservas || []).forEach(r => {
       const k = r.fecha + '|' + r.turno_id;
@@ -1168,6 +1203,34 @@ async function crearBloqueo() {
       m.textContent = j.error === 'ya_bloqueado' ? 'ya estaba bloqueado' : 'no se pudo bloquear'; }
   } catch (e) { m.className = 'msg mal'; m.textContent = 'error de conexión'; }
 }
+/**
+ * Cerrar o reabrir un día desde el calendario. Cerrar NO toca las reservas ya tomadas: sólo impide
+ * que entren nuevas, por panel, por WhatsApp o por la página pública, que consultan la misma
+ * disponibilidad. Por eso el aviso dice cuántas quedan en pie: es la duda que genera el botón.
+ */
+async function alternarDia(fecha, tomadas) {
+  const b = (BLOQ[fecha] || {}).dia || null;
+  if (b) {
+    if (!confirm(`Reabrir ${fechaTxt(fecha)}. Vuelve a tomar reservas.`)) return;
+    try { await fetch('api/reservas/bloqueos/' + b.id, { method: 'DELETE' }); } catch (e) { return; }
+  } else {
+    const aviso = tomadas
+      ? `\n\nLas ${tomadas} personas ya reservadas siguen en pie: cerrar sólo frena las nuevas.`
+      : '';
+    const motivo = prompt(`Cerrar ${fechaTxt(fecha)} para nuevas reservas.${aviso}` +
+                          `\n\nMotivo (opcional):`, '');
+    if (motivo === null) return;
+    try {
+      const r = await fetch('api/reservas/bloqueos', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fecha, turno_id: null, motivo }) });
+      if (!r.ok) return;
+    } catch (e) { return; }
+  }
+  cargarCal();
+  cargarBloqueos();
+}
+
 async function borrarBloqueo(id) {
   try { await fetch('api/reservas/bloqueos/' + id, { method: 'DELETE' }); cargarBloqueos(); cargarCal(); }
   catch (e) {}
