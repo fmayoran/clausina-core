@@ -219,7 +219,13 @@ function modCard(p, canal){
  * una sin aprobar y sin decir una palabra. Le pasó a CF-0261 (11 fotos, Instagram admite 10).
  */
 const PUB_ESPERA_MIN = 5;   // lo que puede tardar legítimamente antes de dar por fallida
+// Piezas que mandamos a publicar en ESTA pantalla y todavía no volvieron. El publicador contesta
+// recién cuando terminó de publicar —n8n responde al final del flujo, y eso puede tardar medio
+// minuto—, así que sin esto la tarjeta se queda quieta desde el clic hasta que sale el post y
+// parece que no pasó nada. Que es exactamente lo que parecía.
+const _publicando = new Set();
 function estadoPublicacion(p){
+  if(_publicando.has(p.id)) return { fase:'yendo', txt:'Publicando en Instagram…' };
   if(p.estado!=='aprobada' || p.ig_post_id) return null;
   const desde = p.aprobado_en ? (Date.now()-new Date(p.aprobado_en).getTime())/60000 : 0;
   if(desde < PUB_ESPERA_MIN) return { fase:'yendo', txt:'Publicando en Instagram… '+hace(p.aprobado_en) };
@@ -242,7 +248,7 @@ function pendCard(p){
       : (t ? `<img class="thumb" loading="lazy" src="${esc(t)}" onerror="this.style.display='none'">` : '<div class="thumb"></div>');
   const copy = p.caption ? `<div class="copy">${esc(p.caption).replace(/\n/g,'<br>')}</div>` : '';
   const pub = estadoPublicacion(p);
-  return `<div class="card">${thumb}<div class="body">
+  return `<div class="card${_publicando.has(p.id)?' publicando':''}" data-pieza="${esc(p.id)}">${thumb}<div class="body">
     <div class="tt">${esc(p.titulo_interno)} <span class="intlbl" title="Nombre interno — no se publica">interno</span></div>
     <div class="meta">${cfBadge(p)}${fmtBadge(p)}${revBadge(p)}${carrBadge(p)}<span>${fecha(p.actualizado_en)}</span></div>
     ${pub ? `<div class="meta2"><span class="rst ${pub.fase==='yendo'?'proc':'rech'}">${esc(pub.txt)}</span></div>` : ''}
@@ -259,6 +265,24 @@ function pendCard(p){
         <button class="btn del" onclick="descartar('${p.id}',this)">Descartar</button>
       </div>
     </div>`}</div>`;
+}
+
+/**
+ * Marca la tarjeta como "publicando" en el momento del clic. No recarga la lista: la respuesta
+ * del publicador todavía no llegó, así que recargar traería la pieza igual que antes.
+ */
+function pintarPublicando(id, on){
+  const c=document.querySelector(`.card[data-pieza="${CSS.escape(id)}"]`);
+  if(!c) return;
+  c.classList.toggle('publicando', !!on);
+  const acts=c.querySelector('.acts');
+  if(acts) acts.style.display = on ? 'none' : '';
+  let b=c.querySelector('.pubbanner');
+  if(on && !b){
+    b=document.createElement('div'); b.className='meta2 pubbanner';
+    b.innerHTML='<span class="rst proc">Publicando en Instagram…</span>';
+    const body=c.querySelector('.body'); if(body) body.appendChild(b);
+  } else if(!on && b) b.remove();
 }
 
 /** Destraba una pieza que el publicador dejó a mitad de camino. */
@@ -463,6 +487,7 @@ async function aprobar(id, btn, colaboradores){
   const conColab = Array.isArray(colaboradores);   // IG: viene del modal de collabs (ya es la confirmación)
   if(!conColab && !confirm('Aprobar y publicar esta pieza. ¿Confirmás?')) return;
   acting=true; busy(btn,'Publicando…');
+  _publicando.add(id); pintarPublicando(id, true);
   let disparo=false;
   try{ const opt = conColab ? {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({colaboradores})} : {method:'POST'};
     const r=await fetch('api/piezas/'+id+'/aprobar',opt); const d=await r.json().catch(()=>({}));
@@ -473,6 +498,7 @@ async function aprobar(id, btn, colaboradores){
     else toast('No se pudo aprobar ('+(d.error||d.status||r.status)+')', true);
   }catch(e){ toast('Error de conexión', true); }
   acting=false;
+  if(!disparo){ _publicando.delete(id); pintarPublicando(id, false); }
   // La publicación la hace n8n de forma async: confirmamos que la pieza REALMENTE salió, en vez de
   // asumir que sí (el hueco que dejó a CF-0260 pendiente sin avisar).
   if(disparo) confirmarPublicacion(id); else setTimeout(currentLoad, 1200);
@@ -480,14 +506,16 @@ async function aprobar(id, btn, colaboradores){
 // Poll del estado real de la pieza tras aprobar. Si no publicó en ~2 min, avisa claro.
 async function confirmarPublicacion(id){
   const t0=Date.now();
+  const cerrar=(msg,mal)=>{ _publicando.delete(id); toast(msg,!!mal); currentLoad(); };
   const tick=async ()=>{
     let e; try{ e=(await fetch('api/piezas/'+id+'/estado').then(r=>r.json())).estado; }catch(_){}
-    if(e==='publicada'){ toast('Publicada ✓'); currentLoad(); return; }
-    if(e==='rechazada'){ toast('La publicación fue rechazada por Instagram. Revisá la pieza.', true); currentLoad(); return; }
-    if(Date.now()-t0 > 120000){ toast('Se aprobó pero todavía no publicó. Si no aparece en un rato, reintentá.', true); currentLoad(); return; }
+    if(e==='publicada') return cerrar('Publicada ✓ — ya está en Instagram');
+    if(e==='rechazada') return cerrar('La publicación fue rechazada por Instagram. Revisá la pieza.', true);
+    if(Date.now()-t0 > 120000)
+      return cerrar('Se aprobó pero todavía no publicó. Miralo en la tarjeta: te deja volverla a revisión.', true);
     setTimeout(tick, 5000);
   };
-  setTimeout(tick, 5000);
+  tick();
 }
 // Aprobar una pieza de IG: primero elegir/editar los colaboradores (Collab).
 let _colId=null, _colList=[];
