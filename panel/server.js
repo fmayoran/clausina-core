@@ -1857,6 +1857,10 @@ app.post('/api/piezas/:id/aprobar', soloAprobador, async (req, res) => {
     const p = await db.getPiezaCanal(req.params.id);
     if (!p || p.estado !== 'pendiente_aprobacion') return res.status(409).json({ ok: false, error: 'no_pendiente' });
     if (p.canal === 'aviso') return res.json({ ok: await db.avisoEstado(req.params.id, 'publicada') });
+    // Lo que Instagram no va a aceptar se frena acá. Si se manda igual, el publicador marca la
+    // pieza aprobada, Instagram la rechaza y queda trabada sin manera de volver a revisión.
+    const noVa = db.motivoInpublicable(p);
+    if (noVa) return res.status(409).json({ ok: false, error: 'inpublicable', mensaje: noVa });
     if (req.body && Array.isArray(req.body.colaboradores)) await db.setColaboradores(req.params.id, req.body.colaboradores);
     let status;
     try {
@@ -1868,6 +1872,21 @@ app.post('/api/piezas/:id/aprobar', soloAprobador, async (req, res) => {
     }
     res.json({ ok: status >= 200 && status < 300, status });
   } catch (e) { console.error('aprobar', e.message); res.status(500).json({ ok: false, error: 'webhook' }); }
+});
+
+// Devuelve a revisión una pieza que quedó trabada en 'aprobada' sin llegar a Instagram (el
+// publicador falló a mitad de camino). Sin esto la pieza no se puede ni editar ni reintentar.
+app.post('/api/piezas/:id/reabrir', soloAprobador, async (req, res) => {
+  const msg = {
+    no_existe: 'No encontré esa pieza.',
+    ya_publicada: 'Esa pieza ya salió en Instagram.',
+    no_trabada: 'Esa pieza no está trabada.',
+    muy_pronto: 'Puede seguir publicándose. Esperá unos minutos antes de reabrirla.',
+  };
+  try {
+    const r = await db.reabrirPieza(req.negocioId, req.params.id);
+    res.status(r.ok ? 200 : 409).json(r.ok ? r : { ...r, mensaje: msg[r.error] || 'No se pudo.' });
+  } catch (e) { console.error('reabrir', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 
 // Estado de una pieza (para confirmar que la publicación async de n8n efectivamente ocurrió).

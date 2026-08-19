@@ -213,6 +213,23 @@ function modCard(p, canal){
     ${motivo}
     </div>${acts}</div>`;
 }
+/**
+ * En qué anda una pieza aprobada que todavía no está en Instagram. El publicador es asíncrono y
+ * cuando falla no escribe nada de vuelta: la pieza quedaba en la columna de pendientes, idéntica a
+ * una sin aprobar y sin decir una palabra. Le pasó a CF-0261 (11 fotos, Instagram admite 10).
+ */
+const PUB_ESPERA_MIN = 5;   // lo que puede tardar legítimamente antes de dar por fallida
+function estadoPublicacion(p){
+  if(p.estado!=='aprobada' || p.ig_post_id) return null;
+  const desde = p.aprobado_en ? (Date.now()-new Date(p.aprobado_en).getTime())/60000 : 0;
+  if(desde < PUB_ESPERA_MIN) return { fase:'yendo', txt:'Publicando en Instagram… '+hace(p.aprobado_en) };
+  // Lo que sabemos sin preguntarle a nadie: si el carrusel se pasa del tope, es eso.
+  const causa = p.n_media>10
+    ? `El carrusel tiene ${p.n_media} fotos e Instagram admite hasta 10.`
+    : 'El publicador no la pudo completar.';
+  return { fase:'trabada', txt:'No salió — '+causa };
+}
+
 function pendCard(p){
   if(p.estado==='rechazada') return modCard(p,'instagram');
   const t = thumbSrc(p.media);
@@ -224,19 +241,37 @@ function pendCard(p){
       ? `<video class="thumb" style="aspect-ratio:9/16;height:auto;max-height:70vh;object-fit:contain;background:#000" src="${esc(m.url)}" ${m.poster_url?`poster="${esc(m.poster_url)}"`:''} preload="metadata" playsinline muted loop controls></video>`
       : (t ? `<img class="thumb" loading="lazy" src="${esc(t)}" onerror="this.style.display='none'">` : '<div class="thumb"></div>');
   const copy = p.caption ? `<div class="copy">${esc(p.caption).replace(/\n/g,'<br>')}</div>` : '';
+  const pub = estadoPublicacion(p);
   return `<div class="card">${thumb}<div class="body">
     <div class="tt">${esc(p.titulo_interno)} <span class="intlbl" title="Nombre interno — no se publica">interno</span></div>
     <div class="meta">${cfBadge(p)}${fmtBadge(p)}${revBadge(p)}${carrBadge(p)}<span>${fecha(p.actualizado_en)}</span></div>
+    ${pub ? `<div class="meta2"><span class="rst ${pub.fase==='yendo'?'proc':'rech'}">${esc(pub.txt)}</span></div>` : ''}
     ${copy}
     ${p.tiene_bitacora ? `<button class="bitlink" onclick="verBitacora('${p.id}')">↳ cómo se generó</button>` : ''}
     </div>
-    <div class="acts">
+    ${pub ? `<div class="acts">${pub.fase==='trabada'
+        ? `<button class="btn no" onclick="reabrirPieza('${p.id}',this)" title="Vuelve a revisión para corregirla y aprobarla de nuevo">Volver a revisión</button>`
+        : ''}</div>`
+      : `<div class="acts">
       <button class="btn ok" onclick='aprobarIG("${p.id}", ${JSON.stringify(p.colaboradores||[])})'>Aprobar y publicar</button>
       <div class="acts-row">
         <button class="btn no" onclick="rechazar('${p.id}',this)">Modificar</button>
         <button class="btn del" onclick="descartar('${p.id}',this)">Descartar</button>
       </div>
-    </div></div>`;
+    </div>`}</div>`;
+}
+
+/** Destraba una pieza que el publicador dejó a mitad de camino. */
+async function reabrirPieza(id, btn){
+  if(acting) return;
+  if(!confirm('Volver esta pieza a revisión para corregirla. No se publicó nada en Instagram.')) return;
+  acting=true; busy(btn,'Volviendo…');
+  try{
+    const d=await fetch('api/piezas/'+id+'/reabrir',{method:'POST'}).then(r=>r.json());
+    if(d.ok) toast('Vuelta a revisión — corregila y aprobala de nuevo');
+    else toast(d.mensaje||'No se pudo', true);
+  }catch(e){ toast('Error de conexión', true); }
+  acting=false; currentLoad();
 }
 function pubCard(p){
   const t = thumbSrc(p.media);
@@ -434,6 +469,7 @@ async function aprobar(id, btn, colaboradores){
     if(d.ok){ disparo=true; toast('Publicando…'); }
     else if(d.error==='sin_conexion') toast('No se pudo contactar al publicador (n8n). Reintentá en un momento.', true);
     else if(d.error==='no_pendiente') toast('Esa versión ya no está pendiente. Refrescá y probá con la vigente.', true);
+    else if(d.error==='inpublicable') toast(d.mensaje, true);
     else toast('No se pudo aprobar ('+(d.error||d.status||r.status)+')', true);
   }catch(e){ toast('Error de conexión', true); }
   acting=false;

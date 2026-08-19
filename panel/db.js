@@ -3539,7 +3539,7 @@ async function getPiezas(canal, negocioId) {
            r.nro, r.formato, r.motivo_rechazo, r.derivado_en,
            COALESCE(r.colaboradores, (SELECT ig_colaboradores FROM contenido.negocios WHERE id=pz.negocio_id)) AS colaboradores,
            (r.bitacora IS NOT NULL) AS tiene_bitacora,
-           r.ig_post_id, r.ig_permalink, r.publicado_en, r.caption,
+           r.ig_post_id, r.ig_permalink, r.publicado_en, r.aprobado_en, r.caption,
            r.daypart, r.clima, r.transito, r.momento, r.duracion_s,
            im.views AS m_views, im.reach AS m_reach, im.likes AS m_likes,
            (SELECT json_build_object('url', m.url, 'tipo', m.tipo, 'poster_url', m.poster_url)
@@ -3560,9 +3560,52 @@ async function getPiezas(canal, negocioId) {
 // Canal + token + estado de la revisión vigente (para ramificar la acción por canal).
 async function getPiezaCanal(id) {
   const { rows } = await pool.query(
-    `SELECT pz.canal, r.token, r.estado FROM contenido.piezas pz
+    `SELECT pz.canal, r.token, r.estado, r.formato, r.ig_post_id, r.aprobado_en,
+            (SELECT count(*)::int FROM contenido.media m WHERE m.pieza_id = pz.id) AS n_media
+       FROM contenido.piezas pz
        JOIN contenido.revisiones r ON r.id = pz.revision_vigente WHERE pz.id = $1`, [id]);
   return rows[0] || null;
+}
+
+/**
+ * Lo que Instagram va a aceptar, mirado ANTES de aprobar. El publicador arma el carrusel y recién
+ * ahí Instagram lo rechaza ("too many attachments"), con la pieza ya marcada aprobada y sin manera
+ * de volver: le pasó a CF-0261 con 11 fotos. Es más barato no dejar aprobar lo que no va a entrar.
+ */
+const IG_CARR_MAX = 10;
+function motivoInpublicable(p) {
+  if (!p || p.canal !== 'instagram' || p.formato === 'story') return null;
+  if (p.n_media > IG_CARR_MAX)
+    return `El carrusel tiene ${p.n_media} fotos e Instagram admite hasta ${IG_CARR_MAX}. ` +
+           `Quitá ${p.n_media - IG_CARR_MAX} antes de aprobar.`;
+  return null;
+}
+
+/**
+ * Devuelve a revisión una pieza que quedó trabada en 'aprobada'. Sólo si NO llegó a publicarse:
+ * con ig_post_id ya hay un post en Instagram y reabrirla acá dejaría la base contando otra cosa.
+ * Se pide además que hayan pasado unos minutos, porque una publicación en curso es legítima y
+ * reabrirla mientras corre es el único camino a publicar dos veces lo mismo.
+ */
+const REABRIR_MIN_MIN = 5;
+async function reabrirPieza(negocioId, piezaId) {
+  const { rows: [p] } = await pool.query(
+    `SELECT pz.id, r.id AS rev, r.estado, r.ig_post_id, r.aprobado_en,
+            EXTRACT(EPOCH FROM (now() - r.aprobado_en))/60 AS minutos
+       FROM contenido.piezas pz JOIN contenido.revisiones r ON r.id = pz.revision_vigente
+      WHERE pz.id=$1 AND pz.negocio_id=$2`, [piezaId, negocioId]);
+  if (!p) return { ok: false, error: 'no_existe' };
+  if (p.ig_post_id) return { ok: false, error: 'ya_publicada' };
+  if (p.estado !== 'aprobada') return { ok: false, error: 'no_trabada' };
+  if (Number(p.minutos) < REABRIR_MIN_MIN)
+    return { ok: false, error: 'muy_pronto', detalle: REABRIR_MIN_MIN };
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.revisiones
+        SET estado='pendiente_aprobacion', aprobado_en=NULL, aprobado_por=NULL
+      WHERE id=$1 AND estado='aprobada' AND ig_post_id IS NULL`, [p.rev]);
+  if (!rowCount) return { ok: false, error: 'no_trabada' };
+  // El estado de la pieza no se toca a mano: lo sincroniza trg_rev_sync desde la revisión.
+  return { ok: true };
 }
 
 // Avisos: cambio de estado directo en la base (no hay API externa). Aprobar=publicada (en pantalla).
@@ -4467,6 +4510,7 @@ module.exports = {
   getLente, getLenteToken, guardarLente, getVerificacion, getSaludExterna,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,
   reordenarCarrusel, agregarSlide, quitarSlide,
+  motivoInpublicable, reabrirPieza,
   pedirGeneracion, getGeneracion,
   FORMATOS, getGraficas, contarGraficasDescartadas, getGrafica, crearGrafica, iterarGrafica, ajustarEncuadre, renombrarGrafica, duplicarGrafica, estadoGrafica,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,
