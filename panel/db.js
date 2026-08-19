@@ -3544,7 +3544,7 @@ async function getPiezas(canal, negocioId) {
            im.views AS m_views, im.reach AS m_reach, im.likes AS m_likes,
            (SELECT json_build_object('url', m.url, 'tipo', m.tipo, 'poster_url', m.poster_url)
               FROM contenido.media m WHERE m.pieza_id = pz.id AND m.orden = 1) AS media,
-           (SELECT COALESCE(json_agg(json_build_object('url', m.url, 'tipo', m.tipo, 'poster_url', m.poster_url) ORDER BY m.orden), '[]'::json)
+           (SELECT COALESCE(json_agg(json_build_object('id', m.id, 'url', m.url, 'tipo', m.tipo, 'poster_url', m.poster_url) ORDER BY m.orden), '[]'::json)
               FROM contenido.media m WHERE m.pieza_id = pz.id) AS medios,
            (SELECT count(*)::int FROM contenido.media m WHERE m.pieza_id = pz.id) AS n_media,
            (SELECT count(*)::int FROM contenido.revisiones rr WHERE rr.pieza_id = pz.id) AS n_revisiones
@@ -3803,6 +3803,134 @@ async function getMaquinas() {
       count(*) FILTER (WHERE estado='error')::int AS errores
     FROM contenido.landing_cambios`)).rows[0];
   return { pipeline, procesos, landing };
+}
+
+/* ── Carrusel de una pieza pendiente ────────────────────────────────────────────
+ * Reordenar o sumar una foto es mecánico: no cambia el concepto ni el copy, así que no tiene
+ * sentido devolverle la pieza al creativo con "cambiá el orden" y esperar a que la rehaga entera.
+ * Se toca la lista de medios directamente, igual que el reencuadre en Gráfica.
+ *
+ * Sólo sobre piezas EN APROBACIÓN. Una publicada ya está en Instagram —tocar la fila local no la
+ * cambiaría allá y dejaría la base mintiendo—, y una aprobada ya salió para el publicador.
+ *
+ * Dos límites vienen del publicador (scripts/n8n/build_cf_pub_publish.py), no de un capricho:
+ *  - MÍNIMO 2. Con una sola fila el flujo deja de tratarla como carrusel y publica `asset_ig` de
+ *    la revisión, que es otra imagen: bajar a 1 no achica el carrusel, cambia la publicación.
+ *  - Sólo IMÁGENES al agregar. El nodo que arma cada hijo del carrusel manda `image_url` y nada
+ *    más; un video entraría como slide rota.
+ */
+const CARR_MIN = 2, CARR_MAX = 10;
+
+/** La pieza existe, es de este negocio y todavía se puede tocar. */
+async function _carrEditable(cli, negocioId, piezaId) {
+  const { rows: [p] } = await cli.query(
+    'SELECT id, estado, canal FROM contenido.piezas WHERE id=$1 AND negocio_id=$2', [piezaId, negocioId]);
+  if (!p) return { error: 'no_existe' };
+  if (p.canal !== 'instagram') return { error: 'canal' };
+  if (p.estado !== 'pendiente_aprobacion') return { error: 'no_pendiente' };
+  return { pieza: p };
+}
+
+async function _slides(cli, piezaId) {
+  const { rows } = await cli.query(
+    `SELECT id, orden, tipo, url, poster_url FROM contenido.media
+      WHERE pieza_id=$1 ORDER BY orden`, [piezaId]);
+  return rows;
+}
+
+/**
+ * Nuevo orden del carrusel. Recibe TODOS los ids, en el orden final: mandar sólo los que se
+ * movieron dejaría huecos y obligaría a adivinar dónde va el resto.
+ */
+async function reordenarCarrusel(negocioId, piezaId, ids) {
+  if (!Array.isArray(ids) || !ids.length) return { ok: false, error: 'orden_invalido' };
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    const g = await _carrEditable(cli, negocioId, piezaId);
+    if (g.error) { await cli.query('ROLLBACK'); return { ok: false, error: g.error }; }
+    const actuales = await _slides(cli, piezaId);
+    const antes = actuales.map(m => m.id).sort().join(',');
+    const pide = [...new Set(ids.map(String))].sort().join(',');
+    // El conjunto tiene que ser el mismo: si no, esta pantalla está mirando una lista vieja y
+    // aplicar el orden borraría o duplicaría slides sin que nadie lo pida.
+    if (antes !== pide) { await cli.query('ROLLBACK'); return { ok: false, error: 'desincronizado' }; }
+    await cli.query(
+      `UPDATE contenido.media m SET orden = n.i
+         FROM unnest($2::uuid[]) WITH ORDINALITY AS n(id, i)
+        WHERE m.id = n.id AND m.pieza_id = $1`, [piezaId, ids]);
+    await cli.query('UPDATE contenido.piezas SET actualizado_en=now() WHERE id=$1', [piezaId]);
+    await cli.query('COMMIT');
+    return { ok: true, medios: await _slides(pool, piezaId) };
+  } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
+}
+
+/**
+ * Suma una foto al final del carrusel. La URL tiene que ser pública y https: Instagram la
+ * descarga desde afuera, así que una ruta local o del panel detrás de login falla recién al
+ * publicar, cuando ya es tarde. Se comprueba acá.
+ */
+async function agregarSlide(negocioId, piezaId, d) {
+  const url = String((d && d.url) || '').trim();
+  if (!/^https:\/\//i.test(url)) return { ok: false, error: 'url_invalida' };
+
+  let tipo;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch(url, { method: 'GET', headers: { Range: 'bytes=0-0' }, signal: ctrl.signal });
+    clearTimeout(t);
+    if (!r.ok && r.status !== 206) return { ok: false, error: 'url_inaccesible', detalle: r.status };
+    const ct = String(r.headers.get('content-type') || '');
+    if (!/^image\//i.test(ct)) return { ok: false, error: 'no_es_imagen', detalle: ct || 'sin tipo' };
+    tipo = 'image';
+  } catch (e) { return { ok: false, error: 'url_inaccesible', detalle: 'no respondió' }; }
+
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    const g = await _carrEditable(cli, negocioId, piezaId);
+    if (g.error) { await cli.query('ROLLBACK'); return { ok: false, error: g.error }; }
+    const actuales = await _slides(cli, piezaId);
+    if (actuales.length >= CARR_MAX) {
+      await cli.query('ROLLBACK'); return { ok: false, error: 'tope', detalle: CARR_MAX };
+    }
+    if (actuales.some(m => m.url === url)) {
+      await cli.query('ROLLBACK'); return { ok: false, error: 'repetida' };
+    }
+    await cli.query(
+      'INSERT INTO contenido.media (pieza_id, orden, tipo, url) VALUES ($1,$2,$3,$4)',
+      [piezaId, actuales.length + 1, tipo, url]);
+    await cli.query('UPDATE contenido.piezas SET actualizado_en=now() WHERE id=$1', [piezaId]);
+    await cli.query('COMMIT');
+    return { ok: true, medios: await _slides(pool, piezaId) };
+  } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
+}
+
+/** Saca una foto del carrusel y renumera, para que no queden huecos en el orden. */
+async function quitarSlide(negocioId, piezaId, mediaId) {
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    const g = await _carrEditable(cli, negocioId, piezaId);
+    if (g.error) { await cli.query('ROLLBACK'); return { ok: false, error: g.error }; }
+    const actuales = await _slides(cli, piezaId);
+    if (!actuales.some(m => m.id === mediaId)) {
+      await cli.query('ROLLBACK'); return { ok: false, error: 'no_existe' };
+    }
+    if (actuales.length <= CARR_MIN) {
+      await cli.query('ROLLBACK'); return { ok: false, error: 'minimo', detalle: CARR_MIN };
+    }
+    await cli.query('DELETE FROM contenido.media WHERE id=$1 AND pieza_id=$2', [mediaId, piezaId]);
+    const quedan = actuales.filter(m => m.id !== mediaId).map(m => m.id);
+    await cli.query(
+      `UPDATE contenido.media m SET orden = n.i
+         FROM unnest($2::uuid[]) WITH ORDINALITY AS n(id, i)
+        WHERE m.id = n.id AND m.pieza_id = $1`, [piezaId, quedan]);
+    await cli.query('UPDATE contenido.piezas SET actualizado_en=now() WHERE id=$1', [piezaId]);
+    await cli.query('COMMIT');
+    return { ok: true, medios: await _slides(pool, piezaId) };
+  } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
 }
 
 // Biblioteca de medios de la marca: piezas (de la base) + material aportado (media store).
@@ -4338,6 +4466,7 @@ module.exports = {
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente, getVerificacion, getSaludExterna,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,
+  reordenarCarrusel, agregarSlide, quitarSlide,
   pedirGeneracion, getGeneracion,
   FORMATOS, getGraficas, contarGraficasDescartadas, getGrafica, crearGrafica, iterarGrafica, ajustarEncuadre, renombrarGrafica, duplicarGrafica, estadoGrafica,
   getPiezas, getPiezaCanal, avisoEstado, setColaboradores, getRequerimientos, getBriefMedia, getStatus, getMaquinas, getTokenPendiente, getBitacora, getBiblioteca, crearSolicitudBiblioteca, delSolicitudBiblioteca,

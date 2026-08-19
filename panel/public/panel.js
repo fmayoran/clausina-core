@@ -68,12 +68,126 @@ async function verBitacora(piezaId){
 
 /* ---------- Tarjetas Instagram ---------- */
 // Tira de medios para revisar un carrusel completo (cada uno abre la imagen/video original).
-function mediaGallery(medios){
-  return `<div class="cargal">${medios.map((m,i)=>{
+function mediaGallery(medios, piezaId){
+  // Con la pieza en aprobación el carrusel se puede ordenar y completar acá mismo: cambiar el
+  // orden de unas fotos no es rehacer la pieza, y devolvérsela al creativo para eso cuesta una
+  // generación entera y vuelve con todo lo demás distinto.
+  const edit = !!piezaId;
+  const tiles = medios.map((m,i)=>{
     const t=thumbSrc(m), full=m.url||'';
     const inner = t ? `<img loading="lazy" src="${esc(t)}" onerror="this.style.opacity=.15">` : '<span class="cgph"></span>';
-    return `<a class="cgi" href="${esc(full)}" target="_blank" rel="noopener" title="Abrir ${i+1}/${medios.length}">${inner}${m.tipo==='video'?'<span class="cgv">▶</span>':''}<span class="cgn">${i+1}</span></a>`;
-  }).join('')}</div>`;
+    const vid = m.tipo==='video'?'<span class="cgv">▶</span>':'';
+    if(!edit) return `<a class="cgi" href="${esc(full)}" target="_blank" rel="noopener" title="Abrir ${i+1}/${medios.length}">${inner}${vid}<span class="cgn">${i+1}</span></a>`;
+    return `<div class="cgi cged" draggable="true" data-mid="${esc(m.id)}" data-i="${i}" title="Arrastrá para reordenar">
+      ${inner}${vid}<span class="cgn">${i+1}</span>
+      <div class="cgtools">
+        <button title="Mover antes" aria-label="Mover antes" onclick="moverSlide('${esc(piezaId)}',${i},-1)"${i===0?' disabled':''}>‹</button>
+        <a href="${esc(full)}" target="_blank" rel="noopener" title="Abrir en grande" aria-label="Abrir en grande">⤢</a>
+        <button title="Quitar del carrusel" aria-label="Quitar" onclick="quitarSlide('${esc(piezaId)}','${esc(m.id)}')">×</button>
+        <button title="Mover después" aria-label="Mover después" onclick="moverSlide('${esc(piezaId)}',${i},1)"${i===medios.length-1?' disabled':''}>›</button>
+      </div></div>`;
+  }).join('');
+  const mas = (edit && medios.length<10)
+    ? `<button class="cgi cgadd" onclick="abrirAgregarSlide('${esc(piezaId)}')" title="Agregar una foto al final"><span>+</span><small>agregar</small></button>`
+    : '';
+  return `<div class="cargal${edit?' cargal-ed':''}"${edit?` data-pieza="${esc(piezaId)}" ondragover="dragOverSlide(event)" ondrop="dropSlide(event)" ondragstart="dragStartSlide(event)"`:''}>${tiles}${mas}</div>`;
+}
+
+/* ── Edición del carrusel (sólo piezas pendientes) ────────────────────────────
+ * Todo lo que se toca acá se manda entero y se repinta con lo que devuelve el servidor: la
+ * pantalla nunca inventa el resultado, así dos pestañas abiertas no se pisan en silencio. */
+let _carrBusy=false, _carrDrag=null;
+function slidesDe(piezaId){
+  const g=document.querySelector(`.cargal-ed[data-pieza="${CSS.escape(piezaId)}"]`);
+  return g ? [...g.querySelectorAll('.cged')].map(e=>e.dataset.mid) : [];
+}
+async function mandarOrden(piezaId, ids){
+  if(_carrBusy) return; _carrBusy=true;
+  try{
+    const d=await fetch('api/piezas/'+piezaId+'/carrusel',{method:'PATCH',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({orden:ids})}).then(r=>r.json());
+    if(!d.ok) toast(d.mensaje||'No se pudo reordenar',true);
+  }catch(e){ toast('Error de conexión',true); }
+  _carrBusy=false; currentLoad();
+}
+function moverSlide(piezaId, i, paso){
+  const ids=slidesDe(piezaId); const j=i+paso;
+  if(j<0||j>=ids.length) return;
+  [ids[i],ids[j]]=[ids[j],ids[i]];
+  mandarOrden(piezaId, ids);
+}
+function dragStartSlide(e){ const t=e.target.closest('.cged'); if(!t) return; _carrDrag=t.dataset.mid; e.dataTransfer.effectAllowed='move'; }
+function dragOverSlide(e){ if(_carrDrag) e.preventDefault(); }
+function dropSlide(e){
+  const g=e.currentTarget, dest=e.target.closest('.cged');
+  if(!_carrDrag||!dest) return;
+  e.preventDefault();
+  const ids=[...g.querySelectorAll('.cged')].map(x=>x.dataset.mid);
+  const from=ids.indexOf(_carrDrag), to=ids.indexOf(dest.dataset.mid);
+  _carrDrag=null;
+  if(from<0||to<0||from===to) return;
+  ids.splice(to,0,ids.splice(from,1)[0]);
+  mandarOrden(g.dataset.pieza, ids);
+}
+/** Sumar una foto: de la biblioteca de la marca o de disco. Reusa el picker que ya existe. */
+let _addPieza=null;
+async function abrirAgregarSlide(piezaId){
+  _addPieza=piezaId;
+  let data; try{ data=await fetch('api/biblioteca').then(r=>r.json()); }
+  catch(e){ toast('No se pudo abrir la biblioteca',true); return; }
+  const items=(data.items||[]).filter(i=>i.tipo!=='video');
+  let ov=document.getElementById('bp-ov');
+  if(!ov){ ov=document.createElement('div'); ov.id='bp-ov'; ov.className='bpov'; document.body.appendChild(ov);
+           ov.addEventListener('click',e=>{ if(e.target===ov) cerrarPicker(); }); }
+  const cells=items.length ? items.map((m,i)=>
+    `<div class="bpcell" onclick="sumarDeBiblio(${i},this)" title="${esc(m.nombre||'')}">` +
+    `<img src="media/${esc(m.media_path)}" onerror="this.style.opacity=.15">` +
+    `<span class="bpcode">${esc(m.codigo||'')}</span></div>`).join('')
+    : '<div class="bpempty">— no hay imágenes en la biblioteca —</div>';
+  ov.innerHTML=`<div class="bpbox"><div class="bphead"><b>Agregar al carrusel</b>
+      <span>sólo imágenes · se suman al final</span>
+      <button onclick="cerrarPicker()" title="Cerrar">×</button></div>
+    <div class="bpup"><label class="btn no">Subir de disco
+      <input type="file" accept="image/*" multiple hidden onchange="sumarDeDisco(this)"></label></div>
+    <div class="bpgrid">${cells}</div></div>`;
+  _addItems=items; ov.style.display='flex';
+}
+let _addItems=[];
+async function _sumarSlide(body, el){
+  try{
+    const d=await fetch('api/piezas/'+_addPieza+'/carrusel',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(r=>r.json());
+    if(d.ok){ toast('Agregada al carrusel'); return true; }
+    toast(d.mensaje||'No se pudo agregar',true);
+    if(el) el.classList.remove('bpadded');
+  }catch(e){ toast('Error de conexión',true); if(el) el.classList.remove('bpadded'); }
+  return false;
+}
+async function sumarDeBiblio(i, el){
+  const m=_addItems[i]; if(!m||!_addPieza||el.classList.contains('bpadded')) return;
+  el.classList.add('bpadded');
+  if(await _sumarSlide({media_path:m.media_path}, el)) currentLoad();
+}
+async function sumarDeDisco(input){
+  const files=[...(input.files||[])]; input.value='';
+  if(!files.length||!_addPieza) return;
+  let n=0;
+  for(const f of files){
+    const dataUrl=await new Promise(r=>{ const fr=new FileReader(); fr.onload=()=>r(fr.result); fr.readAsDataURL(f); });
+    if(await _sumarSlide({dataUrl, filename:f.name})) n++;
+  }
+  if(n){ cerrarPicker(); currentLoad(); }
+}
+
+async function quitarSlide(piezaId, mid){
+  if(_carrBusy) return;
+  if(!confirm('Quitar esta foto del carrusel. La publicación sale sin ella.')) return;
+  _carrBusy=true;
+  try{
+    const d=await fetch('api/piezas/'+piezaId+'/carrusel/'+mid,{method:'DELETE'}).then(r=>r.json());
+    if(!d.ok) toast(d.mensaje||'No se pudo quitar',true);
+  }catch(e){ toast('Error de conexión',true); }
+  _carrBusy=false; currentLoad();
 }
 // Tarjeta de pieza EN MODIFICACIÓN (estado rechazada): visible en la columna de pendientes
 // para que el requerimiento no "desaparezca" del board mientras el agente la reprocesa.
@@ -105,7 +219,7 @@ function pendCard(p){
   const medios = Array.isArray(p.medios) ? p.medios : [];
   const m = p.media || {};
   const thumb = medios.length>1
-    ? mediaGallery(medios)
+    ? mediaGallery(medios, p.estado==='pendiente_aprobacion' ? p.id : null)
     : (m.tipo==='video' && m.url)
       ? `<video class="thumb" style="aspect-ratio:9/16;height:auto;max-height:70vh;object-fit:contain;background:#000" src="${esc(m.url)}" ${m.poster_url?`poster="${esc(m.poster_url)}"`:''} preload="metadata" playsinline muted loop controls></video>`
       : (t ? `<img class="thumb" loading="lazy" src="${esc(t)}" onerror="this.style.display='none'">` : '<div class="thumb"></div>');

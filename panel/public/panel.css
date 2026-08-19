@@ -59,6 +59,27 @@ header .marcasel:hover{border-color:var(--fire);}
 .cargal .cgph{display:block;width:100%;height:100%;background:#1a1a17;}
 .cargal .cgn{position:absolute;bottom:4px;right:5px;font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--white);background:rgba(4,4,3,.7);border-radius:8px;padding:1px 6px;line-height:1.3;}
 .cargal .cgv{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#fff;font-size:1.4rem;text-shadow:0 1px 6px rgba(0,0,0,.8);}
+/* Carrusel editable: las herramientas aparecen sobre la foto y no ocupan lugar, para que la
+   tira siga leyéndose como el carrusel que va a salir y no como un formulario. */
+.cargal-ed .cged{cursor:grab;}
+.cargal-ed .cged:active{cursor:grabbing;}
+.cargal-ed .cged.over{outline:2px dashed var(--fire);outline-offset:-2px;}
+.cgtools{position:absolute;top:0;left:0;right:0;display:flex;gap:2px;padding:4px;opacity:0;
+  transition:opacity .12s;background:linear-gradient(rgba(4,4,3,.85),transparent);}
+.cged:hover .cgtools,.cged:focus-within .cgtools{opacity:1;}
+.cgtools button,.cgtools a{flex:1;background:rgba(4,4,3,.72);border:0;border-radius:5px;color:var(--white);
+  font-size:.86rem;line-height:1.5;cursor:pointer;text-align:center;text-decoration:none;padding:1px 0;}
+.cgtools button:hover,.cgtools a:hover{background:var(--fire);color:#0c0c0a;}
+.cgtools button[disabled]{opacity:.28;cursor:default;}
+.cgtools button[disabled]:hover{background:rgba(4,4,3,.72);color:var(--white);}
+.cgadd{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  background:#141410;border:1px dashed #34342c;color:var(--ash);cursor:pointer;aspect-ratio:4/5;}
+.cgadd:hover{border-color:var(--fire);color:var(--fire);}
+.cgadd span{font-size:1.6rem;line-height:1;}
+.cgadd small{font-family:'JetBrains Mono',monospace;font-size:.58rem;}
+.bpup{padding:12px 18px 0;}
+.bpup .btn{display:inline-block;cursor:pointer;}
+.bpcell.bpadded{opacity:.4;pointer-events:none;}
 .card .body{padding:10px 12px;}
 .card .tt{font-weight:700;font-size:1.02rem;line-height:1.1;color:var(--white);}
 .intlbl{font-family:'JetBrains Mono',monospace;font-weight:400;font-size:.54rem;letter-spacing:.1em;text-transform:uppercase;color:#55554f;border:1px solid var(--line);border-radius:8px;padding:1px 5px;vertical-align:middle;white-space:nowrap;}

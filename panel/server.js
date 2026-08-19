@@ -2326,6 +2326,49 @@ app.post('/api/requerimientos/:id/material-biblioteca', async (req, res) => {
   } catch (e) { console.error('material-biblioteca', e.message); res.status(500).json({ ok: false }); }
 });
 
+// --- Carrusel de una pieza en aprobación: reordenar, sumar y quitar fotos ---
+// Va con soloAprobador porque cambia lo que se va a publicar: es parte de la revisión, no de
+// prepararla. La pieza sigue pendiente después de tocarla; sigue haciendo falta aprobarla.
+const errCarr = {
+  no_existe: 'No encontré esa pieza o esa foto.',
+  canal: 'Esto es sólo para publicaciones de Instagram.',
+  no_pendiente: 'Sólo se puede editar mientras está pendiente de aprobación.',
+  desincronizado: 'La pieza cambió mientras la editabas. Recargá y probá de nuevo.',
+  url_invalida: 'La imagen tiene que estar en una URL pública https.',
+  url_inaccesible: 'No pude descargar esa imagen. Instagram tampoco va a poder.',
+  no_es_imagen: 'Los slides del carrusel tienen que ser imágenes.',
+  repetida: 'Esa foto ya está en el carrusel.',
+  tope: 'Instagram admite hasta 10 fotos por carrusel.',
+  minimo: 'Un carrusel necesita al menos 2 fotos. Para dejar una sola, pedí la modificación al creativo.',
+};
+const resCarr = (res, r) => res.status(r.ok ? 200 : 409)
+  .json(r.ok ? r : { ...r, mensaje: errCarr[r.error] || 'No se pudo.' });
+
+app.patch('/api/piezas/:id/carrusel', soloAprobador, async (req, res) => {
+  try { resCarr(res, await db.reordenarCarrusel(req.negocioId, req.params.id, (req.body || {}).orden)); }
+  catch (e) { console.error('carrusel-orden', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+app.post('/api/piezas/:id/carrusel', soloAprobador, async (req, res) => {
+  try {
+    const b = req.body || {};
+    // Tres orígenes, una sola puerta: una URL pública tal cual, un ítem de la biblioteca, o un
+    // archivo de disco que primero se guarda en el media store. Instagram descarga la imagen
+    // desde afuera, así que en los tres casos termina siendo una URL pública de este host.
+    let url = String(b.url || '').trim();
+    if (!url && b.dataUrl) {
+      const { mediaPath } = await guardarMaterialDisco(b, path.posix.join('carrusel', req.negocio));
+      url = `https://${req.get('host')}/media/` + mediaPath.split('/').map(encodeURIComponent).join('/');
+    } else if (!url && b.media_path) {
+      url = `https://${req.get('host')}/media/` + String(b.media_path).split('/').map(encodeURIComponent).join('/');
+    }
+    resCarr(res, await db.agregarSlide(req.negocioId, req.params.id, { url }));
+  } catch (e) { res.status(e.http || 500).json({ ok: false, mensaje: e.message || 'No se pudo subir.' }); }
+});
+app.delete('/api/piezas/:id/carrusel/:mid', soloAprobador, async (req, res) => {
+  try { resCarr(res, await db.quitarSlide(req.negocioId, req.params.id, req.params.mid)); }
+  catch (e) { console.error('carrusel-del', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+
 // --- Material aportado al RECHAZAR una pieza (se adjunta al brief que la generó, para la corrección) ---
 app.get('/api/piezas/:id/materiales', async (req, res) => {
   try { res.json(await db.getMaterialesPorPieza(req.params.id)); }
