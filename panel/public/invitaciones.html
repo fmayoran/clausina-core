@@ -191,8 +191,9 @@
     que se vendía sola.</div>
 
   <label for="b-turnos">Turnos en que aplica</label>
-  <select id="b-turnos" multiple size="4"></select>
+  <select id="b-turnos" multiple size="4" onchange="pintarDiasReales()"></select>
   <div class="mono2" style="margin-top:6px;">Sin seleccionar ninguno, aplica a todos.</div>
+  <div class="mono2" id="b-reales" style="margin-top:8px;line-height:1.6;"></div>
 
   <div class="mono2" style="margin-top:14px;">A cuánta gente alcanza el descuento. NO es el cupo de
     la campaña —eso se define al emitir, en "usos"— ni un tope para reservar: si la invitación
@@ -297,6 +298,34 @@ const escapar = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
 const DIAS = [[1,'lun'],[2,'mar'],[3,'mié'],[4,'jue'],[5,'vie'],[6,'sáb'],[7,'dom']];
 const ESTADOS = { activa:'activa', en_uso:'en uso', agotada:'agotada', vencida:'vencida', anulada:'anulada' };
 let BENEFICIOS = [], TIPOS = [], TURNOS = [], INV = [], PIEZAS = [];
+
+/**
+ * Los días en que la invitación va a servir DE VERDAD: los que están marcados acá Y además tienen
+ * alguno de los turnos elegidos corriendo. No es lo mismo. La invitación V7M-9EQ decía lunes a
+ * viernes y vencía un sábado, pero su único turno era "Noche Semana" (lunes a jueves): de los seis
+ * días que parecía tener, servía cuatro, y quien la recibió vio dos fechas y no entendió por qué.
+ * Se calcula mientras se arma el beneficio, que es el único momento en que se puede corregir.
+ */
+function pintarDiasReales() {
+  const caja = document.getElementById('b-reales'); if (!caja) return;
+  const marcados = [...$('b-dias').querySelectorAll('input:checked')].map(i => +i.value);
+  const elegidos = [...$('b-turnos').selectedOptions].map(o => o.value);
+  const dias = marcados.length ? marcados : DIAS.map(([n]) => n);
+  const turnos = elegidos.length ? TURNOS.filter(t => elegidos.includes(t.id)) : TURNOS;
+  const corre = d => turnos.some(t => (t.dias || []).map(Number).includes(d));
+  const sirven = dias.filter(corre), vacios = dias.filter(d => !corre(d));
+  const nombre = d => (DIAS.find(([n]) => n === d) || [0, '?'])[1];
+  if (!turnos.length) { caja.innerHTML = '<b>No hay turnos activos:</b> la invitación no va a poder ofrecer ningún día.'; return; }
+  if (!sirven.length) {
+    caja.innerHTML = '<b>Ojo:</b> ningún día marcado tiene turno. Con esta combinación la invitación ' +
+      'no va a ofrecer ninguna fecha.';
+    return;
+  }
+  caja.innerHTML = `Con esto la invitación sirve: <b>${sirven.map(nombre).join(', ')}</b>.` +
+    (vacios.length
+      ? ` <b>${vacios.map(nombre).join(', ')}</b> quedan afuera: ningún turno elegido corre esos días.`
+      : '');
+}
 // El nombre del negocio: los mensajes salen a su nombre, no al de la plataforma.
 let NEGOCIO = {};
 fetch('api/perfil').then(r => r.json()).then(d => { NEGOCIO = d || {}; }).catch(() => {});
@@ -390,12 +419,13 @@ function abrirBeneficio(id) {
   $('b-valor').value = b ? Number(b.valor) : '';
   const c = (b && b.condiciones) || {};
   $('b-dias').innerHTML = DIAS.map(([n, l]) =>
-    `<label><input type="checkbox" value="${n}" ${(c.dias || []).includes(n) ? 'checked' : ''}>${l}</label>`).join('');
+    `<label><input type="checkbox" value="${n}" ${(c.dias || []).includes(n) ? 'checked' : ''} onchange="pintarDiasReales()">${l}</label>`).join('');
   $('b-turnos').innerHTML = TURNOS.map(t =>
     `<option value="${escapar(t.id)}" ${(c.turnos || []).includes(t.id) ? 'selected' : ''}>` +
     `${escapar(t.nombre_publico || t.nombre)} (${t.hora_desde}–${t.hora_hasta})</option>`).join('');
   $('b-cmin').value = c.cantidad_min || '';
   $('b-cmax').value = c.cantidad_max || '';
+  pintarDiasReales();
   // Sin ninguna pieza no se deja un desplegable vacío: se dice dónde se crean, que es lo que
   // la persona necesita saber en ese momento.
   $('b-frente').innerHTML = '<option value="">logo del negocio</option>' + PIEZAS.map(x =>

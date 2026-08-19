@@ -378,6 +378,16 @@ function soloFecha(v) {
   return String(v).slice(0, 10);
 }
 
+/**
+ * "Hoy" en la zona del negocio, no en UTC. El servidor corre en UTC y Argentina va tres horas
+ * atrás: con toISOString(), a partir de las 21:00 locales el bot ya cree que es mañana y deja de
+ * ofrecer el día en curso. La misma zona que usa la base para la anticipación.
+ */
+const TZ_NEG = 'America/Argentina/Buenos_Aires';
+const fechaLocal = (ms = Date.now()) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: TZ_NEG, year: 'numeric', month: '2-digit', day: '2-digit' })
+    .format(new Date(ms));
+
 /** El isodow de una fecha, sin pasar por zonas horarias: la fecha ya viene como AAAA-MM-DD. */
 function isodow(fecha) {
   const [a, m, d] = String(fecha).split('-').map(Number);
@@ -391,8 +401,8 @@ async function elegirDia(cfg, negocio, waId, entrada, datos = {}) {
     await decir(cfg, waId, 'Dale, cuando quieras. Acá estoy.', negocio.id);
     return true;
   }
-  const hoy = new Date().toISOString().slice(0, 10);
-  const hasta = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+  const hoy = fechaLocal();
+  const hasta = fechaLocal(Date.now() + 30 * 864e5);
   const turnos = await db.disponibilidadPublica(negocio.id, hoy, hasta);
   // La invitación acota el calendario ANTES de mostrarlo. Ofrecer treinta días y rechazar al final
   // el que la persona eligió es hacerle perder el tiempo con una regla que ya conocíamos.
@@ -655,8 +665,8 @@ async function seguirVoz(negocio, mensaje) {
   if (!ofreceReservas) return void await recibirConsulta(cfg, negocio, waId, texto, canal);
 
   const cfgRes = await db.getConfigReservas(negocio.id);
-  const hoy = new Date().toISOString().slice(0, 10);
-  const hasta = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+  const hoy = fechaLocal();
+  const hasta = fechaLocal(Date.now() + 30 * 864e5);
   const opciones = await db.disponibilidadPublica(negocio.id, hoy, hasta);
 
   // El código puede venir dictado en el propio audio.
