@@ -19,8 +19,12 @@
       // Primera del grupo: una campaña es el paraguas del que cuelgan las demás acciones de
       // comunicación, así que se lee antes que las piezas sueltas.
       { id: 'campanias', label: 'Campañas',          icon: 'target',      href: 'campanias' },
-      { id: 'propuestas', label: 'Propuestas',       icon: 'lightbulb',   href: 'propuestas' },
-      { id: 'cola',      label: 'Cola y aprobación', icon: 'inbox',       href: 'proyecto' },
+      { id: 'propuestas', label: 'Ideas',            icon: 'lightbulb',   href: 'propuestas' },
+      // 'Cola y aprobación' salió del menú: apuntaba a `proyecto`, que no es una cola sino la
+      // home del negocio —tres de sus cuatro fichas llevaban a Ideas, Instagram e Instagram, que
+      // ya están acá al lado—. La página sigue viva: es donde se cae al elegir un negocio y
+      // adonde vuelven los enlaces "← Negocio".
+
       { id: 'instagram', label: 'Instagram',         icon: 'instagram',   href: 'instagram' },
       { id: 'avisos',    label: 'Avisos',            icon: 'megaphone',   href: 'avisos' },
       { id: 'grafica',   label: 'Gráfica',          icon: 'layout-template', href: 'grafica' },
@@ -115,14 +119,20 @@
   // Breadcrumb contextual: Inicio › Marca › Página. La Marca enlaza al proyecto (home de la marca).
   function crumb(active){
     if(!active || active==='inicio') return '';
-    var lab=labelOf(active); if(!lab) return '';
     var L='mono text-[11px] text-pmut dark:text-mut hover:text-pfg dark:hover:text-fg transition';
     var S='<span class="mono text-[11px] text-pmut dark:text-mut opacity-50">/</span>';
     var CUR='mono text-[11px] text-pfg dark:text-fg';
-    var out='<nav class="flex items-center flex-wrap gap-2 mb-6"><a class="'+L+'" href=".">Inicio</a>';
+    var NAVI='<nav class="flex items-center flex-wrap gap-2 mb-6">';
+    // La home del negocio no tiene entrada en el menú —no es una sección, es donde se cae al
+    // elegir un negocio—, pero sí necesita migas: sin ellas se pierde el camino de vuelta.
+    if(active==='negocio'){
+      return NAVI+'<a class="'+L+'" href=".">Inicio</a>'+S+
+             '<span class="'+CUR+'" id="cr-marca">negocio</span></nav>';
+    }
+    var lab=labelOf(active); if(!lab) return '';
+    var out=NAVI+'<a class="'+L+'" href=".">Inicio</a>';
     if(SECS_NEGOCIO.indexOf(sectionOf(active))>=0){
-      if(active==='cola'){ out+=S+'<span class="'+CUR+'" id="cr-marca">negocio</span>'; }
-      else { out+=S+'<a class="'+L+'" href="proyecto" id="cr-marca">negocio</a>'+S+'<span class="'+CUR+'">'+lab+'</span>'; }
+      out+=S+'<a class="'+L+'" href="proyecto" id="cr-marca">negocio</a>'+S+'<span class="'+CUR+'">'+lab+'</span>';
     } else {
       out+=S+'<span class="'+CUR+'">'+lab+'</span>';
     }

@@ -350,7 +350,7 @@ function avisoPubCard(p){
 /* ---------- Requerimientos (cola) ---------- */
 function reqStatus(b){
   if(!b.pieza_id){
-    if(b.brief_estado==='propuesta')  return {l:'Propuesta del creativo', c:'prop'};
+    if(b.brief_estado==='propuesta')  return {l:'Idea del creativo', c:'prop'};
     if(b.brief_estado==='pendiente')  return {l:'En cola', c:'cola'};
     if(b.brief_estado==='procesando') return {l:'Procesando…', c:'proc'};
     if(b.brief_estado==='error')      return {l:'Error al procesar', c:'err'};
@@ -374,8 +374,8 @@ function propCard(b){
   const hint = [b.requiere_material?'pide material':'', n?`${n} aportado(s)`:''].filter(Boolean).join(' · ');
   return `<div class="card prop">
     <button class="qhead" onclick="openReqModal('${b.id}')">
-      <span class="rst prop">Propuesta</span>
-      <span class="qtt">${esc(b.req_titulo||'Propuesta')}</span>
+      <span class="rst prop">Idea</span>
+      <span class="qtt">${esc(b.req_titulo||'Idea')}</span>
       ${canalBadge(b)}
       ${hint?`<span class="phint">${hint}</span>`:''}
       <span class="qchev">⤢</span>
@@ -391,7 +391,7 @@ function mentionCard(b){
     </button></div>`;
 }
 function solicitudCard(b){
-  const txt = b.brief_estado==='procesando' ? 'El creativo está elaborando propuestas…' : 'Pedido de propuestas en cola…';
+  const txt = b.brief_estado==='procesando' ? 'El creativo está elaborando ideas…' : 'Pedido de ideas en cola…';
   return `<div class="card prop"><div class="reqbody">
     <div class="meta2"><span class="rst proc">Creativo trabajando</span>${canalBadge(b)}</div>
     <div class="ptt">${txt}</div>
@@ -411,7 +411,7 @@ function reqClass(b){
 function revisandoCard(b){
   return `<div class="card prop"><div class="reqbody">
     <div class="meta2"><span class="rst proc">Preparando nueva versión…</span>${canalBadge(b)}</div>
-    <div class="ptt">${esc(b.req_titulo||'Propuesta')}</div>
+    <div class="ptt">${esc(b.req_titulo||'Idea')}</div>
     <div class="reqtext">El creativo está ajustando el concepto con tus comentarios.</div>
   </div></div>`;
 }
@@ -419,7 +419,7 @@ function revisandoCard(b){
 function generandoCard(b){
   return `<div class="card prop"><div class="reqbody">
     <div class="meta2"><span class="rst proc">Generando la pieza…</span>${canalBadge(b)}</div>
-    <div class="ptt">${esc(b.req_titulo||'Propuesta')}</div>
+    <div class="ptt">${esc(b.req_titulo||'Idea')}</div>
     <div class="reqtext">El creativo está armando la publicación. Cuando esté lista aparece en Cola y aprobación para tu visto.</div>
   </div></div>`;
 }
@@ -456,7 +456,7 @@ function reqRow(b){
 }
 
 /* ---------- Barra de status ---------- */
-const procName={correccion:'Modificaciones', ingesta_briefs:'Ingesta', propuestas:'Propuestas'};
+const procName={correccion:'Modificaciones', ingesta_briefs:'Ingesta', propuestas:'Ideas'};
 const humanSec = s => { s=Math.max(0,s|0); if(s<60) return s+'s'; const m=Math.floor(s/60); if(m<60) return m+'m'; const h=Math.floor(m/60); return h<24 ? h+'h' : Math.floor(h/24)+'d'; };
 const _dot = c => `<span class="dotp" style="background:${c}"></span>`;
 // Barra de control de workers (salud de la plataforma de un vistazo). Datos de batch_runs (/api/status).
@@ -468,7 +468,7 @@ function renderStatus(rows){
   const parts=[];
   // 1) Dispatcher (orquestador): revisa la base cada ~1 min y encola el trabajo.
   const d=by.dispatcher, dDown=!d || d.hace_s>90;
-  const dTip='Orquestador: revisa la base cada ~1 min y encola el trabajo pendiente (corrección, propuestas, briefs, landings). Verde = activo · Rojo = dejó de chequear (revisar cf-dispatcher.timer).';
+  const dTip='Orquestador: revisa la base cada ~1 min y encola el trabajo pendiente (corrección, ideas, briefs, landings). Verde = activo · Rojo = dejó de chequear (revisar cf-dispatcher.timer).';
   parts.push(`<span class="it" title="${dTip}">${_dot(dDown?ST_RED:ST_GREEN)}Dispatcher: <b>${dDown?'sin señal':'activo · hace '+humanSec(d.hace_s)}</b></span>`);
   // 2) Workers: ejecutan las tareas. Verde procesando · gris en espera · rojo caído.
   const w=by.worker, wDown=!w || w.hace_s>30, proc=w&&(w.last_msg||'').startsWith('procesando');
@@ -598,7 +598,7 @@ async function pedirPropuestas(){
   btn.disabled=true; btn.textContent='Pidiendo…';
   try{
     const d=await fetch('api/proponer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enfasis:inp.value, canal: sel?sel.value:'instagram', cantidad, material:_propMaterial})}).then(r=>r.json());
-    toast(d.ok?`Pedido enviado (${cantidad}${_propMaterial.length?' · '+_propMaterial.length+' adjunto(s)':''}) — el creativo carga propuestas en unos minutos`:'No se pudo pedir', !d.ok);
+    toast(d.ok?`Pedido enviado (${cantidad}${_propMaterial.length?' · '+_propMaterial.length+' adjunto(s)':''}) — el creativo carga ideas en unos minutos`:'No se pudo pedir', !d.ok);
     if(d.ok){ inp.value=''; propMatReset(); if(typeof window.afterProponer==='function') window.afterProponer(); }
   }catch(e){ toast('Error de conexión', true); }
   btn.disabled=false; btn.textContent=t;
@@ -630,7 +630,7 @@ let modalId=null;    // requerimiento abierto en el modal
 function openReqModal(id){
   const b=_reqs[id]; if(!b) return;
   modalId=id;
-  document.getElementById('rm-tt').textContent=b.req_titulo||'Propuesta';
+  document.getElementById('rm-tt').textContent=b.req_titulo||'Idea';
   document.getElementById('rm-concepto').innerHTML=esc(b.texto||'').replace(/\n/g,'<br>');
   const link=document.getElementById('rm-link');
   if(link){

@@ -133,7 +133,7 @@
 
     <!-- Resumen: cada pastilla con su flecha de acción -->
     <div class="resumen" id="resumen">
-      <a class="statile c-prop" href="propuestas"><span class="sv" id="st-prop">—</span><span class="sl">Propuestas</span><span class="sx" id="st-prop-x">del creativo, por revisar</span><span class="sarrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
+      <a class="statile c-prop" href="propuestas"><span class="sv" id="st-prop">—</span><span class="sl">Ideas</span><span class="sx" id="st-prop-x">del creativo, por revisar</span><span class="sarrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
       <a class="statile c-cola" href="#" onclick="openCola();return false;"><span class="sv" id="st-cola">—</span><span class="sl">En cola</span><span class="sx">requerimientos por resolver</span><span class="sarrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
       <a class="statile c-aprob" href="instagram"><span class="sv" id="st-aprob">—</span><span class="sl">Por aprobar</span><span class="sx">piezas en revisión</span><span class="sarrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
       <a class="statile c-pub" href="instagram"><span class="sv" id="st-pub">—</span><span class="sl">Publicadas</span><span class="sx">en feed y pantalla</span><span class="sarrow"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></span></a>
@@ -154,7 +154,7 @@
         <button class="modal-x" onclick="closeCola()" title="Cerrar">×</button>
       </div>
       <div class="modal-body">
-        <button class="btn ok" id="cm-ask" onclick="openAsk()"><i data-lucide="sparkles" class="w-4 h-4"></i> Pedir propuestas al creativo</button>
+        <button class="btn ok" id="cm-ask" onclick="openAsk()"><i data-lucide="sparkles" class="w-4 h-4"></i> Pedir ideas al creativo</button>
         <div class="cards" id="c-cola"></div>
       </div>
     </div>
@@ -189,11 +189,11 @@
       </div>
     </div>
   </div>
-  <!-- Modal: pedir propuestas al creativo -->
+  <!-- Modal: pedir ideas al creativo -->
   <div id="askmodal" class="modal hidden">
     <div class="modal-bg" onclick="closeAsk()"></div>
     <div class="modal-box">
-      <div class="modal-head"><div class="modal-tt">Pedir propuestas al creativo</div><button class="modal-x" onclick="closeAsk()" title="Cerrar">×</button></div>
+      <div class="modal-head"><div class="modal-tt">Pedir ideas al creativo</div><button class="modal-x" onclick="closeAsk()" title="Cerrar">×</button></div>
       <div class="modal-body">
         <div class="modal-sec"><div class="modal-lbl">Énfasis (opcional)</div><textarea id="enfasis" maxlength="1000" placeholder="Qué destacar: un plato, una promo, el tono…"></textarea></div>
         <div class="modal-sec"><div class="modal-lbl">Canal</div>
@@ -202,7 +202,7 @@
         <div class="modal-sec"><div class="modal-lbl">Cantidad (1 a 8)</div><input id="cantprop" type="number" min="1" max="8" value="5"></div>
       </div>
       <div class="modal-foot">
-        <button class="btn ok" id="askbtn" onclick="pedirPropuestas()">Pedir propuestas</button>
+        <button class="btn ok" id="askbtn" onclick="pedirPropuestas()">Pedir ideas</button>
         <button class="btn no" onclick="closeAsk()">Cancelar</button>
       </div>
     </div>
@@ -210,7 +210,8 @@
 </main></div>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="shell.js"></script>
-<script>ClausinaShell({active:'cola'});</script>
+<!-- Sin entrada propia en el menú: es la home del negocio, no una sección. -->
+<script>ClausinaShell({active:'negocio'});</script>
 <script src="panel.js"></script>
 <script>
   function openAsk(){ document.getElementById('askmodal').classList.remove('hidden'); }
