@@ -372,8 +372,11 @@
         <div class="hint">Mientras esté sin marcar, nadie de afuera puede reservar. El silencio es no.</div>
         <label class="chk" for="c-auto" style="margin-top:18px;">
           <input type="checkbox" id="c-auto">
-          Confirmar automáticamente las reservas que llegan de agentes externos
+          Confirmar automáticamente las reservas que llegan de afuera (web y agentes externos)
         </label>
+        <div class="hint">Sin marcar, todo lo que entra por la página pública queda
+          <b>solicitada</b> hasta que alguien la confirme desde acá — y recién ahí el cliente
+          recibe el WhatsApp de confirmación. WhatsApp tiene su propio interruptor, en su sección.</div>
         <div class="hint">Si queda sin marcar, entran como <b>solicitadas</b> y alguien las confirma.</div>
         <div class="flex gap-3 items-center mt-5">
           <button class="btn" onclick="guardarCfg()">Guardar parámetros</button>

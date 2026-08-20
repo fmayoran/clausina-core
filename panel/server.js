@@ -1227,21 +1227,27 @@ async function avisarReserva(reservaId, quien) {
     const cuando = cuandoLegible(r.fecha, r.turno, r.hora_desde);
     const cantidad = `${r.cantidad} ${UNI_PLUR[r.unidad] || 'personas'}`;
     let envios = [];
+    // Las plantillas están dadas de alta en la cuenta DEL NEGOCIO, no en la de la agencia: una
+    // plantilla de WhatsApp pertenece a una WABA y no existe fuera de ella. Mandando desde el
+    // número de ClaUsina, Meta contesta "Template name does not exist in the translation" y el
+    // aviso se pierde entero. Pasó de verdad: las reservas que entraban por la web no le avisaban
+    // a nadie, y aparecían recién cuando alguien miraba el panel de casualidad.
+    const cfgNeg = await db.getWhatsappNegocio(r.negocio_id, true);
+    if (!cfgNeg || !cfgNeg.wa_phone_id || !cfgNeg.token) {
+      console.log(`aviso ${quien} reserva ${reservaId}: el negocio no tiene WhatsApp propio`);
+      return;
+    }
+    const emisor = { phone_id: cfgNeg.wa_phone_id, token: cfgNeg.token };
     if (quien === 'negocio') {
       const dest = await db.destinatariosAviso(r.negocio_id);
       envios = dest.map(u => wa.enviarPlantilla(u.whatsapp, 'reserva_nueva',
-        [r.negocio, r.cliente || 'sin nombre', cuando, cantidad]));
+        [r.negocio, r.cliente || 'sin nombre', cuando, cantidad], 'es_AR', emisor));
     } else if (quien === 'cliente' && r.cliente_telefono) {
       // Al cliente final se le escribe desde el número DEL NEGOCIO: tiene que ver el nombre del
-      // lugar donde reservó. Si el negocio todavía no tiene el suyo, no se le escribe — mandarle
-      // un mensaje de "ClaUsina" a un comensal es la forma más rápida de que lo reporte.
-      const cfg = await db.getWhatsappNegocio(r.negocio_id, true);
-      if (!cfg || !cfg.wa_phone_id || !cfg.token) {
-        console.log(`aviso cliente reserva ${reservaId}: el negocio no tiene WhatsApp propio`);
-        return;
-      }
+      // lugar donde reservó. Mandarle un mensaje de "ClaUsina" a un comensal es la forma más
+      // rápida de que lo reporte.
       envios = [wa.enviarPlantilla(r.cliente_telefono, 'reserva_confirmada',
-        [r.negocio, cuando, cantidad], 'es_AR', { phone_id: cfg.wa_phone_id, token: cfg.token })];
+        [r.negocio, cuando, cantidad], 'es_AR', emisor)];
     }
     if (!envios.length) { console.log(`aviso ${quien} reserva ${reservaId}: sin destinatarios`); return; }
     const res = await Promise.all(envios);
