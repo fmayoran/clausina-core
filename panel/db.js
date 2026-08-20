@@ -2114,6 +2114,19 @@ async function pedirTarjeta(negocioId, reservaId, waId) {
   } catch (e) { console.error('pedir tarjeta', e.message); }
 }
 
+/**
+ * ¿Hay ventana de 24 h abierta con este teléfono? Meta sólo deja mandar mensajes libres —una foto
+ * suelta, por ejemplo— si la persona escribió primero y hace menos de un día. Fuera de eso hay
+ * que usar una plantilla. Se mira la bitácora, que es donde queda todo lo que entra.
+ */
+async function ventanaAbierta(negocioId, waId) {
+  const { rows: [r] } = await pool.query(
+    `SELECT 1 FROM contenido.whatsapp_mensaje
+      WHERE negocio_id=$1 AND wa_id=$2 AND direccion='entrante'
+        AND creado_en > now() - interval '24 hours' LIMIT 1`, [negocioId, String(waId)]);
+  return !!r;
+}
+
 async function reservaTarjeta(negocioId, reservaId) {
   const { rows: [r] } = await pool.query(
     `SELECT r.id, r.fecha::text, r.cantidad, r.estado,
@@ -4489,7 +4502,7 @@ module.exports = {
   estadoCampania, guardarAccion, borrarAccion, opcionesAccion,
   emitirInvitaciones, getInvitaciones, anularInvitacion, consultarInvitacion,
   cerrarUso, liberarPorReserva, invitacionDeReserva, condicionesLegibles, piezasPublicadas, codigoPieza,
-  reservaTarjeta, pedirTarjeta,
+  reservaTarjeta, pedirTarjeta, ventanaAbierta,
   invitacionesActivas, guardarToken, getUsuarioPorToken, consumirToken,
   getNegocios, getProyectoId, getPerfil, getIgToken, guardarPerfil, getTextoHistorial, getTextoVersion, setLogo, getResumenAgencia,
   getIdentidad, guardarIdentidad, getCatalogosIdentidad, setMapeoAtributo,

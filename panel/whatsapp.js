@@ -145,6 +145,12 @@ async function enviarImagen(a, url, caption, cfg = null) {
   } catch (e) { return { ok: false, motivo: e.message }; }
 }
 
+/**
+ * Manda una plantilla aprobada. `cfg.imagen` agrega una cabecera con foto: es la única forma de
+ * hacerle llegar una imagen a alguien que NO escribió en las últimas 24 h —fuera de esa ventana
+ * Meta sólo deja pasar plantillas—, y es el caso de quien reservó por la web y nunca abrió un
+ * chat. La plantilla tiene que estar declarada con HEADER de tipo IMAGE o Meta la rechaza.
+ */
 async function enviarPlantilla(a, nombre, params, idioma = 'es_AR', cfg = null) {
   const phone = (cfg && cfg.phone_id) || PHONE_ID;
   const token = (cfg && cfg.token) || TOKEN;
@@ -160,9 +166,14 @@ async function enviarPlantilla(a, nombre, params, idioma = 'es_AR', cfg = null) 
         template: {
           name: nombre,
           language: { code: idioma },
-          components: (params && params.length)
-            ? [{ type: 'body', parameters: params.map(t => ({ type: 'text', text: String(t).slice(0, 200) })) }]
-            : [],
+          components: [
+            ...((cfg && cfg.imagen)
+              ? [{ type: 'header', parameters: [{ type: 'image', image: { link: cfg.imagen } }] }]
+              : []),
+            ...((params && params.length)
+              ? [{ type: 'body', parameters: params.map(t => ({ type: 'text', text: String(t).slice(0, 200) })) }]
+              : []),
+          ],
         },
       }),
       signal: AbortSignal.timeout(15000),

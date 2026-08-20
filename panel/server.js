@@ -1220,6 +1220,26 @@ function cuandoLegible(fecha, turno, hora) {
 const UNI_PLUR = { personas:'personas', cubiertos:'cubiertos', canchas:'canchas',
                    mesas:'mesas', lugares:'lugares', cupos:'cupos' };
 
+/**
+ * Confirmación al cliente en forma de tarjeta. Si no tenemos su teléfono no hay a dónde mandarla,
+ * y si el negocio no tiene WhatsApp propio tampoco: en los dos casos se cae al aviso de texto,
+ * que ya sabe manejar esas faltas.
+ */
+async function confirmarConTarjeta(reservaId) {
+  try {
+    const r = await db.datosParaAviso(reservaId);
+    if (!r || !r.cliente_telefono) return avisarReserva(reservaId, 'cliente');
+    // El teléfono que cargó el cliente en la web viene sin país ("1164338963"): a WhatsApp hay
+    // que darle el número completo o el envío se pierde sin decir a quién.
+    const waId = tel.normalizar(r.cliente_telefono);
+    if (!waId) return avisarReserva(reservaId, 'cliente');
+    await db.pedirTarjeta(r.negocio_id, reservaId, waId);
+  } catch (e) {
+    console.error('confirmar con tarjeta', e.message);
+    avisarReserva(reservaId, 'cliente');
+  }
+}
+
 async function avisarReserva(reservaId, quien) {
   try {
     const r = await db.datosParaAviso(reservaId);
@@ -1391,7 +1411,11 @@ app.post('/api/reservas/:id/estado', async (req, res) => {
     const r = await db.cambiarEstadoReserva(req.negocioId, req.params.id, estado);
     // Al cliente se le avisa sólo cuando su pedido pasa a confirmado: es la respuesta que
     // está esperando. Los otros cambios de estado son internos del negocio.
-    if (r.ok && estado === 'confirmada') setImmediate(() => avisarReserva(req.params.id, 'cliente'));
+    // Al confirmar se manda la TARJETA, la misma pieza que ya recibe quien reserva por WhatsApp:
+    // mismo diseño que la invitación y, si no hubo invitación, sin el recuadro del código. El
+    // worker decide cómo entregarla —foto suelta si hay chat abierto, plantilla con cabecera si
+    // no— y cae al texto si la plantilla con foto no está disponible.
+    if (r.ok && estado === 'confirmada') setImmediate(() => confirmarConTarjeta(req.params.id));
     res.status(r.ok ? 200 : 409).json(r);
   } catch (e) { resError(res, e, 'estado reserva'); }
 });

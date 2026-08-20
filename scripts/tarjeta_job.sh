@@ -43,17 +43,38 @@ URL="$BASE_URL/tarjetas/${RID}-${STAMP}.png"
 ENVIO=$(docker exec -i "$(docker ps -q -f name=clausina_panel | head -1)" node -e '
   const db = require("/app/db"), wa = require("/app/whatsapp");
   (async () => {
-    const [neg, waId, url] = process.argv.slice(1);
+    const [neg, waId, url, rid] = process.argv.slice(1);
     const c = await db.getWhatsappNegocio(neg, true);
     if (!c || !c.wa_phone_id || !c.token) return process.stdout.write(JSON.stringify({ ok: false, motivo: "sin_configurar" }));
-    const r = await wa.enviarImagen(waId, url, "", { phone_id: c.wa_phone_id, token: c.token });
+    const emisor = { phone_id: c.wa_phone_id, token: c.token };
+    // Quien reservó por la web nunca escribió: no hay ventana de 24 h y una foto suelta rebota.
+    // Ahí la tarjeta viaja como cabecera de la plantilla, que es lo único que Meta deja pasar.
+    const abierta = await db.ventanaAbierta(neg, waId);
+    let r;
+    if (abierta) {
+      r = await wa.enviarImagen(waId, url, "", emisor);
+    } else {
+      const t = await db.reservaTarjeta(neg, rid);
+      const cuando = t ? `${t.fecha} ${t.hora_desde || ""}`.trim() : "";
+      const cant = t ? `${t.cantidad} ${t.unidad || "personas"}` : "";
+      r = await wa.enviarPlantilla(waId, "reserva_confirmada_tarjeta",
+            [(t && t.negocio) || "", cuando, cant], "es_AR", { ...emisor, imagen: url });
+      // Si la plantilla con foto no está lista —recién creada, o Meta la rechazó—, la persona
+      // igual tiene que enterarse de que su reserva quedó confirmada. Cae a la de texto, que ya
+      // está aprobada. Peor la tarjeta linda que nunca llega.
+      if (!r.ok) {
+        r = await wa.enviarPlantilla(waId, "reserva_confirmada",
+              [(t && t.negocio) || "", cuando, cant], "es_AR", emisor);
+        if (r.ok) r.solo_texto = true;
+      }
+    }
     // La bitácora es la misma que la del texto: el inbox tiene que mostrar la conversación
     // completa, no la mitad que pasó por el webhook.
     if (r.ok) await db.logWhatsapp({ negocio_id: neg, wa_id: waId, direccion: "saliente",
                                      tipo: "image", texto: url, mensaje_id: r.id || null });
     process.stdout.write(JSON.stringify(r));
   })().catch(e => { process.stdout.write(JSON.stringify({ ok: false, motivo: e.message })); });
-' "$NEG" "$WA" "$URL" 2>&1)
+' "$NEG" "$WA" "$URL" "$RID" 2>&1)
 
 case "$ENVIO" in
   *'"ok":true'*) psql "UPDATE contenido.tarjeta_req SET estado='lista', url='$URL', hecho_en=now() WHERE reserva_id='$RID';" >/dev/null
