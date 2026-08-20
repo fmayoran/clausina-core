@@ -532,6 +532,9 @@ function renderColab(){
   ov.innerHTML=`<div class="colabbox">
     <div class="colabhead"><b>Colaboradores del post</b><button class="colx" onclick="cerrarColab()" title="Cerrar">×</button></div>
     <p class="colabhint">Se invita a estas cuentas a Collab (aparece también en su feed si aceptan). Sacá o agregá las que quieras.</p>
+    <p class="colabhint">Instagram descarta en silencio la invitación si la cuenta invitada es privada
+      o tiene apagadas las invitaciones a colaborar (Configuración → Privacidad → Etiquetas y
+      menciones). El post sale igual y nadie avisa: si no llega, se revisa allá.</p>
     <div class="colchips">${chips}</div>
     <div class="coladd"><input id="colab-in" placeholder="agregar cuenta (ej. ardora.ar)" onkeydown="if(event.key==='Enter'){event.preventDefault();agregarColab();}"><button onclick="agregarColab()">+</button></div>
     <div class="colabfoot"><button class="btn ok" onclick="confirmarAprobIG()">Aprobar y publicar</button><button class="btn no" onclick="cerrarColab()">Cancelar</button></div>
