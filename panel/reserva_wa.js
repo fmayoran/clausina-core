@@ -172,6 +172,10 @@ async function atender(negocio, mensaje) {
     // "Otra consulta": lo que sigue va al inbox para que lo lea una persona.
     if (paso === 'consulta') return await recibirConsulta(cfg, negocio, waId, entrada, canal);
     if (paso === 'ofrecido') {
+      if (String(entrada).startsWith('acc:')) {
+        const i = parseInt(String(entrada).slice(4), 10);
+        if (await responderAcceso(cfg, negocio, waId, canal, i, datos)) return true;
+      }
       if (entrada === 'consulta') return await pedirConsulta(cfg, negocio, waId);
       if (!ofreceReservas) return await recibirConsulta(cfg, negocio, waId, entrada, canal);
       // Texto libre en vez de un botón: puede ser una pregunta. Si está contestada, se contesta
@@ -202,6 +206,24 @@ async function atender(negocio, mensaje) {
   return false;
 }
 
+/** Los atajos que el negocio dejó prendidos, en el orden en que los cargó. */
+function accesosDe(canal) {
+  return (Array.isArray(canal && canal.accesos) ? canal.accesos : []).filter(a => a && a.activo);
+}
+
+/**
+ * Responde un atajo del menú. Manda el texto del negocio TAL CUAL —ahí adentro va el link— y
+ * deja la conversación donde estaba: quien pidió el menú probablemente después quiera reservar,
+ * y hacerlo empezar de nuevo sería castigarlo por haber mirado.
+ */
+async function responderAcceso(cfg, negocio, waId, canal, indice, datos) {
+  const a = accesosDe(canal)[indice];
+  if (!a) return false;
+  await decir(cfg, waId, a.texto, negocio.id);
+  await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
+  return true;
+}
+
 async function saludar(cfg, negocio, waId, canal, ofreceReservas, perfil, datos = {}) {
   // Se arranca con lo que ya se sepa: un código detectado en el PRIMER mensaje no tiene todavía
   // conversación donde guardarse, y sin esto se perdía justo ahí.
@@ -224,12 +246,21 @@ async function saludar(cfg, negocio, waId, canal, ofreceReservas, perfil, datos 
   // estamos insistiendo. Quien no quiere nada simplemente no contesta, y "no" escrito sigue
   // cortando el flujo igual.
   if (ofreceReservas) botones.push({ id: 'reservar', titulo: 'Reservar' });
+  // Los atajos del negocio —el menú, cómo llegar— entre reservar y "otra consulta": son lo que
+  // más se pide y no tiene sentido que haya que preguntarlo para recibirlo.
+  accesosDe(canal).forEach((a, i) => botones.push({ id: 'acc:' + i, titulo: a.titulo }));
   if (canal.inbox) botones.push({ id: 'consulta', titulo: 'Otra consulta' });
 
   if (!botones.length) return false;
   const texto = `${saludo}\n\n¿En qué te puedo ayudar?`;
+  // Hasta tres opciones entran como botones, que es lo más cómodo: se tocan sin abrir nada.
+  // De ahí en más WhatsApp sólo acepta lista, y una lista de dos ítems se ve peor que dos
+  // botones. El límite es de Meta, no una preferencia.
   const r = await decirOpciones(cfg, waId, texto, botones.map(b => b.titulo), negocio.id,
-    () => wa.enviarBotones(waId, texto, botones, cfg));
+    () => botones.length <= 3
+      ? wa.enviarBotones(waId, texto, botones, cfg)
+      : wa.enviarLista(waId, texto, 'Ver opciones',
+          botones.map(b => ({ id: b.id, titulo: b.titulo })), cfg));
   // Si los botones fallan (algún cliente viejo no los soporta), se sigue en texto plano.
   if (!r.ok) await decir(cfg, waId, saludo + (ofreceReservas
     ? '\n\nSi querés reservar, escribime "reservar". Si es otra cosa, contame y te respondemos.'

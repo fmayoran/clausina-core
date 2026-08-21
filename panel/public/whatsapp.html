@@ -202,6 +202,24 @@
           confirmando. En la web cualquiera escribe cualquier cosa.</div>
       </div>
 
+      <!-- ══ Atajos del menú ══ -->
+      <div class="card2">
+        <div class="sec">Atajos del menú</div>
+        <div class="hint" style="margin-top:-4px;">Botones que el asistente ofrece <b>junto con el
+          saludo</b>, sin que haga falta preguntar: el menú online, cómo llegar, lo que se pida
+          todo el tiempo. Al tocarlos manda el texto que escriban acá, tal cual — el link va
+          adentro del texto. Destildar uno lo saca del menú sin borrarlo.</div>
+        <div id="acc-lista" style="margin-top:14px;"></div>
+        <div class="bar" style="border:0;padding:0;margin-top:12px;">
+          <button class="btn2" onclick="accAgregar()">Agregar atajo</button>
+          <span class="msg" id="msg-acc"></span>
+        </div>
+        <div class="hint" style="margin-top:10px;">Hasta <b>3 opciones en total</b> —contando
+          Reservar y Otra consulta— WhatsApp las muestra como botones. A partir de la cuarta las
+          agrupa en una lista desplegable, que se toca una vez más. Es un límite de WhatsApp.
+          El rótulo admite hasta 20 caracteres.</div>
+      </div>
+
       <!-- ══ Respuestas frecuentes ══ -->
       <div class="card2">
         <div class="sec">Qué sabe responder</div>
@@ -325,6 +343,9 @@ async function cargarCanal() {
     $('c-inbox').checked = CANAL.inbox !== false;
     $('c-auto').checked = !!CANAL.auto_confirmar;
     FAQ = Array.isArray(CANAL.faq) ? CANAL.faq.map(f => ({ p: f.p, r: f.r })) : [];
+    ACC = Array.isArray(CANAL.accesos)
+      ? CANAL.accesos.map(a => ({ titulo: a.titulo, texto: a.texto, activo: a.activo !== false })) : [];
+    pintarAcc();
     pintarFaq();
     // Sólo se puede ofrecer lo que el bot sabe hacer Y el negocio tiene habilitado: si la
     // capacidad está apagada, la casilla se ve pero no se puede marcar, y dice por qué.
@@ -349,7 +370,7 @@ async function guardarCanal() {
     const r = await fetch('api/whatsapp/canal', { method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ saludo: $('c-saludo').value, ofrece, inbox: $('c-inbox').checked,
-                             auto_confirmar: $('c-auto').checked, faq: leerFaq(),
+                             auto_confirmar: $('c-auto').checked, faq: leerFaq(), accesos: leerAcc(),
                              visto_en: CANAL.actualizado_en }) });
     const j = await r.json();
     if (r.ok && j.ok) { CANAL = j.config; m.className = 'msg bien'; m.textContent = 'guardado';
@@ -365,6 +386,7 @@ async function guardarCanal() {
 
 /* ═══════ Respuestas frecuentes ═══════ */
 let FAQ = [];
+let ACC = [];   // atajos del menú de ayuda
 
 // Se lee del DOM y no de FAQ: lo que vale es lo que la persona tiene escrito en pantalla, aunque
 // todavía no haya salido del campo.
@@ -395,6 +417,41 @@ function pintarFaq() {
                   'Escribilo acá, o cargalo en Identidad y volvé a sugerir.</div>' : ''}
     </div>`).join('');
 }
+
+/* ── Atajos del menú ─────────────────────────────────────────────────────────
+   Se leen del DOM igual que la FAQ: lo que está escrito en pantalla es la verdad, aunque el
+   cursor todavía no haya salido del campo. */
+function leerAcc() {
+  return [...document.querySelectorAll('#acc-lista .acc-fila')]
+    .map(f => ({ titulo: f.querySelector('.acc-t').value.trim().slice(0, 20),
+                 texto: f.querySelector('.acc-r').value.trim(),
+                 activo: f.querySelector('.acc-on').checked }))
+    .filter(a => a.titulo && a.texto);
+}
+
+function pintarAcc() {
+  const cont = $('acc-lista');
+  if (!ACC.length) {
+    cont.innerHTML = '<div class="hint" style="padding:14px 0;">Sin atajos: el menú ofrece sólo ' +
+      'Reservar y Otra consulta.</div>';
+    return;
+  }
+  cont.innerHTML = ACC.map((a, i) => `
+    <div class="acc-fila" style="border:1px solid var(--u-line);border-radius:10px;padding:12px;margin-bottom:10px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <label class="chk" title="Mostrarlo en el menú" style="margin:0;">
+          <input type="checkbox" class="acc-on" ${a.activo ? 'checked' : ''}></label>
+        <input type="text" class="acc-t" value="${escapar(a.titulo || '')}" maxlength="20"
+               placeholder="Rótulo del botón" style="flex:1;font-weight:600;">
+        <button class="btn2" title="Quitar" onclick="accQuitar(${i})" style="padding:6px 10px;">&times;</button>
+      </div>
+      <textarea class="acc-r" rows="2" placeholder="Qué manda al tocarlo — pegá el link acá"
+                style="margin-top:8px;">${escapar(a.texto || '')}</textarea>
+    </div>`).join('');
+}
+
+function accAgregar() { ACC = leerAcc().concat([{ titulo: '', texto: '', activo: true }]); pintarAcc(); }
+function accQuitar(i) { const l = leerAcc(); l.splice(i, 1); ACC = l; pintarAcc(); }
 
 function faqAgregar() { FAQ = leerFaq().concat([{ p: '', r: '' }]); pintarFaq(); }
 function faqQuitar(i) { const l = leerFaq(); l.splice(i, 1); FAQ = l; pintarFaq(); }

@@ -2736,7 +2736,24 @@ const CFG_CANAL = {
   inbox: true,           // guardar lo que no encaja para que lo lea una persona
   auto_confirmar: false, // confirmar en el acto lo que entra por este canal
   faq: [],               // [{p, r}] — respuestas que el negocio escribió y el bot repite TAL CUAL
+  // Atajos del menú de ayuda: [{titulo, texto, activo}]. Son las respuestas que la gente pide
+  // todo el tiempo y que no vale la pena esperar a que escriba —el menú, cómo llegar—: en vez de
+  // adivinar la pregunta, se ofrecen desde el saludo. El texto lo escribe el negocio y sale tal
+  // cual, igual que la FAQ; acá también el bot repite, no redacta.
+  accesos: [],
 };
+
+// El botón de WhatsApp corta el título a 20 caracteres. Recortar en silencio deja al negocio con
+// un rótulo distinto del que escribió, así que se recorta al guardar y se ve en el panel.
+const ACCESO_TITULO_MAX = 20;
+function limpiarAccesos(v) {
+  if (!Array.isArray(v)) return [];
+  return v.map(a => ({
+    titulo: String((a && a.titulo) || '').trim().slice(0, ACCESO_TITULO_MAX),
+    texto: String((a && a.texto) || '').trim().slice(0, 900),
+    activo: !!(a && a.activo),
+  })).filter(a => a.titulo && a.texto).slice(0, 8);
+}
 
 // Todo lo que la plataforma sabe del negocio, en texto plano. Es la materia prima de los
 // borradores: si un dato no está acá, la respuesta va a quedar vacía, y eso es lo correcto.
@@ -2828,6 +2845,7 @@ async function guardarCanalWhatsapp(negocioId, d) {
                    r: String((f && f.r) || '').trim().slice(0, 700) }))
       .filter(f => f.p && f.r)
       .slice(0, 40),
+    accesos: limpiarAccesos(d.accesos),
   };
   await pool.query(
     `INSERT INTO contenido.negocio_capacidad (negocio_id, capacidad, habilitada, config, actualizado_en)
@@ -4515,7 +4533,7 @@ module.exports = {
   getWhatsappNegocio, guardarWhatsappNegocio, verificarWhatsappNegocio, PLANTILLAS_RESERVA,
   secretoDeNumero, negocioPorPhoneId,
   getConversacion, setConversacion, borrarConversacion, podarConversaciones, reservasPorWhatsapp,
-  CAPS_BOT, getCanalWhatsapp, guardarCanalWhatsapp, getInbox, getConversacionInbox, marcarAtendido,
+  CAPS_BOT, ACCESO_TITULO_MAX, getCanalWhatsapp, guardarCanalWhatsapp, getInbox, getConversacionInbox, marcarAtendido,
   negocioPublico, disponibilidadPublica, registrarApertura, marcarCompletado, linkDeApertura,
   ofertaLanding, guardarQueExponeLanding,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,
