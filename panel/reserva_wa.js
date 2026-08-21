@@ -34,6 +34,13 @@ const dia = iso => { const d = new Date(iso + 'T12:00:00'); return `${DOW[d.getD
 const plural = (u, n) => (UNI[u] || UNI.personas)[n === 1 ? 0 : 1];
 const cuantos = u => ((UNI[u] || UNI.personas)[2] === 'm' ? 'cuántos' : 'cuántas');
 const SALIR = /^(cancelar|salir|basta|no|nada|chau|gracias)$/i;
+// Un saludo suelto ARRANCA DE CERO, esté donde esté la conversación. Le pasó a una charla real:
+// se preguntó por la carta, se contestó, y quince minutos después un "Hola" cayó en el paso que
+// venía de antes —donde cualquier texto significa "sí, quiero reservar"— y el bot se puso a pedir
+// código de invitación y días. Quien saluda está empezando de nuevo, no contestando lo anterior.
+// Anclado y solo: "hola, quiero reservar para el viernes" NO es un saludo suelto, es un pedido, y
+// tratarlo como saludo perdería lo que la persona ya dijo.
+const SALUDO = /^[¡¿\s]*(hola+|holis|buenas|buen d[ií]a|buenas tardes|buenas noches|hey|hi|qu[eé] tal)[\s,.!¡?¿]*$/i;
 // SALIR pide la palabra sola y exacta. Alguien que escribe "cancela la reserva" no entra ahí, y
 // en el paso del nombre CUALQUIER texto se toma como nombre: pasó de verdad, y quedó una reserva
 // creada a partir de un pedido de cancelarla. Esto atrapa la frase, no sólo la palabra.
@@ -117,6 +124,13 @@ async function atender(negocio, mensaje) {
       return true;
     }
     return false;
+  }
+
+  // El saludo se mira ANTES del código y del paso: es la señal más clara de "empecemos de nuevo",
+  // y respetarla evita arrastrar el estado de una charla que ya terminó.
+  if (SALUDO.test(entrada)) {
+    await db.borrarConversacion(negocio.id, waId);
+    return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil, {});
   }
 
   const paso = conv ? conv.paso : null;

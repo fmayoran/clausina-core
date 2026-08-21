@@ -2904,13 +2904,21 @@ async function marcarAtendido(negocioId, waId) {
 // Cada mensaje de WhatsApp llega solo, sin memoria. Armar una reserva lleva varios turnos de
 // conversación, así que hay que recordar dónde quedó cada cliente.
 const CONV_MINUTOS = 30;
+// 'ofrecido' no es estar a mitad de una reserva: es "te saludé y todavía no elegiste nada". En ese
+// paso cualquier texto se toma como "sí, quiero reservar", así que arrastrarlo media hora hace que
+// un mensaje nuevo caiga adentro de una charla que ya había terminado. Quien está eligiendo del
+// menú contesta en un par de minutos; el que vuelve al rato está empezando de nuevo.
+// Los pasos de más adelante sí conservan la media hora: ahí la persona ya invirtió respuestas y
+// puede estar consultándolo con alguien antes de seguir.
+const CONV_MINUTOS_OFRECIDO = 10;
 
 async function getConversacion(negocioId, waId) {
   const { rows: [r] } = await pool.query(
     `SELECT paso, datos, actualizado_en FROM contenido.wa_conversacion
       WHERE negocio_id=$1 AND wa_id=$2
-        AND actualizado_en > now() - ($3 || ' minutes')::interval`,
-    [negocioId, waId, String(CONV_MINUTOS)]);
+        AND actualizado_en > now() -
+            (CASE WHEN paso='ofrecido' THEN $4 ELSE $3 END || ' minutes')::interval`,
+    [negocioId, waId, String(CONV_MINUTOS), String(CONV_MINUTOS_OFRECIDO)]);
   return r || null;
 }
 
