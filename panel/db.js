@@ -3345,9 +3345,10 @@ async function ofertaLanding(slug) {
  */
 async function porQueNoEseDia(negocioId, fecha) {
   const cfg = await getConfigReservas(negocioId);
+  // Sin parámetros de más: Postgres no puede inferir el tipo de un $1 que no aparece en el SQL
+  // y la consulta entera falla.
   const { rows: [t] } = await pool.query(
-    `SELECT $2::date < (now() AT TIME ZONE $3)::date AS pasado,
-            EXTRACT(isodow FROM $2::date)::int AS dow`, [negocioId, fecha, TZ]);
+    `SELECT $1::date < (now() AT TIME ZONE $2)::date AS pasado`, [fecha, TZ]);
   if (t.pasado) return { motivo: 'pasado' };
 
   const dias = await getDisponibilidad(negocioId, fecha, fecha);
