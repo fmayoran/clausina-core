@@ -370,12 +370,13 @@ async function preguntarCodigo(cfg, negocio, waId, datos) {
   // escribiendo el código, y la persona se queda sin saber qué hacer.
   const texto = '¿Tenés un código de invitación?';
   const botones = [{ id: 'con_codigo', titulo: 'Sí, tengo uno' },
-                   { id: 'sin_codigo', titulo: 'No tengo' }];
+                   { id: 'sin_codigo', titulo: 'No tengo' },
+                   { id: 'menu', titulo: 'Volver' }];
   const r = await wa.enviarBotones(waId, texto, botones, cfg);
   if (!r.ok) await decir(cfg, waId, texto + ' Escribilo acá, o respondeme "no".', negocio.id);
   else await db.logWhatsapp({ direccion: 'saliente', wa_id: waId, negocio_id: negocio.id,
     mensaje_id: r.id, tipo: 'interactive', estado: 'enviado',
-    texto: texto + '\n· Sí, tengo uno\n· No tengo' }).catch(() => {});
+    texto: texto + '\n· ' + botones.map(b => b.titulo).join('\n· ') }).catch(() => {});
   return true;
 }
 
@@ -651,7 +652,8 @@ async function elegirTurno(cfg, negocio, waId, entrada, datos) {
   const filas = turnos.map(t => ({ id: 't:' + t.turno_id, titulo: t.nombre,
                                    detalle: `${t.hora_desde} a ${t.hora_hasta}` }));
   filas.push({ id: 'menu', titulo: 'Volver al menú' });
-  await decirOpciones(cfg, waId, texto, filas.map(f => `${f.titulo} (${f.detalle})`), negocio.id,
+  await decirOpciones(cfg, waId, texto,
+    filas.map(f => f.detalle ? `${f.titulo} (${f.detalle})` : f.titulo), negocio.id,
     () => wa.enviarLista(waId, texto, 'Ver turnos', filas, cfg));
   return true;
 }
@@ -706,7 +708,10 @@ async function avanzar(cfg, negocio, waId, datos) {
     await decir(cfg, waId, (pasada
       ? `Para ese turno puedo tomar hasta ${tope} ${plural(cfgRes.unidad, tope)} en una reserva. `
       : '') + `¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}?` +
-      (!pasada && tope ? ` Hasta ${tope}.` : '') + ' Respondeme con un número.', negocio.id);
+      (!pasada && tope ? ` Hasta ${tope}.` : '') + ' Respondeme con un número.' +
+      // A partir de acá se contesta escribiendo y ya no hay botones donde ver la salida. Se dice
+      // una sola vez, en el primer paso de texto libre: repetirlo en cada pregunta es ruido.
+      '\n\nSi preferís volver al menú, escribí "volver".', negocio.id);
     return true;
   }
 
