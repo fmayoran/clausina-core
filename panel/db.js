@@ -3350,13 +3350,17 @@ async function ofertaLanding(slug) {
   if (!expone.includes('reservas')) return { reservas: null };
   const n = await negocioPublico(slug);          // respeta el opt-in público
   if (!n) return { reservas: null };
+  const cfgRes = await getConfigReservas(n.id);
   // El botón apunta SIEMPRE a /r/<slug>, y es esa ruta la que decide si muestra la página o manda
   // a WhatsApp. Así el interruptor vale también para los links ya repartidos —invitaciones,
   // campañas, el QR de la mesa— y no sólo para el botón que se dibuja hoy.
   return {
     reservas: {
       url: `/r/${n.slug}`,
-      etiqueta: (w.config.etiqueta_reservas || 'Reservar').slice(0, 40),
+      // Sin rótulo propio, el que corresponde al canal: "Reservar" a secas, frente a un botón que
+      // abre WhatsApp, no anticipa que se va a otra aplicación.
+      etiqueta: (w.config.etiqueta_reservas ||
+        (cfgRes.via_publica === 'whatsapp' ? 'Reservá por WhatsApp' : 'Reservar')).slice(0, 40),
     },
   };
 }
