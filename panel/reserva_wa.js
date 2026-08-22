@@ -33,7 +33,12 @@ const UNI = {
 const dia = iso => { const d = new Date(iso + 'T12:00:00'); return `${DOW[d.getDay()]} ${d.getDate()} ${MESES[d.getMonth()]}`; };
 const plural = (u, n) => (UNI[u] || UNI.personas)[n === 1 ? 0 : 1];
 const cuantos = u => ((UNI[u] || UNI.personas)[2] === 'm' ? 'cuántos' : 'cuántas');
-const SALIR = /^(cancelar|salir|basta|no|nada|chau|gracias)$/i;
+// "gracias" NO cancela. Estaba acá como si fuera "no, gracias", pero suelto es cortesía: alguien
+// pidió la ubicación, le llegó, agradeció, y el bot le contestó "Listo, no reservé nada" — sobre
+// una reserva que nunca existió. "no gracias" sigue cortando, porque empieza con "no".
+const SALIR = /^(cancelar|salir|basta|no|nada|chau)$/i;
+// Agradecer o decir "listo" se acusa recibo y se deja todo como está: no es una orden.
+const GRACIAS = /^[¡\s]*(muchas\s+)?(gracias|graciass+|genial|perfecto|barbaro|bárbaro|dale|listo|ok|oka?y|buenisimo|buenísimo)[\s,.!¡]*(gracias)?[\s.!¡]*$/i;
 // Un saludo suelto ARRANCA DE CERO, esté donde esté la conversación. Le pasó a una charla real:
 // se preguntó por la carta, se contestó, y quince minutos después un "Hola" cayó en el paso que
 // venía de antes —donde cualquier texto significa "sí, quiero reservar"— y el bot se puso a pedir
@@ -121,11 +126,23 @@ async function atender(negocio, mensaje) {
   const entrada = String(mensaje.accion || mensaje.texto || '').trim();
   const conv = await db.getConversacion(negocio.id, waId);
 
+  // Cortesía: contestar y no tocar nada. SÓLO cuando no hay nada pendiente de respuesta: adentro
+  // del flujo estas mismas palabras son un "sí" —"dale", "ok" y "listo" confirman una reserva
+  // dictada por audio—, y tratarlas como agradecimiento dejaría la reserva sin cerrar.
+  if (GRACIAS.test(entrada) && (!conv || conv.paso === 'ofrecido')) {
+    await decir(cfg, waId, 'De nada. Cualquier cosa, acá estoy.', negocio.id);
+    return true;
+  }
+
   // Salida en cualquier momento. Que se pueda cortar es parte de que no sea molesto.
   if (SALIR.test(entrada) || CANCELAR.test(entrada)) {
     await db.borrarConversacion(negocio.id, waId);
     if (conv) {
-      await decir(cfg, waId, 'Listo, no reservé nada. Si querés, escribime cuando quieras.', negocio.id);
+      // 'ofrecido' es "te saludé y no elegiste nada": ahí no hay reserva que deshacer, y decir
+      // "no reservé nada" inventa un trámite que la persona nunca empezó.
+      await decir(cfg, waId, conv.paso === 'ofrecido'
+        ? 'Listo. Cualquier cosa, acá estoy.'
+        : 'Listo, no reservé nada. Si querés, escribime cuando quieras.', negocio.id);
       return true;
     }
     // Sin conversación abierta, "cancelá" habla de una reserva YA hecha. Cancelarla desde acá
