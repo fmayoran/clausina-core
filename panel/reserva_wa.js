@@ -40,6 +40,10 @@ const SALIR = /^(cancelar|salir|basta|no|nada|chau|gracias)$/i;
 // código de invitación y días. Quien saluda está empezando de nuevo, no contestando lo anterior.
 // Anclado y solo: "hola, quiero reservar para el viernes" NO es un saludo suelto, es un pedido, y
 // tratarlo como saludo perdería lo que la persona ya dijo.
+// Volver al menú desde donde sea. Arrepentirse a mitad de una reserva no tenía salida: "no"
+// cancelaba y cortaba la charla entera, y para volver a empezar había que adivinar la palabra
+// justa. Esto vuelve al menú sin perder la conversación.
+const VOLVER = /^[¡¿\s]*(volver|men[uú]|atr[aá]s|inicio|empezar de nuevo|volver al men[uú])[\s.!¡?¿]*$/i;
 const SALUDO = /^[¡¿\s]*(hola+|holis|buenas|buen d[ií]a|buenas tardes|buenas noches|hey|hi|qu[eé] tal)[\s,.!¡?¿]*$/i;
 // SALIR pide la palabra sola y exacta. Alguien que escribe "cancela la reserva" no entra ahí, y
 // en el paso del nombre CUALQUIER texto se toma como nombre: pasó de verdad, y quedó una reserva
@@ -126,6 +130,12 @@ async function atender(negocio, mensaje) {
     return false;
   }
 
+  // "Volver" y el saludo hacen lo mismo: dejar la charla en el menú. Se miran ANTES del código y
+  // del paso, porque son la señal más clara de "esto que veníamos haciendo, dejalo".
+  if (VOLVER.test(entrada) || entrada === 'menu') {
+    await db.borrarConversacion(negocio.id, waId);
+    return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil, {});
+  }
   // El saludo se mira ANTES del código y del paso: es la señal más clara de "empecemos de nuevo",
   // y respetarla evita arrastrar el estado de una charla que ya terminó.
   if (SALUDO.test(entrada)) {
@@ -233,10 +243,28 @@ function accesosDe(canal) {
 async function responderAcceso(cfg, negocio, waId, canal, indice, datos) {
   const a = accesosDe(canal)[indice];
   if (!a) return false;
-  await decir(cfg, waId, a.texto, negocio.id);
+  // Si el texto trae un link, sale como botón que lo abre. Escrito también es tocable, pero se
+  // lee como un mensaje más y hay que apuntarle al renglón: quien pidió "ver la carta" espera
+  // un botón, no una dirección para leer.
+  const url = (String(a.texto).match(/https?:\/\/[^\s<>"')]+/) || [])[0];
+  if (url) {
+    // El link se saca del cuerpo: repetido arriba y en el botón se lee como si fueran dos cosas.
+    const cuerpo = String(a.texto).replace(url, '').replace(/\s{2,}/g, ' ').trim() || a.titulo;
+    const r = await decirOpciones(cfg, waId, cuerpo, [a.titulo], negocio.id,
+      () => wa.enviarBotonUrl(waId, cuerpo, rotuloUrl(a.titulo), url, cfg));
+    // Si el botón no sale —clientes viejos, o una URL que WhatsApp no acepta—, va el texto
+    // completo como estaba escrito: peor el link para copiar que ningún link.
+    if (!r.ok) await decir(cfg, waId, a.texto, negocio.id);
+  } else {
+    await decir(cfg, waId, a.texto, negocio.id);
+  }
   await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
   return true;
 }
+
+// El botón del link admite 20 caracteres. "Carta Online" sirve tal cual; algo más largo se
+// reemplaza por un rótulo corto antes que salir cortado a la mitad.
+const rotuloUrl = t => (String(t).length <= 20 ? String(t) : 'Abrir');
 
 async function saludar(cfg, negocio, waId, canal, ofreceReservas, perfil, datos = {}) {
   // Se arranca con lo que ya se sepa: un código detectado en el PRIMER mensaje no tiene todavía
@@ -473,7 +501,10 @@ async function elegirDia(cfg, negocio, waId, entrada, datos = {}) {
   await db.setConversacion(negocio.id, waId, 'dia',
     { cantidad: datos.cantidad, nombre: datos.nombre, pedir_nombre: datos.pedir_nombre,
       invitacion: datos.invitacion });
-  const filas = fechas.map(f => ({ id: 'd:' + f, titulo: dia(f) }));
+  // Una fila menos de fechas para que entre la salida: sin ella, quien se arrepiente a mitad de
+  // la reserva no tiene botón para volver y queda dando vueltas en la misma lista.
+  const filas = fechas.slice(0, 9).map(f => ({ id: 'd:' + f, titulo: dia(f) }));
+  filas.push({ id: 'menu', titulo: 'Volver al menú' });
   // Con la lista recortada hay que decir por qué: si no, parece que el local no tiene lugar.
   const pregunta = lim && fechas.length <= 3
     ? `Tu invitación vale ${fechas.length === 1 ? 'sólo el ' + dia(fechas[0]) : 'para estos días'}. ¿Te sirve?`
@@ -483,8 +514,83 @@ async function elegirDia(cfg, negocio, waId, entrada, datos = {}) {
   return true;
 }
 
+const MES_NOMBRE = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+                    'septiembre','octubre','noviembre','diciembre'];
+const DOW_NOMBRE = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+
+/**
+ * Qué día pidió la persona cuando escribió en vez de tocar la lista. Devuelve AAAA-MM-DD o null.
+ * Deliberadamente sin modelo: "hoy" y "el viernes" son aritmética de calendario, y un modelo acá
+ * agrega latencia, costo y la posibilidad de equivocarse en algo que no admite error.
+ */
+function fechaPedida(texto, hoyIso) {
+  const t = String(texto || '').toLowerCase().trim();
+  if (!t) return null;
+  const base = new Date(hoyIso + 'T12:00:00');
+  const iso = d => d.toISOString().slice(0, 10);
+  const mas = n => { const d = new Date(base); d.setDate(d.getDate() + n); return iso(d); };
+
+  if (/\bhoy\b|\besta noche\b|\beste mediod[ií]a\b/.test(t)) return mas(0);
+  if (/\bma[ñn]ana\b/.test(t)) return mas(1);
+  if (/\bpasado ma[ñn]ana\b/.test(t)) return mas(2);
+
+  // Día del mes con mes nombrado: "21 de agosto", "vie 21 ago".
+  const dm = t.match(/\b(\d{1,2})\s*(?:de\s+)?([a-záéíóú]{3,10})\b/);
+  if (dm) {
+    const mi = MES_NOMBRE.findIndex(m => m.startsWith(dm[2].slice(0, 3)));
+    if (mi >= 0) {
+      const d = new Date(base); d.setMonth(mi, +dm[1]);
+      // Un mes ya pasado se entiende del año que viene: nadie reserva para atrás.
+      if (iso(d) < hoyIso) d.setFullYear(d.getFullYear() + 1);
+      return iso(d);
+    }
+  }
+  // Numérico: "21/8", "21-08".
+  const nm = t.match(/\b(\d{1,2})[\/\-](\d{1,2})\b/);
+  if (nm) {
+    const d = new Date(base); d.setMonth(+nm[2] - 1, +nm[1]);
+    if (iso(d) < hoyIso) d.setFullYear(d.getFullYear() + 1);
+    return iso(d);
+  }
+  // Día de la semana suelto: la próxima vez que caiga, contando hoy.
+  const di = DOW_NOMBRE.findIndex(n => new RegExp('\\b' + n.slice(0, 3) + '[a-záéíóú]*\\b').test(t));
+  if (di >= 0) {
+    const hoyDow = base.getDay();
+    return mas((di - hoyDow + 7) % 7);
+  }
+  return null;
+}
+
+/** La explicación, en las palabras que le sirven a quien preguntó. */
+function textoNoEseDia(fecha, r, hoyIso) {
+  const cuando = fecha === hoyIso ? 'hoy' : dia(fecha);
+  if (r.motivo === 'pasado')    return `${dia(fecha)} ya pasó.`;
+  if (r.motivo === 'cerrado')   return `Los ${DOW_NOMBRE[new Date(fecha + 'T12:00:00').getDay()]} no abrimos.`;
+  if (r.motivo === 'bloqueado') return `${cuando} está cerrado${r.nota ? ' — ' + r.nota : ''}.`;
+  if (r.motivo === 'completo')  return `${cuando} ya no nos queda lugar.`;
+  if (r.motivo === 'tarde')     return `Para ${cuando} ya no llegamos a tomar reservas: se piden ` +
+    `con ${r.horas} ${r.horas === 1 ? 'hora' : 'horas'} de anticipación. Si querés venir igual, ` +
+    `escribime y le paso el mensaje al equipo.`;
+  return `${cuando} está más lejos de lo que puedo reservar (hasta ${r.dias_max} días).`;
+}
+
 async function elegirTurno(cfg, negocio, waId, entrada, datos) {
-  const fecha = entrada.startsWith('d:') ? entrada.slice(2) : null;
+  let fecha = entrada.startsWith('d:') ? entrada.slice(2) : null;
+  if (!fecha) {
+    // Escribió en vez de tocar. Si nombró un día, se le contesta POR ESE DÍA: repetir la lista
+    // sin mencionarlo es lo que dejó a una persona pidiendo "hoy" cuatro veces seguidas.
+    const pedida = fechaPedida(entrada, fechaLocal());
+    if (pedida) {
+      const no = await db.porQueNoEseDia(negocio.id, pedida).catch(() => null);
+      if (!no) {
+        // Sí se puede: se toma el día que pidió en vez de obligarlo a buscarlo en la lista.
+        fecha = pedida;
+      } else {
+        await decir(cfg, waId, textoNoEseDia(pedida, no, fechaLocal()), negocio.id);
+        return await elegirDia(cfg, negocio, waId, '', datos);
+      }
+    }
+  }
   // Sin la lista a mano, "elegí un día de la lista" es un callejón: la persona no tiene de dónde
   // elegir. Se vuelve a ofrecer en vez de repetir el reproche.
   if (!fecha) return await elegirDia(cfg, negocio, waId, entrada, datos);
@@ -492,14 +598,19 @@ async function elegirTurno(cfg, negocio, waId, entrada, datos) {
   const lim = await limiteInvitacion(negocio, datos);
   if (lim && lim.turnos.length) turnos = turnos.filter(t => lim.turnos.includes(t.turno_id));
   if (!turnos.length) {
-    await decir(cfg, waId, 'Ese día se quedó sin lugar. Escribime "reservar" y elegimos otro.', negocio.id);
-    await db.borrarConversacion(negocio.id, waId);
-    return true;
+    // Sin borrar la conversación: si el día no sirve, lo que hace falta es la lista otra vez, no
+    // empezar de cero. Y se distingue el motivo — que la invitación no valga ese día no es lo
+    // mismo que estar completo, y mandarlo a "elegí otro" sin decirlo lo deja adivinando.
+    await decir(cfg, waId, (lim && lim.turnos.length)
+      ? `${dia(fecha)} no entra en tu invitación. Estos son los días que podés usar:`
+      : `${dia(fecha)} se quedó sin lugar. Te paso los que quedan:`, negocio.id);
+    return await elegirDia(cfg, negocio, waId, '', datos);
   }
   await db.setConversacion(negocio.id, waId, 'turno', { ...datos, fecha });
   const texto = `${dia(fecha)}. ¿Qué turno?`;
   const filas = turnos.map(t => ({ id: 't:' + t.turno_id, titulo: t.nombre,
                                    detalle: `${t.hora_desde} a ${t.hora_hasta}` }));
+  filas.push({ id: 'menu', titulo: 'Volver al menú' });
   await decirOpciones(cfg, waId, texto, filas.map(f => `${f.titulo} (${f.detalle})`), negocio.id,
     () => wa.enviarLista(waId, texto, 'Ver turnos', filas, cfg));
   return true;

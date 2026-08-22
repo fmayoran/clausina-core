@@ -3335,6 +3335,39 @@ async function ofertaLanding(slug) {
   };
 }
 
+/**
+ * Por qué un día concreto no se puede reservar. Devuelve null si SÍ se puede.
+ *
+ * Existe porque repetir la lista de días no es una respuesta. Le pasó a una persona real: pidió
+ * cuatro veces "hoy" —"No se puede reservar para hoy?", "Hoy", "Viernes 21 de agosto"— y las
+ * cuatro veces recibió la misma lista arrancando el sábado, sin una palabra sobre el viernes.
+ * Se contesta con el motivo, que es lo único que le sirve para decidir qué hacer.
+ */
+async function porQueNoEseDia(negocioId, fecha) {
+  const cfg = await getConfigReservas(negocioId);
+  const { rows: [t] } = await pool.query(
+    `SELECT $2::date < (now() AT TIME ZONE $3)::date AS pasado,
+            EXTRACT(isodow FROM $2::date)::int AS dow`, [negocioId, fecha, TZ]);
+  if (t.pasado) return { motivo: 'pasado' };
+
+  const dias = await getDisponibilidad(negocioId, fecha, fecha);
+  if (!dias.length) return { motivo: 'cerrado' };                 // ningún turno corre ese día
+  if (dias.every(d => d.bloqueado)) return { motivo: 'bloqueado', nota: dias[0].motivo_bloqueo };
+  const abiertos = dias.filter(d => !d.bloqueado);
+  if (abiertos.every(d => d.capacidad - d.ocupado <= 0)) return { motivo: 'completo' };
+
+  // Queda la anticipación: el turno existe y tiene lugar, pero ya es tarde (o falta demasiado).
+  const libres = await disponibilidadPublica(negocioId, fecha, fecha);
+  if (libres.length) return null;                                  // se puede: no hay nada que explicar
+  const { rows: [v] } = await pool.query(
+    `SELECT ($1::date + max(hora_desde)) < ((now() AT TIME ZONE $3) + ($2 || ' hours')::interval) AS tarde
+       FROM contenido.turno WHERE negocio_id=$4 AND activo
+        AND EXTRACT(isodow FROM $1::date)::smallint = ANY(dias)`,
+    [fecha, String(cfg.anticipacion_min_horas), TZ, negocioId]);
+  return { motivo: (v && v.tarde) ? 'tarde' : 'lejos', horas: cfg.anticipacion_min_horas,
+           dias_max: cfg.anticipacion_max_dias };
+}
+
 async function disponibilidadPublica(negocioId, desde, hasta) {
   const cfg = await getConfigReservas(negocioId);
   const dias = await getDisponibilidad(negocioId, desde, hasta);
@@ -4542,7 +4575,7 @@ module.exports = {
   secretoDeNumero, negocioPorPhoneId,
   getConversacion, setConversacion, borrarConversacion, podarConversaciones, reservasPorWhatsapp,
   CAPS_BOT, ACCESO_TITULO_MAX, getCanalWhatsapp, guardarCanalWhatsapp, getInbox, getConversacionInbox, marcarAtendido,
-  negocioPublico, disponibilidadPublica, registrarApertura, marcarCompletado, linkDeApertura,
+  negocioPublico, disponibilidadPublica, porQueNoEseDia, registrarApertura, marcarCompletado, linkDeApertura,
   ofertaLanding, guardarQueExponeLanding,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,
   crearDescubrimiento, getDescubrimiento,

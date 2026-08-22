@@ -224,6 +224,20 @@ async function enviarBotones(a, texto, botones, cfg = null) {
   }, cfg);
 }
 
+/**
+ * Mensaje con un botón que ABRE UN LINK. Un texto con la URL adentro también es tocable, pero se
+ * lee como un mensaje más y hay que apuntarle al renglón; esto es un botón, que es lo que la
+ * persona espera cuando pidió "ver la carta".
+ * WhatsApp admite un solo botón de este tipo por mensaje, y sólo con http/https.
+ */
+async function enviarBotonUrl(a, texto, rotulo, url, cfg = null) {
+  return _enviarInteractivo(a, {
+    type: 'cta_url',
+    body: { text: _corte(texto, 1024) },
+    action: { name: 'cta_url', parameters: { display_text: _corte(rotulo, 20), url: String(url) } },
+  }, cfg);
+}
+
 async function enviarLista(a, texto, rotuloBoton, filas, cfg = null) {
   return _enviarInteractivo(a, {
     type: 'list',
@@ -237,5 +251,5 @@ async function enviarLista(a, texto, rotuloBoton, filas, cfg = null) {
   }, cfg);
 }
 
-module.exports = { configurado, firmaValida, leerMensajes, enviarTexto, enviarImagen, enviarPlantilla,
+module.exports = { configurado, firmaValida, leerMensajes, enviarTexto, enviarImagen, enviarPlantilla, enviarBotonUrl,
                    enviarBotones, enviarLista, VERIFY };
