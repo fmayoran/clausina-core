@@ -43,6 +43,15 @@ const SALIR = /^(cancelar|salir|basta|no|nada|chau|gracias)$/i;
 // Volver al menú desde donde sea. Arrepentirse a mitad de una reserva no tenía salida: "no"
 // cancelaba y cortaba la charla entera, y para volver a empezar había que adivinar la palabra
 // justa. Esto vuelve al menú sin perder la conversación.
+// Pedir reservar es una INTENCIÓN, no una pregunta. La respuesta frecuente "¿hacen reservas?"
+// existe y está bien escrita, pero contesta *sobre* las reservas: si gana, quien escribe "quiero
+// reservar" recibe las condiciones y nunca entra a reservar. Pasó tres veces seguidas en una
+// charla real —"Puedo reservar?", "Cómo reservo?", "Quiero reservar"— con la misma respuesta.
+// La intención abre el flujo; la FAQ sigue atendiendo lo que sí es pregunta ("¿hasta cuántos?").
+const QUIERO_RESERVAR =
+  // \w no cubre las vocales acentuadas: "reservó" —que es lo que deja el corrector del teléfono
+  // cuando alguien escribe "reservo"— quedaba afuera. Se listan a mano.
+  /^(?![^]*\bno\s+(quiero|puedo)\b)[^]*(\b(quiero|quisiera|puedo|podr[ií]a|necesito|me gustar[ií]a|c[oó]mo|quer[ií]a)\b[^.?!]{0,25}\b(reserv[a-záéíóúñ]*|mesa|lugar)\b|^\s*reserv(ar|a|o|ó)\s*[.!?]*$)/i;
 const VOLVER = /^[¡¿\s]*(volver|men[uú]|atr[aá]s|inicio|empezar de nuevo|volver al men[uú])[\s.!¡?¿]*$/i;
 const SALUDO = /^[¡¿\s]*(hola+|holis|buenas|buen d[ií]a|buenas tardes|buenas noches|hey|hi|qu[eé] tal)[\s,.!¡?¿]*$/i;
 // SALIR pide la palabra sola y exacta. Alguien que escribe "cancela la reserva" no entra ahí, y
@@ -145,6 +154,16 @@ async function atender(negocio, mensaje) {
 
   const paso = conv ? conv.paso : null;
   let datos = conv ? (conv.datos || {}) : {};
+
+  // Sólo al principio: más adelante la persona ya está reservando y "quiero reservar" no puede
+  // hacerla volver al casillero uno.
+  if (ofreceReservas && (!paso || paso === 'ofrecido') && QUIERO_RESERVAR.test(entrada)) {
+    await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
+    if (!datos.invitacion && await db.invitacionesActivas(negocio.id)) {
+      return await preguntarCodigo(cfg, negocio, waId, datos);
+    }
+    return await elegirDia(cfg, negocio, waId, '', datos);
+  }
 
   // Un código puede aparecer en cualquier mensaje: al saludar, en medio del flujo o pegado al
   // final de una frase. Se detecta siempre y se guarda; pedirlo en un paso fijo obligaría a la
@@ -249,9 +268,13 @@ async function responderAcceso(cfg, negocio, waId, canal, indice, datos) {
   const url = (String(a.texto).match(/https?:\/\/[^\s<>"')]+/) || [])[0];
   if (url) {
     // El link se saca del cuerpo: repetido arriba y en el botón se lee como si fueran dos cosas.
-    const cuerpo = String(a.texto).replace(url, '').replace(/\s{2,}/g, ' ').trim() || a.titulo;
-    const r = await decirOpciones(cfg, waId, cuerpo, [a.titulo], negocio.id,
-      () => wa.enviarBotonUrl(waId, cuerpo, rotuloUrl(a.titulo), url, cfg));
+    const suelto = String(a.texto).replace(url, '').replace(/\s{2,}/g, ' ').trim();
+    // Cuando el negocio sólo pegó el link, el cuerpo es el rótulo y el botón dice "Abrir": poner
+    // el rótulo en los dos lugares se lee como un mensaje repetido.
+    const cuerpo = suelto || a.titulo;
+    const rotulo = suelto ? rotuloUrl(a.titulo) : 'Abrir';
+    const r = await decirOpciones(cfg, waId, cuerpo, [rotulo], negocio.id,
+      () => wa.enviarBotonUrl(waId, cuerpo, rotulo, url, cfg));
     // Si el botón no sale —clientes viejos, o una URL que WhatsApp no acepta—, va el texto
     // completo como estaba escrito: peor el link para copiar que ningún link.
     if (!r.ok) await decir(cfg, waId, a.texto, negocio.id);
