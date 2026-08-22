@@ -366,6 +366,16 @@ app.get('/r/:slug', async (req, res) => {
   try {
     const n = await db.negocioPublico(String(req.params.slug));
     if (!n) return res.status(404).send('Este negocio no tiene reservas abiertas al público.');
+    // El negocio elige por dónde recibe. Con 'whatsapp' se redirige acá y no en la landing, para
+    // que valga también para los links ya repartidos: invitaciones, campañas, el QR de la mesa.
+    // El código de invitación viaja en el mensaje para que no haya que volver a tipearlo.
+    const cfg = await db.getConfigReservas(n.id);
+    if (cfg.via_publica === 'whatsapp') {
+      const codigo = String(req.query.inv || '').replace(/[^A-Za-z0-9-]/g, '').slice(0, 12);
+      const url = await db.urlReservaWhatsapp(n.id, codigo || null);
+      // Sin número configurado no se redirige a ninguna parte: sigue la página, que funciona.
+      if (url) return res.redirect(302, url);
+    }
     res.sendFile(path.join(__dirname, 'public', 'publico', 'reservar.html'));
   } catch (e) { console.error('publico', e.message); res.status(500).send('Error'); }
 });

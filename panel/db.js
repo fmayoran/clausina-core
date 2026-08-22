@@ -1208,6 +1208,12 @@ const CFG_RESERVAS = {
   cantidad_max: 12,
   // Se cuenta DESDE EL INICIO DEL TURNO: la reserva es por turno completo, no por una hora suelta.
   tolerancia_min: 15,
+  // Por dónde reserva quien viene de afuera: 'web' abre la página de reserva, 'whatsapp' lleva la
+  // conversación al número del negocio. No es sólo una preferencia de canal: lo que entra por la
+  // web queda SOLICITADA y alguien la tiene que confirmar a mano, mientras que WhatsApp puede
+  // autoconfirmar —ahí el teléfono lo verificó Meta y la conversación la abrió el cliente—. Elegir
+  // WhatsApp es elegir no tener esa cola.
+  via_publica: 'web',
 };
 
 async function getConfigReservas(negocioId) {
@@ -1237,6 +1243,7 @@ async function guardarConfigReservas(negocioId, d, esAdmin) {
     auto_confirmar:         !!d.auto_confirmar,
     // Abrir las reservas al público es un acto explícito: el silencio es no.
     publico:                !!d.publico,
+    via_publica: d.via_publica === 'whatsapp' ? 'whatsapp' : 'web',
   };
   if (cfg.cantidad_min > cfg.cantidad_max) cfg.cantidad_min = cfg.cantidad_max;
   if (esAdmin && ['clausina', 'externo'].includes(d.fuente_verdad)) cfg.fuente_verdad = d.fuente_verdad;
@@ -3318,6 +3325,22 @@ async function guardarQueExponeLanding(negocioId, d) {
 // Lo que necesita una landing para colgarse la capacidad: si está ofrecida y con qué rótulo.
 // Es la única consulta que una cápsula externa hace contra el motor, así que es deliberadamente
 // chica y no expone nada más.
+/**
+ * A dónde mandar a alguien que quiere reservar, desde la landing o desde cualquier link nuestro.
+ * Devuelve null si el negocio no puede recibir por WhatsApp: sin número no hay a dónde ir, y
+ * dejarlo sin botón es mejor que un enlace roto.
+ */
+async function urlReservaWhatsapp(negocioId, codigo) {
+  const { rows: [n] } = await pool.query(
+    'SELECT whatsapp, nombre FROM contenido.negocios WHERE id=$1', [negocioId]);
+  const num = String((n && n.whatsapp) || '').replace(/\D+/g, '');
+  if (!num) return null;
+  // El texto ya viene escrito para que el bot lo entienda: cae en la intención de reservar y
+  // arranca el flujo sin que la persona tenga que adivinar qué decir. Con código, lo lleva.
+  const texto = codigo ? `Hola, quiero reservar. Mi código es ${codigo}` : 'Hola, quiero reservar';
+  return `https://wa.me/${num}?text=${encodeURIComponent(texto)}`;
+}
+
 async function ofertaLanding(slug) {
   const { rows: [w] } = await pool.query(
     `SELECT nc.config FROM contenido.negocio_capacidad nc
@@ -3327,6 +3350,9 @@ async function ofertaLanding(slug) {
   if (!expone.includes('reservas')) return { reservas: null };
   const n = await negocioPublico(slug);          // respeta el opt-in público
   if (!n) return { reservas: null };
+  // El botón apunta SIEMPRE a /r/<slug>, y es esa ruta la que decide si muestra la página o manda
+  // a WhatsApp. Así el interruptor vale también para los links ya repartidos —invitaciones,
+  // campañas, el QR de la mesa— y no sólo para el botón que se dibuja hoy.
   return {
     reservas: {
       url: `/r/${n.slug}`,
@@ -4576,7 +4602,7 @@ module.exports = {
   secretoDeNumero, negocioPorPhoneId,
   getConversacion, setConversacion, borrarConversacion, podarConversaciones, reservasPorWhatsapp,
   CAPS_BOT, ACCESO_TITULO_MAX, getCanalWhatsapp, guardarCanalWhatsapp, getInbox, getConversacionInbox, marcarAtendido,
-  negocioPublico, disponibilidadPublica, porQueNoEseDia, registrarApertura, marcarCompletado, linkDeApertura,
+  negocioPublico, disponibilidadPublica, porQueNoEseDia, urlReservaWhatsapp, registrarApertura, marcarCompletado, linkDeApertura,
   ofertaLanding, guardarQueExponeLanding,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,
   crearDescubrimiento, getDescubrimiento,

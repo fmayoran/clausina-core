@@ -370,6 +370,16 @@
           Abrir las reservas al público (habilita la página de reserva y los enlaces)
         </label>
         <div class="hint">Mientras esté sin marcar, nadie de afuera puede reservar. El silencio es no.</div>
+
+        <label for="c-via" style="margin-top:18px;">Por dónde reservan desde afuera</label>
+        <select id="c-via">
+          <option value="web">La página de reserva (formulario)</option>
+          <option value="whatsapp">WhatsApp — abre la conversación con el negocio</option>
+        </select>
+        <div class="hint">Vale para <b>todos</b> los enlaces de reserva: el botón de la landing, las
+          invitaciones y los de campañas. Con WhatsApp la reserva entra por el chat y, si el canal
+          tiene la autoconfirmación puesta, queda confirmada sola — se acaba la cola de reservas
+          por revisar. A cambio, quien no usa WhatsApp se queda sin forma de reservar solo.</div>
         <label class="chk" for="c-auto" style="margin-top:18px;">
           <input type="checkbox" id="c-auto">
           Confirmar automáticamente las reservas que llegan de afuera (web y agentes externos)
@@ -1062,6 +1072,7 @@ function pintarCfg() {
   $('c-cmax').value = CFG.cantidad_max;
   $('c-auto').checked = !!CFG.auto_confirmar;
   $('c-publico').checked = !!CFG.publico;
+  $('c-via').value = CFG.via_publica === 'whatsapp' ? 'whatsapp' : 'web';
   if (ES_ADMIN) { $('box-fuente').style.display = ''; $('c-fuente').value = CFG.fuente_verdad || 'clausina'; }
   $('aviso-espejo').style.display = CFG.fuente_verdad === 'externo' ? '' : 'none';
 }
@@ -1071,6 +1082,7 @@ async function guardarCfg() {
     anticipacion_max_dias: +$('c-maxdias').value, anticipacion_min_horas: +$('c-minhoras').value,
     tolerancia_min: +$('c-tol').value, cantidad_min: +$('c-cmin').value,
     cantidad_max: +$('c-cmax').value, unidad: $('c-unidad').value,
+    via_publica: $('c-via').value,
     publico: $('c-publico').checked,
     auto_confirmar: $('c-auto').checked,
   };
