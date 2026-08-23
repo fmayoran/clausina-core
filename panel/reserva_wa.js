@@ -123,7 +123,16 @@ async function atender(negocio, mensaje) {
     return true;
   }
 
+  // Un emoji de reacción sobre un mensaje nuestro NO es una pregunta: no trae texto y no espera
+  // respuesta. Se lo trataba como mensaje vacío y disparaba el saludo entero —y peor, dejaba la
+  // charla en 'ofrecido', donde el siguiente mensaje se toma como intención de reservar. Fue lo
+  // que le contestó "¿tenés un código de invitación?" a alguien que preguntó por un sándwich.
+  if (mensaje.tipo === 'reaction') return true;
+
   const entrada = String(mensaje.accion || mensaje.texto || '').trim();
+  // Sin nada que leer no hay nada que contestar. Vale para tipos que no manejamos (stickers,
+  // ubicación, contactos): quedan en la bitácora y los ve una persona.
+  if (!entrada) return true;
   const conv = await db.getConversacion(negocio.id, waId);
 
   // Cortesía: contestar y no tocar nada. SÓLO cuando no hay nada pendiente de respuesta: adentro
@@ -241,6 +250,13 @@ async function atender(negocio, mensaje) {
       // Texto libre en vez de un botón: puede ser una pregunta. Si está contestada, se contesta
       // y se queda donde estaba, en vez de arrancar a pedirle días a alguien que preguntó otra cosa.
       if (entrada !== 'reservar' && await responderFaq(cfg, negocio, waId, entrada, canal)) return true;
+      // Y si no la sabemos contestar, va a una persona. ANTES caía en la reserva: "¿Hacen sándwich
+      // para llevar?" recibía "¿Tenés un código de invitación?". Empezar a pedir días a quien no
+      // pidió reservar es peor que hacerlo esperar una respuesta de verdad — y el botón "Reservar"
+      // está ahí mismo, además de que "quiero reservar" escrito ya abre el flujo más arriba.
+      if (entrada !== 'reservar' && canal.inbox) {
+        return await recibirConsulta(cfg, negocio, waId, entrada, canal);
+      }
       // Igual que en la web: se pregunta por el código ANTES de mostrar días, porque la
       // invitación puede limitar qué días y qué turnos se pueden ofrecer. Quien llegó con una
       // tarjeta física no tiene por qué adivinar que hay que mencionarla.
