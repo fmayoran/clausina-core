@@ -130,53 +130,17 @@ function dropSlide(e){
   mandarOrden(g.dataset.pieza, ids);
 }
 /** Sumar una foto: de la biblioteca de la marca o de disco. Reusa el picker que ya existe. */
-let _addPieza=null, _addTodos=[];
+let _addPieza=null;
 async function abrirAgregarSlide(piezaId){
   _addPieza=piezaId;
   let data; try{ data=await fetch('api/biblioteca').then(r=>r.json()); }
   catch(e){ toast('No se pudo abrir la biblioteca',true); return; }
-  _addTodos=(data.items||[]).filter(i=>i.tipo!=='video');
-  let ov=document.getElementById('bp-ov');
-  if(!ov){ ov=document.createElement('div'); ov.id='bp-ov'; ov.className='bpov'; document.body.appendChild(ov);
-           ov.addEventListener('click',e=>{ if(e.target===ov) cerrarPicker(); }); }
-  const carpetas=[...new Set(_addTodos.map(m=>m.carpeta).filter(Boolean))];
-  ov.innerHTML=`<div class="bpbox"><div class="bphead"><b>Agregar al carrusel</b>
-      <span>sólo imágenes · se suman al final</span>
-      <button onclick="cerrarPicker()" title="Cerrar">×</button></div>
-    <div class="bpfiltros">
-      <input type="search" id="bp-q" placeholder="buscar por nombre o código" oninput="pintarPicker()">
-      <select id="bp-carp" onchange="pintarPicker()">
-        <option value="">todas las carpetas</option>
-        ${carpetas.map(c=>`<option>${esc(c)}</option>`).join('')}
-      </select>
-      <label class="btn no bpsubir">Subir de disco
-        <input type="file" accept="image/*" multiple hidden onchange="sumarDeDisco(this)"></label>
-    </div>
-    <div class="bpgrid" id="bp-grid"></div></div>`;
-  ov.style.display='flex';
-  pintarPicker();
-  const q=document.getElementById('bp-q'); if(q) q.focus();
+  const items=(data.items||[]).filter(i=>i.tipo!=='video');
+  abrirPicker({ titulo:'Agregar al carrusel', sub:'sólo imágenes · se suman al final', items,
+    pick:sumarDeBiblio,
+    subir:`<label class="btn no bpsubir">Subir de disco
+      <input type="file" accept="image/*" multiple hidden onchange="sumarDeDisco(this)"></label>` });
 }
-
-/** Con 400 ítems no se puede pintar todo de una: se filtra, y las miniaturas cargan al aparecer. */
-function pintarPicker(){
-  const g=document.getElementById('bp-grid'); if(!g) return;
-  const q=(document.getElementById('bp-q').value||'').trim().toLowerCase();
-  const carp=document.getElementById('bp-carp').value;
-  const vis=_addTodos.filter(m=>
-    (!carp || m.carpeta===carp) &&
-    (!q || (m.nombre||'').toLowerCase().includes(q) || (m.codigo||'').toLowerCase().includes(q)));
-  _addItems=vis;
-  if(!vis.length){ g.innerHTML='<div class="bpempty">— no hay imágenes con ese filtro —</div>'; return; }
-  // La miniatura y no el original: los originales pesan hasta 5 MB y abrir el selector era esperar.
-  g.innerHTML=vis.map((m,i)=>
-    `<div class="bpcell" onclick="sumarDeBiblio(${i},this)" title="${esc(m.nombre||'')}">` +
-    `<img loading="lazy" decoding="async" src="api/miniatura?w=320&p=${encodeURIComponent(m.media_path)}" ` +
-    `onerror="this.style.opacity=.15">` +
-    `<span class="bpcode">${esc(m.codigo||'')}</span>` +
-    `<span class="bpnom">${esc(m.nombre||'')}</span></div>`).join('');
-}
-let _addItems=[];
 async function _sumarSlide(body, el){
   try{
     const d=await fetch('api/piezas/'+_addPieza+'/carrusel',{method:'POST',
@@ -187,8 +151,8 @@ async function _sumarSlide(body, el){
   }catch(e){ toast('Error de conexión',true); if(el) el.classList.remove('bpadded'); }
   return false;
 }
-async function sumarDeBiblio(i, el){
-  const m=_addItems[i]; if(!m||!_addPieza||el.classList.contains('bpadded')) return;
+async function sumarDeBiblio(m, el){
+  if(!m||!_addPieza||el.classList.contains('bpadded')) return;
   el.classList.add('bpadded');
   if(await _sumarSlide({media_path:m.media_path}, el)) currentLoad();
 }
@@ -713,24 +677,69 @@ async function rmDelMaterial(mid){
   acting=false; loadMateriales();
 }
 // --- Elegir material desde la biblioteca (taller) para una propuesta ---
-let _pickItems=[], _pickMode='req';
+let _pickMode='req';
+/* ── Selector de biblioteca (uno solo para todos los usos) ─────────────────────
+ * Antes había dos copias y se fueron separando: la de las propuestas seguía bajando los
+ * ORIGINALES —hasta 5 MB por foto, y los videos enteros, 23 MB— mientras la del carrusel ya usaba
+ * miniaturas. Una sola función evita que vuelva a pasar.
+ * `pick` recibe (item, celda) y decide qué hacer con lo elegido. */
+let _pkTodos=[], _pkVis=[], _pkPick=null;
+
+function abrirPicker({ titulo, sub, items, pick, subir }) {
+  _pkTodos = items; _pkPick = pick;
+  let ov=document.getElementById('bp-ov');
+  if(!ov){ ov=document.createElement('div'); ov.id='bp-ov'; ov.className='bpov'; document.body.appendChild(ov);
+           ov.addEventListener('click',e=>{ if(e.target===ov) cerrarPicker(); }); }
+  const carpetas=[...new Set(items.map(m=>m.carpeta).filter(Boolean))];
+  ov.innerHTML=`<div class="bpbox">
+    <div class="bphead"><b>${esc(titulo)}</b><span>${esc(sub||'')}</span>
+      <button onclick="cerrarPicker()" title="Cerrar">×</button></div>
+    <div class="bpfiltros">
+      <input type="search" id="bp-q" placeholder="buscar por nombre o código" oninput="pintarPicker()">
+      <select id="bp-carp" onchange="pintarPicker()">
+        <option value="">todas las carpetas</option>
+        ${carpetas.map(c=>`<option>${esc(c)}</option>`).join('')}
+      </select>
+      ${subir||''}
+    </div>
+    <div class="bpgrid" id="bp-grid"></div></div>`;
+  ov.style.display='flex';
+  pintarPicker();
+  const q=document.getElementById('bp-q'); if(q) q.focus();
+}
+
+/** Filtra y dibuja. Miniatura + carga diferida: con 400 ítems no se puede bajar todo de una. */
+function pintarPicker(){
+  const g=document.getElementById('bp-grid'); if(!g) return;
+  const q=(document.getElementById('bp-q').value||'').trim().toLowerCase();
+  const carp=document.getElementById('bp-carp').value;
+  _pkVis=_pkTodos.filter(m=>
+    (!carp || m.carpeta===carp) &&
+    (!q || (m.nombre||'').toLowerCase().includes(q) || (m.codigo||'').toLowerCase().includes(q)));
+  if(!_pkVis.length){ g.innerHTML='<div class="bpempty">— no hay material con ese filtro —</div>'; return; }
+  g.innerHTML=_pkVis.map((m,i)=>
+    `<div class="bpcell" onclick="elegirDelPicker(${i},this)" title="${esc(m.nombre||'')}">` +
+    // La miniatura sirve también para los videos: el endpoint les saca el primer cuadro. Antes se
+    // metía un <video> con el archivo entero sólo para mostrar una tapa.
+    `<img loading="lazy" decoding="async" src="api/miniatura?w=320&p=${encodeURIComponent(m.media_path)}" ` +
+    `onerror="this.style.opacity=.15">` +
+    (m.tipo==='video'?'<span class="bpvid">▶</span>':'') +
+    `<span class="bpcode">${esc(m.codigo||'')}</span>` +
+    `<span class="bpnom">${esc(m.nombre||'')}</span></div>`).join('');
+}
+function elegirDelPicker(i, el){ if(_pkPick) _pkPick(_pkVis[i], el); }
+
 async function abrirPickerBiblio(mode){
   _pickMode = (mode==='prop') ? 'prop' : 'req';
   if(_pickMode==='req' && !modalId) return;
   let data; try{ data=await fetch('api/biblioteca').then(r=>r.json()); }catch(e){ toast('No se pudo abrir la biblioteca',true); return; }
-  _pickItems=(data.items||[]).filter(i=>i.carpeta==='En proceso'||i.carpeta==='Terminado');
-  let ov=document.getElementById('bp-ov');
-  if(!ov){ ov=document.createElement('div'); ov.id='bp-ov'; ov.className='bpov'; document.body.appendChild(ov); ov.addEventListener('click',e=>{ if(e.target===ov) cerrarPicker(); }); }
-  const cells=_pickItems.length ? _pickItems.map((m,i)=>{
-    const u='media/'+m.media_path;
-    const th=m.tipo==='video'?`<video src="${esc(u)}#t=0.1" muted></video>`:`<img src="${esc(u)}" onerror="this.style.opacity=.15">`;
-    return `<div class="bpcell" onclick="attachBiblio(${i},this)" title="${esc(m.nombre||'')}">${th}<span class="bpcode">${esc(m.codigo||'')}</span></div>`;
-  }).join('') : '<div class="bpempty">— la biblioteca (taller) está vacía; subí o generá material primero —</div>';
-  ov.innerHTML=`<div class="bpbox"><div class="bphead"><b>Agregar desde la biblioteca</b><span>elegí uno o varios · se copian a esta propuesta</span><button onclick="cerrarPicker()" title="Cerrar">×</button></div><div class="bpgrid">${cells}</div></div>`;
-  ov.style.display='flex';
+  const items=(data.items||[]).filter(i=>i.carpeta==='En proceso'||i.carpeta==='Terminado');
+  if(!items.length){ toast('La biblioteca (taller) está vacía; subí o generá material primero',true); return; }
+  abrirPicker({ titulo:'Agregar desde la biblioteca', sub:'elegí uno o varios · se copian a esta propuesta',
+                items, pick:attachBiblio });
 }
-async function attachBiblio(i, el){
-  const m=_pickItems[i]; if(!m||el.classList.contains('bpadded')) return;
+async function attachBiblio(m, el){
+  if(!m||el.classList.contains('bpadded')) return;
   if(_pickMode==='req' && !modalId) return;
   el.classList.add('bpadded');
   const body=JSON.stringify({media_path:m.media_path,tipo:m.tipo,filename:m.nombre||m.codigo});
