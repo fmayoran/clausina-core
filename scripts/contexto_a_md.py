@@ -127,6 +127,10 @@ def main():
         '**Instagram:** ' || coalesce(n.ig_handle,'—'),
         '**Web:** ' || coalesce(n.dominio_web,'—'),
         '**WhatsApp:** ' || coalesce(n.whatsapp,'—'),
+        -- El enlace de reservas SIEMPRE es este, mande a la página o a WhatsApp: la ruta decide
+        -- según cómo esté configurado el negocio. Que el creativo lo arme a mano es garantía de
+        -- que quede pegado al canal viejo cuando se cambie el interruptor.
+        '**Link de reservas:** https://panel.clausina.ar/r/' || n.slug,
         '**Logo (fondo oscuro):** ' || coalesce(pp.logo,'—'),
         '**Logo (fondo claro):** ' || coalesce(pp.logo_claro,'(no cargado)'))
       FROM contenido.negocios n LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id=n.id
