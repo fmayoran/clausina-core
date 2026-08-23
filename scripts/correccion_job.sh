@@ -28,6 +28,24 @@ CID=$(docker ps -q -f name=crm_pgvector.1.)
 psql(){ docker exec -i "$CID" psql -U postgres -d claude -t -A -c "$1"; }
 hb(){ docker exec -i "$CID" psql -U postgres -d claude -q -c "INSERT INTO contenido.batch_runs(proceso,last_run,last_msg) VALUES('correccion',now(),\$m\$$1\$m\$) ON CONFLICT(proceso) DO UPDATE SET last_run=now(), last_msg=EXCLUDED.last_msg;" >/dev/null 2>&1; }
 
+# Cupo agotado: NO reintentar cada minuto. El límite de la suscripción no se levanta en un
+# minuto, así que reintentar es gastar el ciclo y —peor— pisar el mensaje de error del intento
+# anterior con "corrigiendo", que es lo que hacía que el problema fuera invisible: 117 intentos en
+# dos horas y la Sala de máquinas mostrando trabajo normal.
+CUPO="/tmp/cf_cupo_agotado"
+ESPERA_CUPO=1800   # media hora
+if [ -f "$CUPO" ]; then
+  desde=$(cat "$CUPO" 2>/dev/null || echo 0)
+  ahora=$(date +%s)
+  if [ $((ahora - desde)) -lt $ESPERA_CUPO ]; then
+    faltan=$(( (ESPERA_CUPO - (ahora - desde) + 59) / 60 ))
+    hb "sin cupo de suscripción — reintenta en ~${faltan} min"
+    echo "$(ts) $slug: cupo agotado, faltan ~${faltan} min" >> "$LOG"
+    exit 0
+  fi
+  rm -f "$CUPO"
+fi
+
 # Cola = revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA="contenido.revisiones r JOIN contenido.piezas pz ON pz.id=r.pieza_id AND pz.revision_vigente=r.id JOIN contenido.negocios p ON p.id=pz.negocio_id WHERE r.estado='rechazada' AND r.derivado_en IS NULL"
 
@@ -107,8 +125,12 @@ if [ $rc -ne 0 ]; then
   # Causa más común: límite temporal de uso de la suscripción (igual que en manual_gen_job.sh).
   msg="la corrección falló (exit $rc)"
   [ $rc -eq 124 ] && msg="la corrección se pasó del tiempo límite (20 min)"
-  grep -qi "session limit\|usage limit\|rate limit" "$LOG" 2>/dev/null && \
-    msg="se alcanzó el límite de uso de la suscripción; reintenta solo en el próximo ciclo"
+  # Sólo el final del log: es un archivo que se acumula, y buscando en todo, un límite de uso de
+  # la semana pasada haría que CUALQUIER falla futura se diagnosticara como cupo agotado.
+  if tail -c 20000 "$LOG" 2>/dev/null | grep -qi "session limit\|usage limit\|rate limit"; then
+    msg="se alcanzó el límite de uso de la suscripción; reintenta en ~$((ESPERA_CUPO/60)) min"
+    date +%s > "$CUPO"
+  fi
   echo "$(ts) ERROR $slug: $msg" >> "$LOG"
   hb "$slug: corrección FALLÓ — $msg"
   echo "$slug: $msg" >&2

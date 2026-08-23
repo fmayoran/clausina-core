@@ -465,6 +465,11 @@ function renderStatus(rows){
   const wColor=wDown?ST_RED:(proc?ST_GREEN:ST_GREY);
   const wTxt=wDown?'sin señal':(proc?esc(w.last_msg):'en espera');
   parts.push(`<span class="it" title="${wTip}">${_dot(wColor)}Workers (1): <b>${wTxt}</b></span>`);
+  // Sin cupo de suscripción el creativo no puede trabajar y NADA avanza. Antes sólo se veía
+  // "procesando" y la pieza se quedaba en modificación sin explicación: se enteraba mirando el
+  // journal del worker. Va arriba, con el resto del estado, porque es lo que explica la demora.
+  const sinCupo=Object.values(by).find(x=>/cupo|límite de uso|limite de uso/i.test(x.last_msg||''));
+  if(sinCupo) parts.push(`<span class="it" title="El creativo trabaja sobre la suscripción de Claude. Mientras no haya cupo, las correcciones y las ideas quedan en espera; se reintenta solo.">${_dot(ST_RED)}<b>${esc(sinCupo.last_msg)}</b></span>`);
   sb.innerHTML = parts.join('');
 }
 function setUpd(){ const u=document.getElementById('upd'); if(u) u.textContent='actualizado '+new Date().toLocaleTimeString('es-AR',{hour12:false}); }
