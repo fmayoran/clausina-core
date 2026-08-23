@@ -5,7 +5,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const archiver = require('archiver');
 const db = require('./db');
 const vnnox = require('./vnnox');
@@ -487,6 +487,52 @@ app.use((req, res, next) => {
 // está pensado para compartirse por link.
 // Lo puramente interno sí se cierra: material de trabajo, referencias y assets de marca.
 // PENDIENTE: URLs firmadas al publicar, para poder cerrar también ig/ y biblioteca/.
+/**
+ * Miniatura de un archivo del media store. El selector de la biblioteca mostraba los originales:
+ * con 444 MB cargados y fotos de hasta 5 MB, abrirlo era esperar. Acá se genera una vez, se
+ * guarda al lado y de ahí en más se sirve del disco.
+ *
+ * ffmpeg y no una librería de imágenes: ya está en el contenedor —lo pusimos para comprimir
+ * video— y sirve igual para sacarle un cuadro a un video, que es lo que hace falta para que los
+ * videos también tengan tapa en el selector.
+ */
+const THUMB_DIR = '/app/media/.thumbs';
+const THUMB_ANCHOS = [200, 320, 480];
+function thumbSeguro(rel) {
+  // Nada de subir de directorio ni de rutas absolutas: sólo lo que cuelga del media store.
+  const limpio = path.posix.normalize(String(rel || '')).replace(/^(\.\.(\/|$))+/, '');
+  if (!limpio || limpio.startsWith('/') || limpio.includes('..')) return null;
+  return limpio;
+}
+app.get('/api/miniatura', async (req, res) => {
+  try {
+    const rel = thumbSeguro(req.query.p);
+    if (!rel) return res.status(400).end();
+    const w = THUMB_ANCHOS.includes(+req.query.w) ? +req.query.w : 320;
+    const origen = path.join('/app/media', rel);
+    if (!fs.existsSync(origen)) return res.status(404).end();
+    const destino = path.join(THUMB_DIR, String(w), rel.replace(/\.[^./]+$/, '') + '.webp');
+    if (!fs.existsSync(destino)) {
+      fs.mkdirSync(path.dirname(destino), { recursive: true });
+      // -frames:v 1 sirve para los dos casos: de una foto saca la foto, de un video el primer
+      // cuadro. Sin esto un .mp4 no tendría con qué mostrarse y quedaría un hueco gris.
+      await new Promise((ok, mal) => {
+        execFile('ffmpeg', ['-y', '-i', origen, '-frames:v', '1',
+                            '-vf', `scale=${w}:-1:force_original_aspect_ratio=decrease`,
+                            '-quality', '72', destino],
+          { timeout: 20000 }, (e) => e ? mal(e) : ok());
+      });
+    }
+    res.set('Cache-Control', 'private, max-age=604800');
+    res.type('image/webp').sendFile(destino);
+  } catch (e) {
+    // Si no se pudo miniaturizar, el original: lento, pero se ve.
+    const rel = thumbSeguro(req.query.p);
+    if (rel) return res.redirect(302, '/media/' + rel.split('/').map(encodeURIComponent).join('/'));
+    res.status(500).end();
+  }
+});
+
 const MEDIA_PRIVADA = ['material', 'referencias', 'creativo', 'marca'];
 app.use('/media', (req, res, next) => {
   const carpeta = req.path.split('/').filter(Boolean)[0] || '';

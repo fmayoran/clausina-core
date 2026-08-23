@@ -93,8 +93,18 @@ header .marcasel:hover{border-color:var(--fire);}
 .bphead b{font-family:'Inter Tight',sans-serif;font-size:15px;color:var(--chalk);}
 .bphead span{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ash);}
 .bphead button{margin-left:auto;background:none;border:0;color:var(--ash);font-size:22px;cursor:pointer;line-height:1;}
-.bpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;padding:16px 18px;overflow:auto;}
-.bpcell{position:relative;aspect-ratio:1;border-radius:9px;overflow:hidden;border:1px solid #1c2128;cursor:pointer;background:#0c0f12;}
+/* Celdas más grandes: con 110px las fotos se leían como un muro y había que abrir una por una
+   para saber qué eran. Y con el nombre debajo, que es lo que distingue dos fotos parecidas. */
+.bpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding:16px 18px;overflow:auto;}
+.bpfiltros{display:flex;gap:8px;align-items:center;padding:12px 18px 0;flex-wrap:wrap;}
+.bpfiltros input[type=search],.bpfiltros select{background:#0c0f12;color:var(--chalk);
+  border:1px solid #1c2128;border-radius:7px;padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:12px;}
+.bpfiltros input[type=search]{flex:1;min-width:180px;}
+.bpfiltros .bpsubir{margin-left:auto;cursor:pointer;}
+.bpcell .bpnom{position:absolute;left:0;right:0;bottom:0;padding:14px 6px 4px;font-size:9px;
+  color:var(--chalk);background:linear-gradient(transparent,rgba(4,4,3,.88));
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bpcell{position:relative;aspect-ratio:4/5;border-radius:9px;overflow:hidden;border:1px solid #1c2128;cursor:pointer;background:#0c0f12;}
 .bpcell:hover{border-color:var(--fire);}
 .bpcell img,.bpcell video{width:100%;height:100%;object-fit:cover;pointer-events:none;}  /* el click es de la celda, no de la miniatura */
 .bpcell .bpcode{position:absolute;bottom:4px;left:4px;font-family:'JetBrains Mono',monospace;font-size:8px;background:rgba(0,0,0,.6);color:var(--fire);padding:1px 5px;border-radius:5px;}

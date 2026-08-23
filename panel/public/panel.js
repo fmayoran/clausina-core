@@ -130,27 +130,51 @@ function dropSlide(e){
   mandarOrden(g.dataset.pieza, ids);
 }
 /** Sumar una foto: de la biblioteca de la marca o de disco. Reusa el picker que ya existe. */
-let _addPieza=null;
+let _addPieza=null, _addTodos=[];
 async function abrirAgregarSlide(piezaId){
   _addPieza=piezaId;
   let data; try{ data=await fetch('api/biblioteca').then(r=>r.json()); }
   catch(e){ toast('No se pudo abrir la biblioteca',true); return; }
-  const items=(data.items||[]).filter(i=>i.tipo!=='video');
+  _addTodos=(data.items||[]).filter(i=>i.tipo!=='video');
   let ov=document.getElementById('bp-ov');
   if(!ov){ ov=document.createElement('div'); ov.id='bp-ov'; ov.className='bpov'; document.body.appendChild(ov);
            ov.addEventListener('click',e=>{ if(e.target===ov) cerrarPicker(); }); }
-  const cells=items.length ? items.map((m,i)=>
-    `<div class="bpcell" onclick="sumarDeBiblio(${i},this)" title="${esc(m.nombre||'')}">` +
-    `<img src="media/${esc(m.media_path)}" onerror="this.style.opacity=.15">` +
-    `<span class="bpcode">${esc(m.codigo||'')}</span></div>`).join('')
-    : '<div class="bpempty">— no hay imágenes en la biblioteca —</div>';
+  const carpetas=[...new Set(_addTodos.map(m=>m.carpeta).filter(Boolean))];
   ov.innerHTML=`<div class="bpbox"><div class="bphead"><b>Agregar al carrusel</b>
       <span>sólo imágenes · se suman al final</span>
       <button onclick="cerrarPicker()" title="Cerrar">×</button></div>
-    <div class="bpup"><label class="btn no">Subir de disco
-      <input type="file" accept="image/*" multiple hidden onchange="sumarDeDisco(this)"></label></div>
-    <div class="bpgrid">${cells}</div></div>`;
-  _addItems=items; ov.style.display='flex';
+    <div class="bpfiltros">
+      <input type="search" id="bp-q" placeholder="buscar por nombre o código" oninput="pintarPicker()">
+      <select id="bp-carp" onchange="pintarPicker()">
+        <option value="">todas las carpetas</option>
+        ${carpetas.map(c=>`<option>${esc(c)}</option>`).join('')}
+      </select>
+      <label class="btn no bpsubir">Subir de disco
+        <input type="file" accept="image/*" multiple hidden onchange="sumarDeDisco(this)"></label>
+    </div>
+    <div class="bpgrid" id="bp-grid"></div></div>`;
+  ov.style.display='flex';
+  pintarPicker();
+  const q=document.getElementById('bp-q'); if(q) q.focus();
+}
+
+/** Con 400 ítems no se puede pintar todo de una: se filtra, y las miniaturas cargan al aparecer. */
+function pintarPicker(){
+  const g=document.getElementById('bp-grid'); if(!g) return;
+  const q=(document.getElementById('bp-q').value||'').trim().toLowerCase();
+  const carp=document.getElementById('bp-carp').value;
+  const vis=_addTodos.filter(m=>
+    (!carp || m.carpeta===carp) &&
+    (!q || (m.nombre||'').toLowerCase().includes(q) || (m.codigo||'').toLowerCase().includes(q)));
+  _addItems=vis;
+  if(!vis.length){ g.innerHTML='<div class="bpempty">— no hay imágenes con ese filtro —</div>'; return; }
+  // La miniatura y no el original: los originales pesan hasta 5 MB y abrir el selector era esperar.
+  g.innerHTML=vis.map((m,i)=>
+    `<div class="bpcell" onclick="sumarDeBiblio(${i},this)" title="${esc(m.nombre||'')}">` +
+    `<img loading="lazy" decoding="async" src="api/miniatura?w=320&p=${encodeURIComponent(m.media_path)}" ` +
+    `onerror="this.style.opacity=.15">` +
+    `<span class="bpcode">${esc(m.codigo||'')}</span>` +
+    `<span class="bpnom">${esc(m.nombre||'')}</span></div>`).join('');
 }
 let _addItems=[];
 async function _sumarSlide(body, el){
