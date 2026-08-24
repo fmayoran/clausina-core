@@ -18,6 +18,17 @@ aporte el material; recién ahí entra al circuito de generación + aprobación 
 - `canal`: **`instagram`** (publicaciones de feed) o **`aviso`** (spots para la **pantalla de calle DOOH**, 2:3 vertical, muda, ~10s). **Proponé para ese canal.**
 - `cantidad`: **cuántas propuestas generar (número exacto)**. Generá exactamente esa cantidad.
 - `recientes`: las últimas publicaciones (título + caption), para **no repetir** y mantener coherencia/variedad.
+- `rendimiento`: **cómo le fue a lo que este negocio ya publicó** — mediana de views/reach/likes por
+  formato, las mejores y las peores con su título y su fecha, y un `aviso`.
+  Es lo que separa proponer con criterio de proponer de memoria: hasta ahora decidías con el manual
+  de marca y las referencias de OTRAS cuentas, sin mirar nunca la propia. **Usalo para elegir formato
+  y ángulo**, y decilo en el `porque` cuando pese en la decisión ("los carruseles rinden 9× la foto
+  suelta acá").
+  Dos honestidades obligatorias:
+  - **Respetá el `aviso`.** Si dice que la muestra es chica, es una pista y no una ley: no descartes
+    una buena idea porque su formato rindió poco en cinco casos.
+  - **Las vistas no son el único objetivo.** Una pieza de reserva o de menú rinde menos en alcance y
+    está bien: se mide contra el objetivo del pedido, no contra el número más alto de la tabla.
 - `materiales`: material que Fer adjuntó al pedido (lista de `{path, media_type, filename}`; puede estar vacía). Si viene con contenido, **es la materia prima que Fer quiere publicar**: MIRALO (hacé `Read` de las imágenes) y proponé publicaciones que lo usen. Ese material queda adjuntado a cada requerimiento, así que al generar la pieza va a estar disponible.
 
 ## Según el canal

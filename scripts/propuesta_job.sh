@@ -51,12 +51,17 @@ for m in json.loads(os.environ['MATS'] or '[]'):
     if mp and os.path.isfile(p):
         out.append({'path':p,'media_type':m.get('media_type') or 'photo','filename':m.get('filename') or ''})
 print(json.dumps(out, ensure_ascii=False))")
-E="$enfasis" R="$recientes" CN="$canal" QT="$cantidad" MA="$matabs" python3 -c "import json,os;json.dump({'enfasis':os.environ['E'],'canal':os.environ['CN'],'cantidad':int(os.environ['QT']),'recientes':json.loads(os.environ['R']),'materiales':json.loads(os.environ['MA'])},open('/tmp/prop_ctx.json','w'),ensure_ascii=False)"
+# Cómo le fue a lo que ya publicó ESTE negocio. Estaba en la base y el creativo no lo miraba
+# nunca: proponía con el contexto de marca y las referencias de otras cuentas, a ciegas sobre su
+# propia historia. Si falla, se sigue sin esto: es contexto, no un requisito.
+rend=$(python3 "$MOTOR/scripts/rendimiento.py" "$slug" --json 2>/dev/null || echo 'null')
+[ -z "$rend" ] && rend='null'
+E="$enfasis" R="$recientes" CN="$canal" QT="$cantidad" MA="$matabs" RD="$rend" python3 -c "import json,os;json.dump({'enfasis':os.environ['E'],'canal':os.environ['CN'],'cantidad':int(os.environ['QT']),'recientes':json.loads(os.environ['R']),'materiales':json.loads(os.environ['MA']),'rendimiento':json.loads(os.environ['RD'])},open('/tmp/prop_ctx.json','w'),ensure_ascii=False)"
 
 cd "$REPO" || exit 1
 bash "$MOTOR/scripts/perfil_a_md.sh" "$(basename "$REPO")" >/dev/null 2>&1 || true
 PROMPT="Sos el Director Creativo del proyecto. Su identidad, voz y estética están en contexto/CONTEXTO_MARCA.md y en el CLAUDE.md del proyecto (directorio actual): leelos y respetalos; NO uses contexto de otra marca. Generá propuestas para la cola de requerimientos, siguiendo $MOTOR/scripts/propuestas_creativo.md.
-Contexto en /tmp/prop_ctx.json: 'enfasis' (qué destacar; puede estar vacío), 'canal' (instagram=publicaciones de feed, o aviso=spots para la pantalla de calle DOOH 2:3), 'cantidad' (EXACTAMENTE cuántas propuestas generar), 'recientes' (últimas publicaciones, para no repetir) y 'materiales' (material que Fer adjuntó: lista de {path,media_type,filename}). Si 'materiales' NO está vacío, MIRÁ cada archivo (Read en las imágenes) y basá las propuestas en ese contenido — son la materia prima que Fer quiere publicar; proponé publicaciones que lo usen.
+Contexto en /tmp/prop_ctx.json: 'enfasis' (EL OBJETIVO del pedido: qué se quiere lograr), 'canal' (instagram=publicaciones de feed, o aviso=spots para la pantalla de calle DOOH 2:3), 'cantidad' (EXACTAMENTE cuántas propuestas generar), 'recientes' (últimas publicaciones, para no repetir), 'rendimiento' (cómo le fue a lo ya publicado: mediana por formato, mejores y peores con su título, y un aviso sobre el tamaño de la muestra — usalo para decidir, respetando ese aviso) y 'materiales' (material que Fer adjuntó: lista de {path,media_type,filename}). Si 'materiales' NO está vacío, MIRÁ cada archivo (Read en las imágenes) y basá las propuestas en ese contenido — son la materia prima que Fer quiere publicar; proponé publicaciones que lo usen.
 Proponé para el CANAL indicado. Escribí EXCLUSIVAMENTE el archivo /tmp/propuestas.json (array de objetos). NO publiques, NO toques la base, NO mandes mails: solo escribí el archivo."
 timeout 900 claude -p "$PROMPT" --model sonnet --allowedTools "Bash" Read Write Edit Glob Grep >> "$LOG" 2>&1
 
