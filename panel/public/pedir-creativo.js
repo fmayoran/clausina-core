@@ -56,9 +56,9 @@
             '<select id="pc-cant"><option>3</option><option selected>5</option><option>8</option></select></div>' +
           '<div class="cfgfld"><label>Material <span class="cfghint">— opcional</span></label>' +
             '<div class="pc-bar">' +
-              '<label class="btn2">Subir de disco<input type="file" accept="image/*,video/*" multiple hidden ' +
+              '<label class="ibtn">Subir de disco<input type="file" accept="image/*,video/*" multiple hidden ' +
                 'onchange="PedirCreativo.deDisco(this)"></label>' +
-              '<button class="btn2" onclick="PedirCreativo.deBiblioteca()">De la biblioteca</button>' +
+              '<button class="ibtn" onclick="PedirCreativo.deBiblioteca()">De la biblioteca</button>' +
             '</div>' +
             '<div id="pc-mats" class="pc-mats"></div>' +
             '<div class="cfghint">Si subís material, el creativo propone <b>usándolo</b> en vez de inventar.</div></div>' +

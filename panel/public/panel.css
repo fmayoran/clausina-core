@@ -363,4 +363,12 @@ header .marcasel:hover{border-color:var(--fire);}
 /* El pie de este modal lleva un mensaje al lado del botón, así que el botón no se estira como
    en los demás (.modal-foot .btn{flex:1}). Sólo acá. */
 .pc-box .modal-foot{align-items:center;}
-.pc-box .modal-foot .btn{flex:0 0 auto;}
+/* .btn trae width:100% para las tarjetas del tablero; en este pie va al lado de un mensaje. */
+.pc-box .modal-foot .btn{flex:0 0 auto;width:auto;padding:9px 20px;}
+/* Los botones de material van dentro de .cfgfld, y ahí `.cfgfld label` le gana a `.ibtn` y
+   convertía "Subir de disco" en un rótulo de campo en vez de un botón. */
+.pc-bar .ibtn,.pc-bar label.ibtn{display:inline-flex;align-items:center;gap:6px;
+  font-family:'JetBrains Mono',monospace;font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--chalk);background:transparent;border:1px solid var(--line);border-radius:7px;
+  padding:7px 12px;cursor:pointer;margin:0;}
+.pc-bar .ibtn:hover,.pc-bar label.ibtn:hover{border-color:var(--fire);color:var(--fire);}
