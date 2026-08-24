@@ -344,3 +344,23 @@ header .marcasel:hover{border-color:var(--fire);}
 .ibtn.prim:hover{background:var(--ember);border-color:var(--ember);color:var(--bg);}
 .ibtn.ghost{color:var(--ash);}
 .ibtn:disabled{opacity:.45;cursor:default;}
+
+/* ── Pedirle al creativo ──────────────────────────────────────────────────────
+   Vive en cada pantalla de canal, no en una sección aparte: el pedido se hace donde uno está
+   trabajando y el canal ya viene dado por ahí. */
+.ibtn.destacado{border-color:var(--fire);color:var(--fire);}
+.ibtn.destacado:hover{background:rgba(204,242,77,.1);}
+.pc-box{max-width:560px;}
+.pc-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.pc-bar .btn2{cursor:pointer;}
+.pc-mats{display:flex;flex-wrap:wrap;gap:6px;min-height:26px;}
+.pc-mat{display:inline-flex;align-items:center;gap:6px;background:#15140f;border:1px solid var(--line);
+  border-radius:999px;padding:3px 6px 3px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;
+  color:var(--chalk);max-width:100%;}
+.pc-mat button{background:none;border:0;color:var(--ash);cursor:pointer;font-size:14px;line-height:1;padding:0 3px;}
+.pc-mat button:hover{color:var(--alarm);}
+.pc-vacio{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ash);}
+/* El pie de este modal lleva un mensaje al lado del botón, así que el botón no se estira como
+   en los demás (.modal-foot .btn{flex:1}). Sólo acá. */
+.pc-box .modal-foot{align-items:center;}
+.pc-box .modal-foot .btn{flex:0 0 auto;}

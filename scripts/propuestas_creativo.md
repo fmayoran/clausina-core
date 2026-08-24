@@ -9,7 +9,12 @@ aporte el material; recién ahí entra al circuito de generación + aprobación 
 
 ## Lo que recibís
 `/tmp/prop_ctx.json` con:
-- `enfasis`: lo que Fer quiere destacar en este pedido (puede estar vacío → proponé agenda general de marca).
+- `enfasis`: **el OBJETIVO del pedido**, escrito por Fer desde la pantalla del canal ("llenar el mediodía
+  de la semana que viene", "que el que pasa por la avenida sepa que estamos abiertos"). Puede estar vacío
+  en pedidos viejos → ahí proponé agenda general de marca.
+  **Cuando viene, es la vara con la que se mide cada propuesta**: no es un tema a mencionar, es un
+  resultado a conseguir. Una pieza linda que no empuja ese objetivo no sirve para este pedido. Decí en
+  el `porque` de cada propuesta cómo la acerca.
 - `canal`: **`instagram`** (publicaciones de feed) o **`aviso`** (spots para la **pantalla de calle DOOH**, 2:3 vertical, muda, ~10s). **Proponé para ese canal.**
 - `cantidad`: **cuántas propuestas generar (número exacto)**. Generá exactamente esa cantidad.
 - `recientes`: las últimas publicaciones (título + caption), para **no repetir** y mantener coherencia/variedad.
