@@ -229,6 +229,11 @@ header .marcasel:hover{border-color:var(--fire);}
 .qcard.prop .mini.ph{color:var(--pend);}
 .qcard.men .mini.ph{color:#5b9bd5;}
 .qcard .qchev{align-self:center;}
+/* Las de estado no se abren: no deben parecer botones. */
+.qcard.estado{cursor:default;}
+.qcard.estado:hover{border-color:var(--line);}
+.qcard .sub{margin-top:4px;font-family:'JetBrains Mono',monospace;font-size:.62rem;line-height:1.45;
+  color:var(--ash);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
 /* El título de una idea puede ocupar dos renglones: es la descripción, no una etiqueta. */
 .qcard .tt{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden;line-height:1.25;}

@@ -390,13 +390,27 @@ function mentionCard(b){
     <span class="qchev">⤢</span>
   </button>`;
 }
+/**
+ * Las tarjetas de ESTADO usan la misma anatomía de fila que la propuesta y que la publicada.
+ * Antes tenían forma propia —sin bloque a la izquierda—, así que su texto arrancaba pegado al
+ * borde y el de las propuestas 56px más adentro: la columna se leía como dos listas distintas
+ * apiladas. Mismo esqueleto para todas; sólo cambian el ícono y qué dice.
+ * No llevan onclick: son estado, no algo para abrir.
+ */
+function estadoCard(o){
+  return `<div class="card row qcard estado">
+    <span class="mini ph"><i data-lucide="${o.icono}" class="w-5 h-5"></i></span>
+    <div class="rbody">
+      <div class="tt">${o.titulo}</div>
+      <div class="meta"><span class="rst proc">${esc(o.pill)}</span></div>
+      ${o.detalle?`<div class="sub">${o.detalle}</div>`:''}
+    </div>
+  </div>`;
+}
 function solicitudCard(b){
-  const txt = b.brief_estado==='procesando' ? 'El creativo está elaborando ideas…' : 'Pedido de ideas en cola…';
-  return `<div class="card prop"><div class="reqbody">
-    <div class="meta2"><span class="rst proc">Creativo trabajando</span>${canalBadge(b)}</div>
-    <div class="ptt">${txt}</div>
-    ${b.enfasis?`<div class="reqtext">Énfasis: ${esc(b.enfasis)}</div>`:''}
-  </div></div>`;
+  return estadoCard({ icono:'sparkles', pill:'Creativo trabajando',
+    titulo: b.brief_estado==='procesando' ? 'Elaborando ideas…' : 'Pedido en cola…',
+    detalle: b.enfasis ? esc(b.enfasis) : '' });
 }
 // Clasifica un brief para la sección a la que pertenece.
 //   'work' = pedido en curso (creativo elaborando) · 'prop' = propuesta/mención por revisar · 'cola' = requerimiento en pipeline.
@@ -409,19 +423,15 @@ function reqClass(b){
 }
 // Propuesta en proceso de reescritura (loop "pedir nueva versión"): visible mientras el creativo la ajusta.
 function revisandoCard(b){
-  return `<div class="card prop"><div class="reqbody">
-    <div class="meta2"><span class="rst proc">Preparando nueva versión…</span>${canalBadge(b)}</div>
-    <div class="ptt">${esc(b.req_titulo||'Idea')}</div>
-    <div class="reqtext">El creativo está ajustando el concepto con tus comentarios.</div>
-  </div></div>`;
+  return estadoCard({ icono:'refresh-cw', pill:'Nueva versión',
+    titulo: esc(b.req_titulo||'Idea'),
+    detalle:'Ajustando el concepto con tus comentarios.' });
 }
 // Pieza generándose tras "Generar publicación": visible hasta que aparece en Cola y aprobación.
 function generandoCard(b){
-  return `<div class="card prop"><div class="reqbody">
-    <div class="meta2"><span class="rst proc">Generando la pieza…</span>${canalBadge(b)}</div>
-    <div class="ptt">${esc(b.req_titulo||'Idea')}</div>
-    <div class="reqtext">El creativo está armando la publicación. Cuando esté lista aparece en Cola y aprobación para tu visto.</div>
-  </div></div>`;
+  return estadoCard({ icono:'image', pill:'Generando la pieza',
+    titulo: esc(b.req_titulo||'Idea'),
+    detalle:'Armando la publicación. Cuando esté lista pasa a Pendiente de aprobación.' });
 }
 const firstLine = (t,n=64) => { t=(t||'').trim().split('\n')[0]; return t.length>n ? t.slice(0,n).trim()+'…' : t; };
 
