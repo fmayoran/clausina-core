@@ -620,8 +620,54 @@ async function descartarDesdeModal(){
 /* ---------- Ventana de interacción con el creativo (preview + comentarios + generar) ---------- */
 let _reqs={};        // briefs de la última carga, por id (para abrir el modal sin re-fetch)
 let modalId=null;    // requerimiento abierto en el modal
+/**
+ * El modal de la propuesta se inyecta si no está en la página. Vivía escrito a mano en el HTML de
+ * Ideas y del panel del negocio; al traer las propuestas a Instagram y Avisos, ahí no existía y
+ * el clic no hacía NADA —`getElementById('rm-tt')` devolvía null y la función se cortaba sin
+ * decir una palabra—. Se inyecta en vez de copiarlo en cada página, que es lo que ya hace el
+ * modal de modificación: una sola definición, no cuatro que se van separando.
+ */
+function asegurarReqModal(){
+  if(document.getElementById('reqmodal')) return;
+  const d=document.createElement('div');
+  d.innerHTML=`<div id="reqmodal" class="modal hidden">
+    <div class="modal-bg" onclick="closeReqModal()"></div>
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-tt" id="rm-tt"></div>
+        <button class="modal-x" onclick="closeReqModal()" title="Cerrar">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="reqtext" id="rm-concepto"></div>
+        <div id="rm-link"></div>
+        <div class="needs" id="rm-needs"></div>
+        <div class="modal-sec">
+          <div class="modal-lbl">Material aportado</div>
+          <div class="gallery" id="rm-gallery"></div>
+          <div class="mt8" style="display:flex;gap:8px;flex-wrap:wrap">
+            <label class="btn ok filelbl"><span class="flbl">Subir del disco</span><input type="file" accept="image/*,video/*" multiple onchange="rmAddFiles(this)"></label>
+            <button type="button" class="btn ok" onclick="abrirPickerBiblio()">Desde la biblioteca</button>
+          </div>
+        </div>
+        <div class="modal-sec">
+          <div class="modal-lbl">Comentarios para el creativo</div>
+          <textarea id="rm-coment" maxlength="2000" placeholder="Indicaciones: cuál foto va de portada, recortes, orden del carrusel, tono…"></textarea>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn ok" id="rm-gen" onclick="generarPublicacion()">Generar publicación</button>
+        <button class="btn no" id="rm-rev" onclick="pedirNuevaVersion()">Pedir nueva versión</button>
+        <button class="btn del" id="rm-desc" onclick="descartarDesdeModal()">Descartar</button>
+        <button class="btn no" onclick="closeReqModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(d.firstElementChild);
+}
+
 function openReqModal(id){
   const b=_reqs[id]; if(!b) return;
+  asegurarReqModal();
   modalId=id;
   document.getElementById('rm-tt').textContent=b.req_titulo||'Idea';
   document.getElementById('rm-concepto').innerHTML=esc(b.texto||'').replace(/\n/g,'<br>');
