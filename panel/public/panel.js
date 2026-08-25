@@ -353,7 +353,11 @@ function reqStatus(b){
     default:                     return {l:b.pieza_estado, c:'cola'};
   }
 }
-const canalBadge = b => b.canal_destino==='aviso'
+// Dentro del panel de un canal la pastilla del canal es ruido: todas las tarjetas dicen lo mismo.
+// En Ideas, que los mezcla, sí distingue.
+let _sinCanalBadge = false;
+const canalBadge = b => _sinCanalBadge ? ''
+  : b.canal_destino==='aviso'
   ? '<span class="badge canal aviso">aviso</span>'
   : '<span class="badge canal">instagram</span>';
 // Compacta: una línea que abre el popup con el texto completo + material + acciones.
@@ -914,6 +918,7 @@ async function loadCola(){
 function renderPropuestasCanal(reqs, canal){
   if(!document.getElementById('c-prop')) return;
   const mios=(reqs||[]).filter(b=>(b.canal_destino||'instagram')===canal);
+  _sinCanalBadge = true;
   const work=mios.filter(b=>reqClass(b)==='work');
   const prop=mios.filter(b=>reqClass(b)==='prop');
   const html = work.map(b =>
@@ -921,6 +926,7 @@ function renderPropuestasCanal(reqs, canal){
       : (!b.pieza_id && (b.brief_estado==='pendiente'||b.brief_estado==='procesando')) ? generandoCard(b)
       : solicitudCard(b)).join('')
     + prop.map(b => b.origen==='mencion' ? mentionCard(b) : propCard(b)).join('');
+  _sinCanalBadge = false;
   fill('c-prop','n-prop', html);
   // El modal de la propuesta lee de _reqs; sin esto, abrir una desde acá no encuentra nada.
   _reqs={}; (reqs||[]).forEach(b=>{ if(b.id) _reqs[b.id]=b; });
