@@ -211,6 +211,22 @@ header .marcasel:hover{border-color:var(--fire);}
    propuestas a Instagram y Avisos llegaban sin estilo y la columna quedaba despareja: el título
    sin recortar, la pastilla y el chevrón sin alinear. Va en el CSS compartido, que es donde tiene
    que estar algo que dibujan cuatro páginas. */
+/* La propuesta usa la anatomía de fila de una publicada (.card.row), pero es un botón: hay que
+   apagarle lo que el navegador le pone y alinear el contenido a la izquierda. */
+.qcard{width:100%;text-align:left;font-family:inherit;color:inherit;cursor:pointer;
+  align-items:center;}
+.qcard:hover{border-color:var(--ember);}
+.qcard .rbody{flex:1;}
+/* El lugar de la miniatura cuando todavía no hay imagen: la idea no tiene arte, pero si el hueco
+   no ocupa lo mismo la columna se corre respecto de las otras. */
+.card.row .mini.ph{display:grid;place-items:center;width:56px;height:70px;border-radius:4px;
+  background:#15140f;border:1px solid var(--line);color:var(--ash);}
+.qcard.prop .mini.ph{color:var(--pend);}
+.qcard.men .mini.ph{color:#5b9bd5;}
+.qcard .qchev{align-self:center;}
+/* El título de una idea puede ocupar dos renglones: es la descripción, no una etiqueta. */
+.qcard .tt{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;line-height:1.25;}
 .card.prop .qhead,.card.men .qhead{padding:10px 12px;}
 .qhead{width:100%;background:transparent;border:0;color:inherit;cursor:pointer;display:flex;
   align-items:center;gap:9px;padding:9px 12px;text-align:left;font-family:inherit;}

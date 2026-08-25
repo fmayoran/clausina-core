@@ -361,26 +361,34 @@ const canalBadge = b => _sinCanalBadge ? ''
   ? '<span class="badge canal aviso">aviso</span>'
   : '<span class="badge canal">instagram</span>';
 // Compacta: una línea que abre el popup con el texto completo + material + acciones.
+/**
+ * Tarjeta de propuesta con la MISMA anatomía que la de una pieza publicada: bloque a la izquierda
+ * del mismo tamaño, y a la derecha título arriba y datos abajo. Antes era una sola línea con todo
+ * en fila, así que la columna de propuestas no rimaba con las otras dos y el tablero se leía
+ * desparejo. Una idea todavía no tiene imagen: el lugar de la miniatura lo ocupa un cuadro con su
+ * marca, para que la grilla no se corra.
+ */
 function propCard(b){
   const n = b.n_material||0;
   const hint = [b.requiere_material?'pide material':'', n?`${n} aportado(s)`:''].filter(Boolean).join(' · ');
-  return `<div class="card prop">
-    <button class="qhead" onclick="openReqModal('${b.id}')">
-      <span class="rst prop">Idea</span>
-      <span class="qtt">${esc(b.req_titulo||'Idea')}</span>
-      ${canalBadge(b)}
-      ${hint?`<span class="phint">${hint}</span>`:''}
-      <span class="qchev">⤢</span>
-    </button></div>`;
+  return `<button class="card row qcard prop" onclick="openReqModal('${b.id}')">
+    <span class="mini ph"><i data-lucide="lightbulb" class="w-5 h-5"></i></span>
+    <div class="rbody">
+      <div class="tt">${esc(b.req_titulo||'Idea')}</div>
+      <div class="meta"><span class="rst prop">Idea</span>${canalBadge(b)}${hint?`<span class="phint">${hint}</span>`:''}</div>
+    </div>
+    <span class="qchev">⤢</span>
+  </button>`;
 }
 function mentionCard(b){
-  return `<div class="card men">
-    <button class="qhead" onclick="openReqModal('${b.id}')">
-      <span class="rst men">Mención</span>
-      <span class="qtt">${esc(b.req_titulo||'Mención')}</span>
-      ${canalBadge(b)}
-      <span class="qchev">⤢</span>
-    </button></div>`;
+  return `<button class="card row qcard men" onclick="openReqModal('${b.id}')">
+    <span class="mini ph"><i data-lucide="at-sign" class="w-5 h-5"></i></span>
+    <div class="rbody">
+      <div class="tt">${esc(b.req_titulo||'Mención')}</div>
+      <div class="meta"><span class="rst men">Mención</span>${canalBadge(b)}</div>
+    </div>
+    <span class="qchev">⤢</span>
+  </button>`;
 }
 function solicitudCard(b){
   const txt = b.brief_estado==='procesando' ? 'El creativo está elaborando ideas…' : 'Pedido de ideas en cola…';
@@ -928,6 +936,9 @@ function renderPropuestasCanal(reqs, canal){
     + prop.map(b => b.origen==='mencion' ? mentionCard(b) : propCard(b)).join('');
   _sinCanalBadge = false;
   fill('c-prop','n-prop', html);
+  // Las tarjetas traen íconos <i data-lucide>: si nadie los convierte después de repintar, queda
+  // el hueco vacío. shell.js sólo los crea al cargar la página, y esto se redibuja cada 6 s.
+  if(window.lucide) lucide.createIcons();
   // El modal de la propuesta lee de _reqs; sin esto, abrir una desde acá no encuentra nada.
   _reqs={}; (reqs||[]).forEach(b=>{ if(b.id) _reqs[b.id]=b; });
   _reqList=reqs||[];
