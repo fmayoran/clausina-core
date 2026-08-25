@@ -322,9 +322,18 @@ header .marcasel:hover{border-color:var(--fire);}
 .cfgfld{display:flex;flex-direction:column;gap:5px;margin-bottom:13px;}
 .cfgfld label{font-family:'JetBrains Mono',monospace;font-size:.62rem;text-transform:uppercase;
   letter-spacing:.06em;color:var(--ember,var(--ember));}
-.cfgfld input{background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--white);
-  font-family:'Inter',sans-serif;font-size:.95rem;padding:9px 11px;outline:none;width:100%;}
-.cfgfld input:focus{border-color:var(--ember,var(--ember));}
+/* textarea y select entran acá igual que input: sin esto salen con el blanco del navegador y se
+   escribe en negro sobre blanco dentro de un modal oscuro — ilegible y ajeno a la app. */
+.cfgfld input,.cfgfld textarea,.cfgfld select{background:var(--bg);border:1px solid var(--line);
+  border-radius:6px;color:var(--white);font-family:'Inter',sans-serif;font-size:.95rem;
+  padding:9px 11px;outline:none;width:100%;}
+.cfgfld textarea{resize:vertical;line-height:1.45;min-height:64px;}
+.cfgfld select{appearance:none;cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,var(--ash) 50%),linear-gradient(135deg,var(--ash) 50%,transparent 50%);
+  background-position:calc(100% - 17px) 51%,calc(100% - 12px) 51%;background-size:5px 5px,5px 5px;
+  background-repeat:no-repeat;padding-right:32px;}
+.cfgfld input::placeholder,.cfgfld textarea::placeholder{color:var(--ash);}
+.cfgfld input:focus,.cfgfld textarea:focus,.cfgfld select:focus{border-color:var(--ember,var(--ember));}
 .cfgfld .cfghint{font-family:'JetBrains Mono',monospace;font-size:.56rem;color:var(--ash);
   text-transform:none;letter-spacing:0;}
 .cfgsep{border-top:1px solid var(--line);padding-top:12px;margin-top:4px;}
@@ -372,3 +381,16 @@ header .marcasel:hover{border-color:var(--fire);}
   color:var(--chalk);background:transparent;border:1px solid var(--line);border-radius:7px;
   padding:7px 12px;cursor:pointer;margin:0;}
 .pc-bar .ibtn:hover,.pc-bar label.ibtn:hover{border-color:var(--fire);color:var(--fire);}
+/* Cartel de trabajo en curso, debajo de los botones de la pantalla del canal. */
+#pc-encurso{margin:0 0 14px;}
+.pc-trab,.pc-listo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;
+  border:1px solid var(--line);border-radius:10px;background:#15140f;
+  font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--ash);}
+.pc-trab b{font-family:'Inter Tight',sans-serif;font-size:.8rem;color:var(--chalk);font-weight:600;}
+.pc-trab .pc-obj{flex:1;min-width:140px;color:var(--chalk);opacity:.75;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;}
+.pc-trab .pc-hace{margin-left:auto;}
+.pc-punto{width:8px;height:8px;border-radius:50%;background:var(--fire);flex:0 0 auto;
+  animation:pc-late 1.5s ease-in-out infinite;}
+@keyframes pc-late{0%,100%{opacity:1;}50%{opacity:.25;}}
+.pc-listo a{color:var(--fire);text-decoration:underline;}

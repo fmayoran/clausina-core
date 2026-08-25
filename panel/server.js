@@ -472,7 +472,16 @@ app.post('/api/publico/:slug/reserva', async (req, res) => {
 // ═══════════════════ FIN DE LA SUPERFICIE PÚBLICA ═════════════════════════════════════════
 
 const ASSETS_PUBLICOS = /\.(css|svg|png|jpe?g|ico|webp|woff2?)$/i;
-const estaticoPublico = express.static(path.join(__dirname, 'public'), { maxAge: '30d', index: false, dotfiles: 'ignore' });
+// El CSS NO puede cachearse 30 días. Esta ruta gana sobre la de abajo —que sí pone `no-cache`
+// para html/js/css— porque va primero, así que cada arreglo de estilo quedaba invisible en el
+// navegador hasta que venciera el caché. Pasó varias veces seguidas: se corregía el selector de
+// biblioteca, se deployaba, y del otro lado seguía viéndose igual.
+// Se revalida con ETag: si no cambió, la respuesta es un 304 vacío. El costo es un pedido
+// condicional por carga; el de equivocarse es no poder arreglar la pantalla.
+const estaticoPublico = express.static(path.join(__dirname, 'public'), {
+  index: false, dotfiles: 'ignore',
+  setHeaders: (res, p) => res.setHeader('Cache-Control', /\.css$/.test(p) ? 'no-cache' : 'public, max-age=2592000'),
+});
 app.use((req, res, next) => {
   // El filtro va acá, no en las opciones de express.static: `static` sirve todo lo que encuentre.
   // Dejamos pasar sólo estáticos inertes; el HTML y el JS del panel siguen detrás de la sesión.
@@ -2017,6 +2026,13 @@ app.post('/api/proponer', async (req, res) => {
     await db.pedirPropuestas(enfasis, canal, cantidad, req.negocioId, material);
     res.json({ ok: true });
   } catch (e) { console.error('proponer', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
+
+// Lo que el creativo tiene en curso para este canal: lo consulta la pantalla desde la que se
+// pidió, para mostrar que está trabajando en vez de dejar la sensación de que no pasó nada.
+app.get('/api/proponer/en-curso', async (req, res) => {
+  try { res.json({ pedidos: await db.pedidosEnCurso(req.negocioId, String(req.query.canal || 'instagram')) }); }
+  catch (e) { console.error('proponer-en-curso', e.message); res.status(500).json({ pedidos: [] }); }
 });
 
 // Staging de material para un pedido de propuestas (aún sin solicitud): guarda a disco y

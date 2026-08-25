@@ -53,7 +53,9 @@
             '<textarea id="pc-obj" rows="3" maxlength="1000" placeholder="' + esc(cfg.ph) + '"></textarea>' +
             '<div class="cfghint">El objetivo, no la pieza. De la pieza se encarga él.</div></div>' +
           '<div class="cfgfld"><label>Cuántas propuestas</label>' +
-            '<select id="pc-cant"><option>3</option><option selected>5</option><option>8</option></select></div>' +
+            '<select id="pc-cant"><option>1</option><option>2</option><option>3</option>' +
+            '<option selected>5</option><option>8</option></select>' +
+            '<div class="cfghint">Una sola cuando ya sabés qué querés; varias para elegir.</div></div>' +
           '<div class="cfgfld"><label>Material <span class="cfghint">— opcional</span></label>' +
             '<div class="pc-bar">' +
               '<label class="ibtn">Subir de disco<input type="file" accept="image/*,video/*" multiple hidden ' +
@@ -123,12 +125,54 @@
         .then(function (r) { return r.json(); });
       if (d.ok) {
         cerrar();
-        if (window.toast) toast('Pedido enviado — las propuestas aparecen en Ideas en unos minutos');
+        if (window.toast) toast('Pedido enviado — el creativo está trabajando');
+        pintarEnCurso();
       } else { m.className = 'msg mal'; m.textContent = 'No se pudo pedir'; }
     } catch (e) { m.className = 'msg mal'; m.textContent = 'Error de conexión'; }
     btn.disabled = false; btn.textContent = 'Pedir propuestas';
   }
 
-  window.PedirCreativo = { abrir, cerrar, enviar, deDisco, deBiblioteca,
+  /**
+   * Cartel de "el creativo está trabajando" en la pantalla desde la que se pidió. Sin esto, pedir
+   * propuestas era apretar un botón y no ver nada: el trabajo tarda minutos y las propuestas
+   * aparecen en otra sección, así que no quedaba ninguna señal de que se había enviado.
+   */
+  async function pintarEnCurso() {
+    var caja = $('pc-encurso');
+    if (!caja) {
+      var acts = document.querySelector('.pgacts');
+      if (!acts) return;
+      caja = document.createElement('div'); caja.id = 'pc-encurso';
+      acts.parentNode.insertBefore(caja, acts.nextSibling);
+    }
+    var d;
+    try { d = await fetch('api/proponer/en-curso?canal=' + encodeURIComponent(canal)).then(function (r) { return r.json(); }); }
+    catch (e) { return; }
+    var ps = (d && d.pedidos) || [];
+    if (!ps.length) {
+      // Al terminar no se borra en silencio: si había uno andando, se avisa dónde mirarlo.
+      if (caja.dataset.tenia === '1') {
+        caja.innerHTML = '<div class="pc-listo">El creativo terminó — <a href="propuestas">mirá las ideas</a></div>';
+        caja.dataset.tenia = '0';
+      } else { caja.innerHTML = ''; }
+      return;
+    }
+    caja.dataset.tenia = '1';
+    caja.innerHTML = ps.map(function (p) {
+      var min = Math.floor((p.hace_s || 0) / 60);
+      return '<div class="pc-trab"><span class="pc-punto"></span>' +
+        '<b>El creativo está trabajando</b>' +
+        '<span class="pc-obj">' + esc(p.enfasis || '') + '</span>' +
+        '<span class="pc-hace">' + (min ? 'hace ' + min + ' min' : 'recién') + ' · ' + p.cantidad + ' propuestas</span>' +
+        '</div>';
+    }).join('');
+    clearTimeout(pintarEnCurso._t);
+    pintarEnCurso._t = setTimeout(pintarEnCurso, 20000);
+  }
+
+  // Al abrir la pantalla también: un pedido puede seguir en curso de una sesión anterior.
+  function arrancar(op) { canal = (op && CANALES[op.canal]) ? op.canal : 'instagram'; pintarEnCurso(); }
+
+  window.PedirCreativo = { abrir, cerrar, enviar, deDisco, deBiblioteca, arrancar, pintarEnCurso,
     quitar: function (i) { material.splice(i, 1); pintarMaterial(); } };
 })();

@@ -3784,6 +3784,21 @@ async function insertMencion(refId, username, permalink, negocioId) {
 }
 
 // Pedido de propuestas al creativo (lo levanta el cron propuestas_local.sh). cantidad: 1..8.
+/**
+ * Pedidos al creativo que todavía están en curso, para el canal indicado. Sirve para que la
+ * pantalla desde la que se pidió muestre que hay trabajo andando: sin esto se apretaba "Pedir
+ * propuestas", no pasaba nada visible, y no había forma de saber si se había enviado.
+ */
+async function pedidosEnCurso(negocioId, canal) {
+  const { rows } = await pool.query(
+    `SELECT id, estado, enfasis, cantidad, creado_en,
+            EXTRACT(EPOCH FROM (now()-creado_en))::int AS hace_s
+       FROM contenido.solicitudes_propuesta
+      WHERE negocio_id=$1 AND canal=$2 AND estado IN ('pendiente','procesando')
+      ORDER BY creado_en DESC`, [negocioId, canal === 'aviso' ? 'aviso' : 'instagram']);
+  return rows;
+}
+
 async function pedirPropuestas(enfasis, canal, cantidad, negocioId, material) {
   const n = Math.min(8, Math.max(1, parseInt(cantidad, 10) || 5));
   const { rows: [s] } = await pool.query(
@@ -4612,7 +4627,7 @@ module.exports = {
   crearDescubrimiento, getDescubrimiento,
   getLente, getLenteToken, guardarLente, getVerificacion, getSaludExterna,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,
-  reordenarCarrusel, agregarSlide, quitarSlide,
+  reordenarCarrusel, agregarSlide, quitarSlide, pedidosEnCurso,
   motivoInpublicable, reabrirPieza,
   pedirGeneracion, getGeneracion,
   FORMATOS, getGraficas, contarGraficasDescartadas, getGrafica, crearGrafica, iterarGrafica, ajustarEncuadre, renombrarGrafica, duplicarGrafica, estadoGrafica,
