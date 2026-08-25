@@ -2028,13 +2028,6 @@ app.post('/api/proponer', async (req, res) => {
   } catch (e) { console.error('proponer', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 
-// Lo que el creativo tiene en curso para este canal: lo consulta la pantalla desde la que se
-// pidió, para mostrar que está trabajando en vez de dejar la sensación de que no pasó nada.
-app.get('/api/proponer/en-curso', async (req, res) => {
-  try { res.json({ pedidos: await db.pedidosEnCurso(req.negocioId, String(req.query.canal || 'instagram')) }); }
-  catch (e) { console.error('proponer-en-curso', e.message); res.status(500).json({ pedidos: [] }); }
-});
-
 // Staging de material para un pedido de propuestas (aún sin solicitud): guarda a disco y
 // devuelve el media_path; /api/proponer lo vincula. Imagen por base64; video por streaming+ffmpeg.
 app.post('/api/proponer/material', async (req, res) => {

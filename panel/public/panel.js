@@ -858,11 +858,38 @@ async function loadCola(){
     renderStatus(status); setUpd(); updateMenuCounts();
   }catch(e){ setUpd(); }
 }
+/**
+ * Las propuestas del creativo PARA ESTE CANAL, en la misma pantalla donde se piden y donde
+ * después se aprueban. Vivían sólo en Ideas: se pedía desde Instagram, la respuesta aparecía en
+ * otra sección y había que ir a buscarla para volver acá. El trabajo de un canal se hace en la
+ * pantalla de ese canal.
+ * Ideas sigue existiendo como vista cruzada de todos los canales.
+ */
+function renderPropuestasCanal(reqs, canal){
+  if(!document.getElementById('c-prop')) return;
+  const mios=(reqs||[]).filter(b=>(b.canal_destino||'instagram')===canal);
+  const work=mios.filter(b=>reqClass(b)==='work');
+  const prop=mios.filter(b=>reqClass(b)==='prop');
+  const html = work.map(b =>
+      (b.brief_estado==='revisar'||b.brief_estado==='revisando') ? revisandoCard(b)
+      : (!b.pieza_id && (b.brief_estado==='pendiente'||b.brief_estado==='procesando')) ? generandoCard(b)
+      : solicitudCard(b)).join('')
+    + prop.map(b => b.origen==='mencion' ? mentionCard(b) : propCard(b)).join('');
+  fill('c-prop','n-prop', html);
+  // El modal de la propuesta lee de _reqs; sin esto, abrir una desde acá no encuentra nada.
+  _reqs={}; (reqs||[]).forEach(b=>{ if(b.id) _reqs[b.id]=b; });
+  _reqList=reqs||[];
+}
+
 async function loadInstagram(){
   if(acting) return;
   try{
     const r=await fetch('api/piezas?canal=instagram'); if(r.status===401){ location.href='login'; return; }
-    const piezas=await r.json();
+    const [piezas, reqs] = await Promise.all([
+      r.json(),
+      fetch('api/requerimientos').then(x=>x.json()).catch(()=>[]),
+    ]);
+    renderPropuestasCanal(reqs, 'instagram');
     fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado) || (p.estado==='rechazada' && !p.derivado_en)).map(pendCard).join(''));
     fill('c-pub','n-pub', piezas.filter(p=>p.estado==='publicada').map(pubCard).join(''));
     setUpd();
@@ -1078,7 +1105,11 @@ async function loadAvisos(){
   if(acting) return;
   try{
     const r=await fetch('api/piezas?canal=aviso'); if(r.status===401){ location.href='login'; return; }
-    const piezas=await r.json();
+    const [piezas, reqs] = await Promise.all([
+      r.json(),
+      fetch('api/requerimientos').then(x=>x.json()).catch(()=>[]),
+    ]);
+    renderPropuestasCanal(reqs, 'aviso');
     fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado) || (p.estado==='rechazada' && !p.derivado_en)).map(avisoPendCard).join(''));
     fill('c-pub','n-pub', piezas.filter(p=>p.estado==='publicada').map(avisoPubCard).join(''));
     setUpd();

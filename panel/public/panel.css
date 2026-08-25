@@ -381,16 +381,3 @@ header .marcasel:hover{border-color:var(--fire);}
   color:var(--chalk);background:transparent;border:1px solid var(--line);border-radius:7px;
   padding:7px 12px;cursor:pointer;margin:0;}
 .pc-bar .ibtn:hover,.pc-bar label.ibtn:hover{border-color:var(--fire);color:var(--fire);}
-/* Cartel de trabajo en curso, debajo de los botones de la pantalla del canal. */
-#pc-encurso{margin:0 0 14px;}
-.pc-trab,.pc-listo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;
-  border:1px solid var(--line);border-radius:10px;background:#15140f;
-  font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--ash);}
-.pc-trab b{font-family:'Inter Tight',sans-serif;font-size:.8rem;color:var(--chalk);font-weight:600;}
-.pc-trab .pc-obj{flex:1;min-width:140px;color:var(--chalk);opacity:.75;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap;}
-.pc-trab .pc-hace{margin-left:auto;}
-.pc-punto{width:8px;height:8px;border-radius:50%;background:var(--fire);flex:0 0 auto;
-  animation:pc-late 1.5s ease-in-out infinite;}
-@keyframes pc-late{0%,100%{opacity:1;}50%{opacity:.25;}}
-.pc-listo a{color:var(--fire);text-decoration:underline;}
