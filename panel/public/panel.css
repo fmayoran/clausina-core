@@ -213,10 +213,15 @@ header .marcasel:hover{border-color:var(--fire);}
    que estar algo que dibujan cuatro páginas. */
 /* La propuesta usa la anatomía de fila de una publicada (.card.row), pero es un botón: hay que
    apagarle lo que el navegador le pone y alinear el contenido a la izquierda. */
-.qcard{width:100%;text-align:left;font-family:inherit;color:inherit;cursor:pointer;
-  align-items:center;}
+.qcard{width:100%;text-align:left;font-family:inherit;color:inherit;cursor:pointer;}
+/* El texto arranca ARRIBA, a la altura del borde de la miniatura, igual que en una publicada.
+   .card.row centra el cuerpo en vertical, y en una publicada eso no se nota porque el contenido
+   llena los 70px; en una propuesta hay dos renglones y el bloque quedaba flotando en el medio,
+   desalineado con la columna de al lado. */
+/* .card.row.qcard y no .qcard: `.card.row .rbody` son TRES clases y le ganaba a las dos mías, así
+   que la regla se escribía y no hacía nada. */
+.card.row.qcard .rbody{justify-content:flex-start;flex:1;}
 .qcard:hover{border-color:var(--ember);}
-.qcard .rbody{flex:1;}
 /* El lugar de la miniatura cuando todavía no hay imagen: la idea no tiene arte, pero si el hueco
    no ocupa lo mismo la columna se corre respecto de las otras. */
 .card.row .mini.ph{display:grid;place-items:center;width:56px;height:70px;border-radius:4px;
