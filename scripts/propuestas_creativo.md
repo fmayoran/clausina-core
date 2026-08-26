@@ -1,5 +1,11 @@
 # Propuestas del creativo → cola de requerimientos
 
+> **Este archivo es la fuente.** Lo sigue el worker automático y también el creativo cuando trabaja
+> en sesión (el skill `/creativo` lo referencia en vez de repetirlo). Si aprendés un criterio nuevo
+> sobre esta tarea, **escribilo acá** y lo saben los dos. Un hecho del NEGOCIO —cómo compra su
+> público, qué le funciona— no va acá: va al brief, en el panel → Identidad.
+
+
 Instrucciones para **Claude Code headless** cuando `propuestas_local.sh` procesa un pedido de propuestas
 (el panel pidió ideas, con un énfasis opcional). Corrés como **Director Creativo del proyecto** (su identidad, voz y estética están en `contexto/CONTEXTO_MARCA.md` y el `CLAUDE.md` del directorio actual).
 
