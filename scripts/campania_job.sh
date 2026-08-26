@@ -103,7 +103,7 @@ err=(d.get("error") or "").strip()
 if err:
     upd_sol(f"estado='error', resumen={dq(err[:2000])}"); print("err:"+err[:180]); raise SystemExit
 
-OBJ_OK={"OUTCOME_AWARENESS","OUTCOME_TRAFFIC","OUTCOME_ENGAGEMENT"}
+OBJ_OK={"OUTCOME_AWARENESS","OUTCOME_TRAFFIC","OUTCOME_ENGAGEMENT","OUTCOME_PERFIL"}
 nombre=(d.get("nombre") or "Campaña").strip()[:120]
 objetivo=(d.get("objetivo") or "").strip()
 if objetivo not in OBJ_OK:

@@ -27,7 +27,13 @@ GRAPH = "https://graph.facebook.com/v21.0"
 PG_NAME_FILTER = "crm_pgvector.1."
 
 OPT_GOAL = {"OUTCOME_TRAFFIC": "LINK_CLICKS", "OUTCOME_ENGAGEMENT": "POST_ENGAGEMENT",
-            "OUTCOME_AWARENESS": "REACH"}
+            "OUTCOME_AWARENESS": "REACH", "OUTCOME_PERFIL": "PROFILE_VISIT"}
+# "Ganar seguidores" no existe como objetivo en Meta. Lo más cerca es mandar al PERFIL de Instagram
+# y optimizar por visitas: los seguidores salen de ahí. Se modela como un objetivo propio nuestro
+# —OUTCOME_PERFIL— que por dentro es OUTCOME_TRAFFIC con destino perfil, porque para quien pide la
+# campaña la diferencia entre "llevar a la web" y "llevar al perfil" es la que importa.
+OBJ_META = {"OUTCOME_PERFIL": "OUTCOME_TRAFFIC"}
+DEST_TYPE = {"OUTCOME_PERFIL": "INSTAGRAM_PROFILE"}
 CTA_OK = {"LEARN_MORE", "SHOP_NOW", "BOOK_TRAVEL", "CONTACT_US", "SIGN_UP"}
 
 
@@ -213,7 +219,7 @@ def crear(cid):
 
     # 1) Campaña
     camp = graph("POST", f"{act}/campaigns", {
-        "name": d["nombre"], "objective": objetivo, "status": "PAUSED",
+        "name": d["nombre"], "objective": OBJ_META.get(objetivo, objetivo), "status": "PAUSED",
         "special_ad_categories": "[]", "is_adset_budget_sharing_enabled": "false",
         "access_token": token})
     camp_id = camp["id"]
@@ -225,6 +231,8 @@ def crear(cid):
                    "billing_event": "IMPRESSIONS", "optimization_goal": opt,
                    "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
                    "targeting": json.dumps(targeting), "access_token": token}
+        if objetivo in DEST_TYPE:
+            adset_p["destination_type"] = DEST_TYPE[objetivo]
         adset_p["daily_budget" if es_diario else "lifetime_budget"] = str(monto_cents)
         if d.get("fi"):
             adset_p["start_time"] = f"{d['fi']}T00:00:00-0300"
@@ -241,11 +249,13 @@ def crear(cid):
             # El nombre lleva el título de la pieza: en el reporte de Meta, tres anuncios con el
             # mismo nombre no se pueden distinguir, que es justo lo que se quiere comparar.
             nombre_ad = f"{d['nombre']} — {pz['titulo']}"[:120] if pz["titulo"] else f"{d['nombre']} {i}"
-            creative = graph("POST", f"{act}/adcreatives", {
-                "name": nombre_ad, "object_id": page, "instagram_user_id": ig,
-                "source_instagram_media_id": pz["media"],
-                "call_to_action": json.dumps({"type": cta, "value": {"link": link}}),
-                "access_token": token})
+            crea_p = {"name": nombre_ad, "object_id": page, "instagram_user_id": ig,
+                      "source_instagram_media_id": pz["media"], "access_token": token}
+            # Con destino perfil el anuncio lleva al perfil de Instagram: agregarle un link externo
+            # sería mandarlo a otro lado que el que la campaña eligió.
+            if objetivo not in DEST_TYPE:
+                crea_p["call_to_action"] = json.dumps({"type": cta, "value": {"link": link}})
+            creative = graph("POST", f"{act}/adcreatives", crea_p)
             ad = graph("POST", f"{act}/ads", {
                 "name": nombre_ad, "adset_id": adset_id,
                 "creative": json.dumps({"creative_id": creative["id"]}),

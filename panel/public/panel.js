@@ -972,7 +972,7 @@ async function loadInstagram(){
 function money(v, cur){ try{ return new Intl.NumberFormat('es-AR',{style:'currency',currency:cur||'USD',maximumFractionDigits:2}).format(Number(v||0)); }catch(_){ return (cur||'')+' '+nf(v); } }
 const pct = v => Number(v||0).toLocaleString('es-AR',{maximumFractionDigits:2})+'%';
 function stClass(e){ if(e==='ACTIVE') return 'ok'; if(['PAUSED','ADSET_PAUSED','CAMPAIGN_PAUSED'].includes(e)) return 'pause'; if(['WITH_ISSUES','DISABLED','DELETED','ARCHIVED'].includes(e)) return 'warn'; return ''; }
-const OBJ={OUTCOME_AWARENESS:'Reconocimiento',OUTCOME_TRAFFIC:'Tráfico',OUTCOME_ENGAGEMENT:'Interacción'};
+const OBJ={OUTCOME_AWARENESS:'Reconocimiento',OUTCOME_TRAFFIC:'Tráfico',OUTCOME_ENGAGEMENT:'Interacción',OUTCOME_PERFIL:'Seguidores'};
 const CAMP_EST={propuesta:['Propuesta','pause'],aprobada:['Creando en Meta…','pause'],activar:['Activando…','pause'],pausar:['Pausando…','pause'],descartar:['Descartando…','warn'],pausada:['Pausada en Meta','pause'],activa:['Activa','ok'],rechazada:['Rechazada','warn'],error:['Error','warn']};
 let _CAMPS=[], _CAMPCUR='USD', _LIVEBYID={}, _EVOL=[], _EVOLMETRIC='gasto', _PAUTABUSY=false, _PAUTAAT='';
 function audTxt(a){ a=a||{}; const p=[];

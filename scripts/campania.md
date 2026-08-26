@@ -34,6 +34,7 @@ Leé además `contexto/CONTEXTO_MARCA.md` de la cápsula (estás parado en el re
    - `OUTCOME_AWARENESS` (reconocimiento / que la marca se vea)
    - `OUTCOME_TRAFFIC` (llevar a la web/landing)
    - `OUTCOME_ENGAGEMENT` (interacción con el post)
+   - `OUTCOME_PERFIL` (llevar al **perfil de Instagram** y ganar seguidores)
 2. **Creativos** — elegí **entre 1 y 3** publicaciones de `publicaciones` y poné sus ids en
    `pieza_ids`, en orden de preferencia (la primera es la principal).
    Cada una va a ser un anuncio **dentro del mismo conjunto**: comparten público y presupuesto, y
@@ -48,7 +49,21 @@ Leé además `contexto/CONTEXTO_MARCA.md` de la cápsula (estás parado en el re
    Meta se hace después). Ubicación por radio o ciudades cercanas al negocio.
 4. **Presupuesto** — chico y sensato. Preferí `diario`. Poné `moneda` = la de la cuenta.
 5. **Fechas** — `fecha_inicio` / `fecha_fin` (YYYY-MM-DD). Duración corta para probar (3–7 días).
+5.bis **Elegí el objetivo por CÓMO COMPRA ese público en ese momento, no por el rubro.** No todos
+   los momentos del día se comportan igual, y el destino equivocado tira a la basura el clic que
+   ya pagaste:
+   - Momentos de **decisión anticipada** (una cena, una fecha especial, un grupo): la persona
+     planifica y reserva → `OUTCOME_TRAFFIC` al link de **reservas**.
+   - Momentos **de paso** (el mediodía de semana, quien pasa por la puerta): la persona **no
+     reserva**, decide en el momento y entra o no entra. Pedirle que reserve es pedirle algo que no
+     va a hacer. Ahí conviene `OUTCOME_PERFIL`: se gana el seguidor, que es la única forma de
+     seguir hablándole después y —a falta de medición en el local— la señal más cercana de que la
+     campaña movió gente de verdad.
+   Si el brief de la marca dice algo sobre esto, mandá el brief por sobre esta guía.
+
 6. Si el objetivo es `OUTCOME_TRAFFIC`: `url_destino` + `cta`.
+   Con `OUTCOME_PERFIL` **no pongas `url_destino` ni `cta`**: el anuncio lleva al perfil, y un link
+   externo lo mandaría a otro lado.
    **Elegí el destino según lo que se pidió, no por defecto.** En `destinos` vienen los dos:
    - `reservas` — cuando el pedido es **llenar mesas, turnos o cupos**. Es el que corresponde casi
      siempre en gastronomía: resuelve solo si abre la página de reserva o el WhatsApp del negocio,
