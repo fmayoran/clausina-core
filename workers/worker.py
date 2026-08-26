@@ -52,6 +52,11 @@ def process(job):
     if not handler:
         log(f"job desconocido tipo={tipo} -> descartado")
         registrar_job(tipo or "?", slug, False, "tipo de job desconocido: no hay handler registrado")
+        # El lock se suelta ACÁ también. Sin esto, un handler que falta —que es un error de orden
+        # al deployar, no del pedido— dejaba la clave tomada media hora: el dispatcher no volvía a
+        # encolar y parecía que el trabajo se había perdido. Pasó al agregar 'aprendizaje'.
+        if lock_key:
+            jobqueue.release_inflight(lock_key)
         return
     log(f"-> {tipo} / {slug}")
     # Todo job deja rastro en la DB, salga bien o mal. Antes el error moría en el journal de
