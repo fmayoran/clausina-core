@@ -33,9 +33,10 @@ psql "UPDATE contenido.solicitudes_campania SET estado='procesando', iniciado_en
 # Contexto para el creativo: instrucción + marca + moneda + publicaciones disponibles como creativo.
 cd "$REPO" || exit 1
 bash "$MOTOR/scripts/perfil_a_md.sh" "$slug" >/dev/null 2>&1 || true
-CID="$CID" SID="$sid" PID="$pid" python3 - <<'PY'
+CID="$CID" SID="$sid" PID="$pid" SLUG="$slug" MOTOR="$MOTOR" python3 - <<'PY'
 import json, os, subprocess
 cid=os.environ["CID"]; sid=os.environ["SID"]; pid=os.environ["PID"]
+slug=os.environ["SLUG"]; MOTOR=os.environ["MOTOR"]
 def q(sql):
     return subprocess.run(["docker","exec","-i",cid,"psql","-U","postgres","-d","claude","-t","-A","-c",sql],
                           capture_output=True, text=True).stdout.strip()
@@ -53,8 +54,18 @@ pubs = q("SELECT coalesce(json_agg(t),'[]') FROM ("
          "ORDER BY pz.numero DESC LIMIT 20) t")
 try: publicaciones=json.loads(pubs)
 except Exception: publicaciones=[]
+# Cómo le fue a lo que este negocio ya publicó. Sin esto el estratega elegía el creativo por
+# criterio estético y por el caption: ahora puede elegirlo por lo que de verdad rindió en ESTA
+# cuenta. Si falla, se sigue sin el dato: es contexto, no un requisito.
+import subprocess as _sp
+try:
+    _r=_sp.run(["python3", f"{MOTOR}/scripts/rendimiento.py", slug, "--json"],
+               capture_output=True, text=True, timeout=60)
+    rendimiento=json.loads(_r.stdout) if _r.returncode==0 and _r.stdout.strip() else None
+except Exception:
+    rendimiento=None
 ctx={"instruccion":instr,"objetivo_marca":objetivo,"brief":brief.strip(),"estilo":estilo.strip(),
-     "moneda":moneda,"publicaciones":publicaciones}
+     "moneda":moneda,"publicaciones":publicaciones,"rendimiento":rendimiento}
 json.dump(ctx, open(f"/tmp/camp_ctx_{sid}.json","w"), ensure_ascii=False)
 print(f"ctx: {len(publicaciones)} publicaciones, moneda {moneda}")
 PY
@@ -92,8 +103,15 @@ nombre=(d.get("nombre") or "Campaña").strip()[:120]
 objetivo=(d.get("objetivo") or "").strip()
 if objetivo not in OBJ_OK:
     upd_sol(f"estado='error', resumen={dq('Objetivo inválido: '+objetivo)}"); print("err:objetivo"); raise SystemExit
-pieza=(d.get("pieza_id") or "").strip()
-pieza_sql = f"'{pieza}'" if pieza and pieza.lower()!="null" else "NULL"
+# El estratega puede proponer VARIOS creativos: cada uno va a ser un anuncio dentro del mismo
+# conjunto. Se acepta `pieza_ids` (lista) y, para propuestas viejas, `pieza_id` suelto.
+piezas=[str(x).strip() for x in (d.get("pieza_ids") or []) if str(x).strip()]
+if not piezas:
+    _una=(d.get("pieza_id") or "").strip()
+    if _una and _una.lower()!="null": piezas=[_una]
+piezas=piezas[:5]
+pieza=piezas[0] if piezas else ""
+pieza_sql = f"'{pieza}'" if pieza else "NULL"
 razon=(d.get("razon") or "").strip()[:4000]
 resumen=(d.get("resumen") or "").strip()[:600]
 aud=json.dumps(d.get("audiencia") or {}, ensure_ascii=False)
@@ -112,6 +130,10 @@ if r.returncode!=0 or not r.stdout.strip():
     upd_sol(f"estado='error', resumen={dq('No se pudo guardar la propuesta: '+(r.stderr or '').strip()[:400])}")
     print("err:insert "+(r.stderr or '').strip()[:180]); raise SystemExit
 camp_id=r.stdout.strip().splitlines()[0]
+# La relación campaña-piezas, en el orden propuesto: es lo que después crea un anuncio por pieza.
+for i, pz in enumerate(piezas, 1):
+    psql("INSERT INTO contenido.pauta_campania_pieza (campania_id,pieza_id,orden) "
+         f"VALUES ('{camp_id}','{pz}',{i}) ON CONFLICT (campania_id,pieza_id) DO NOTHING;")
 upd_sol(f"estado='listo', campania_id='{camp_id}', resumen={dq(resumen)}")
 print("ok:"+nombre)
 PY

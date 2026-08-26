@@ -11,6 +11,14 @@ En `/tmp/camp_ctx_<sid>.json` tenés:
 - `moneda`: moneda de la cuenta publicitaria (ej. USD).
 - `publicaciones`: lista de posts YA publicados en Instagram que podés usar de creativo,
   cada uno con `pieza_id`, `numero` (CF-XXXX), `caption`, `permalink`, `tipo` (imagen/video).
+- `rendimiento`: **cómo le fue a lo que este negocio ya publicó** — mediana de views/reach/likes por
+  formato, las mejores y las peores con su título, y un `aviso`. Puede venir `null` si todavía no
+  hay historia.
+  **Elegí los creativos con este dato, no de memoria ni por gusto.** Si un formato rinde varias
+  veces más que otro en ESTA cuenta, es la primera candidatura. Dos honestidades obligatorias:
+  respetá el `aviso` —con muestra chica es una pista, no una ley— y recordá que **las vistas no son
+  el objetivo**: una pieza de reserva rinde menos en alcance y puede ser la correcta si el pedido
+  es llenar mesas.
 
 Leé además `contexto/CONTEXTO_MARCA.md` de la cápsula (estás parado en el repo de la marca).
 
@@ -19,15 +27,25 @@ Leé además `contexto/CONTEXTO_MARCA.md` de la cápsula (estás parado en el re
    - `OUTCOME_AWARENESS` (reconocimiento / que la marca se vea)
    - `OUTCOME_TRAFFIC` (llevar a la web/landing)
    - `OUTCOME_ENGAGEMENT` (interacción con el post)
-2. **Creativo** — elegí UNA publicación de `publicaciones` (poné su `pieza_id`). Preferí una
-   que empuje el objetivo. Si de verdad ninguna sirve, dejá `pieza_id` en null y explicá en `razon`.
+2. **Creativos** — elegí **entre 1 y 3** publicaciones de `publicaciones` y poné sus ids en
+   `pieza_ids`, en orden de preferencia (la primera es la principal).
+   Cada una va a ser un anuncio **dentro del mismo conjunto**: comparten público y presupuesto, y
+   Meta le da entrega al que mejor funciona. Por eso conviene que **se diferencien en algo que
+   valga la pena comparar** —formato, ángulo, con o sin gente— y no que sean tres variantes de lo
+   mismo: si son parecidas, el resultado no enseña nada.
+   Con presupuesto chico (menos de US$10 por día) proponé **dos**, no tres: repartir menos plata
+   entre más anuncios hace que ninguno junte impresiones suficientes para que la diferencia
+   signifique algo.
+   Si de verdad ninguna publicación sirve, dejá `pieza_ids` vacío y explicá en `razon`.
 3. **Audiencia** — geo + edad + género + intereses (nombres legibles; la resolución a IDs de
    Meta se hace después). Ubicación por radio o ciudades cercanas al negocio.
 4. **Presupuesto** — chico y sensato. Preferí `diario`. Poné `moneda` = la de la cuenta.
 5. **Fechas** — `fecha_inicio` / `fecha_fin` (YYYY-MM-DD). Duración corta para probar (3–7 días).
 6. Si el objetivo es `OUTCOME_TRAFFIC`: `url_destino` (la web de la marca) + `cta`
    (uno de: LEARN_MORE, SHOP_NOW, BOOK_TRAVEL, CONTACT_US, SIGN_UP). Si no, dejalos null.
-7. **razon** — 2–4 frases: por qué esta campaña, este creativo y este público tienen sentido
+7. **razon** — 2–4 frases: por qué esta campaña, estos creativos y este público tienen sentido.
+   Si el rendimiento pesó en la elección, **decilo con el número** ("los carrusels rinden 9× la foto
+   suelta acá"): es lo que le permite a Fer discutir la propuesta en vez de aceptarla a ciegas
    para el momento de la marca. **resumen** — 1 frase para la tarjeta del panel.
 
 Criterio: proponé algo que vos aprobarías con plata propia. Presupuesto conservador, público
@@ -40,7 +58,7 @@ Escribí EXACTAMENTE este JSON en `/tmp/camp_res_<sid>.json` (sin texto extra):
 {
   "nombre": "Nombre corto y claro de la campaña",
   "objetivo": "OUTCOME_TRAFFIC",
-  "pieza_id": "uuid-de-la-publicacion-elegida-o-null",
+  "pieza_ids": ["uuid-de-la-principal", "uuid-de-la-segunda"],
   "razon": "Por qué esta campaña/creativo/público.",
   "audiencia": {
     "ubicaciones": [{"tipo": "radio", "nombre": "Ranelagh, Buenos Aires", "radio_km": 15}],
