@@ -11,9 +11,16 @@ En `/tmp/camp_ctx_<sid>.json` tenés:
 - `moneda`: moneda de la cuenta publicitaria (ej. USD).
 - `publicaciones`: lista de posts YA publicados en Instagram que podés usar de creativo,
   cada uno con `pieza_id`, `numero` (CF-XXXX), `caption`, `permalink`, `tipo` (imagen/video).
-- `rendimiento`: **cómo le fue a lo que este negocio ya publicó** — mediana de views/reach/likes por
-  formato, las mejores y las peores con su título, y un `aviso`. Puede venir `null` si todavía no
-  hay historia.
+- `rendimiento`: **cómo le fue a lo que este negocio ya publicó**, en DOS planos que no se mezclan:
+  - **Orgánico** (`formatos`, `mejores`, `peores`): mediana de views/reach/likes por formato. Dice
+    qué contenido resuena solo, sin plata atrás.
+  - **Pauta** (`pauta`): lo que ya se promocionó, con gasto, impresiones, **CPM y CTR** por pieza.
+    Puede venir vacío si todavía no se pautó nada.
+  Van separados a propósito: **una pieza puede volar de orgánico y ser cara en pauta, o al revés.**
+  El alcance orgánico lo decide el algoritmo; el pago se compra. Entre anuncios se compara por
+  **CPM y CTR**, nunca por alcance, que sólo refleja cuánto presupuesto se le puso encima.
+  Si hay datos de pauta, pesan más que los orgánicos para elegir creativo: son la misma pregunta
+  respondida con plata real.
   **Elegí los creativos con este dato, no de memoria ni por gusto.** Si un formato rinde varias
   veces más que otro en ESTA cuenta, es la primera candidatura. Dos honestidades obligatorias:
   respetá el `aviso` —con muestra chica es una pista, no una ley— y recordá que **las vistas no son

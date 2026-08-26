@@ -191,6 +191,41 @@ def fetch_daily(act, token):
     return out
 
 
+def fetch_ad_daily(act, token):
+    """Serie diaria POR ANUNCIO. El total del negocio dice cuánto se gastó; esto dice en qué.
+    Sin abrir por anuncio no hay forma de saber cuál creativo ganó, que es todo el sentido de
+    poner varios en el mismo conjunto."""
+    if not act.startswith("act_"):
+        act = "act_" + act
+    out = []
+    try:
+        ins = graph_get(f"{act}/insights", token, {
+            "time_increment": 1, "date_preset": "last_30d", "level": "ad",
+            "fields": "ad_id,spend,impressions,reach,clicks", "limit": 500})
+        for r in ins.get("data", []):
+            if not r.get("ad_id") or not r.get("date_start"):
+                continue
+            out.append({
+                "ad_id": r["ad_id"], "fecha": r["date_start"],
+                "gasto": round(num(r.get("spend")), 2),
+                "impresiones": int(num(r.get("impressions"))),
+                "alcance": int(num(r.get("reach"))),
+                "clics": int(num(r.get("clicks"))),
+            })
+    except Exception as e:  # noqa: BLE001
+        sys.stderr.write(f"ad_daily: {e}\n")
+    return out
+
+
+def upsert_ad_daily(pid, filas):
+    for d in filas:
+        psql(
+            "INSERT INTO contenido.ads_ad_daily(negocio_id,meta_ad_id,fecha,gasto,impresiones,alcance,clics,actualizado_en) "
+            f"VALUES('{pid}','{d['ad_id']}','{d['fecha']}',{d['gasto']},{d['impresiones']},{d['alcance']},{d['clics']},now()) "
+            "ON CONFLICT(negocio_id,meta_ad_id,fecha) DO UPDATE SET gasto=EXCLUDED.gasto,"
+            "impresiones=EXCLUDED.impresiones,alcance=EXCLUDED.alcance,clics=EXCLUDED.clics,actualizado_en=now();")
+
+
 def upsert_daily(pid, daily):
     for d in daily:
         if not d.get("fecha"):
@@ -255,6 +290,8 @@ def main():
             pid = upsert(slug, snap)
             try:
                 upsert_daily(pid, fetch_daily(act, token))
+                # Y el detalle por anuncio, que es lo que permite comparar creativos.
+                upsert_ad_daily(pid, fetch_ad_daily(act, token))
             except Exception as e:  # noqa: BLE001
                 sys.stderr.write(f"{slug} daily: {e}\n")
             n = len(snap["campanias"])

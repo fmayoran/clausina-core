@@ -80,6 +80,36 @@ resumen['peores'] = ordenadas[-k:][::-1]
 # Mediana y no promedio: un solo pico se lleva el promedio y hace parecer normal lo que fue
 # excepcional.
 resumen['views_mediana'] = int(statistics.median([p['views'] for p in piezas]))
+# ── Lo PAGO, que es otra cosa que lo orgánico ────────────────────────────────
+# Una pieza puede volar de orgánico y ser cara en pauta, o al revés: el alcance orgánico lo decide
+# el algoritmo y el pago lo comprás. Van separados a propósito; mezclarlos escondería justamente
+# la comparación que interesa.
+pagas = psql(f"""
+  SELECT p2.numero, coalesce(p2.titulo_interno,''),
+         sum(a.gasto)::numeric(12,2), sum(a.impresiones), sum(a.alcance), sum(a.clics),
+         min(a.fecha)::text, max(a.fecha)::text
+    FROM contenido.ads_ad_daily a
+    JOIN contenido.negocios n ON n.id = a.negocio_id
+    JOIN contenido.pauta_campania_pieza cp ON cp.meta_ad_id = a.meta_ad_id
+    JOIN contenido.piezas p2 ON p2.id = cp.pieza_id
+   WHERE n.slug='{A.slug}'
+   GROUP BY p2.numero, p2.titulo_interno
+   HAVING sum(a.impresiones) > 0
+   ORDER BY sum(a.gasto) DESC;""")
+
+resumen['pauta'] = []
+for f in pagas:
+    if len(f) < 8:
+        continue
+    gasto, impr, clics = float(f[2] or 0), int(f[3] or 0), int(f[5] or 0)
+    resumen['pauta'].append({
+        'numero': int(f[0]), 'titulo': f[1], 'gasto': gasto, 'impresiones': impr,
+        'alcance': int(f[4] or 0), 'clics': clics,
+        # CPM y CTR son lo comparable entre anuncios: el gasto solo dice cuánto se le puso encima.
+        'cpm': round(gasto / impr * 1000, 2) if impr else None,
+        'ctr': round(clics / impr * 100, 2) if impr else None,
+        'desde': f[6], 'hasta': f[7]})
+
 resumen['aviso'] = (
     'MUESTRA CHICA: con menos de 20 publicaciones esto es una pista, no una regla. '
     'No descartes una idea sólo porque su formato rindió poco acá.'
@@ -105,4 +135,14 @@ print("\nLo que PEOR funcionó:")
 for p in resumen['peores']:
     print(f"  CF-{p['numero']:04d} {p['formato']:9} {p['views']:>7} views · {p['likes']:>4} likes · "
           f"{p['fecha']} · {p['titulo'][:52]}")
+if resumen['pauta']:
+    print("\nEn PAUTA (lo que se promocionó con plata; el alcance acá se compra, no se gana):")
+    for p in resumen['pauta']:
+        print(f"  CF-{p['numero']:04d} {p['gasto']:>7.2f} gastado · {p['impresiones']:>7} impr · "
+              f"CPM {p['cpm']} · CTR {p['ctr']}% · {p['titulo'][:38]}")
+    print("  Comparar entre sí por CPM y CTR, no por alcance: el alcance lo define el presupuesto.")
+else:
+    print("\nEn PAUTA: todavía no hay nada promocionado con datos. Elegí los creativos por el "
+          "rendimiento orgánico y por lo que empuje el objetivo.")
+
 print(f"\n{resumen['aviso']}")
