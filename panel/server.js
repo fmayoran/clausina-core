@@ -1909,7 +1909,13 @@ app.get('/api/campanias/creativos', async (req, res) => {
   catch (e) { console.error('campania-creativos', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/:id/creativo', async (req, res) => {
-  try { res.json({ ok: await db.setCreativoCampania(req.negocioId, req.params.id, (req.body || {}).pieza_id) }); }
+  try {
+    const b = req.body || {};
+    // Acepta una pieza o varias: las propuestas viejas mandan `pieza_id` suelto.
+    const ids = Array.isArray(b.pieza_ids) ? b.pieza_ids : (b.pieza_id ? [b.pieza_id] : []);
+    const r = await db.setCreativosCampania(req.negocioId, req.params.id, ids);
+    res.status(r.ok ? 200 : 409).json(r);
+  }
   catch (e) { console.error('campania-creativo', e.message); res.status(500).json({ error: 'db' }); }
 });
 

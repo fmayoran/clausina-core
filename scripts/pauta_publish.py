@@ -174,7 +174,6 @@ def crear(cid):
     row = psql("SELECT row_to_json(t) FROM (SELECT c.nombre,c.objetivo,c.audiencia,c.presupuesto,"
                "to_char(c.fecha_inicio,'YYYY-MM-DD') fi,to_char(c.fecha_fin,'YYYY-MM-DD') ff,"
                "c.url_destino,c.cta,c.meta_campaign_id,"
-               "(SELECT r.ig_post_id FROM contenido.revisiones r WHERE r.pieza_id=c.pieza_id AND r.estado='publicada' LIMIT 1) ig_media,"
                "(SELECT p.dominio_web FROM contenido.negocios p WHERE p.id=c.negocio_id) dominio "
                f"FROM contenido.pauta_campania c WHERE c.id='{cid}') t;")
     if not row:
@@ -182,9 +181,25 @@ def crear(cid):
     d = json.loads(row)
     if d.get("meta_campaign_id"):
         return "ya creada"
-    ig_media = d.get("ig_media")
-    if not ig_media:
-        set_estado(cid, "error", "La campaña necesita un post ya publicado como creativo.")
+
+    # Las piezas de la campaña, en orden. Cada una va a ser UN anuncio dentro del MISMO conjunto:
+    # así compiten por el mismo público y Meta le da entrega a la que rinde. Partirlas en varios
+    # conjuntos sería peor —ninguno junta los eventos que Meta necesita para aprender, y compiten
+    # entre sí en la subasta—.
+    piezas = []
+    for linea in psql(
+            "SELECT cp.id||'|'||coalesce(r.ig_post_id,'')||'|'||coalesce(pz.titulo_interno,'') "
+            "FROM contenido.pauta_campania_pieza cp "
+            "JOIN contenido.piezas pz ON pz.id=cp.pieza_id "
+            "LEFT JOIN contenido.revisiones r ON r.pieza_id=cp.pieza_id AND r.estado='publicada' "
+            f"WHERE cp.campania_id='{cid}' ORDER BY cp.orden, cp.creado_en").split("\n"):
+        if not linea.strip():
+            continue
+        rid, media, titulo = (linea.split("|", 2) + ["", ""])[:3]
+        if media:
+            piezas.append({"rel": rid, "media": media, "titulo": titulo})
+    if not piezas:
+        set_estado(cid, "error", "La campaña necesita al menos un post ya publicado como creativo.")
         return "sin creativo"
 
     objetivo = d["objetivo"]
@@ -220,24 +235,32 @@ def crear(cid):
         adset = graph("POST", f"{act}/adsets", adset_p)
         adset_id = adset["id"]
 
-        # 3) Creativo (desde el post de IG ya publicado)
-        creative = graph("POST", f"{act}/adcreatives", {
-            "name": d["nombre"], "object_id": page, "instagram_user_id": ig,
-            "source_instagram_media_id": ig_media,
-            "call_to_action": json.dumps({"type": cta, "value": {"link": link}}),
-            "access_token": token})
-        creative_id = creative["id"]
+        # 3 y 4) Un creativo y un anuncio POR PIEZA, todos en el mismo conjunto.
+        ads_ids = []
+        for i, pz in enumerate(piezas, 1):
+            # El nombre lleva el título de la pieza: en el reporte de Meta, tres anuncios con el
+            # mismo nombre no se pueden distinguir, que es justo lo que se quiere comparar.
+            nombre_ad = f"{d['nombre']} — {pz['titulo']}"[:120] if pz["titulo"] else f"{d['nombre']} {i}"
+            creative = graph("POST", f"{act}/adcreatives", {
+                "name": nombre_ad, "object_id": page, "instagram_user_id": ig,
+                "source_instagram_media_id": pz["media"],
+                "call_to_action": json.dumps({"type": cta, "value": {"link": link}}),
+                "access_token": token})
+            ad = graph("POST", f"{act}/ads", {
+                "name": nombre_ad, "adset_id": adset_id,
+                "creative": json.dumps({"creative_id": creative["id"]}),
+                "status": "PAUSED", "access_token": token})
+            psql(f"UPDATE contenido.pauta_campania_pieza SET meta_creative_id={dq(creative['id'])}, "
+                 f"meta_ad_id={dq(ad['id'])} WHERE id='{pz['rel']}';")
+            ads_ids.append(ad["id"])
 
-        # 4) Anuncio
-        ad = graph("POST", f"{act}/ads", {
-            "name": d["nombre"], "adset_id": adset_id,
-            "creative": json.dumps({"creative_id": creative_id}),
-            "status": "PAUSED", "access_token": token})
-
+        cuantos = f"{len(ads_ids)} anuncios" if len(ads_ids) > 1 else "1 anuncio"
         set_estado(cid, "pausada",
-                   f"Creada en Meta (pausada). Presupuesto {'diario' if es_diario else 'total'} "
+                   f"Creada en Meta (pausada) con {cuantos}. Presupuesto {'diario' if es_diario else 'total'} "
                    f"{monto_cents/100:.0f} {pres.get('moneda','USD')}. Activala para que empiece a correr.",
-                   meta={"meta_campaign_id": camp_id, "meta_adset_id": adset_id, "meta_ad_id": ad["id"]})
+                   # meta_ad_id guarda el primero por compatibilidad; el detalle por pieza vive en
+                   # pauta_campania_pieza, que es de donde sale el rendimiento por anuncio.
+                   meta={"meta_campaign_id": camp_id, "meta_adset_id": adset_id, "meta_ad_id": ads_ids[0]})
         return "ok:" + camp_id
     except Exception as e:
         # Limpieza: borrar la campaña a medias en Meta para que el reintento sea limpio.

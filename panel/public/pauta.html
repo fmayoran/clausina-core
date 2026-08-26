@@ -40,8 +40,15 @@
   <div id="creativopick" class="modal hidden">
     <div class="modal-bg" onclick="closeCreativos()"></div>
     <div class="modal-box">
-      <div class="modal-head"><div class="modal-tt">Elegir creativo</div><button class="modal-x" onclick="closeCreativos()" title="Cerrar">×</button></div>
-      <div class="modal-body"><div class="cpick-grid" id="creativo-grid"></div></div>
+      <div class="modal-head"><div class="modal-tt">Elegir creativos</div><button class="modal-x" onclick="closeCreativos()" title="Cerrar">×</button></div>
+      <div class="modal-body">
+        <div class="cm-note" style="margin-bottom:10px;">Elegí uno o varios. Cada uno es un anuncio
+          dentro del <b>mismo conjunto</b>: comparten público y presupuesto, y Meta le da entrega al
+          que mejor funciona. Es la forma de saber cuál rinde sin partir la audiencia.</div>
+        <div class="cpick-grid" id="creativo-grid"></div>
+      </div>
+      <div class="modal-foot"><button class="btn ok" id="crea-guardar" onclick="guardarCreativos()">Usar este creativo</button>
+        <button class="btn no" onclick="closeCreativos()">Cancelar</button></div>
     </div>
   </div>
 

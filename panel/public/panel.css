@@ -435,3 +435,8 @@ header .marcasel:hover{border-color:var(--fire);}
   color:var(--chalk);background:transparent;border:1px solid var(--line);border-radius:7px;
   padding:7px 12px;cursor:pointer;margin:0;}
 .pc-bar .ibtn:hover,.pc-bar label.ibtn:hover{border-color:var(--fire);color:var(--fire);}
+/* Número de orden sobre el creativo elegido: con varios seleccionados hay que ver cuál va primero. */
+.cpick-ord{position:absolute;top:5px;left:5px;width:19px;height:19px;border-radius:50%;
+  background:var(--fire);color:var(--bg);font-family:'JetBrains Mono',monospace;font-size:10px;
+  font-weight:700;display:grid;place-items:center;}
+.cpick{position:relative;}

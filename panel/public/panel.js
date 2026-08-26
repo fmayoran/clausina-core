@@ -1144,26 +1144,56 @@ async function descartarCamp(id){ if(await campAction(id,'descartar')) toast('De
 async function activarCamp(id){ if(!confirm('Vas a ACTIVAR la campaña en Meta: empieza a gastar según el presupuesto y las fechas. ¿Confirmás?')) return; if(await campAction(id,'activar')) toast('Activando en Meta…'); }
 async function pausarCamp(id){ if(await campAction(id,'pausar')) toast('Pausando en Meta…'); }
 async function reintentarCamp(id){ if(await campAction(id,'reintentar')) toast('Reintentando la creación…'); }
+/**
+ * Elegir los creativos de una campaña: VARIOS, no uno. Cada uno va a ser un anuncio dentro del
+ * mismo conjunto, que es cómo se averigua cuál funciona sin partir el público en dos.
+ * Se marcan y se guardan juntos, en vez de un clic que cierra: elegir tres de a uno obligaba a
+ * abrir el selector tres veces.
+ */
+let _creaSel = [];
+const CREA_MAX = 5;
 async function abrirCreativos(){
-  const camp=_CAMPS.find(x=>x.id===_CAMPOPEN); const cur=camp?camp.pieza_id:null;
+  const camp=_CAMPS.find(x=>x.id===_CAMPOPEN);
+  _creaSel = (camp && camp.creativos && camp.creativos.length)
+    ? camp.creativos.map(c=>c.pieza_id)
+    : (camp && camp.pieza_id ? [camp.pieza_id] : []);
   try{
-    const r=await fetch('api/campanias/creativos'); const list=await r.json();
-    document.getElementById('creativo-grid').innerHTML = (list||[]).map(c=>{
-      const u=(c.tipo==='video'&&c.poster_url)?c.poster_url:c.url;
-      return `<a class="cpick${c.pieza_id===cur?' on':''}" href="#" onclick="elegirCreativo('${c.pieza_id}');return false;" title="${cod(c.numero)}">
-        <img src="${esc(u)}" loading="lazy" onerror="this.style.opacity=.15">
-        <span class="cpick-n">${cod(c.numero)}${c.tipo==='video'?' ▶':''}</span></a>`;
-    }).join('') || '<div class="cm-note">No hay posts publicados disponibles como creativo.</div>';
+    _creaLista = await fetch('api/campanias/creativos').then(r=>r.json());
+    pintarCreativos();
     document.getElementById('creativopick').classList.remove('hidden');
   }catch(e){ toast('No se pudieron cargar los posts',true); }
 }
+let _creaLista=[];
+function pintarCreativos(){
+  const g=document.getElementById('creativo-grid'); if(!g) return;
+  g.innerHTML = (_creaLista||[]).map(c=>{
+    const u=(c.tipo==='video'&&c.poster_url)?c.poster_url:c.url;
+    const i=_creaSel.indexOf(c.pieza_id);
+    return `<a class="cpick${i>=0?' on':''}" href="#" onclick="toggleCreativo('${c.pieza_id}');return false;" title="${cod(c.numero)}">
+      <img src="${esc(u)}" loading="lazy" onerror="this.style.opacity=.15">
+      ${i>=0?`<span class="cpick-ord">${i+1}</span>`:''}
+      <span class="cpick-n">${cod(c.numero)}${c.tipo==='video'?' ▶':''}</span></a>`;
+  }).join('') || '<div class="cm-note">No hay posts publicados disponibles como creativo.</div>';
+  const b=document.getElementById('crea-guardar');
+  if(b){ b.disabled=!_creaSel.length;
+    b.textContent = _creaSel.length>1 ? `Usar estos ${_creaSel.length} creativos` : 'Usar este creativo'; }
+}
+function toggleCreativo(piezaId){
+  const i=_creaSel.indexOf(piezaId);
+  if(i>=0) _creaSel.splice(i,1);
+  else if(_creaSel.length>=CREA_MAX) return toast(`Hasta ${CREA_MAX}: con más, ninguno junta impresiones suficientes para comparar`,true);
+  else _creaSel.push(piezaId);
+  pintarCreativos();
+}
 function closeCreativos(){ const m=document.getElementById('creativopick'); if(m) m.classList.add('hidden'); }
-async function elegirCreativo(piezaId){
-  const id=_CAMPOPEN; if(!id) return;
-  try{ const r=await fetch('api/campanias/'+id+'/creativo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pieza_id:piezaId})});
+async function guardarCreativos(){
+  const id=_CAMPOPEN; if(!id || !_creaSel.length) return;
+  try{ const r=await fetch('api/campanias/'+id+'/creativo',{method:'POST',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify({pieza_ids:_creaSel})});
     const d=await r.json();
-    if(d.ok){ toast('Creativo actualizado'); closeCreativos(); await loadPauta(); openCamp(id); }
-    else toast('No se pudo cambiar el creativo',true);
+    if(d.ok){ toast(d.creativos>1?`${d.creativos} creativos guardados`:'Creativo actualizado');
+      closeCreativos(); await loadPauta(); openCamp(id); }
+    else toast(d.error==='demasiados'?`Hasta ${d.detalle} creativos`:'No se pudo guardar',true);
   }catch(e){ toast('Error de conexión',true); }
 }
 function askCampania(){ const m=document.getElementById('campask'); if(m){ const i=document.getElementById('camp-instr'); if(i) i.value=''; m.classList.remove('hidden'); } }

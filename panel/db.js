@@ -4488,7 +4488,17 @@ async function getPautaCampanias(negocioId) {
             c.fecha_inicio, c.fecha_fin, c.url_destino, c.cta, c.resumen,
             c.meta_campaign_id, c.creado_en, c.aprobado_en,
             pz.numero AS pieza_numero, r.ig_permalink AS pieza_permalink, r.caption AS pieza_caption,
-            m.url AS pieza_url, m.poster_url AS pieza_poster, m.tipo AS pieza_tipo
+            m.url AS pieza_url, m.poster_url AS pieza_poster, m.tipo AS pieza_tipo,
+            -- Todos los creativos de la campaña: la tarjeta muestra el principal, pero el selector
+            -- y el reporte por anuncio necesitan la lista entera.
+            (SELECT COALESCE(json_agg(json_build_object(
+                      'pieza_id', cp.pieza_id, 'numero', p2.numero, 'orden', cp.orden,
+                      'meta_ad_id', cp.meta_ad_id,
+                      'url', m2.url, 'poster_url', m2.poster_url, 'tipo', m2.tipo) ORDER BY cp.orden), '[]'::json)
+               FROM contenido.pauta_campania_pieza cp
+               JOIN contenido.piezas p2 ON p2.id = cp.pieza_id
+               LEFT JOIN contenido.media m2 ON m2.pieza_id = cp.pieza_id AND m2.orden = 1
+              WHERE cp.campania_id = c.id) AS creativos
        FROM contenido.pauta_campania c
        LEFT JOIN contenido.piezas pz ON pz.id = c.pieza_id
        LEFT JOIN contenido.revisiones r ON r.pieza_id = c.pieza_id AND r.estado='publicada'
@@ -4553,14 +4563,43 @@ async function getCreativosDisponibles(negocioId) {
   return rows;
 }
 
-// Cambiar el creativo (pieza) de una propuesta — sólo antes de crearse en Meta.
-async function setCreativoCampania(negocioId, id, piezaId) {
-  const { rowCount } = await pool.query(
-    `UPDATE contenido.pauta_campania SET pieza_id=$3, actualizado_en=now()
-      WHERE id=$1 AND negocio_id=$2 AND estado='propuesta'
-        AND EXISTS (SELECT 1 FROM contenido.piezas WHERE id=$3 AND negocio_id=$2)`,
-    [id, negocioId, piezaId]);
-  return rowCount > 0;
+/**
+ * Los creativos de una propuesta de pauta: UNA O VARIAS piezas. Cada una va a ser un anuncio
+ * dentro del mismo conjunto, que es la forma de averiguar cuál funciona sin partir el público.
+ * Sólo antes de crearse en Meta: después la campaña ya existe allá y cambiarla acá mentiría.
+ *
+ * `pauta_campania.pieza_id` se conserva como la pieza PRINCIPAL —la que ilustra la tarjeta y la
+ * que se promociona si la campaña tiene una sola—, no como la única.
+ */
+async function setCreativosCampania(negocioId, id, piezaIds) {
+  const ids = [...new Set((Array.isArray(piezaIds) ? piezaIds : [piezaIds]).filter(Boolean))];
+  if (!ids.length) return { ok: false, error: 'sin_creativos' };
+  // Meta admite muchos anuncios por conjunto, pero comparar diez creativos con presupuesto chico
+  // no da señal de nada: ninguno junta impresiones suficientes para que la diferencia signifique algo.
+  if (ids.length > 5) return { ok: false, error: 'demasiados', detalle: 5 };
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    const { rows: [c] } = await cli.query(
+      `SELECT id FROM contenido.pauta_campania
+        WHERE id=$1 AND negocio_id=$2 AND estado='propuesta' AND meta_campaign_id IS NULL`,
+      [id, negocioId]);
+    if (!c) { await cli.query('ROLLBACK'); return { ok: false, error: 'no_editable' }; }
+    // Que todas las piezas sean de este negocio: sin esto se podría pautar la pieza de otro.
+    const { rows: [v] } = await cli.query(
+      `SELECT count(*)::int AS n FROM contenido.piezas
+        WHERE id = ANY($1::uuid[]) AND negocio_id=$2 AND canal='instagram'`, [ids, negocioId]);
+    if (v.n !== ids.length) { await cli.query('ROLLBACK'); return { ok: false, error: 'pieza_ajena' }; }
+
+    await cli.query('DELETE FROM contenido.pauta_campania_pieza WHERE campania_id=$1', [id]);
+    await cli.query(
+      `INSERT INTO contenido.pauta_campania_pieza (campania_id, pieza_id, orden)
+       SELECT $1, p.id, p.i FROM unnest($2::uuid[]) WITH ORDINALITY AS p(id, i)`, [id, ids]);
+    await cli.query('UPDATE contenido.pauta_campania SET pieza_id=$2, actualizado_en=now() WHERE id=$1',
+      [id, ids[0]]);
+    await cli.query('COMMIT');
+    return { ok: true, creativos: ids.length };
+  } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
 }
 
 async function reintentarCampania(negocioId, id) {
@@ -4626,5 +4665,5 @@ module.exports = {
   getLandingCambios, crearLandingCambio, aprobarLanding, rechazarLanding,
   getAuditoria, pedirAuditoria, estadoAuditoria, getPauta, getPautaEvolucion, pedirRefrescoPauta,
   crearSolicitudCampania, getPautaCampanias, aprobarCampania, rechazarCampania, descartarCampania,
-  activarCampania, pausarCampania, reintentarCampania, getCreativosDisponibles, setCreativoCampania,
+  activarCampania, pausarCampania, reintentarCampania, getCreativosDisponibles, setCreativosCampania,
   health };
