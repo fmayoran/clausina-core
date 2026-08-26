@@ -1868,9 +1868,13 @@ app.post('/api/pauta/refrescar', async (req, res) => {
 });
 
 // Campañas de pauta: propuestas del creativo + su ciclo de aprobación.
-app.get('/api/campanias', async (req, res) => {
+// La ruta es /api/pauta/campanias y NO /api/campanias: ese path ya lo tomaba el listado de
+// campañas de comunicación, registrado más arriba, y Express le da el pedido a la primera que
+// coincide. Resultado: la pantalla de Pauta mostraba campañas de comunicación y esta ruta era
+// código muerto. Se descubrió al no aparecer el botón Activar de una campaña que sí existía.
+app.get('/api/pauta/campanias', async (req, res) => {
   try { res.json(await db.getPautaCampanias(req.negocioId)); }
-  catch (e) { console.error('campanias', e.message); res.status(500).json({ error: 'db' }); }
+  catch (e) { console.error('pauta-campanias', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/solicitar', async (req, res) => {
   try { res.json({ ok: true, id: await db.crearSolicitudCampania(req.negocioId, (req.body || {}).instruccion) }); }

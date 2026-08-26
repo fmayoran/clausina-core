@@ -1049,7 +1049,7 @@ async function refrescarPauta(){
 }
 async function loadPauta(){
   try{
-    const [rp,rc,re]=await Promise.all([fetch('api/pauta'),fetch('api/campanias'),fetch('api/pauta/evolucion').then(r=>r.ok?r.json():[]).catch(()=>[])]);
+    const [rp,rc,re]=await Promise.all([fetch('api/pauta'),fetch('api/pauta/campanias'),fetch('api/pauta/evolucion').then(r=>r.ok?r.json():[]).catch(()=>[])]);
     if(rp.status===401){ location.href='login'; return; }
     const d=await rp.json();
     const cc=rc.ok?await rc.json():{campanias:[],trabajando:0};
