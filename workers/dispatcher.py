@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "skill_sync", "contexto_sync", "campania_propuesta", "auditoria", "marca_capsula", "descubrimiento", "voz", "tarjeta", "marca_gen", "grafica", "aprendizaje"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "skill_sync", "contexto_sync", "campania_propuesta", "auditoria", "marca_capsula", "descubrimiento", "voz", "tarjeta", "marca_gen", "grafica", "aprendizaje", "pieza_chat"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -149,6 +149,22 @@ def det_tarjeta():
         if rid:
             jobs.append({"tipo": "tarjeta", "negocio_slug": slug,
                          "payload": {"reserva_id": rid}, "lock_key": f"tarjeta:{rid}"})
+    return jobs
+
+
+def det_pieza_chat():
+    # Mensajes de Fer sin responder. Uno por pieza a la vez: dos respuestas simultáneas al mismo
+    # hilo se pisarían y quedarían fuera de orden.
+    jobs = []
+    for row in _lines("SELECT DISTINCT ON (c.pieza_id) c.id||'|'||COALESCE(p.slug,'') "
+                      "FROM contenido.pieza_chat c "
+                      "JOIN contenido.piezas pz ON pz.id=c.pieza_id "
+                      "LEFT JOIN contenido.negocios p ON p.id=pz.negocio_id "
+                      "WHERE c.estado='pendiente' ORDER BY c.pieza_id, c.creado_en"):
+        mid, slug = row.split('|', 1)
+        if mid and slug:
+            jobs.append({"tipo": "pieza_chat", "negocio_slug": slug,
+                         "payload": {"mensaje_id": mid}, "lock_key": f"pieza_chat:{mid}"})
     return jobs
 
 
@@ -361,6 +377,7 @@ DETECTORS = {
     "secrets_sync": det_secrets_sync,
     "skill_sync": det_skill_sync,
     "aprendizaje": det_aprendizaje,
+    "pieza_chat": det_pieza_chat,
     "contexto_sync": det_contexto_sync,
     "campania_propuesta": det_campania_propuesta,
     "auditoria": det_auditoria,

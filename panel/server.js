@@ -2493,6 +2493,19 @@ app.delete('/api/piezas/:id/carrusel/:mid', soloAprobador, async (req, res) => {
   catch (e) { console.error('carrusel-del', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 
+// --- Chat sobre una pieza: un hilo por pieza, asincrónico ---
+app.get('/api/piezas/:id/chat', async (req, res) => {
+  try { const r = await db.getChatPieza(req.negocioId, req.params.id);
+    res.status(r.ok ? 200 : 404).json(r); }
+  catch (e) { console.error('chat-leer', e.message); res.status(500).json({ ok: false }); }
+});
+app.post('/api/piezas/:id/chat', async (req, res) => {
+  try {
+    const r = await db.escribirEnChat(req.negocioId, req.params.id, (req.body || {}).texto);
+    res.status(r.ok ? 200 : 409).json(r);
+  } catch (e) { console.error('chat-escribir', e.message); res.status(500).json({ ok: false }); }
+});
+
 // --- Lo que el creativo aprendió de las correcciones, esperando el visto ---
 app.get('/api/aprendizaje', async (req, res) => {
   try { res.json(await db.getAprendizajes(req.negocioId)); }

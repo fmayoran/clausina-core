@@ -4079,6 +4079,38 @@ async function quitarSlide(negocioId, piezaId, mediaId) {
   } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
 }
 
+/* ── Chat sobre una pieza ─────────────────────────────────────────────────────
+ * Un hilo por pieza. El modelo no recuerda entre llamadas: la continuidad sale de que el worker
+ * relee el hilo entero de acá en cada turno. Por eso el hilo vive en la base y no en una sesión.
+ */
+async function getChatPieza(negocioId, piezaId) {
+  const { rows: [pz] } = await pool.query(
+    'SELECT id FROM contenido.piezas WHERE id=$1 AND negocio_id=$2', [piezaId, negocioId]);
+  if (!pz) return { ok: false, error: 'no_existe' };
+  const { rows } = await pool.query(
+    `SELECT id, rol, texto, estado, error, creado_en FROM contenido.pieza_chat
+      WHERE pieza_id=$1 ORDER BY creado_en`, [piezaId]);
+  return { ok: true, mensajes: rows, pensando: rows.some(m => ['pendiente', 'procesando'].includes(m.estado)) };
+}
+
+async function escribirEnChat(negocioId, piezaId, texto) {
+  const t = String(texto || '').trim().slice(0, 2000);
+  if (!t) return { ok: false, error: 'vacio' };
+  const { rows: [pz] } = await pool.query(
+    'SELECT id FROM contenido.piezas WHERE id=$1 AND negocio_id=$2', [piezaId, negocioId]);
+  if (!pz) return { ok: false, error: 'no_existe' };
+  // Un mensaje a la vez por pieza: si se encolan dos, el segundo se responde sin ver la respuesta
+  // al primero y la conversación queda desfasada.
+  const { rows: [y] } = await pool.query(
+    `SELECT id FROM contenido.pieza_chat
+      WHERE pieza_id=$1 AND estado IN ('pendiente','procesando') LIMIT 1`, [piezaId]);
+  if (y) return { ok: false, error: 'pensando' };
+  const { rows: [m] } = await pool.query(
+    `INSERT INTO contenido.pieza_chat (pieza_id, rol, texto, estado)
+     VALUES ($1,'fer',$2,'pendiente') RETURNING id`, [piezaId, t]);
+  return { ok: true, id: m.id };
+}
+
 /* ── Lo que el creativo aprendió, esperando el visto ──────────────────────────
  * Un modelo no aprende por conversar: lo que queda, queda porque el sistema lo escribió en algún
  * lado durable. Acá se juntan las reglas que salieron de repetir correcciones, y al aceptarlas
@@ -4717,6 +4749,7 @@ module.exports = {
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,
   reordenarCarrusel, agregarSlide, quitarSlide,
   getAprendizajes, pedirAprendizaje, decidirAprendizaje,
+  getChatPieza, escribirEnChat,
   motivoInpublicable, reabrirPieza,
   pedirGeneracion, getGeneracion,
   FORMATOS, getGraficas, contarGraficasDescartadas, getGrafica, crearGrafica, iterarGrafica, ajustarEncuadre, renombrarGrafica, duplicarGrafica, estadoGrafica,

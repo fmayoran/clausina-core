@@ -249,6 +249,7 @@ function pendCard(p){
       : `<div class="acts">
       <button class="btn ok" onclick='aprobarIG("${p.id}", ${JSON.stringify(p.colaboradores||[])})'>Aprobar y publicar</button>
       <div class="acts-row">
+        <button class="btn no" onclick='abrirChat("${p.id}", ${JSON.stringify(p.titulo_interno||"")})'>Hablar</button>
         <button class="btn no" onclick="rechazar('${p.id}',this)">Modificar</button>
         <button class="btn del" onclick="descartar('${p.id}',this)">Descartar</button>
       </div>
@@ -271,6 +272,67 @@ function pintarPublicando(id, on){
     b.innerHTML='<span class="rst proc">Publicando en Instagram…</span>';
     const body=c.querySelector('.body'); if(body) body.appendChild(b);
   } else if(!on && b) b.remove();
+}
+
+/* ── Chat sobre una pieza ─────────────────────────────────────────────────────
+ * Asincrónico a propósito: el creativo tarda minutos, así que no se espera con la pantalla
+ * bloqueada. Se muestra "pensando" y se refresca solo hasta que contesta. El hilo vive en la base,
+ * así que se puede cerrar el panel y volver mañana sin perderlo.
+ */
+let _chatPieza = null, _chatT = null;
+function abrirChat(piezaId, titulo){
+  _chatPieza = piezaId;
+  let ov = document.getElementById('chat-ov');
+  if(!ov){ ov = document.createElement('div'); ov.id='chat-ov'; ov.className='modal';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', e=>{ if(e.target===ov || e.target.classList.contains('modal-bg')) cerrarChat(); }); }
+  ov.innerHTML = `<div class="modal-bg"></div><div class="modal-box chat-box">
+    <div class="modal-head"><div class="modal-tt">Hablar de esta pieza</div>
+      <span class="chat-sub">${esc(titulo||'')}</span>
+      <button class="modal-x" onclick="cerrarChat()" title="Cerrar">&times;</button></div>
+    <div class="chat-hilo" id="chat-hilo"><div class="cm-note">cargando…</div></div>
+    <div class="chat-pie">
+      <textarea id="chat-in" rows="2" placeholder="Preguntale por qué, o contale qué no te cierra…"
+        onkeydown="if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();enviarChat();}"></textarea>
+      <button class="btn ok" id="chat-go" onclick="enviarChat()">Enviar</button>
+    </div>
+    <div class="cm-note chat-nota">Tarda unos minutos. Podés cerrar y volver: el hilo queda.
+      El creativo <b>no modifica la pieza</b> desde acá — si hay que cambiarla, te lo dice y usás Modificar.</div>
+  </div>`;
+  ov.classList.remove('hidden');
+  pintarChat();
+}
+function cerrarChat(){ clearTimeout(_chatT); _chatPieza=null;
+  const o=document.getElementById('chat-ov'); if(o) o.classList.add('hidden'); }
+
+async function pintarChat(){
+  if(!_chatPieza) return;
+  let d; try{ d = await fetch('api/piezas/'+_chatPieza+'/chat').then(r=>r.json()); }catch(e){ return; }
+  const c = document.getElementById('chat-hilo'); if(!c) return;
+  const ms = (d.mensajes||[]).filter(m=>m.estado!=='error');
+  const err = (d.mensajes||[]).find(m=>m.estado==='error');
+  c.innerHTML = (ms.length ? ms.map(m =>
+      `<div class="chat-m ${m.rol==='fer'?'mio':'suyo'}"><span class="chat-quien">${m.rol==='fer'?'Vos':'El creativo'}</span>${esc(m.texto).replace(/\n/g,'<br>')}</div>`).join('')
+    : '<div class="cm-note">Todavía no hablaron de esta pieza.</div>')
+    + (d.pensando ? '<div class="chat-m suyo pensando"><span class="chat-quien">El creativo</span>pensando…</div>' : '')
+    + (err ? `<div class="chat-m err">No pudo responder: ${esc(err.error||'')}</div>` : '');
+  c.scrollTop = c.scrollHeight;
+  const b=document.getElementById('chat-go'); if(b) b.disabled = !!d.pensando;
+  clearTimeout(_chatT);
+  // Sólo se repregunta mientras hay algo en curso: refrescar un hilo quieto es gasto puro.
+  if(d.pensando) _chatT = setTimeout(pintarChat, 8000);
+}
+
+async function enviarChat(){
+  const t=document.getElementById('chat-in'); if(!t || !_chatPieza) return;
+  const texto=(t.value||'').trim(); if(!texto) return;
+  const b=document.getElementById('chat-go'); b.disabled=true;
+  try{
+    const d=await fetch('api/piezas/'+_chatPieza+'/chat',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({texto})}).then(r=>r.json());
+    if(d.ok){ t.value=''; pintarChat(); }
+    else { toast(d.error==='pensando'?'Esperá la respuesta anterior':'No se pudo enviar', true); b.disabled=false; }
+  }catch(e){ toast('Error de conexión',true); b.disabled=false; }
 }
 
 /** Destraba una pieza que el publicador dejó a mitad de camino. */
@@ -320,6 +382,7 @@ function avisoPendCard(p){
     <div class="acts">
       <button class="btn ok" onclick="aprobar('${p.id}',this)">Aprobar (a pantalla)</button>
       <div class="acts-row">
+        <button class="btn no" onclick='abrirChat("${p.id}", ${JSON.stringify(p.titulo_interno||"")})'>Hablar</button>
         <button class="btn no" onclick="rechazar('${p.id}',this)">Modificar</button>
         <button class="btn del" onclick="descartar('${p.id}',this)">Descartar</button>
       </div>
