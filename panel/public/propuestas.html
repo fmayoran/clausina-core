@@ -55,6 +55,11 @@
       <button class="btn ok pp-ask" onclick="openAsk()" title="Pedir ideas al creativo" aria-label="Pedir ideas al creativo"><i data-lucide="sparkles" class="w-5 h-5"></i></button>
     </div>
 
+    <section class="col brief" style="margin-bottom:16px;">
+      <h2><span class="dot"></span>Lo que fue aprendiendo</h2>
+      <div class="cards" id="aprendizaje"><div class="cm-note">cargando…</div></div>
+    </section>
+
     <section class="col brief">
       <h2><span class="dot"></span>Ideas <span class="n" id="n-prop"></span></h2>
       <div class="cards" id="c-prop"></div>
@@ -135,6 +140,7 @@
   function closeAsk(){ document.getElementById('askmodal').classList.add('hidden'); }
   window.afterProponer = closeAsk;
   currentLoad = loadCola; loadCola(); setInterval(loadCola, 6000);
+loadAprendizaje();
   lucide.createIcons();
 </script>
 </body>

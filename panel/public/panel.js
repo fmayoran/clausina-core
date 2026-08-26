@@ -274,6 +274,50 @@ function pintarPublicando(id, on){
   } else if(!on && b) b.remove();
 }
 
+/* ── Lo que el creativo aprendió ──────────────────────────────────────────────
+ * Reglas destiladas de las correcciones de Fer, esperando su visto. Aceptar es lo único que toca
+ * el brief, y por eso la pantalla muestra SIEMPRE la evidencia: una regla que no se puede
+ * rastrear a algo que él dijo no debería entrar al criterio del negocio.
+ */
+async function loadAprendizaje(){
+  let d; try{ d = await fetch('api/aprendizaje').then(r=>r.json()); }catch(e){ return; }
+  const caja = document.getElementById('aprendizaje'); if(!caja) return;
+  const pend = (d.aprendizajes||[]).filter(a=>a.estado==='propuesto');
+  const hechos = (d.aprendizajes||[]).filter(a=>a.estado==='aceptado');
+  const cab = `<div class="apr-cab">
+      <span>${d.correcciones||0} correcciones tuyas · ${hechos.length} regla(s) ya en el brief</span>
+      <button class="btn2" onclick="destilar()" ${d.trabajando?'disabled':''}>
+        ${d.trabajando?'Buscando…':'Buscar aprendizajes'}</button></div>`;
+  caja.innerHTML = cab + (pend.length ? pend.map(a=>{
+    const ev=(a.evidencia||[]).map(e=>`<li><b>${esc(e.pieza||'')}</b> — “${esc(e.motivo||'')}”</li>`).join('');
+    return `<div class="apr">
+      <div class="apr-txt">${esc(a.texto)}</div>
+      ${a.porque?`<div class="apr-why">${esc(a.porque)}</div>`:''}
+      <details class="apr-ev"><summary>De dónde sale (${(a.evidencia||[]).length})</summary><ul>${ev}</ul></details>
+      <div class="apr-acts">
+        <button class="btn ok" onclick="decidirApr('${a.id}','aceptar')">Agregar al brief</button>
+        <button class="btn no" onclick="decidirApr('${a.id}','descartar')">Descartar</button>
+      </div></div>`;
+  }).join('')
+   : `<div class="cm-note">${d.trabajando ? 'El creativo está revisando tus correcciones…'
+        : 'Nada nuevo por ahora. Cuando se repita un criterio en tus correcciones, aparece acá.'}</div>`);
+  clearTimeout(loadAprendizaje._t);
+  if(d.trabajando) loadAprendizaje._t = setTimeout(loadAprendizaje, 15000);
+}
+async function destilar(){
+  try{ const d=await fetch('api/aprendizaje/destilar',{method:'POST'}).then(r=>r.json());
+    toast(d.ok?'Buscando patrones en tus correcciones…':'Ya hay una búsqueda en curso', !d.ok);
+    loadAprendizaje();
+  }catch(e){ toast('Error de conexión',true); }
+}
+async function decidirApr(id, accion){
+  if(accion==='aceptar' && !confirm('Se agrega al brief del negocio. Desde ahí lo van a leer todos los agentes, no sólo el creativo.')) return;
+  try{ const d=await fetch(`api/aprendizaje/${id}/${accion}`,{method:'POST'}).then(r=>r.json());
+    toast(d.ok?(accion==='aceptar'?'Agregado al brief':'Descartado'):'No se pudo', !d.ok);
+    loadAprendizaje();
+  }catch(e){ toast('Error de conexión',true); }
+}
+
 /* ── Chat sobre una pieza ─────────────────────────────────────────────────────
  * Asincrónico a propósito: el creativo tarda minutos, así que no se espera con la pantalla
  * bloqueada. Se muestra "pensando" y se refresca solo hasta que contesta. El hilo vive en la base,
