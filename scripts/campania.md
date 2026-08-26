@@ -50,10 +50,12 @@ Leé además `contexto/CONTEXTO_MARCA.md` de la cápsula (estás parado en el re
    Con presupuesto chico (menos de US$10 por día) proponé **dos**, no tres: repartir menos plata
    entre más anuncios hace que ninguno junte impresiones suficientes para que la diferencia
    signifique algo.
-   **Elegí FOTOS o CARRUSELES, no videos.** Meta no deja promocionar un video de Instagram ya
-   publicado sin subirlo antes a Facebook, así que una pieza de video hace fallar la creación.
-   Y la imagen tiene que estar entre **4:5 y 1,91:1**: una foto vertical de historia (9:16) la
-   rechaza por proporción. Si la mejor pieza es un video, decilo en `razon` y elegí la mejor foto.
+   **Los tres formatos se pueden promocionar** —foto, carrusel y Reel—, así que elegí por
+   rendimiento y no por formato. Dos límites reales de Meta, igual: no mezcles formatos distintos
+   en la misma campaña (las ubicaciones dependen del formato: un Reel va a reels/historias y una
+   foto a feed/explorar, y no se pueden pedir las dos cosas a la vez); y una **foto** tiene que
+   estar entre **4:5 y 1,91:1**, así que una vertical de historia (9:16) no sirve como foto —los
+   videos verticales sí, porque van a reels.
 
    Si de verdad ninguna publicación sirve, dejá `pieza_ids` vacío y explicá en `razon`.
 3. **Audiencia** — geo + edad + género + intereses (nombres legibles; la resolución a IDs de

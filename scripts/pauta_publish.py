@@ -33,7 +33,11 @@ OPT_GOAL = {"OUTCOME_TRAFFIC": "LINK_CLICKS", "OUTCOME_ENGAGEMENT": "POST_ENGAGE
 # —OUTCOME_PERFIL— que por dentro es OUTCOME_TRAFFIC con destino perfil, porque para quien pide la
 # campaña la diferencia entre "llevar a la web" y "llevar al perfil" es la que importa.
 OBJ_META = {"OUTCOME_PERFIL": "OUTCOME_TRAFFIC"}
-DEST_TYPE = {"OUTCOME_PERFIL": "INSTAGRAM_PROFILE"}
+# Adónde manda el anuncio. Interacción va ON_POST —la interacción ocurre sobre el post— y sin esto
+# el ANUNCIO (no el conjunto) falla con "tu campaña debe incluir un conjunto de anuncios con un
+# objeto seleccionado para promocionar". Ojo: `promoted_object` no es el arreglo, el conjunto lo
+# rechaza. Verificado objetivo por objetivo el 26/08/2026.
+DEST_TYPE = {"OUTCOME_PERFIL": "INSTAGRAM_PROFILE", "OUTCOME_ENGAGEMENT": "ON_POST"}
 CTA_OK = {"LEARN_MORE", "SHOP_NOW", "BOOK_TRAVEL", "CONTACT_US", "SIGN_UP"}
 
 
@@ -175,6 +179,10 @@ def build_targeting(aud, token):
 # Aprendido a los golpes con la prueba de entrega:
 #   - "No se admiten anuncios por secuencia en la vista Explorar video": un carrusel/imagen NO
 #     puede ir en `reels`, que es una superficie de video.
+# Lo que SÍ se puede (verificado contra la API el 26/08/2026, objetivo por objetivo): promocionar
+# un REEL ya publicado con `source_instagram_media_id`, igual que una foto. No hace falta subir el
+# mp4 a Facebook — ese error venía de otra cosa, no del formato— y así el anuncio conserva los
+# likes y comentarios del post original, que es justo lo que lo hace rendir.
 #   - "Relación de aspecto no válida": en feed y explorar la imagen tiene que estar entre 4:5
 #     (0,8) y 1,91:1. Una foto 9:16 —lo normal para historias— no entra.
 UBICACIONES = {"image": ["stream", "explore"], "video": ["reels", "story"]}
@@ -223,16 +231,6 @@ def crear(cid):
     if not piezas:
         set_estado(cid, "error", "La campaña necesita al menos un post ya publicado como creativo.")
         return "sin creativo"
-    # Meta no deja promocionar un VIDEO de Instagram ya publicado sin subirlo antes a Facebook:
-    # "Al anunciar un video de Instagram existente, debes subirlo a Facebook antes de crear el
-    # anuncio". Se avisa acá y no en medio de la creación, con la campaña a medio armar.
-    if (d.get("tipo_media") or "image") == "video":
-        set_estado(cid, "error",
-                   "El creativo elegido es un video. Meta no permite promocionar un video de "
-                   "Instagram ya publicado sin subirlo antes a Facebook: elegí una foto o un "
-                   "carrusel.")
-        return "creativo video"
-
     objetivo = d["objetivo"]
     opt = OPT_GOAL.get(objetivo, "LINK_CLICKS")
     pres = d.get("presupuesto") or {}
@@ -277,8 +275,9 @@ def crear(cid):
             nombre_ad = f"{d['nombre']} — {pz['titulo']}"[:120] if pz["titulo"] else f"{d['nombre']} {i}"
             crea_p = {"name": nombre_ad, "object_id": page, "instagram_user_id": ig,
                       "source_instagram_media_id": pz["media"], "access_token": token}
-            # Con destino perfil el anuncio lleva al perfil de Instagram: agregarle un link externo
-            # sería mandarlo a otro lado que el que la campaña eligió.
+            # Los objetivos con destino propio (perfil de Instagram, o el post mismo en Interacción)
+            # ya definen adónde va el clic: agregarles un link externo sería mandar a la gente a otro
+            # lado que el que la campaña eligió.
             if objetivo not in DEST_TYPE:
                 crea_p["call_to_action"] = json.dumps({"type": cta, "value": {"link": link}})
             creative = graph("POST", f"{act}/adcreatives", crea_p)
