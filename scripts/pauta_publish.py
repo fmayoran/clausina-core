@@ -158,7 +158,8 @@ def build_targeting(aud, token):
          "age_min": int(aud.get("edad_min") or 18),
          "age_max": int(aud.get("edad_max") or 65),
          "publisher_platforms": ["instagram"],
-         "instagram_positions": ["stream", "story", "reels", "explore"],
+         # Las ubicaciones se ajustan después según el tipo de creativo (ver UBICACIONES).
+         "instagram_positions": ["stream", "explore"],
          "targeting_automation": {"advantage_audience": 0}}
     gen = aud.get("generos") or []
     if gen and "todos" not in gen:
@@ -167,6 +168,20 @@ def build_targeting(aud, token):
     if intereses:
         t["flexible_spec"] = [{"interests": intereses}]
     return t
+
+
+# Las ubicaciones dependen del CREATIVO, no del gusto. Meta rechaza el anuncio entero si no
+# coinciden, y el error aparece recién en Ads Manager: la campaña se crea "bien" y no entrega.
+# Aprendido a los golpes con la prueba de entrega:
+#   - "No se admiten anuncios por secuencia en la vista Explorar video": un carrusel/imagen NO
+#     puede ir en `reels`, que es una superficie de video.
+#   - "Relación de aspecto no válida": en feed y explorar la imagen tiene que estar entre 4:5
+#     (0,8) y 1,91:1. Una foto 9:16 —lo normal para historias— no entra.
+UBICACIONES = {"image": ["stream", "explore"], "video": ["reels", "story"]}
+
+
+def ubicaciones_para(tipo):
+    return UBICACIONES.get(tipo or "image", ["stream", "explore"])
 
 
 def crear(cid):
@@ -180,7 +195,8 @@ def crear(cid):
     row = psql("SELECT row_to_json(t) FROM (SELECT c.nombre,c.objetivo,c.audiencia,c.presupuesto,"
                "to_char(c.fecha_inicio,'YYYY-MM-DD') fi,to_char(c.fecha_fin,'YYYY-MM-DD') ff,"
                "c.url_destino,c.cta,c.meta_campaign_id,"
-               "(SELECT p.dominio_web FROM contenido.negocios p WHERE p.id=c.negocio_id) dominio "
+               "(SELECT p.dominio_web FROM contenido.negocios p WHERE p.id=c.negocio_id) dominio,"
+               "(SELECT m.tipo::text FROM contenido.media m WHERE m.pieza_id=c.pieza_id ORDER BY m.orden LIMIT 1) tipo_media "
                f"FROM contenido.pauta_campania c WHERE c.id='{cid}') t;")
     if not row:
         raise RuntimeError("campaña inexistente")
@@ -207,6 +223,15 @@ def crear(cid):
     if not piezas:
         set_estado(cid, "error", "La campaña necesita al menos un post ya publicado como creativo.")
         return "sin creativo"
+    # Meta no deja promocionar un VIDEO de Instagram ya publicado sin subirlo antes a Facebook:
+    # "Al anunciar un video de Instagram existente, debes subirlo a Facebook antes de crear el
+    # anuncio". Se avisa acá y no en medio de la creación, con la campaña a medio armar.
+    if (d.get("tipo_media") or "image") == "video":
+        set_estado(cid, "error",
+                   "El creativo elegido es un video. Meta no permite promocionar un video de "
+                   "Instagram ya publicado sin subirlo antes a Facebook: elegí una foto o un "
+                   "carrusel.")
+        return "creativo video"
 
     objetivo = d["objetivo"]
     opt = OPT_GOAL.get(objetivo, "LINK_CLICKS")
@@ -227,6 +252,7 @@ def crear(cid):
     try:
         # 2) Conjunto
         targeting = build_targeting(d.get("audiencia"), token)
+        targeting["instagram_positions"] = ubicaciones_para(d.get("tipo_media"))
         adset_p = {"name": d["nombre"], "campaign_id": camp_id, "status": "PAUSED",
                    "billing_event": "IMPRESSIONS", "optimization_goal": opt,
                    "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
