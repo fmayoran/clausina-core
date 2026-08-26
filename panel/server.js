@@ -2493,6 +2493,26 @@ app.delete('/api/piezas/:id/carrusel/:mid', soloAprobador, async (req, res) => {
   catch (e) { console.error('carrusel-del', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
 
+// --- Lo que el creativo aprendió de las correcciones, esperando el visto ---
+app.get('/api/aprendizaje', async (req, res) => {
+  try { res.json(await db.getAprendizajes(req.negocioId)); }
+  catch (e) { console.error('aprendizaje', e.message); res.status(500).json({ error: 'db' }); }
+});
+app.post('/api/aprendizaje/destilar', async (req, res) => {
+  try { const r = await db.pedirAprendizaje(req.negocioId); res.status(r.ok ? 200 : 409).json(r); }
+  catch (e) { console.error('aprendizaje-destilar', e.message); res.status(500).json({ ok: false }); }
+});
+// Aceptar es lo único que toca el brief, y por eso pide permiso de aprobador: cambia el criterio
+// con el que van a trabajar todos los agentes de ahí en más.
+app.post('/api/aprendizaje/:id/:accion', soloAprobador, async (req, res) => {
+  try {
+    const ac = req.params.accion;
+    if (!['aceptar', 'descartar'].includes(ac)) return res.status(400).json({ ok: false });
+    const r = await db.decidirAprendizaje(req.negocioId, req.params.id, ac === 'aceptar');
+    res.status(r.ok ? 200 : 409).json(r);
+  } catch (e) { console.error('aprendizaje-decidir', e.message); res.status(500).json({ ok: false }); }
+});
+
 // --- Material aportado al RECHAZAR una pieza (se adjunta al brief que la generó, para la corrección) ---
 app.get('/api/piezas/:id/materiales', async (req, res) => {
   try { res.json(await db.getMaterialesPorPieza(req.params.id)); }

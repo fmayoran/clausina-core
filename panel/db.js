@@ -4079,6 +4079,70 @@ async function quitarSlide(negocioId, piezaId, mediaId) {
   } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
 }
 
+/* ── Lo que el creativo aprendió, esperando el visto ──────────────────────────
+ * Un modelo no aprende por conversar: lo que queda, queda porque el sistema lo escribió en algún
+ * lado durable. Acá se juntan las reglas que salieron de repetir correcciones, y al aceptarlas
+ * pasan al brief del negocio —que es lo que leen todos los agentes—. El aprendizaje del creativo
+ * también pasa por aprobación humana.
+ */
+async function getAprendizajes(negocioId) {
+  const { rows } = await pool.query(
+    `SELECT id, estado, texto, porque, evidencia, creado_en, decidido_en
+       FROM contenido.aprendizaje WHERE negocio_id=$1
+      ORDER BY (estado='propuesto') DESC, creado_en DESC LIMIT 60`, [negocioId]);
+  const { rows: [t] } = await pool.query(
+    `SELECT count(*)::int AS n FROM contenido.aprendizaje_req
+      WHERE negocio_id=$1 AND estado IN ('pendiente','procesando')`, [negocioId]);
+  const { rows: [c] } = await pool.query(
+    `SELECT count(*)::int AS n FROM contenido.revisiones r
+       JOIN contenido.piezas pz ON pz.id=r.pieza_id
+      WHERE pz.negocio_id=$1 AND coalesce(r.motivo_rechazo,'') <> ''`, [negocioId]);
+  return { aprendizajes: rows, trabajando: t.n, correcciones: c.n };
+}
+
+async function pedirAprendizaje(negocioId) {
+  const { rows: [y] } = await pool.query(
+    `SELECT id FROM contenido.aprendizaje_req
+      WHERE negocio_id=$1 AND estado IN ('pendiente','procesando') LIMIT 1`, [negocioId]);
+  if (y) return { ok: false, error: 'ya_en_curso' };
+  const { rows: [r] } = await pool.query(
+    'INSERT INTO contenido.aprendizaje_req (negocio_id) VALUES ($1) RETURNING id', [negocioId]);
+  return { ok: true, id: r.id };
+}
+
+/**
+ * Aceptar una regla: se agrega al brief del negocio. Es el único momento en que el criterio de Fer
+ * cambia, y lo dispara él. Se agrega al final y se deja rastro de que vino del creativo, para que
+ * dentro de seis meses se sepa por qué está esa línea ahí.
+ */
+async function decidirAprendizaje(negocioId, id, aceptar) {
+  const cli = await pool.connect();
+  try {
+    await cli.query('BEGIN');
+    const { rows: [a] } = await cli.query(
+      `SELECT texto FROM contenido.aprendizaje
+        WHERE id=$1 AND negocio_id=$2 AND estado='propuesto' FOR UPDATE`, [id, negocioId]);
+    if (!a) { await cli.query('ROLLBACK'); return { ok: false, error: 'no_pendiente' }; }
+    if (aceptar) {
+      await cli.query(
+        `UPDATE contenido.negocio_perfil
+            SET brief_md = COALESCE(NULLIF(brief_md,''), '') ||
+                E'\n\n' || $2 || E'\n' || $3, actualizado_en = now()
+          WHERE negocio_id = $1`,
+        [negocioId, '## Aprendido de las correcciones', '- ' + a.texto]);
+      // El brief cambió: el contexto de marca en disco es copia derivada y hay que regenerarlo.
+      await cli.query(
+        `INSERT INTO contenido.contexto_sync_req (slug)
+         SELECT slug FROM contenido.negocios WHERE id=$1`, [negocioId]).catch(() => {});
+    }
+    await cli.query(
+      `UPDATE contenido.aprendizaje SET estado=$3, decidido_en=now() WHERE id=$1 AND negocio_id=$2`,
+      [id, negocioId, aceptar ? 'aceptado' : 'descartado']);
+    await cli.query('COMMIT');
+    return { ok: true };
+  } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
+}
+
 // Biblioteca de medios de la marca: piezas (de la base) + material aportado (media store).
 async function getBiblioteca(negocioId) {
   const piezas = (await pool.query(`
@@ -4652,6 +4716,7 @@ module.exports = {
   getLente, getLenteToken, guardarLente, getVerificacion, getSaludExterna,
   getContactos, guardarContactos, crearAvisoManual, getProgramaPlaylist, urlsDeMediaDelNegocio,
   reordenarCarrusel, agregarSlide, quitarSlide,
+  getAprendizajes, pedirAprendizaje, decidirAprendizaje,
   motivoInpublicable, reabrirPieza,
   pedirGeneracion, getGeneracion,
   FORMATOS, getGraficas, contarGraficasDescartadas, getGrafica, crearGrafica, iterarGrafica, ajustarEncuadre, renombrarGrafica, duplicarGrafica, estadoGrafica,

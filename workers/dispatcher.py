@@ -15,7 +15,7 @@ import jobqueue
 from db import psql, heartbeat
 
 # Procesos que maneja el dispatcher (los demás siguen en cron).
-MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "skill_sync", "contexto_sync", "campania_propuesta", "auditoria", "marca_capsula", "descubrimiento", "voz", "tarjeta", "marca_gen", "grafica"}
+MIGRATED = {"correccion", "propuesta", "revision", "brief", "landing", "bibliotecario", "campania", "campania_meta", "pauta_sync", "secrets_sync", "skill_sync", "contexto_sync", "campania_propuesta", "auditoria", "marca_capsula", "descubrimiento", "voz", "tarjeta", "marca_gen", "grafica", "aprendizaje"}
 
 # Cola de corrección: revisión rechazada, vigente de su pieza, no derivada a Fer.
 COLA_CORR = (
@@ -149,6 +149,19 @@ def det_tarjeta():
         if rid:
             jobs.append({"tipo": "tarjeta", "negocio_slug": slug,
                          "payload": {"reserva_id": rid}, "lock_key": f"tarjeta:{rid}"})
+    return jobs
+
+
+def det_aprendizaje():
+    # Destilación de lo que Fer corrigió: pedidos pendientes.
+    jobs = []
+    for row in _lines("SELECT r.id||'|'||COALESCE(p.slug,'') FROM contenido.aprendizaje_req r "
+                      "LEFT JOIN contenido.negocios p ON p.id=r.negocio_id "
+                      "WHERE r.estado='pendiente' ORDER BY r.creado_en"):
+        rid, slug = row.split('|', 1)
+        if rid and slug:
+            jobs.append({"tipo": "aprendizaje", "negocio_slug": slug,
+                         "payload": {"req_id": rid}, "lock_key": f"aprendizaje:{slug}"})
     return jobs
 
 
@@ -347,6 +360,7 @@ DETECTORS = {
     "pauta_sync": det_pauta_sync,
     "secrets_sync": det_secrets_sync,
     "skill_sync": det_skill_sync,
+    "aprendizaje": det_aprendizaje,
     "contexto_sync": det_contexto_sync,
     "campania_propuesta": det_campania_propuesta,
     "auditoria": det_auditoria,
