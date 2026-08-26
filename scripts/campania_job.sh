@@ -64,8 +64,13 @@ try:
     rendimiento=json.loads(_r.stdout) if _r.returncode==0 and _r.stdout.strip() else None
 except Exception:
     rendimiento=None
+# A dónde mandar a la gente. El link de reservas resuelve solo si va a la página o a WhatsApp
+# según cómo esté configurado el negocio, así que sirve siempre y no queda pegado a un canal.
+dominio = q(f"SELECT coalesce(dominio_web,'') FROM contenido.negocios WHERE id='{pid}'")
+destinos = {"web": f"https://{dominio}" if dominio else None,
+            "reservas": f"https://panel.clausina.ar/r/{slug}"}
 ctx={"instruccion":instr,"objetivo_marca":objetivo,"brief":brief.strip(),"estilo":estilo.strip(),
-     "moneda":moneda,"publicaciones":publicaciones,"rendimiento":rendimiento}
+     "moneda":moneda,"publicaciones":publicaciones,"rendimiento":rendimiento,"destinos":destinos}
 json.dump(ctx, open(f"/tmp/camp_ctx_{sid}.json","w"), ensure_ascii=False)
 print(f"ctx: {len(publicaciones)} publicaciones, moneda {moneda}")
 PY

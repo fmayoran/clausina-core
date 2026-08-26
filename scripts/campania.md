@@ -48,7 +48,14 @@ Leé además `contexto/CONTEXTO_MARCA.md` de la cápsula (estás parado en el re
    Meta se hace después). Ubicación por radio o ciudades cercanas al negocio.
 4. **Presupuesto** — chico y sensato. Preferí `diario`. Poné `moneda` = la de la cuenta.
 5. **Fechas** — `fecha_inicio` / `fecha_fin` (YYYY-MM-DD). Duración corta para probar (3–7 días).
-6. Si el objetivo es `OUTCOME_TRAFFIC`: `url_destino` (la web de la marca) + `cta`
+6. Si el objetivo es `OUTCOME_TRAFFIC`: `url_destino` + `cta`.
+   **Elegí el destino según lo que se pidió, no por defecto.** En `destinos` vienen los dos:
+   - `reservas` — cuando el pedido es **llenar mesas, turnos o cupos**. Es el que corresponde casi
+     siempre en gastronomía: resuelve solo si abre la página de reserva o el WhatsApp del negocio,
+     según cómo esté configurado, así que no queda pegado a un canal. CTA `CONTACT_US`.
+   - `web` — cuando el pedido es dar a conocer, contar algo o mostrar la carta. CTA `LEARN_MORE`.
+   Mandar a la home a alguien que buscabas que reservara **pierde la conversión en el último paso**:
+   la persona llegó, y ahora tiene que descubrir sola cómo reservar
    (uno de: LEARN_MORE, SHOP_NOW, BOOK_TRAVEL, CONTACT_US, SIGN_UP). Si no, dejalos null.
 7. **razon** — 2–4 frases: por qué esta campaña, estos creativos y este público tienen sentido.
    Si el rendimiento pesó en la elección, **decilo con el número** ("los carrusels rinden 9× la foto
