@@ -27,11 +27,17 @@ GRAPH = "https://graph.facebook.com/v21.0"
 PG_NAME_FILTER = "crm_pgvector.1."
 
 OPT_GOAL = {"OUTCOME_TRAFFIC": "LINK_CLICKS", "OUTCOME_ENGAGEMENT": "POST_ENGAGEMENT",
-            "OUTCOME_AWARENESS": "REACH", "OUTCOME_PERFIL": "PROFILE_VISIT"}
+            "OUTCOME_AWARENESS": "REACH", "OUTCOME_PERFIL": "LINK_CLICKS"}
 # "Ganar seguidores" no existe como objetivo en Meta. Lo más cerca es mandar al PERFIL de Instagram
-# y optimizar por visitas: los seguidores salen de ahí. Se modela como un objetivo propio nuestro
+# y optimizar por clics: los seguidores salen de ahí. Se modela como un objetivo propio nuestro
 # —OUTCOME_PERFIL— que por dentro es OUTCOME_TRAFFIC con destino perfil, porque para quien pide la
 # campaña la diferencia entre "llevar a la web" y "llevar al perfil" es la que importa.
+#
+# Quien va a optimizar por PROFILE_VISIT, que parece lo obvio: NO se puede. El conjunto se crea
+# bien y el ANUNCIO falla con "tu llamada a la acción no puede usarse para el objetivo de
+# rendimiento", que no nombra ni el objetivo ni el creativo. Reproducido el 27/08/2026 contra la
+# API: con destino perfil andan LINK_CLICKS, LANDING_PAGE_VIEWS y REACH, y sólo PROFILE_VISIT
+# falla. Quien manda al perfil es `destination_type`, no el objetivo de optimización.
 OBJ_META = {"OUTCOME_PERFIL": "OUTCOME_TRAFFIC"}
 # Adónde manda el anuncio. Interacción va ON_POST —la interacción ocurre sobre el post— y sin esto
 # el ANUNCIO (no el conjunto) falla con "tu campaña debe incluir un conjunto de anuncios con un
