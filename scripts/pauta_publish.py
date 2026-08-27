@@ -318,9 +318,24 @@ def crear(cid):
 
 
 def _set_status(cid, status, nuevo_estado):
+    """Activar o pausar TODOS los objetos de la campaña en Meta.
+
+    Los anuncios se leen de `pauta_campania_pieza`, no de `pauta_campania.meta_ad_id`: ese campo
+    guarda sólo el PRIMER anuncio, por compatibilidad con las campañas de un solo creativo. Cuando
+    la campaña pasó a ser multi-anuncio, activar seguía tocando uno solo y el resto quedaba en
+    PAUSED para siempre —con la campaña y el conjunto en ACTIVE, así que no se veía nada raro
+    salvo que un creativo no entregaba nunca—. Pasó con Mediodía Express el 27/08/2026: el Reel de
+    El Oso nunca llegó a mostrarse y parecía que alguien lo había pausado a mano.
+    """
     token = config_for_campania(cid)["token"]
-    ids = psql("SELECT coalesce(meta_campaign_id,'')||'|'||coalesce(meta_adset_id,'')||'|'||coalesce(meta_ad_id,'') "
+    ids = psql("SELECT coalesce(meta_campaign_id,'')||'|'||coalesce(meta_adset_id,'') "
                f"FROM contenido.pauta_campania WHERE id='{cid}';").split("|")
+    anuncios = psql("SELECT coalesce(meta_ad_id,'') FROM contenido.pauta_campania_pieza "
+                    f"WHERE campania_id='{cid}' AND meta_ad_id IS NOT NULL ORDER BY orden;").split("\n")
+    # Campañas viejas (un creativo) no tienen filas en pauta_campania_pieza: ahí vale meta_ad_id.
+    if not any(a.strip() for a in anuncios):
+        anuncios = [psql(f"SELECT coalesce(meta_ad_id,'') FROM contenido.pauta_campania WHERE id='{cid}';")]
+    ids += [a.strip() for a in anuncios]
     for oid in ids:
         if oid:
             try:
