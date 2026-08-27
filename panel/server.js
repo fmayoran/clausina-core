@@ -472,15 +472,18 @@ app.post('/api/publico/:slug/reserva', async (req, res) => {
 // ═══════════════════ FIN DE LA SUPERFICIE PÚBLICA ═════════════════════════════════════════
 
 const ASSETS_PUBLICOS = /\.(css|svg|png|jpe?g|ico|webp|woff2?)$/i;
-// El CSS NO puede cachearse 30 días. Esta ruta gana sobre la de abajo —que sí pone `no-cache`
-// para html/js/css— porque va primero, así que cada arreglo de estilo quedaba invisible en el
+// Ni el CSS ni el JS pueden cachearse 30 días. Esta ruta gana sobre la de abajo —que sí pone
+// `no-cache` para html/js/css— porque va primero, así que cada arreglo quedaba invisible en el
 // navegador hasta que venciera el caché. Pasó varias veces seguidas: se corregía el selector de
 // biblioteca, se deployaba, y del otro lado seguía viéndose igual.
+// El CSS se arregló primero y el JS quedó afuera por descuido, que es peor: un `panel.js` viejo no
+// se ve mal, se comporta mal, y el síntoma es "le doy y no hace nada".
 // Se revalida con ETag: si no cambió, la respuesta es un 304 vacío. El costo es un pedido
 // condicional por carga; el de equivocarse es no poder arreglar la pantalla.
 const estaticoPublico = express.static(path.join(__dirname, 'public'), {
   index: false, dotfiles: 'ignore',
-  setHeaders: (res, p) => res.setHeader('Cache-Control', /\.css$/.test(p) ? 'no-cache' : 'public, max-age=2592000'),
+  setHeaders: (res, p) => res.setHeader('Cache-Control',
+    /\.(css|js)$/.test(p) ? 'no-cache' : 'public, max-age=2592000'),
 });
 app.use((req, res, next) => {
   // El filtro va acá, no en las opciones de express.static: `static` sirve todo lo que encuentre.
@@ -1907,6 +1910,15 @@ app.post('/api/campanias/:id/reintentar', async (req, res) => {
 app.get('/api/campanias/creativos', async (req, res) => {
   try { res.json(await db.getCreativosDisponibles(req.negocioId)); }
   catch (e) { console.error('campania-creativos', e.message); res.status(500).json({ error: 'db' }); }
+});
+// Ajustes de una propuesta de pauta antes de aprobarla (presupuesto y ventana). No es PUT
+// /api/campanias/:id: ese path ya lo tomaba el alta de campañas de comunicación, que es otra cosa.
+app.post('/api/campanias/:id/ajustes', soloAprobador, async (req, res) => {
+  try {
+    const r = await db.editarPautaCampania(req.negocioId, req.params.id, req.body || {});
+    res.status(r.ok ? 200 : 409).json(r);
+  }
+  catch (e) { console.error('campania-ajustes', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/:id/creativo', async (req, res) => {
   try {

@@ -4698,6 +4698,60 @@ async function setCreativosCampania(negocioId, id, piezaIds) {
   } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
 }
 
+/**
+ * Ajustar presupuesto y ventana de una propuesta de pauta antes de aprobarla.
+ *
+ * Sólo mientras está en `propuesta` y no existe en Meta, por lo mismo que los creativos: después
+ * la campaña ya vive allá y editarla acá sería mentir. Y hay una razón dura para poder tocar esto
+ * ANTES: Meta no deja convertir un presupuesto diario en total una vez creada la campaña, así que
+ * si el creativo propuso "diario" y en realidad se quería un tope, el único momento de arreglarlo
+ * es este. Lo mismo con la fecha de fin: sin fecha, un presupuesto diario gasta para siempre —fue
+ * exactamente lo que dejó correr sola a la campaña de julio de 2026—.
+ */
+async function editarPautaCampania(negocioId, id, campos) {
+  const c = campos || {};
+  const set = [], val = [id, negocioId];
+  if (c.presupuesto !== undefined) {
+    const p = c.presupuesto || {};
+    const monto = Number(p.monto);
+    if (!Number.isFinite(monto) || monto <= 0) return { ok: false, error: 'monto' };
+    const tipo = p.tipo === 'total' ? 'total' : 'diario';
+    val.push(JSON.stringify({ tipo, monto, moneda: p.moneda || 'USD' }));
+    set.push(`presupuesto=$${val.length}::jsonb`);
+  }
+  for (const k of ['fecha_inicio', 'fecha_fin']) {
+    if (c[k] === undefined) continue;
+    const v = c[k] || null;
+    if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return { ok: false, error: k };
+    val.push(v);
+    set.push(`${k}=$${val.length}::date`);
+  }
+  if (!set.length) return { ok: false, error: 'nada' };
+
+  const { rows: [c0] } = await pool.query(
+    `SELECT presupuesto, fecha_inicio, fecha_fin FROM contenido.pauta_campania
+      WHERE id=$1 AND negocio_id=$2 AND estado='propuesta' AND meta_campaign_id IS NULL`,
+    [id, negocioId]);
+  if (!c0) return { ok: false, error: 'no_editable' };
+
+  // Un presupuesto TOTAL sin fecha de fin Meta directamente lo rechaza: se avisa acá y no cuando
+  // la campaña ya se está creando a medias.
+  const tipoFinal = c.presupuesto !== undefined
+    ? (c.presupuesto.tipo === 'total' ? 'total' : 'diario')
+    : ((c0.presupuesto || {}).tipo || 'diario');
+  const finFinal = c.fecha_fin !== undefined ? (c.fecha_fin || null) : c0.fecha_fin;
+  if (tipoFinal === 'total' && !finFinal) return { ok: false, error: 'total_sin_fin' };
+  if (finFinal) {
+    const ini = c.fecha_inicio !== undefined ? (c.fecha_inicio || null) : c0.fecha_inicio;
+    if (ini && String(finFinal) < String(ini).slice(0, 10)) return { ok: false, error: 'fin_antes' };
+  }
+
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.pauta_campania SET ${set.join(', ')}, actualizado_en=now()
+      WHERE id=$1 AND negocio_id=$2 AND estado='propuesta' AND meta_campaign_id IS NULL`, val);
+  return rowCount > 0 ? { ok: true } : { ok: false, error: 'no_editable' };
+}
+
 async function reintentarCampania(negocioId, id) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.pauta_campania SET estado='aprobada', resumen=NULL, actualizado_en=now()
@@ -4764,4 +4818,5 @@ module.exports = {
   getAuditoria, pedirAuditoria, estadoAuditoria, getPauta, getPautaEvolucion, pedirRefrescoPauta,
   crearSolicitudCampania, getPautaCampanias, aprobarCampania, rechazarCampania, descartarCampania,
   activarCampania, pausarCampania, reintentarCampania, getCreativosDisponibles, setCreativosCampania,
+  editarPautaCampania,
   health };

@@ -355,6 +355,26 @@ header .marcasel:hover{border-color:var(--fire);}
 .cm-name{font-size:1.3rem;font-weight:700;color:var(--white);margin:0;}
 .cm-razon{font-size:.95rem;color:#cfcbc2;line-height:1.4;margin:0;}
 .cm-media{display:block;width:100%;max-height:60vh;object-fit:contain;background:#000;border-radius:8px;border:1px solid var(--line);}
+/* Los creativos de una campaña: uno grande, varios en tira. Cada uno es un anuncio. */
+.cm-creas{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:8px;}
+.cm-creas.uno{grid-template-columns:1fr;}
+.cm-crea{position:relative;margin:0;min-width:0;}
+.cm-crea img,.cm-ph{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;background:#000;
+  border-radius:8px;border:1px solid var(--line);}
+.cm-creas.uno .cm-crea img{aspect-ratio:auto;max-height:60vh;object-fit:contain;}
+.cm-crea figcaption{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.06em;
+  color:var(--ash);text-align:center;margin-top:5px;}
+.cm-play{position:absolute;top:8px;left:8px;width:0;height:0;border-style:solid;
+  border-width:6px 0 6px 10px;border-color:transparent transparent transparent #fff;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.8));}
+/* Campos editables de la propuesta: se ven como el resto de la ficha, no como un formulario aparte. */
+.cm-inl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.cm-inl select,.cm-inl input{background:var(--coal);color:var(--white);border:1px solid var(--line);
+  border-radius:6px;padding:5px 7px;font:inherit;font-size:.9rem;min-width:0;}
+.cm-inl input[type=number]{width:82px;}
+.cm-inl input[type=date]{flex:1 1 130px;}
+.cm-cur,.cm-a{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--ash);}
+.cm-warn{font-size:.82rem;color:var(--ember);margin:0;}
 .cm-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;}
 @media(max-width:520px){.cm-grid{grid-template-columns:1fr;}}
 .cm-grid .cm-k{display:block;font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:3px;}

@@ -1213,26 +1213,54 @@ function openCamp(id){
   const cur=_CAMPCUR, [lbl,cls]=CAMP_EST[c.estado]||[c.estado,''];
   const fechas=(c.fecha_inicio||c.fecha_fin)?`${c.fecha_inicio||'—'} → ${c.fecha_fin||'—'}`:'—';
   const perm=c.pieza_permalink?` <a href="${esc(c.pieza_permalink)}" target="_blank" rel="noopener">ver post ↗</a>`:'';
-  let mediaHtml='';
-  if(c.pieza_url){
-    mediaHtml = (c.pieza_tipo==='video')
-      ? `<video class="cm-media" src="${esc(c.pieza_url)}" ${c.pieza_poster?`poster="${esc(c.pieza_poster)}"`:''} controls playsinline preload="metadata"></video>`
-      : `<img class="cm-media" src="${esc(c.pieza_url)}" onerror="this.style.display='none'">`;
-  }
+  // La campaña puede llevar VARIOS anuncios. Mostrar sólo la pieza principal hacía creer que se
+  // iba a promocionar una sola: se muestran todos los creativos que se van a crear.
+  const creas=(c.creativos&&c.creativos.length)?c.creativos
+    :(c.pieza_url?[{pieza_id:c.pieza_id,numero:c.pieza_numero,url:c.pieza_url,poster_url:c.pieza_poster,tipo:c.pieza_tipo}]:[]);
+  const uno=creas.length===1;
+  const mediaHtml=creas.length?`<div class="cm-creas${uno?' uno':''}">`+creas.map(k=>{
+    const src=(k.tipo==='video'&&k.poster_url)?k.poster_url:k.url;
+    const med=src?`<img src="${esc(src)}" onerror="this.style.visibility='hidden'">`:'<span class="cm-ph"></span>';
+    return `<figure class="cm-crea">${med}${k.tipo==='video'?'<span class="cm-play"></span>':''}
+      <figcaption>${k.numero?cod(k.numero):'—'}</figcaption></figure>`;
+  }).join('')+'</div>':'';
+  const editable=(c.estado==='propuesta');
+  const pr=c.presupuesto||{}, tipo=pr.tipo||'diario';
+  const presCell=editable?`
+      <div class="cm-ed">
+        <span class="cm-k">Presupuesto</span>
+        <div class="cm-inl">
+          <select id="ed-tipo"><option value="diario"${tipo==='diario'?' selected':''}>por día</option><option value="total"${tipo==='total'?' selected':''}>total</option></select>
+          <input id="ed-monto" type="number" min="1" step="1" value="${esc(String(pr.monto??''))}">
+          <span class="cm-cur">${esc(pr.moneda||cur||'USD')}</span>
+        </div>
+      </div>`
+    :`<div><span class="cm-k">Presupuesto</span><span class="cm-v">${presTxt(c.presupuesto,cur)}</span></div>`;
+  const fechasCell=editable?`
+      <div class="cm-ed">
+        <span class="cm-k">Ventana</span>
+        <div class="cm-inl">
+          <input id="ed-fi" type="date" value="${esc(c.fecha_inicio?String(c.fecha_inicio).slice(0,10):'')}">
+          <span class="cm-a">→</span>
+          <input id="ed-ff" type="date" value="${esc(c.fecha_fin?String(c.fecha_fin).slice(0,10):'')}">
+        </div>
+      </div>`
+    :`<div><span class="cm-k">Fechas</span><span class="cm-v">${esc(fechas)}</span></div>`;
   document.getElementById('camp-body').innerHTML=`
     <div class="cm-row"><span class="st ${cls}">${lbl}</span><span class="cm-obj">${OBJ[c.objetivo]||esc(c.objetivo)}</span></div>
     <h3 class="cm-name">${esc(c.nombre)}</h3>
     ${c.razon?`<p class="cm-razon">${esc(c.razon)}</p>`:''}
     ${mediaHtml}
     <div class="cm-grid">
-      <div><span class="cm-k">Creativo</span><span class="cm-v">${c.pieza_numero?cod(c.pieza_numero):'—'}${perm}</span></div>
-      <div><span class="cm-k">Presupuesto</span><span class="cm-v">${presTxt(c.presupuesto,cur)}</span></div>
-      <div><span class="cm-k">Fechas</span><span class="cm-v">${esc(fechas)}</span></div>
+      <div><span class="cm-k">${creas.length>1?`Creativos (${creas.length} anuncios)`:'Creativo'}</span><span class="cm-v">${creas.length?creas.map(k=>k.numero?cod(k.numero):'—').join(' · '):'—'}${uno?perm:''}</span></div>
+      ${presCell}
+      ${fechasCell}
       <div><span class="cm-k">Audiencia</span><span class="cm-v">${audTxt(c.audiencia)}</span></div>
       ${c.url_destino?`<div><span class="cm-k">Destino</span><span class="cm-v">${esc(c.url_destino)}${c.cta?' · '+esc(c.cta):''}</span></div>`:''}
-    </div>`;
+    </div>
+    ${editable&&tipo==='diario'&&!c.fecha_fin?`<p class="cm-warn">Sin fecha de fin, un presupuesto por día sigue gastando hasta que alguien lo pause.</p>`:''}`;
   const acts=document.getElementById('camp-acts');
-  if(c.estado==='propuesta') acts.innerHTML=`<button class="btn no" onclick="abrirCreativos()">Cambiar creativo</button><button class="btn del" onclick="descartarCamp('${c.id}')">Descartar</button><button class="btn ok" onclick="aprobarCamp('${c.id}')">Aprobar</button>`;
+  if(c.estado==='propuesta') acts.innerHTML=`<button class="btn no" onclick="abrirCreativos()">Cambiar creativos</button><button class="btn del" onclick="descartarCamp('${c.id}')">Descartar</button><button class="btn ok" onclick="aprobarCamp('${c.id}')">Aprobar</button>`;
   else if(['aprobada','activar','pausar','descartar'].includes(c.estado)) acts.innerHTML=`<span class="cm-note">El motor está aplicando el cambio en Meta… (se refresca solo)</span>`;
   else if(c.estado==='pausada') acts.innerHTML=`<span class="cm-note" style="flex:1">Creada <b>pausada</b> en Meta. No gasta hasta que la actives.</span><button class="btn ok" onclick="activarCamp('${c.id}')">Activar</button>`;
   else if(c.estado==='activa') acts.innerHTML=`<span class="cm-note" style="flex:1">Corriendo en Meta.</span><button class="btn no" onclick="pausarCamp('${c.id}')">Pausar</button>`;
@@ -1246,7 +1274,33 @@ async function campAction(id, accion, body){
     const d=await r.json(); if(d.ok){ closeCamp(); loadPauta(); return true; } toast('No se pudo',true); return false;
   }catch(e){ toast('Error de conexión',true); return false; }
 }
-async function aprobarCamp(id){ if(await campAction(id,'aprobar')) toast('Aprobada — se crea pausada en Meta'); }
+/**
+ * Guarda presupuesto y ventana de una propuesta. Devuelve false si el backend los rechaza, para
+ * que aprobar NO siga de largo: aprobar con un valor inválido crearía la campaña con el viejo.
+ */
+async function guardarAjustes(id){
+  const t=document.getElementById('ed-tipo'); if(!t) return true;  // no está en modo edición
+  const monto=parseFloat(document.getElementById('ed-monto').value);
+  if(!(monto>0)){ toast('El presupuesto tiene que ser mayor a cero',true); return false; }
+  const body={presupuesto:{tipo:t.value,monto,moneda:_CAMPCUR||'USD'},
+              fecha_inicio:document.getElementById('ed-fi').value||null,
+              fecha_fin:document.getElementById('ed-ff').value||null};
+  try{
+    const d=await fetch('api/campanias/'+id+'/ajustes',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)}).then(r=>r.json());
+    if(d.ok) return true;
+    toast({total_sin_fin:'Un presupuesto total necesita fecha de fin',
+           fin_antes:'La fecha de fin no puede ser anterior al inicio',
+           no_editable:'La campaña ya no se puede editar'}[d.error]||'No se pudo guardar',true);
+    return false;
+  }catch(e){ toast('Error de conexión',true); return false; }
+}
+async function aprobarCamp(id){
+  // Se guarda ANTES de aprobar: si no, lo que se tocó en pantalla se pierde y la campaña se crea
+  // en Meta con los valores viejos, que es lo peor de los dos mundos.
+  if(!await guardarAjustes(id)) return;
+  if(await campAction(id,'aprobar')) toast('Aprobada — se crea pausada en Meta');
+}
 async function descartarCamp(id){ if(await campAction(id,'descartar')) toast('Descartada'); }
 async function activarCamp(id){ if(!confirm('Vas a ACTIVAR la campaña en Meta: empieza a gastar según el presupuesto y las fechas. ¿Confirmás?')) return; if(await campAction(id,'activar')) toast('Activando en Meta…'); }
 async function pausarCamp(id){ if(await campAction(id,'pausar')) toast('Pausando en Meta…'); }
@@ -1260,6 +1314,8 @@ async function reintentarCamp(id){ if(await campAction(id,'reintentar')) toast('
 let _creaSel = [];
 const CREA_MAX = 5;
 async function abrirCreativos(){
+  // Ir a elegir creativos no debería tirar a la basura el presupuesto que se acaba de ajustar.
+  if(_CAMPOPEN) await guardarAjustes(_CAMPOPEN);
   const camp=_CAMPS.find(x=>x.id===_CAMPOPEN);
   _creaSel = (camp && camp.creativos && camp.creativos.length)
     ? camp.creativos.map(c=>c.pieza_id)
