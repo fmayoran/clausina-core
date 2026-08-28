@@ -110,6 +110,23 @@ for f in pagas:
         'ctr': round(clics / impr * 100, 2) if impr else None,
         'desde': f[6], 'hasta': f[7]})
 
+# Seguidores: la serie diaria de contenido.perfil_social_diario. Es lo único que responde si una
+# campaña con objetivo Seguidores sirvió — la pauta informa clics al perfil, no seguidores ganados.
+seg = psql(f"""
+  SELECT fecha, seguidores FROM contenido.perfil_social_diario d
+    JOIN contenido.negocios n ON n.id = d.negocio_id
+   WHERE n.slug = '{A.slug}' AND d.red = 'instagram'
+   ORDER BY fecha DESC LIMIT 30;""")
+serie = [(f[0], int(f[1])) for f in seg if len(f) >= 2 and f[1]]
+resumen['seguidores'] = None
+if serie:
+    hoy_f, hoy_n = serie[0]
+    r = {'fecha': hoy_f, 'total': hoy_n, 'dias': len(serie)}
+    for etq, k in (('var_7d', 7), ('var_30d', 30)):
+        if len(serie) > k:
+            r[etq] = hoy_n - serie[k][1]
+    resumen['seguidores'] = r
+
 resumen['aviso'] = (
     'MUESTRA CHICA: con menos de 20 publicaciones esto es una pista, no una regla. '
     'No descartes una idea sólo porque su formato rindió poco acá.'
@@ -144,5 +161,18 @@ if resumen['pauta']:
 else:
     print("\nEn PAUTA: todavía no hay nada promocionado con datos. Elegí los creativos por el "
           "rendimiento orgánico y por lo que empuje el objetivo.")
+
+s = resumen.get('seguidores')
+if s:
+    linea = f"\nSEGUIDORES: {s['total']} al {s['fecha']}"
+    for etq, txt in (('var_7d', '7 días'), ('var_30d', '30 días')):
+        if etq in s:
+            linea += f" · {s[etq]:+d} en {txt}"
+    print(linea)
+    if s['dias'] < 3:
+        print("  Serie recién arrancada: todavía no alcanza para leer el efecto de una campaña.")
+else:
+    print("\nSEGUIDORES: sin serie todavía. Sin ella no se puede saber si una campaña de "
+          "Seguidores funcionó: la pauta informa clics al perfil, no seguidores ganados.")
 
 print(f"\n{resumen['aviso']}")
