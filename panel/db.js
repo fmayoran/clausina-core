@@ -226,7 +226,8 @@ async function getProyectoId(slug) {
 // --- Perfil del proyecto (registro que consume el creativo): marca + slogan + logo + brief ---
 async function getPerfil(negocioId) {
   const { rows: [r] } = await pool.query(
-    `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email, p.whatsapp, p.gestion, p.prefijo,
+    `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email, p.whatsapp,
+            p.whatsapp_directo, p.gestion, p.prefijo,
             pp.slogan, pp.logo, pp.logo_claro, pp.brief_md, pp.estilo_md, pp.referencias_md, pp.actualizado_en,
             pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id,
             (pp.meta_ads_token_enc IS NOT NULL) AS meta_ads_token_set,
@@ -951,12 +952,14 @@ async function guardarPerfil(negocioId, d) {
        ig_user_id = CASE WHEN $10 THEN $4 ELSE ig_user_id END,
        telegram_chat_id = CASE WHEN $11 THEN $5 ELSE telegram_chat_id END,
        email = CASE WHEN $12 THEN $6 ELSE email END,
-       whatsapp = CASE WHEN $13 THEN $7 ELSE whatsapp END
+       whatsapp = CASE WHEN $13 THEN $7 ELSE whatsapp END,
+       whatsapp_directo = CASE WHEN $15 THEN $14 ELSE whatsapp_directo END
      WHERE id=$1`,
     [negocioId, q('ig_handle'), q('dominio_web'), q('ig_user_id'), q('telegram_chat_id'),
      q('email'), q('whatsapp'),
      d.ig_handle !== undefined, d.dominio_web !== undefined, d.ig_user_id !== undefined,
-     d.telegram_chat_id !== undefined, d.email !== undefined, d.whatsapp !== undefined]);
+     d.telegram_chat_id !== undefined, d.email !== undefined, d.whatsapp !== undefined,
+     q('whatsapp_directo'), d.whatsapp_directo !== undefined]);
   if (typeof d.prefijo === 'string') {
     const pf = d.prefijo.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
     if (pf) { await pool.query('UPDATE contenido.negocios SET prefijo=$2 WHERE id=$1', [negocioId, pf]); _negociosAt = 0; }
@@ -3040,7 +3043,7 @@ async function secretoDeNumero(phoneId) {
 // Qué negocio es dueño de un número, para saber a quién le llegó el mensaje.
 async function negocioPorPhoneId(phoneId) {
   const { rows: [r] } = await pool.query(
-    `SELECT p.id, p.slug, p.nombre FROM contenido.negocios p
+    `SELECT p.id, p.slug, p.nombre, p.whatsapp_directo FROM contenido.negocios p
        JOIN contenido.negocio_perfil pp ON pp.negocio_id = p.id
       WHERE pp.wa_phone_id = $1`, [String(phoneId || '')]);
   return r || null;

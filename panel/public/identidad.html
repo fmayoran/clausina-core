@@ -284,7 +284,9 @@
           </div>
           <div><label for="dominio_web">Web <span class="hint">— dominio</span></label><input type="text" id="dominio_web" placeholder="marca.ar"></div>
           <div><label for="email">Email <span class="hint">— del negocio</span></label><input type="text" id="email" placeholder="hola@marca.ar"></div>
-          <div><label for="whatsapp">WhatsApp</label><input type="text" id="whatsapp" placeholder="+54 9 11 ..."></div>
+          <div><label for="whatsapp">WhatsApp <span class="hint">— por donde atiende el asistente</span></label><input type="text" id="whatsapp" placeholder="+54 9 11 ..."></div>
+          <div><label for="whatsapp_directo">WhatsApp directo <span class="hint">— la línea del local, atendida por una persona</span></label><input type="text" id="whatsapp_directo" placeholder="+54 9 11 ..."></div>
+          <div class="hint" style="margin:-4px 0 4px;">Si lo cargás, el asistente lo ofrece cuando alguien pide hablar con una persona y cuando no supo responder una consulta.</div>
           <div><label for="telegram_chat_id">Telegram chat ID</label><input type="text" id="telegram_chat_id"></div>
           <div><label for="prefijo">Prefijo de código <span class="hint">— ej. CF-0260</span></label><input type="text" id="prefijo" maxlength="4" placeholder="CF" style="text-transform:uppercase"></div>
           <div>
@@ -599,7 +601,7 @@ async function guardarFicha(confirmar) {
 }
 
 /* ═══════════ Perfil: marca, brief, estilo, redes ═══════════ */
-const CAMPOS = ['nombre','slogan','ig_handle','dominio_web','email','whatsapp','ig_user_id',
+const CAMPOS = ['nombre','slogan','ig_handle','dominio_web','email','whatsapp','whatsapp_directo','ig_user_id',
                 'telegram_chat_id','logo','logo_claro','brief_md','estilo_md','referencias_md',
                 'meta_ads_account_id','meta_ads_page_id','meta_ads_ig_id'];
 function fval(id) { const e = $(id); return e ? String(e.value || '').trim() : ''; }

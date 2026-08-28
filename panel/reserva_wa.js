@@ -17,6 +17,7 @@ const db = require('./db');
 const voz = require('./voz');
 const faq = require('./faq');
 const inv = require('./invitaciones');
+const tel = require('./telefono');
 
 const DOW = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -39,6 +40,16 @@ const cuantos = u => ((UNI[u] || UNI.personas)[2] === 'm' ? 'cuántos' : 'cuánt
 const SALIR = /^(cancelar|salir|basta|no|nada|chau)$/i;
 // Agradecer o decir "listo" se acusa recibo y se deja todo como está: no es una orden.
 const GRACIAS = /^[¡\s]*(muchas\s+)?(gracias|graciass+|genial|perfecto|barbaro|bárbaro|dale|listo|ok|oka?y|buenisimo|buenísimo)[\s,.!¡]*(gracias)?[\s.!¡]*$/i;
+// Pedido de hablar con una persona. Va ANTES que la FAQ y que la reserva: quien pide un humano no
+// quiere una respuesta enlatada, y contestarle con uno de los atajos es exactamente el momento en
+// que la gente abandona. Sólo dispara si el negocio cargó su línea directa.
+const HABLAR_DIRECTO = new RegExp(
+  '(hablar|comunicar\\w*|contactar\\w*|llamar|atiend\\w+|atenci[oó]n)\\s+' +
+  '((con|al?)\\s+)?(una?\\s+)?(persona|humano|alguien|ustedes|encargad\\w+|' +
+  '(el\\s+)?local|(el\\s+)?resta\\w*|(el\\s+)?negocio)' +
+  '|n[uú]mero\\s+(de\\s+)?(tel[eé]fono|directo|del\\s+local)' +
+  '|tel[eé]fono\\s+(del\\s+)?local' +
+  '|quiero\\s+hablar\\s+con', 'i');
 // Un saludo suelto ARRANCA DE CERO, esté donde esté la conversación. Le pasó a una charla real:
 // se preguntó por la carta, se contestó, y quince minutos después un "Hola" cayó en el paso que
 // venía de antes —donde cualquier texto significa "sí, quiero reservar"— y el bot se puso a pedir
@@ -178,6 +189,13 @@ async function atender(negocio, mensaje) {
     return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil, {});
   }
 
+  // Pedir hablar con una persona se atiende ANTES del paso: puede pasar en cualquier momento, y
+  // más todavía en medio de una reserva que se trabó. La conversación se deja como está —quien
+  // pide el teléfono no está cancelando lo que venía haciendo—.
+  if (negocio.whatsapp_directo && HABLAR_DIRECTO.test(entrada)) {
+    if (await ofrecerDirecto(cfg, negocio, waId)) return true;
+  }
+
   const paso = conv ? conv.paso : null;
   let datos = conv ? (conv.datos || {}) : {};
 
@@ -280,6 +298,24 @@ async function atender(negocio, mensaje) {
     return true;
   }
   return false;
+}
+
+/**
+ * Pasa la línea humana del local como botón que abre el chat directo.
+ *
+ * Va a `wa.me`, no al número escrito: el teléfono suelto obliga a copiarlo, salir de WhatsApp y
+ * pegarlo, y el botón abre la conversación de una. Es el mismo criterio que los atajos con link.
+ * Devuelve false si el negocio no cargó el número, para que quien llama siga con lo suyo.
+ */
+async function ofrecerDirecto(cfg, negocio, waId, prefacio) {
+  const num = tel.normalizar(negocio.whatsapp_directo || '');
+  if (!num) return false;
+  const cuerpo = prefacio || `Te paso el WhatsApp de ${negocio.nombre} para que hables directo con el local.`;
+  const r = await decirOpciones(cfg, waId, cuerpo, ['Abrir chat'], negocio.id,
+    () => wa.enviarBotonUrl(waId, cuerpo, 'Abrir chat', `https://wa.me/${num}`, cfg));
+  // Si el botón no sale, va el número escrito: peor un número para copiar que ningún contacto.
+  if (!r.ok) await decir(cfg, waId, `${cuerpo}\n${tel.lindo(negocio.whatsapp_directo)}`, negocio.id);
+  return true;
 }
 
 /** Los atajos que el negocio dejó prendidos, en el orden en que los cargó. */
@@ -468,6 +504,13 @@ async function recibirConsulta(cfg, negocio, waId, texto, canal) {
   // El mensaje ya se guarda en la bitácora del webhook: acá sólo se acusa recibo. Prometer un
   // plazo que no controlamos sería peor que no prometer nada.
   await decir(cfg, waId, 'Gracias, ya le pasé tu mensaje al equipo. Te van a responder por acá.', negocio.id);
+  // El mejor momento para ofrecer la línea humana es justo este: el bot no supo, y la alternativa
+  // a esperar sin plazo es escribirle al local. Se ofrece, no se reemplaza — la consulta ya quedó
+  // registrada, así que quien prefiera esperar la respuesta por acá la va a recibir igual.
+  if (negocio.whatsapp_directo) {
+    await ofrecerDirecto(cfg, negocio, waId,
+      'Si es algo urgente, podés escribirle directo al local.');
+  }
   return true;
 }
 
