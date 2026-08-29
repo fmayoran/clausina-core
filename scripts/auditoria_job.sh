@@ -98,14 +98,14 @@ NEGOCIO ACTIVO: '$slug'. Leé su contexto ANTES de escribir nada:
 MEDICIONES YA HECHAS (no las recalcules, no las contradigas):
   Web:       $DIRW/web.json
   Instagram: $DIRW/ig.json
-  Pauta:     $DIRW/pauta.json   (si trae 'vacio': true, es que todavía no hay pauta con datos)
+  Pauta Meta: $DIRW/pauta.json   (si trae 'vacio': true, es que todavía no hay pauta con datos)
 
 CÓMO LEER LOS BENCHMARKS: cada JSON trae un bloque 'metricas' donde CADA métrica ya viene
 comparada, con su 'valor', su 'rango', su 'veredicto' (bien/atencion/mal/sin_dato), su 'texto' y
 su 'fuente'. Usá ESOS veredictos tal cual. NO inventes rangos de referencia ni cites benchmarks de
 memoria: si una métrica no está en 'metricas', no tiene benchmark y se informa sin comparar.
 
-DE LA PAUTA, lo que importa: el CTR comparable es el DE LINK ('ctr_link'), no el total —el total
+DE LA PAUTA META (hoy el único canal de pauta; nombralo así, 'Pauta Meta'), lo que importa: el CTR comparable es el DE LINK ('ctr_link'), no el total —el total
 cuenta cualquier toque y da 1,5x-2x más alto—. Los avisos se comparan entre sí por CTR de link y
 CPM, NUNCA por impresiones o alcance: eso lo define el presupuesto, no el creativo. Si el JSON
 trae 'ganador', ese es el creativo que gana y ya está validado por volumen; si no lo trae, es

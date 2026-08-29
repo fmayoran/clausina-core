@@ -64,6 +64,37 @@
     background:color-mix(in srgb,var(--u-bien,#5ec27a) 10%,transparent);
     border-radius:9px;padding:10px 12px;margin-bottom:16px;font-size:.87rem;}
   .ganador.sin{border-color:var(--u-line);background:none;color:var(--u-mut);}
+  /* Tablero: una tarjeta por sección auditada. El informe entero en una sola página no se leía;
+     acá se entra por el titular y el detalle queda a un clic. */
+  .dash{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px;}
+  .dcard{background:#0c0c0a;border:1px solid var(--line);border-radius:12px;padding:17px 18px;
+    text-align:left;width:100%;cursor:pointer;font:inherit;color:inherit;display:flex;
+    flex-direction:column;gap:10px;transition:border-color .15s;}
+  .dcard:hover{border-color:color-mix(in srgb,#1ec9ff 45%,var(--line));}
+  .dcard[disabled]{cursor:default;opacity:.55;}
+  .dcard[disabled]:hover{border-color:var(--line);}
+  .dc-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
+  .dc-tt{font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;font-weight:700;color:var(--white);}
+  .dc-sub{font-family:'IBM Plex Mono',monospace;font-size:.58rem;color:var(--ash);}
+  .dc-big{font-family:'Barlow Condensed',sans-serif;font-size:2.5rem;line-height:.95;color:var(--white);}
+  .dc-big small{font-size:.95rem;color:var(--ash);font-family:'IBM Plex Mono',monospace;margin-left:5px;}
+  .dc-lab{font-family:'IBM Plex Mono',monospace;font-size:.56rem;text-transform:uppercase;
+    letter-spacing:.05em;color:var(--ash);margin-top:-6px;}
+  .dc-cw{position:relative;height:96px;}
+  /* Semáforo agregado: cuántas métricas de la sección están bien, en atención o mal. */
+  .sem{display:flex;gap:5px;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--ash);}
+  .sem i{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .sem .b{background:#5ec27a;} .sem .a{background:#E0A526;} .sem .m{background:var(--fire,#FF6B4A);}
+  .dc-ir{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:#1ec9ff;margin-top:2px;}
+  /* Navegación del detalle */
+  .volver{background:none;border:1px solid var(--line);border-radius:8px;color:var(--ash);
+    font:inherit;font-size:.78rem;padding:6px 12px;cursor:pointer;margin-bottom:16px;}
+  .volver:hover{color:var(--white);border-color:var(--ash);}
+  /* Las conclusiones no se muestran de entrada: son el cierre, no la portada. */
+  .verreco{display:block;width:100%;margin-top:18px;background:none;border:1px dashed var(--line);
+    border-radius:10px;color:#1ec9ff;font:inherit;font-size:.9rem;padding:13px;cursor:pointer;}
+  .verreco:hover{border-color:#1ec9ff;background:color-mix(in srgb,#1ec9ff 7%,transparent);}
+  .oculto{display:none;}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
   .kpi{background:#0c0c0a;border:1px solid var(--line);border-radius:9px;padding:14px 16px;}
   .kpi b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:1.9rem;color:var(--white);line-height:1;}
@@ -101,7 +132,8 @@
     <button class="gen" id="b-gen" onclick="generar()">Generar auditoría</button>
   </div>
   <p class="intro">Mide la web contra el sitio publicado y el Instagram contra lo que ya se
-    publicó, lo compara con el benchmark y deja recomendaciones priorizadas.</p>
+    publicó y la pauta contra lo que se invirtió en Meta. Cada sección se compara con su
+    benchmark y cierra con recomendaciones priorizadas.</p>
   <div id="estado-aud"></div>
   <div class="wrap" id="wrap"><div class="empty">Cargando auditoría…</div></div>
 </main></div>
@@ -124,6 +156,15 @@ function md(t){ if(!t) return '';
     else if(l.startsWith('- ')){if(il!=='ul'){cl();h+='<ul>';il='ul';}h+='<li>'+l.slice(2)+'</li>';}
     else{cl();h+='<p>'+l+'</p>';} } cl(); return h; }
 function kpi(val,label,bm,cls){ return `<div class="kpi ${cls||''}"><b>${val}</b><span>${label}</span>${bm?`<div class="bm">${bm}</div>`:''}</div>`; }
+
+// Los gráficos se guardan para destruirlos al cambiar de vista: Chart.js no deja reusar un
+// canvas con un gráfico vivo encima, y al volver al tablero la segunda vez tiraba error y dejaba
+// la pantalla en blanco.
+let WEB=null, IG=null, PAUTA=null;
+let CHARTS=[];
+const mk=(id,cfg)=>{ const el=document.getElementById(id); if(!el) return null;
+  const c=new Chart(el,cfg); CHARTS.push(c); return c; };
+function limpiarCharts(){ CHARTS.forEach(c=>{try{c.destroy();}catch(e){}}); CHARTS=[]; }
 
 Chart.defaults.color='#8a8a82'; Chart.defaults.font.family="'IBM Plex Mono', monospace"; Chart.defaults.font.size=10;
 const GRID={color:'rgba(255,255,255,0.06)'};
@@ -170,7 +211,7 @@ function webHTML(a){
     <div class="card"><h3>Categorías</h3><div class="cw"><canvas id="cw-cat"></canvas></div></div>
     <div class="card"><h3>Checklist técnico</h3><div class="chk">${(k.checklist||[]).map(c=>`<div class="chk-row"><span class="d ${c.ok?'ok':'no'}"></span><span class="ct">${esc(c.cat)}</span><span>${esc(c.item)}</span><span class="dt">${esc(c.detalle||'')}</span></div>`).join('')}</div></div>
   </div>
-  <div class="reco">${md(a.recomendaciones)}</div>`;
+  `;
 }
 function igHTML(a){
   if(!a||!a.kpis) return `<div class="sect"><span class="t">Instagram</span></div><div class="nodata">— Sin datos aún. —</div>`;
@@ -192,7 +233,7 @@ function igHTML(a){
     <div class="card"><h3>Mix de formatos</h3><div class="cw"><canvas id="c-mix"></canvas></div></div>
     <div class="card"><h3>Top posts (engag./alcance)</h3><div class="cw"><canvas id="c-top"></canvas></div></div>
   </div>
-  <div class="reco">${md(a.recomendaciones)}</div>`;
+  `;
 }
 // La pauta: lo que se compró. Nunca se comparan avisos por alcance —eso lo define el presupuesto—,
 // sino por CTR de link y CPM, que es lo único que dice qué creativo funciona.
@@ -207,7 +248,7 @@ function pautaHTML(a){
       <td class="n">${v.ctr_link!=null?v.ctr_link+'%':'—'}</td>
       <td class="n">${v.cpm!=null?'US$'+v.cpm:'—'}</td>
     </tr>`).join('');
-  return `<div class="sect"><span class="t">Pauta</span><span class="m">${esc(k.periodo||'')} · US$${g.gasto} invertidos</span></div>
+  return `<div class="sect"><span class="t">Pauta Meta</span><span class="m">${esc(k.periodo||'')} · US$${g.gasto} invertidos</span></div>
   <div class="bm">${(k.metricas||[]).map(bmCard).join('')}</div>
   ${fuentes(k.metricas)}
   <div class="kpis">
@@ -225,44 +266,128 @@ function pautaHTML(a){
       <th class="n">CTR link</th><th class="n">CPM</th></tr></thead><tbody>${filas}</tbody></table>
     <div class="fuente" style="margin:8px 0 0">Se comparan por CTR de link y CPM. El alcance no compara nada: lo define el presupuesto.</div>
   </div>
-  <div class="reco">${md(a.recomendaciones)}</div>`;
+  `;
 }
 
 function renderWeb(a){ if(!a||!a.kpis) return; const c=a.kpis.categorias||[];
-  new Chart(document.getElementById('cw-cat'),{type:'bar',data:{labels:c.map(x=>x.nombre),
+  mk('cw-cat',{type:'bar',data:{labels:c.map(x=>x.nombre),
     datasets:[{label:'% OK',data:c.map(x=>x.pct),backgroundColor:c.map(x=>x.pct>=80?GR:(x.pct>=50?GD:OR))}]},
     options:{maintainAspectRatio:false,scales:{y:{grid:GRID,min:0,max:100},x:{grid:{display:false}}},plugins:{legend:{display:false}}}}); }
 function renderIg(a){ if(!a||!a.kpis) return; const k=a.kpis;
   const cad=k.cadencia||[];
-  new Chart(document.getElementById('c-cad'),{data:{labels:cad.map(x=>x.mes),datasets:[
+  mk('c-cad',{data:{labels:cad.map(x=>x.mes),datasets:[
     {type:'bar',label:'Posts',data:cad.map(x=>x.posts),backgroundColor:'rgba(30,201,255,0.55)',yAxisID:'y'},
     {type:'line',label:'Alcance prom',data:cad.map(x=>x.reach_prom),borderColor:OR,backgroundColor:OR,tension:.3,yAxisID:'y1'}]},
     options:{maintainAspectRatio:false,scales:{y:{position:'left',grid:GRID},y1:{position:'right',grid:{display:false}},x:{grid:{display:false}}},plugins:{legend:{labels:{boxWidth:10}}}}});
   const fmt=k.por_formato||[];
-  new Chart(document.getElementById('c-fmt'),{type:'bar',data:{labels:fmt.map(x=>x.formato),datasets:[
+  mk('c-fmt',{type:'bar',data:{labels:fmt.map(x=>x.formato),datasets:[
     {label:'Alcance prom',data:fmt.map(x=>x.reach_prom),backgroundColor:CY},
     {label:'Vistas prom',data:fmt.map(x=>x.views_prom),backgroundColor:'rgba(255,119,0,0.7)'}]},
     options:{maintainAspectRatio:false,scales:{y:{grid:GRID},x:{grid:{display:false}}},plugins:{legend:{labels:{boxWidth:10}}}}});
-  new Chart(document.getElementById('c-mix'),{type:'doughnut',data:{labels:fmt.map(x=>x.formato),datasets:[{data:fmt.map(x=>x.n),backgroundColor:[CY,OR,GR,GD]}]},
+  mk('c-mix',{type:'doughnut',data:{labels:fmt.map(x=>x.formato),datasets:[{data:fmt.map(x=>x.n),backgroundColor:[CY,OR,GR,GD]}]},
     options:{maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:12}}}}});
   const top=k.top||[];
-  new Chart(document.getElementById('c-top'),{type:'bar',data:{labels:top.map(x=>x.fecha+' · '+x.formato),datasets:[{label:'ER %',data:top.map(x=>x.er_pct),backgroundColor:GR}]},
+  mk('c-top',{type:'bar',data:{labels:top.map(x=>x.fecha+' · '+x.formato),datasets:[{label:'ER %',data:top.map(x=>x.er_pct),backgroundColor:GR}]},
     options:{indexAxis:'y',maintainAspectRatio:false,scales:{x:{grid:GRID},y:{grid:{display:false}}},plugins:{legend:{display:false}}}});
 }
+// ── Tablero ──────────────────────────────────────────────────────────────────────────────────
+// Cuenta cuántas métricas de una sección están bien, en atención o mal. Es el resumen más honesto
+// que se puede dar de un vistazo: no promedia cosas que no se promedian.
+function semaforo(ms){
+  const c={bien:0,atencion:0,mal:0};
+  (ms||[]).forEach(m=>{ if(c[m.veredicto]!==undefined) c[m.veredicto]++; });
+  const p=[];
+  if(c.bien) p.push(`<i class="b"></i>${c.bien}`);
+  if(c.atencion) p.push(`<i class="a"></i>${c.atencion}`);
+  if(c.mal) p.push(`<i class="m"></i>${c.mal}`);
+  return p.length?`<span class="sem">${p.join(' ')}</span>`:'';
+}
+
+function dcard(id, titulo, sub, valor, unidad, etiqueta, ms, hay){
+  if(!hay) return `<button class="dcard" disabled>
+    <div class="dc-top"><span class="dc-tt">${esc(titulo)}</span></div>
+    <div class="dc-lab">Sin datos todavía</div></button>`;
+  return `<button class="dcard" onclick="mostrar('${id}')">
+    <div class="dc-top"><span class="dc-tt">${esc(titulo)}</span><span class="dc-sub">${esc(sub||'')}</span></div>
+    <div class="dc-big">${esc(valor)}${unidad?`<small>${esc(unidad)}</small>`:''}</div>
+    <div class="dc-lab">${esc(etiqueta)}</div>
+    ${semaforo(ms)}
+    <div class="dc-cw"><canvas id="d-${id}"></canvas></div>
+    <div class="dc-ir">Ver el detalle →</div></button>`;
+}
+
+function dashHTML(){
+  const kw=(WEB&&WEB.kpis)||null, ki=(IG&&IG.kpis)||null, kp=(PAUTA&&PAUTA.kpis)||null;
+  const gi=(ki&&ki.global)||{}, gp=(kp&&kp.global)||{};
+  return `<div class="dash">
+    ${dcard('web','Web', kw?esc(kw.dominio||''):'', kw?kw.score:'', kw?'/100':'', 'Salud técnica',
+            null, !!kw)}
+    ${dcard('instagram','Instagram', ki?(gi.posts+' posts'):'', ki?nfmt(ki.followers):'', '',
+            'Seguidores', ki&&ki.metricas, !!(ki&&ki.global))}
+    ${dcard('pauta','Pauta Meta', kp?esc(kp.periodo||''):'', kp?('US$'+gp.gasto):'', '',
+            'Invertido', kp&&kp.metricas, !!(kp&&kp.global))}
+  </div>`;
+}
+
+// Los gráficos del tablero son de RESUMEN: uno por sección, sin ejes ni leyenda. Su trabajo es
+// mostrar la forma de la serie, no que se lean valores — para eso está el detalle.
+const MINI={maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:false}},
+  scales:{x:{display:false},y:{display:false}},elements:{point:{radius:0}}};
+function renderDash(){
+  const kw=(WEB&&WEB.kpis), ki=(IG&&IG.kpis), kp=(PAUTA&&PAUTA.kpis);
+  if(kw){ const c=kw.categorias||[];
+    mk('d-web',{type:'bar',data:{labels:c.map(x=>x.nombre),
+      datasets:[{data:c.map(x=>x.pct!=null?x.pct:x.score),backgroundColor:CY,borderRadius:3}]},options:MINI}); }
+  if(ki&&ki.global){ const cad=ki.cadencia||[];
+    mk('d-instagram',{type:'bar',data:{labels:cad.map(x=>x.mes),
+      datasets:[{data:cad.map(x=>x.reach_prom),backgroundColor:GR,borderRadius:3}]},options:MINI}); }
+  if(kp&&kp.global){ const d=kp.por_dia||[];
+    mk('d-pauta',{type:'line',data:{labels:d.map(x=>x.fecha),
+      datasets:[{data:d.map(x=>x.gasto),borderColor:CY,backgroundColor:'rgba(30,201,255,.16)',
+                 fill:true,tension:.3,borderWidth:2}]},options:MINI}); }
+}
+
+// ── Navegación ───────────────────────────────────────────────────────────────────────────────
+// Tres niveles: tablero -> detalle de una sección -> conclusiones. Las conclusiones van detrás de
+// un botón a propósito: son el cierre del informe, no la portada, y mostrarlas siempre era lo que
+// hacía que la página no terminara nunca.
+let VISTA='dash';
+function mostrar(v){
+  VISTA=v; limpiarCharts();
+  const w=document.getElementById('wrap');
+  if(v==='dash'){ w.innerHTML=dashHTML(); renderDash(); window.scrollTo(0,0); return; }
+  const a = v==='web'?WEB : v==='instagram'?IG : PAUTA;
+  const cuerpo = v==='web'?webHTML(a) : v==='instagram'?igHTML(a) : pautaHTML(a);
+  const reco = (a&&a.recomendaciones)
+    ? `<button class="verreco" id="b-reco" onclick="toggleReco()">Ver conclusiones y recomendaciones</button>
+       <div class="reco oculto" id="caja-reco">${md(a.recomendaciones)}</div>`
+    : `<div class="nodata">Esta sección todavía no tiene conclusiones escritas.</div>`;
+  w.innerHTML=`<button class="volver" onclick="mostrar('dash')">← Volver al tablero</button>${cuerpo}${reco}`;
+  if(v==='web') renderWeb(a); else if(v==='instagram') renderIg(a);
+  window.scrollTo(0,0);
+}
+function toggleReco(){
+  const c=document.getElementById('caja-reco'), b=document.getElementById('b-reco');
+  if(!c) return;
+  const abierto=!c.classList.contains('oculto');
+  c.classList.toggle('oculto', abierto);
+  b.textContent = abierto ? 'Ver conclusiones y recomendaciones' : 'Ocultar conclusiones';
+  if(!abierto) c.scrollIntoView({behavior:'smooth',block:'start'});
+}
+window.mostrar=mostrar; window.toggleReco=toggleReco;
+
 async function load(){
-  let web=null, ig=null, pauta=null;
   try{
     const [rw,ri,rp]=await Promise.all([fetch('api/auditoria?canal=web'),
       fetch('api/auditoria?canal=instagram'), fetch('api/auditoria?canal=pauta')]);
     if(rw.status===401){location.href='login';return;}
-    web=await rw.json(); ig=await ri.json(); pauta=await rp.json();
+    WEB=await rw.json(); IG=await ri.json(); PAUTA=await rp.json();
   }catch(e){}
   const w=document.getElementById('wrap');
-  const fechas=[web&&web.creada_en, ig&&ig.creada_en, pauta&&pauta.creada_en].filter(Boolean).sort().pop();
+  const fechas=[WEB&&WEB.creada_en, IG&&IG.creada_en, PAUTA&&PAUTA.creada_en].filter(Boolean).sort().pop();
   const u=document.getElementById('upd'); if(u&&fechas) u.textContent='generada '+fecha(fechas);
-  if(!web && !ig && !pauta){ w.innerHTML='<div class="empty">— Todavía no hay auditoría para este proyecto. —</div>'; return; }
-  w.innerHTML = webHTML(web) + igHTML(ig) + pautaHTML(pauta);
-  renderWeb(web); renderIg(ig);
+  if(!WEB && !IG && !PAUTA){ w.innerHTML='<div class="empty">— Todavía no hay auditoría para este proyecto. —</div>'; return; }
+  mostrar(VISTA);
 }
 // ── Generarla ────────────────────────────────────────────────────────────────────────────────
 // Tarda minutos: mide la web contra el sitio vivo, calcula la serie de Instagram y recién ahí el
