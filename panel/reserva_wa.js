@@ -255,9 +255,21 @@ async function atender(negocio, mensaje) {
     }
     if (!paso) {
       // Si el primer mensaje ya es una pregunta que el negocio tiene contestada, se contesta y
-      // recién después se ofrece el menú: hacerlo al revés obliga a repetir la pregunta.
+      // LISTO: nada de mandar el saludo atrás.
+      //
+      // Antes se contestaba y se disparaba el menú en el mismo segundo. Se veía así: respuesta,
+      // botón del local, y encima "Hola Fernando. Soy el asistente de CORTAFUEGO. ¿En qué te puedo
+      // ayudar?" — tres mensajes en un segundo. Dos problemas: sepulta lo que la persona acababa de
+      // pedir (el botón queda arriba, sin leer) y presentarse DESPUÉS de haber contestado se lee
+      // como que la charla arrancó de nuevo. Fer lo probó y lo describió exacto: "no me dio tiempo
+      // a contestar y me abrió una conversación nueva".
+      //
+      // La conversación igual queda en 'ofrecido', así que lo que escriba después se atiende con
+      // todo el menú disponible; el saludo sigue saliendo cuando lo pide de verdad —un "hola"
+      // suelto, o "menú"—, que es cuando significa algo.
       if (await responderFaq(cfg, negocio, waId, entrada, canal)) {
-        return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil, datos) || true;
+        await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
+        return true;
       }
       return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil, datos);
     }
