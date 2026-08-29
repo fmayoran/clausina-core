@@ -112,6 +112,45 @@ def main():
     cadencia = [{'mes': m, 'posts': len(v), 'reach_prom': prom([x['reach'] for x in v if x['reach']]) or 0}
                 for m, v in sorted(cad.items())]
 
+    # ── Mes en curso, día por día ──────────────────────────────────────────────────────────
+    # La vista mensual no sirve cuando hay un mes y medio de historia: compara un mes entero de
+    # pre-apertura contra diez días de apertura y la "evolución" es un escalón, no una tendencia.
+    # Para saber cómo se viene funcionando hace falta el detalle diario del mes en curso.
+    mes_actual = posts[-1]['mes']
+    del_mes = [p for p in posts if p['mes'] == mes_actual]
+    por_fecha = defaultdict(list)
+    for p in del_mes:
+        por_fecha[p['fecha']].append(p)
+    dia_a_dia = [{'fecha': f, 'posts': len(v),
+                  'reach': sum(x['reach'] for x in v),
+                  'interac': sum(x['interac'] for x in v),
+                  'er_pct': round(100 * sum(x['interac'] for x in v) / max(1, sum(x['reach'] for x in v)), 2)}
+                 for f, v in sorted(por_fecha.items())]
+    # Los seguidores por día se cruzan por fecha: es lo que permite ver si un post movió la aguja.
+    for d in dia_a_dia:
+        d['seguidores'] = next((x['seguidores'] for x in serie if x['fecha'] == d['fecha']), None)
+    mes = {'mes': mes_actual, 'posts': len(del_mes),
+           'reach_total': sum(p['reach'] for p in del_mes),
+           'reach_prom': prom([p['reach'] for p in del_mes if p['reach']]),
+           'er_pct': round(100 * sum(p['interac'] for p in del_mes) / max(1, sum(p['reach'] for p in del_mes)), 2),
+           'dias_con_post': len(dia_a_dia), 'dia_a_dia': dia_a_dia}
+
+    # ── Historias ────────────────────────────────────────────────────────────────────────────
+    # Se capturan aparte (historias_sync) porque a las 24 h Instagram borra el objeto. Si no hay
+    # nada, se dice por qué: "sin dato" a secas se lee como que las historias no rinden.
+    hist = json.loads(q(f"""
+      SELECT coalesce(json_agg(t), '[]') FROM (
+        SELECT to_char(h.publicado_en,'YYYY-MM-DD') AS fecha, h.reach, h.views, h.navigation,
+               h.interacciones, h.profile_visits
+          FROM contenido.ig_historia h JOIN contenido.negocios n ON n.id = h.negocio_id
+         WHERE n.slug = '{slug}' ORDER BY h.publicado_en DESC LIMIT 60) t""") or '[]')
+    historias = None
+    if hist:
+        historias = {'n': len(hist), 'reach_prom': prom([h['reach'] for h in hist if h['reach']]),
+                     'views_prom': prom([h['views'] for h in hist if h['views']]),
+                     'visitas_perfil': sum(h['profile_visits'] or 0 for h in hist),
+                     'desde': hist[-1]['fecha'], 'items': hist}
+
     fmt = defaultdict(list)
     for p in posts:
         fmt[p['formato']].append(p)
@@ -140,6 +179,10 @@ def main():
     print(json.dumps({
         'followers': seguidores,
         'crecimiento': crecimiento,
+        'mes': mes,
+        'historias': historias,
+        'historias_nota': ('Las historias se miden mientras viven: a las 24 h Instagram borra el '
+                           'objeto y el dato ya no se puede recuperar. La captura corre cada 2 h.'),
         'metricas': metricas,
         'periodo': f"{posts[0]['fecha']} → {posts[-1]['fecha']}",
         'global': {
