@@ -306,9 +306,9 @@ async function atender(negocio, mensaje) {
       return await elegirDia(cfg, negocio, waId, entrada, datos);
     }
     if (paso === 'codigo') return await recibirCodigo(cfg, negocio, waId, entrada, datos, rechazo);
-    if (paso === 'dia') return await elegirTurno(cfg, negocio, waId, entrada, datos);
-    if (paso === 'turno') return await pedirCantidad(cfg, negocio, waId, entrada, datos);
-    if (paso === 'cantidad') return await pedirNombre(cfg, negocio, waId, entrada, datos);
+    if (paso === 'dia') return await elegirTurno(cfg, negocio, waId, entrada, datos, canal, ofreceReservas);
+    if (paso === 'turno') return await pedirCantidad(cfg, negocio, waId, entrada, datos, canal, ofreceReservas);
+    if (paso === 'cantidad') return await pedirNombre(cfg, negocio, waId, entrada, datos, canal, ofreceReservas);
     if (paso === 'nombre') return await confirmar(cfg, negocio, waId, entrada, datos);
     if (paso === 'confirmar_voz') return await confirmarVoz(cfg, negocio, waId, entrada, datos);
   } catch (e) {
@@ -748,7 +748,7 @@ function textoNoEseDia(fecha, r, hoyIso) {
   return `${cuando} está más lejos de lo que puedo reservar (hasta ${r.dias_max} días).`;
 }
 
-async function elegirTurno(cfg, negocio, waId, entrada, datos) {
+async function elegirTurno(cfg, negocio, waId, entrada, datos, canal, ofreceReservas) {
   let fecha = entrada.startsWith('d:') ? entrada.slice(2) : null;
   if (!fecha) {
     // Escribió en vez de tocar. Si nombró un día, se le contesta POR ESE DÍA: repetir la lista
@@ -767,7 +767,16 @@ async function elegirTurno(cfg, negocio, waId, entrada, datos) {
   }
   // Sin la lista a mano, "elegí un día de la lista" es un callejón: la persona no tiene de dónde
   // elegir. Se vuelve a ofrecer en vez de repetir el reproche.
-  if (!fecha) return await elegirDia(cfg, negocio, waId, entrada, datos);
+  if (!fecha) {
+    // Si escribió algo que no es un día, puede ser una pregunta y no un intento fallido de elegir.
+    // `canal` sólo llega desde el mensaje de una persona: las llamadas internas —avanzar()— no lo
+    // pasan y siguen simplemente reofreciendo la lista.
+    if (canal && String(entrada || '').trim()) {
+      return await noEntendi(cfg, negocio, waId, canal, ofreceReservas, entrada, datos, 'dia',
+        () => elegirDia(cfg, negocio, waId, '', datos));
+    }
+    return await elegirDia(cfg, negocio, waId, entrada, datos);
+  }
   let turnos = (await db.disponibilidadPublica(negocio.id, fecha, fecha));
   const lim = await limiteInvitacion(negocio, datos);
   if (lim && lim.turnos.length) turnos = turnos.filter(t => lim.turnos.includes(t.turno_id));
@@ -797,18 +806,22 @@ async function topeDe(negocioId, fecha, turnoId) {
   return t ? t.tope : null;
 }
 
-async function pedirCantidad(cfg, negocio, waId, entrada, datos) {
+async function pedirCantidad(cfg, negocio, waId, entrada, datos, canal, ofreceReservas) {
   const turnoId = entrada.startsWith('t:') ? entrada.slice(2) : null;
-  if (!turnoId) { await decir(cfg, waId, 'Elegí un turno de la lista, por favor.', negocio.id); return true; }
-  return await avanzar(cfg, negocio, waId, { ...datos, turno_id: turnoId });
+  if (!turnoId) {
+    return await noEntendi(cfg, negocio, waId, canal, ofreceReservas, entrada, datos, 'turno',
+      () => decir(cfg, waId, 'Elegí un turno de la lista, por favor.', negocio.id));
+  }
+  // Se avanzó: el contador de trabas vuelve a cero, si no una traba vieja cortaría un paso futuro.
+  return await avanzar(cfg, negocio, waId, { ...datos, turno_id: turnoId, trabas: 0 });
 }
 
-async function pedirNombre(cfg, negocio, waId, entrada, datos) {
+async function pedirNombre(cfg, negocio, waId, entrada, datos, canal, ofreceReservas) {
   const n = parseInt(String(entrada).replace(/\D+/g, ''), 10);
   const cfgRes = await db.getConfigReservas(negocio.id);
   if (!n || n < cfgRes.cantidad_min) {
-    await decir(cfg, waId, `Necesito un número. ¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}?`, negocio.id);
-    return true;
+    return await noEntendi(cfg, negocio, waId, canal, ofreceReservas, entrada, datos, 'cantidad',
+      () => decir(cfg, waId, `Necesito un número. ¿Para ${cuantos(cfgRes.unidad)} ${plural(cfgRes.unidad, 2)}?`, negocio.id));
   }
   // El mínimo del beneficio se avisa acá y no al confirmar: enterarse al final de que la
   // invitación pedía más gente obliga a rehacer toda la conversación.
@@ -826,6 +839,46 @@ async function pedirNombre(cfg, negocio, waId, entrada, datos) {
  * de los datos, así que da igual si vienen de un audio, de los botones o de una mezcla: lo que ya
  * se sabe no se vuelve a preguntar.
  */
+// Cuántas veces seguidas se puede no entender antes de dejar de insistir. Dos: la primera puede
+// ser un tipeo o un botón que no se tocó; la segunda ya es una charla trabada.
+const TRABAS_MAX = 2;
+
+/**
+ * Qué hacer cuando la respuesta a un paso no se entiende. Antes cada paso repetía su consigna y
+ * nada más, para siempre: quedaba un bucle sin salida. Le pasó a una clienta eligiendo turno —
+ * escribió "Pero somos más de 12" y recibió "Elegí un turno de la lista, por favor." dos veces—.
+ * Dos cosas fallaban ahí: no era una respuesta al paso sino una PREGUNTA con respuesta en la FAQ,
+ * y no había forma de salir.
+ *
+ * Entonces, en orden:
+ *  1. ¿Es una pregunta que el negocio ya contestó? Se contesta. Si esa respuesta manda a hablar
+ *     con el local —el caso no entra en la reserva automática— se corta el flujo y se ofrece el
+ *     menú; si no, se sigue donde estaba, porque la reserva todavía puede terminar.
+ *  2. Si no es pregunta y es la primera vez, se repite la consigna: pudo ser un tipeo.
+ *  3. A la segunda seguida se deja de insistir y se vuelve a las opciones. Repetir lo mismo una
+ *     tercera vez no lo va a arreglar, y el menú incluye escribirle a una persona.
+ */
+async function noEntendi(cfg, negocio, waId, canal, ofreceReservas, entrada, datos, paso, repetir) {
+  const resp = await responderFaq(cfg, negocio, waId, entrada, canal);
+  if (resp) {
+    if (MENCIONA_WA_LOCAL.test(String(resp))) {
+      return await trasResponder(cfg, negocio, waId, canal, ofreceReservas, resp, {});
+    }
+    await db.setConversacion(negocio.id, waId, paso, { ...datos, trabas: 0 });
+    await repetir();
+    return true;
+  }
+  const trabas = (Number(datos.trabas) || 0) + 1;
+  if (trabas >= TRABAS_MAX) {
+    await db.setConversacion(negocio.id, waId, 'ofrecido', {});
+    return await ofrecerMenu(cfg, negocio, waId, canal, ofreceReservas,
+      'Perdón, no te estoy entendiendo. ¿Cómo seguimos?') || true;
+  }
+  await db.setConversacion(negocio.id, waId, paso, { ...datos, trabas });
+  await repetir();
+  return true;
+}
+
 async function avanzar(cfg, negocio, waId, datos) {
   if (!datos.fecha)    return await elegirDia(cfg, negocio, waId, '', datos);
   if (!datos.turno_id) return await elegirTurno(cfg, negocio, waId, 'd:' + datos.fecha, datos);
