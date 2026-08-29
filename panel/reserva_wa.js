@@ -50,6 +50,11 @@ const HABLAR_DIRECTO = new RegExp(
   '|n[uú]mero\\s+(de\\s+)?(tel[eé]fono|directo|del\\s+local)' +
   '|tel[eé]fono\\s+(del\\s+)?local' +
   '|quiero\\s+hablar\\s+con', 'i');
+// Una respuesta de la FAQ que manda a "escribir al WhatsApp del local". Se detecta para adjuntarle
+// el contacto: el negocio escribe esa frase pensando en su número, pero quien la lee ya está
+// escribiendo por WhatsApp y no tiene cómo saber que hay otro. NO alcanza con nombrar WhatsApp
+// suelto —"seguinos por WhatsApp"— ni con "este mismo número", que es el del bot.
+const MENCIONA_WA_LOCAL = /\b(whats?app|wsp|wpp)\b[^.\n]{0,30}\b(del?\s+)?(local|negocio|resta\w*|sal[oó]n)\b/i;
 // Un saludo suelto ARRANCA DE CERO, esté donde esté la conversación. Le pasó a una charla real:
 // se preguntó por la carta, se contestó, y quince minutos después un "Hola" cayó en el paso que
 // venía de antes —donde cualquier texto significa "sí, quiero reservar"— y el bot se puso a pedir
@@ -423,7 +428,14 @@ async function responderFaq(cfg, negocio, waId, texto, canal) {
   if (!lista.length) return false;
   const i = await faq.responder(texto, lista).catch(() => null);
   if (i == null) return false;
-  await decir(cfg, waId, lista[i].r, negocio.id);
+  const r = lista[i].r;
+  await decir(cfg, waId, r, negocio.id);
+  // Si la respuesta invita a escribirle al local, hay que DAR ese contacto: la persona ya está en
+  // un WhatsApp, así que "escribinos al WhatsApp del local" sin número es una instrucción que no
+  // se puede seguir —y peor, suena a que ya lo está haciendo—. El botón lo vuelve accionable.
+  if (negocio.whatsapp_directo && MENCIONA_WA_LOCAL.test(r)) {
+    await ofrecerDirecto(cfg, negocio, waId, 'Este es el WhatsApp del local:');
+  }
   return true;
 }
 
