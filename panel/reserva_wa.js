@@ -267,30 +267,33 @@ async function atender(negocio, mensaje) {
       // La conversación igual queda en 'ofrecido', así que lo que escriba después se atiende con
       // todo el menú disponible; el saludo sigue saliendo cuando lo pide de verdad —un "hola"
       // suelto, o "menú"—, que es cuando significa algo.
-      if (await responderFaq(cfg, negocio, waId, entrada, canal)) {
-        await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
-        return true;
-      }
+      const resp = await responderFaq(cfg, negocio, waId, entrada, canal);
+      if (resp) return await trasResponder(cfg, negocio, waId, canal, ofreceReservas, resp, datos);
       return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil, datos);
     }
     // "Otra consulta": lo que sigue va al inbox para que lo lea una persona.
-    if (paso === 'consulta') return await recibirConsulta(cfg, negocio, waId, entrada, canal);
+    if (paso === 'consulta') return await recibirConsulta(cfg, negocio, waId, entrada, canal, ofreceReservas);
     if (paso === 'ofrecido') {
       if (String(entrada).startsWith('acc:')) {
         const i = parseInt(String(entrada).slice(4), 10);
         if (await responderAcceso(cfg, negocio, waId, canal, i, datos)) return true;
       }
       if (entrada === 'consulta') return await pedirConsulta(cfg, negocio, waId);
-      if (!ofreceReservas) return await recibirConsulta(cfg, negocio, waId, entrada, canal);
+      // "Escribir al local": el menú lo ofrece igual que reservar, así que hay que atenderlo.
+      if (entrada === 'directo' && await ofrecerDirecto(cfg, negocio, waId)) return true;
+      if (!ofreceReservas) return await recibirConsulta(cfg, negocio, waId, entrada, canal, ofreceReservas);
       // Texto libre en vez de un botón: puede ser una pregunta. Si está contestada, se contesta
       // y se queda donde estaba, en vez de arrancar a pedirle días a alguien que preguntó otra cosa.
-      if (entrada !== 'reservar' && await responderFaq(cfg, negocio, waId, entrada, canal)) return true;
+      if (entrada !== 'reservar') {
+        const resp = await responderFaq(cfg, negocio, waId, entrada, canal);
+        if (resp) return await trasResponder(cfg, negocio, waId, canal, ofreceReservas, resp, datos);
+      }
       // Y si no la sabemos contestar, va a una persona. ANTES caía en la reserva: "¿Hacen sándwich
       // para llevar?" recibía "¿Tenés un código de invitación?". Empezar a pedir días a quien no
       // pidió reservar es peor que hacerlo esperar una respuesta de verdad — y el botón "Reservar"
       // está ahí mismo, además de que "quiero reservar" escrito ya abre el flujo más arriba.
       if (entrada !== 'reservar' && canal.inbox) {
-        return await recibirConsulta(cfg, negocio, waId, entrada, canal);
+        return await recibirConsulta(cfg, negocio, waId, entrada, canal, ofreceReservas);
       }
       // Igual que en la web: se pregunta por el código ANTES de mostrar días, porque la
       // invitación puede limitar qué días y qué turnos se pueden ofrecer. Quien llegó con una
@@ -403,6 +406,19 @@ async function saludar(cfg, negocio, waId, canal, ofreceReservas, perfil, datos 
     .replace(/^[¡\s]*hola[\s,.!¡]*/i, '')
     .replace(/^./, c => c.toUpperCase());
   const saludo = nombrePila ? `Hola ${nombrePila}. ${base}` : `Hola. ${base}`;
+  return await ofrecerMenu(cfg, negocio, waId, canal, ofreceReservas,
+    `${saludo}\n\n¿En qué te puedo ayudar?`, saludo);
+}
+
+/**
+ * Manda las opciones del canal. Separado de `saludar` porque el menú sirve en dos momentos
+ * distintos: al presentarse, y después de una respuesta que deja a la persona ante una bifurcación
+ * —"si son hasta 12 reservá acá, si son más escribile al local"—. En ese segundo caso el saludo
+ * sobra (ya estábamos hablando) pero las opciones son justo lo que hace falta.
+ *
+ * `encabezado` es el texto que va arriba; `planoB` el que sale si los botones fallan.
+ */
+async function ofrecerMenu(cfg, negocio, waId, canal, ofreceReservas, encabezado, planoB) {
   const botones = [];
   // Sin "Ahora no": ofrecer una salida antes de que la persona haya pedido nada suena a que
   // estamos insistiendo. Quien no quiere nada simplemente no contesta, y "no" escrito sigue
@@ -411,20 +427,22 @@ async function saludar(cfg, negocio, waId, canal, ofreceReservas, perfil, datos 
   // Los atajos del negocio —el menú, cómo llegar— entre reservar y "otra consulta": son lo que
   // más se pide y no tiene sentido que haya que preguntarlo para recibirlo.
   accesosDe(canal).forEach((a, i) => botones.push({ id: 'acc:' + i, titulo: a.titulo }));
+  // Hablar con una persona es una opción del menú y no sólo algo que hay que saber pedir: quien
+  // prefiere un humano no tiene por qué adivinar la frase que lo despierta.
+  if (negocio.whatsapp_directo) botones.push({ id: 'directo', titulo: ROTULO_DIRECTO });
   if (canal.inbox) botones.push({ id: 'consulta', titulo: 'Otra consulta' });
 
   if (!botones.length) return false;
-  const texto = `${saludo}\n\n¿En qué te puedo ayudar?`;
   // Hasta tres opciones entran como botones, que es lo más cómodo: se tocan sin abrir nada.
   // De ahí en más WhatsApp sólo acepta lista, y una lista de dos ítems se ve peor que dos
   // botones. El límite es de Meta, no una preferencia.
-  const r = await decirOpciones(cfg, waId, texto, botones.map(b => b.titulo), negocio.id,
+  const r = await decirOpciones(cfg, waId, encabezado, botones.map(b => b.titulo), negocio.id,
     () => botones.length <= 3
-      ? wa.enviarBotones(waId, texto, botones, cfg)
-      : wa.enviarLista(waId, texto, 'Ver opciones',
+      ? wa.enviarBotones(waId, encabezado, botones, cfg)
+      : wa.enviarLista(waId, encabezado, 'Ver opciones',
           botones.map(b => ({ id: b.id, titulo: b.titulo })), cfg));
   // Si los botones fallan (algún cliente viejo no los soporta), se sigue en texto plano.
-  if (!r.ok) await decir(cfg, waId, saludo + (ofreceReservas
+  if (!r.ok) await decir(cfg, waId, (planoB || encabezado) + (ofreceReservas
     ? '\n\nSi querés reservar, escribime "reservar". Si es otra cosa, contame y te respondemos.'
     : '\n\nContame en qué te puedo ayudar y te respondemos a la brevedad.'), negocio.id);
   return true;
@@ -440,14 +458,28 @@ async function responderFaq(cfg, negocio, waId, texto, canal) {
   if (!lista.length) return false;
   const i = await faq.responder(texto, lista).catch(() => null);
   if (i == null) return false;
-  const r = lista[i].r;
-  await decir(cfg, waId, r, negocio.id);
-  // Si la respuesta invita a escribirle al local, hay que DAR ese contacto: la persona ya está en
-  // un WhatsApp, así que "escribinos al WhatsApp del local" sin número es una instrucción que no
-  // se puede seguir —y peor, suena a que ya lo está haciendo—. El botón lo vuelve accionable.
-  if (negocio.whatsapp_directo && MENCIONA_WA_LOCAL.test(r)) {
-    await ofrecerDirecto(cfg, negocio, waId, 'Este es el WhatsApp del local:');
-  }
+  // Devuelve el TEXTO y no true: quien llama necesita saber qué se contestó para decidir si
+  // corresponde ofrecer algo después. Un string no vacío es igual de truthy que true, así que los
+  // llamadores que sólo preguntan "¿contestó?" siguen funcionando igual.
+  await decir(cfg, waId, lista[i].r, negocio.id);
+  return lista[i].r;
+}
+
+/**
+ * Qué hacer después de contestar con la FAQ, cuando esa respuesta manda a escribirle al local.
+ *
+ * Se ofrece el MENÚ, no el botón del local solo. La diferencia importa: esas respuestas suelen
+ * tener dos salidas —"si son hasta 12 reservá acá, si son más escribile al local"— y mandar
+ * únicamente el botón del local da por sentado que la persona es del segundo caso, dejando al del
+ * primero sin saber cómo seguir. El menú incluye las dos y deja elegir. Lo marcó Fer probándolo.
+ *
+ * La conversación queda en 'ofrecido' para que los botones del menú se atiendan de verdad: en
+ * 'consulta' cualquier toque se leería como texto libre para el inbox.
+ */
+async function trasResponder(cfg, negocio, waId, canal, ofreceReservas, respuesta, datos = {}) {
+  await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
+  if (!negocio.whatsapp_directo || !MENCIONA_WA_LOCAL.test(String(respuesta || ''))) return true;
+  await ofrecerMenu(cfg, negocio, waId, canal, ofreceReservas, '¿Cómo seguimos?');
   return true;
 }
 
@@ -532,9 +564,10 @@ async function pedirConsulta(cfg, negocio, waId) {
   return true;
 }
 
-async function recibirConsulta(cfg, negocio, waId, texto, canal) {
+async function recibirConsulta(cfg, negocio, waId, texto, canal, ofreceReservas = true) {
   // Primero lo que el negocio ya contestó: si hay respuesta, no hay nada que derivar.
-  if (await responderFaq(cfg, negocio, waId, texto, canal)) return true;
+  const resp = await responderFaq(cfg, negocio, waId, texto, canal);
+  if (resp) return await trasResponder(cfg, negocio, waId, canal, ofreceReservas, resp);
   await db.borrarConversacion(negocio.id, waId);
   // El mensaje ya se guarda en la bitácora del webhook: acá sólo se acusa recibo. Prometer un
   // plazo que no controlamos sería peor que no prometer nada.
@@ -957,7 +990,7 @@ async function seguirVoz(negocio, mensaje) {
     return void await decir(cfg, waId, 'Gracias, ya le pasé tu mensaje al equipo. Te van a responder por acá.', negocio.id);
   }
 
-  if (!ofreceReservas) return void await recibirConsulta(cfg, negocio, waId, texto, canal);
+  if (!ofreceReservas) return void await recibirConsulta(cfg, negocio, waId, texto, canal, ofreceReservas);
 
   const cfgRes = await db.getConfigReservas(negocio.id);
   const hoy = fechaLocal();
@@ -982,7 +1015,7 @@ async function seguirVoz(negocio, mensaje) {
 
   // No se entendió, o el audio no era para reservar: al inbox, que es donde lo va a leer alguien.
   if (!i) return void await elegirDia(cfg, negocio, waId, '');
-  if (i.intencion !== 'reserva') return void await recibirConsulta(cfg, negocio, waId, texto, canal);
+  if (i.intencion !== 'reserva') return void await recibirConsulta(cfg, negocio, waId, texto, canal, ofreceReservas);
 
   // Pidió un día concreto que no está en la agenda. Sin esto se le muestra una lista que empieza
   // semanas después y se lee como "no hay lugar", cuando puede ser que el local esté cerrado.
