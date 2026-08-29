@@ -300,21 +300,32 @@ async function atender(negocio, mensaje) {
   return false;
 }
 
+// Rótulo del botón que abre el chat con el local. Dice QUÉ pasa al tocarlo, no dónde lleva:
+// "Abrir chat" era ambiguo —¿qué chat, si ya estás en uno?—. Máximo 20 caracteres (límite de Meta).
+const ROTULO_DIRECTO = 'Escribir al local';
+
 /**
  * Pasa la línea humana del local como botón que abre el chat directo.
  *
  * Va a `wa.me`, no al número escrito: el teléfono suelto obliga a copiarlo, salir de WhatsApp y
  * pegarlo, y el botón abre la conversación de una. Es el mismo criterio que los atajos con link.
+ *
+ * El texto NOMBRA al botón ("tocá «Escribir al local»") en vez de sólo acompañarlo. Un botón al pie
+ * de un mensaje se lee como decoración y la gente no lo toca; nombrarlo lo convierte en la
+ * instrucción. Por eso el cuerpo tiene dos versiones: la que apunta al botón y la plana para
+ * cuando el botón no sale —ahí mandar "tocá el botón" sería mandar a tocar algo que no existe—.
+ *
  * Devuelve false si el negocio no cargó el número, para que quien llama siga con lo suyo.
  */
 async function ofrecerDirecto(cfg, negocio, waId, prefacio) {
   const num = tel.normalizar(negocio.whatsapp_directo || '');
   if (!num) return false;
-  const cuerpo = prefacio || `Te paso el WhatsApp de ${negocio.nombre} para que hables directo con el local.`;
-  const r = await decirOpciones(cfg, waId, cuerpo, ['Abrir chat'], negocio.id,
-    () => wa.enviarBotonUrl(waId, cuerpo, 'Abrir chat', `https://wa.me/${num}`, cfg));
+  const base = prefacio || `Te paso el WhatsApp de ${negocio.nombre} para que hables directo con el local.`;
+  const cuerpo = `${base}\n\nTocá «${ROTULO_DIRECTO}» acá abajo y se abre el chat.`;
+  const r = await decirOpciones(cfg, waId, cuerpo, [ROTULO_DIRECTO], negocio.id,
+    () => wa.enviarBotonUrl(waId, cuerpo, ROTULO_DIRECTO, `https://wa.me/${num}`, cfg));
   // Si el botón no sale, va el número escrito: peor un número para copiar que ningún contacto.
-  if (!r.ok) await decir(cfg, waId, `${cuerpo}\n${tel.lindo(negocio.whatsapp_directo)}`, negocio.id);
+  if (!r.ok) await decir(cfg, waId, `${base}\n${tel.lindo(negocio.whatsapp_directo)}`, negocio.id);
   return true;
 }
 
@@ -509,7 +520,7 @@ async function recibirConsulta(cfg, negocio, waId, texto, canal) {
   // registrada, así que quien prefiera esperar la respuesta por acá la va a recibir igual.
   if (negocio.whatsapp_directo) {
     await ofrecerDirecto(cfg, negocio, waId,
-      'Si es algo urgente, podés escribirle directo al local.');
+      'Si es urgente y no querés esperar, escribile directo al local.');
   }
   return true;
 }
