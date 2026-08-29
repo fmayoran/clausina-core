@@ -2877,6 +2877,8 @@ async function getInbox(negocioId) {
             max(m.creado_en) AS ultimo,
             max(m.creado_en) FILTER (WHERE m.direccion='entrante') AS ultimo_entrante,
             count(*) FILTER (WHERE m.direccion='entrante' AND NOT m.atendido)::int AS pendientes,
+            bool_or(m.requiere_accion) AS requiere_accion,
+            max(m.creado_en) FILTER (WHERE m.requiere_accion) AS espera_desde,
             (array_agg(m.texto ORDER BY m.creado_en DESC) FILTER (WHERE m.texto IS NOT NULL))[1] AS ultimo_texto,
             (SELECT c.nombre FROM contenido.cliente c
               WHERE c.negocio_id=$1 AND c.telefono_norm = right(regexp_replace(m.wa_id,'\D','','g'), 10)
@@ -2900,6 +2902,34 @@ async function getConversacionInbox(negocioId, waId) {
       WHERE negocio_id=$1 AND wa_id=$2
       ORDER BY creado_en LIMIT 200`, [negocioId, waId]);
   return rows;
+}
+
+/**
+ * La conversación pasa a esperar a una persona. La llama el BOT en el momento en que no pudo
+ * resolver o en que pidieron un humano — no el panel al abrirla.
+ *
+ * Marca el último mensaje entrante y no inserta uno nuevo: la marca es sobre lo que la persona
+ * escribió, así el inbox puede mostrar desde cuándo espera y qué fue lo último que dijo.
+ */
+async function marcarRequiereAccion(negocioId, waId) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.whatsapp_mensaje SET requiere_accion = true
+      WHERE id = (SELECT id FROM contenido.whatsapp_mensaje
+                   WHERE negocio_id=$1 AND wa_id=$2 AND direccion='entrante'
+                   ORDER BY creado_en DESC LIMIT 1)`, [negocioId, String(waId || '')]);
+  return rowCount > 0;
+}
+
+/**
+ * Cerrar: la conversación deja de esperar. Es una decisión de una persona —"ya le contesté por el
+ * otro número"—, por eso es explícita y no se dispara al abrir el hilo. El histórico queda intacto:
+ * se apaga la marca, no se borra nada.
+ */
+async function cerrarConversacion(negocioId, waId) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.whatsapp_mensaje SET requiere_accion = false
+      WHERE negocio_id=$1 AND wa_id=$2 AND requiere_accion`, [negocioId, String(waId || '')]);
+  return rowCount > 0;
 }
 
 async function marcarAtendido(negocioId, waId) {
@@ -4798,6 +4828,7 @@ module.exports = {
   secretoDeNumero, negocioPorPhoneId,
   getConversacion, setConversacion, borrarConversacion, podarConversaciones, reservasPorWhatsapp,
   CAPS_BOT, ACCESO_TITULO_MAX, getCanalWhatsapp, guardarCanalWhatsapp, getInbox, getConversacionInbox, marcarAtendido,
+  marcarRequiereAccion, cerrarConversacion,
   negocioPublico, disponibilidadPublica, porQueNoEseDia, urlReservaWhatsapp, registrarApertura, marcarCompletado, linkDeApertura,
   ofertaLanding, guardarQueExponeLanding,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,

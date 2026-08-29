@@ -340,6 +340,10 @@ const ROTULO_DIRECTO = 'Escribir al local';
 async function ofrecerDirecto(cfg, negocio, waId, prefacio) {
   const num = tel.normalizar(negocio.whatsapp_directo || '');
   if (!num) return false;
+  // Dar el contacto NO es haber resuelto: la persona se va a escribir al otro número y alguien
+  // tiene que contestarle. Queda marcada para que el inbox la muestre esperando, y se cierra a
+  // mano cuando la atendieron por allá.
+  await db.marcarRequiereAccion(negocio.id, waId).catch(() => {});
   const base = prefacio || `Te paso el WhatsApp de ${negocio.nombre} para que hables directo con el local.`;
   const cuerpo = `${base}\n\nTocá «${ROTULO_DIRECTO}» acá abajo y se abre el chat.`;
   const r = await decirOpciones(cfg, waId, cuerpo, [ROTULO_DIRECTO], negocio.id,
@@ -571,6 +575,8 @@ async function recibirConsulta(cfg, negocio, waId, texto, canal, ofreceReservas 
   await db.borrarConversacion(negocio.id, waId);
   // El mensaje ya se guarda en la bitácora del webhook: acá sólo se acusa recibo. Prometer un
   // plazo que no controlamos sería peor que no prometer nada.
+  // Acá es donde el bot admite que no supo: es EL caso que requiere una persona.
+  await db.marcarRequiereAccion(negocio.id, waId).catch(() => {});
   await decir(cfg, waId, 'Gracias, ya le pasé tu mensaje al equipo. Te van a responder por acá.', negocio.id);
   // El mejor momento para ofrecer la línea humana es justo este: el bot no supo, y la alternativa
   // a esperar sin plazo es escribirle al local. Se ofrece, no se reemplaza — la consulta ya quedó

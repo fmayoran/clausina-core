@@ -1254,6 +1254,12 @@ app.post('/api/whatsapp/inbox/:waId/atendido', async (req, res) => {
   try { res.json(await db.marcarAtendido(req.negocioId, req.params.waId)); }
   catch (e) { console.error('wa atendido', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
+// Cerrar: la conversación deja de esperar a una persona. Es explícito y no se dispara al abrir el
+// hilo — el caso típico es "ya le contesté por el otro número", que el panel no tiene forma de ver.
+app.post('/api/whatsapp/inbox/:waId/cerrar', async (req, res) => {
+  try { res.json({ ok: await db.cerrarConversacion(req.negocioId, req.params.waId) }); }
+  catch (e) { console.error('wa cerrar', e.message); res.status(500).json({ ok: false, error: 'db' }); }
+});
 // Responder a mano. Sólo funciona DENTRO de la ventana de 24 h; fuera de ella Meta exige
 // plantilla, y devolvemos el motivo para que la pantalla lo pueda decir.
 app.post('/api/whatsapp/inbox/:waId/responder', async (req, res) => {
