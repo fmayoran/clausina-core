@@ -82,7 +82,7 @@
     letter-spacing:.05em;color:var(--ash);margin-top:-6px;}
   .dc-cw{position:relative;height:96px;}
   /* Semáforo agregado: cuántas métricas de la sección están bien, en atención o mal. */
-  .sem{display:flex;gap:5px;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--ash);}
+  .sem{display:flex;gap:5px;align-items:center;min-height:13px;font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--ash);}
   .sem i{width:9px;height:9px;border-radius:50%;display:inline-block;}
   .sem .b{background:#5ec27a;} .sem .a{background:#E0A526;} .sem .m{background:var(--fire,#FF6B4A);}
   .dc-ir{font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:#1ec9ff;margin-top:2px;}
@@ -293,17 +293,17 @@ function renderIg(a){ if(!a||!a.kpis) return; const k=a.kpis;
 // ── Tablero ──────────────────────────────────────────────────────────────────────────────────
 // Cuenta cuántas métricas de una sección están bien, en atención o mal. Es el resumen más honesto
 // que se puede dar de un vistazo: no promedia cosas que no se promedian.
-function semaforo(ms){
-  const c={bien:0,atencion:0,mal:0};
-  (ms||[]).forEach(m=>{ if(c[m.veredicto]!==undefined) c[m.veredicto]++; });
+function semaforo(ms, conteo){
+  const c=conteo||{bien:0,atencion:0,mal:0};
+  if(!conteo) (ms||[]).forEach(m=>{ if(c[m.veredicto]!==undefined) c[m.veredicto]++; });
   const p=[];
   if(c.bien) p.push(`<i class="b"></i>${c.bien}`);
   if(c.atencion) p.push(`<i class="a"></i>${c.atencion}`);
   if(c.mal) p.push(`<i class="m"></i>${c.mal}`);
-  return p.length?`<span class="sem">${p.join(' ')}</span>`:'';
+  return `<span class="sem">${p.join(' ')}</span>`;
 }
 
-function dcard(id, titulo, sub, valor, unidad, etiqueta, ms, hay){
+function dcard(id, titulo, sub, valor, unidad, etiqueta, ms, hay, conteo){
   if(!hay) return `<button class="dcard" disabled>
     <div class="dc-top"><span class="dc-tt">${esc(titulo)}</span></div>
     <div class="dc-lab">Sin datos todavía</div></button>`;
@@ -311,7 +311,7 @@ function dcard(id, titulo, sub, valor, unidad, etiqueta, ms, hay){
     <div class="dc-top"><span class="dc-tt">${esc(titulo)}</span><span class="dc-sub">${esc(sub||'')}</span></div>
     <div class="dc-big">${esc(valor)}${unidad?`<small>${esc(unidad)}</small>`:''}</div>
     <div class="dc-lab">${esc(etiqueta)}</div>
-    ${semaforo(ms)}
+    ${semaforo(ms, conteo)}
     <div class="dc-cw"><canvas id="d-${id}"></canvas></div>
     <div class="dc-ir">Ver el detalle →</div></button>`;
 }
@@ -321,7 +321,7 @@ function dashHTML(){
   const gi=(ki&&ki.global)||{}, gp=(kp&&kp.global)||{};
   return `<div class="dash">
     ${dcard('web','Web', kw?esc(kw.dominio||''):'', kw?kw.score:'', kw?'/100':'', 'Salud técnica',
-            null, !!kw)}
+            null, !!kw, kw?{bien:kw.checks_ok, atencion:0, mal:(kw.checks_total||0)-(kw.checks_ok||0)}:null)}
     ${dcard('instagram','Instagram', ki?(gi.posts+' posts'):'', ki?nfmt(ki.followers):'', '',
             'Seguidores', ki&&ki.metricas, !!(ki&&ki.global))}
     ${dcard('pauta','Pauta Meta', kp?esc(kp.periodo||''):'', kp?('US$'+gp.gasto):'', '',
