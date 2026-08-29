@@ -177,7 +177,7 @@ def fetch_daily(act, token):
     try:
         ins = graph_get(f"{act}/insights", token, {
             "time_increment": 1, "date_preset": "last_30d",
-            "fields": "spend,impressions,reach,clicks", "limit": 60})
+            "fields": "spend,impressions,reach,clicks,inline_link_clicks", "limit": 60})
         for r in ins.get("data", []):
             out.append({
                 "fecha": r.get("date_start"),
@@ -185,6 +185,8 @@ def fetch_daily(act, token):
                 "impresiones": int(num(r.get("impressions"))),
                 "alcance": int(num(r.get("reach"))),
                 "clics": int(num(r.get("clicks"))),
+                # El comparable contra benchmarks: clics al destino, no cualquier toque.
+                "clics_link": int(num(r.get("inline_link_clicks"))),
             })
     except Exception as e:  # noqa: BLE001
         sys.stderr.write(f"daily: {e}\n")
@@ -201,7 +203,7 @@ def fetch_ad_daily(act, token):
     try:
         ins = graph_get(f"{act}/insights", token, {
             "time_increment": 1, "date_preset": "last_30d", "level": "ad",
-            "fields": "ad_id,spend,impressions,reach,clicks", "limit": 500})
+            "fields": "ad_id,spend,impressions,reach,clicks,inline_link_clicks", "limit": 500})
         for r in ins.get("data", []):
             if not r.get("ad_id") or not r.get("date_start"):
                 continue
@@ -211,6 +213,8 @@ def fetch_ad_daily(act, token):
                 "impresiones": int(num(r.get("impressions"))),
                 "alcance": int(num(r.get("reach"))),
                 "clics": int(num(r.get("clicks"))),
+                # El comparable contra benchmarks: clics al destino, no cualquier toque.
+                "clics_link": int(num(r.get("inline_link_clicks"))),
             })
     except Exception as e:  # noqa: BLE001
         sys.stderr.write(f"ad_daily: {e}\n")
@@ -220,10 +224,11 @@ def fetch_ad_daily(act, token):
 def upsert_ad_daily(pid, filas):
     for d in filas:
         psql(
-            "INSERT INTO contenido.ads_ad_daily(negocio_id,meta_ad_id,fecha,gasto,impresiones,alcance,clics,actualizado_en) "
-            f"VALUES('{pid}','{d['ad_id']}','{d['fecha']}',{d['gasto']},{d['impresiones']},{d['alcance']},{d['clics']},now()) "
+            "INSERT INTO contenido.ads_ad_daily(negocio_id,meta_ad_id,fecha,gasto,impresiones,alcance,clics,clics_link,actualizado_en) "
+            f"VALUES('{pid}','{d['ad_id']}','{d['fecha']}',{d['gasto']},{d['impresiones']},{d['alcance']},{d['clics']},{d.get('clics_link',0)},now()) "
             "ON CONFLICT(negocio_id,meta_ad_id,fecha) DO UPDATE SET gasto=EXCLUDED.gasto,"
-            "impresiones=EXCLUDED.impresiones,alcance=EXCLUDED.alcance,clics=EXCLUDED.clics,actualizado_en=now();")
+            "impresiones=EXCLUDED.impresiones,alcance=EXCLUDED.alcance,clics=EXCLUDED.clics,"
+            "clics_link=EXCLUDED.clics_link,actualizado_en=now();")
 
 
 def upsert_daily(pid, daily):
@@ -231,10 +236,10 @@ def upsert_daily(pid, daily):
         if not d.get("fecha"):
             continue
         psql(
-            "INSERT INTO contenido.ads_daily(negocio_id,fecha,gasto,impresiones,alcance,clics,actualizado_en) "
-            f"VALUES('{pid}','{d['fecha']}',{d['gasto']},{d['impresiones']},{d['alcance']},{d['clics']},now()) "
+            "INSERT INTO contenido.ads_daily(negocio_id,fecha,gasto,impresiones,alcance,clics,clics_link,actualizado_en) "
+            f"VALUES('{pid}','{d['fecha']}',{d['gasto']},{d['impresiones']},{d['alcance']},{d['clics']},{d.get('clics_link',0)},now()) "
             "ON CONFLICT(negocio_id,fecha) DO UPDATE SET gasto=EXCLUDED.gasto,impresiones=EXCLUDED.impresiones,"
-            "alcance=EXCLUDED.alcance,clics=EXCLUDED.clics,actualizado_en=now();")
+            "alcance=EXCLUDED.alcance,clics=EXCLUDED.clics,clics_link=EXCLUDED.clics_link,actualizado_en=now();")
 
 
 def pg_container():

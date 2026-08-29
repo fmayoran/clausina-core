@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
 <link rel="stylesheet" href="tw.css">
-<link rel="stylesheet" href="panel.css?v=20260829">
+<link rel="stylesheet" href="panel.css?v=20260829b">
 <script src="vendor/chart.min.js"></script>
 <style>
   .gen{margin-left:14px;background:var(--pend,#FF6A45);color:#0c0c0a;border:0;border-radius:8px;
@@ -35,6 +35,35 @@
   .sect:first-child{margin-top:6px;}
   .sect .t{font-family:'Barlow Condensed',sans-serif;font-size:1.5rem;font-weight:700;color:var(--white);}
   .sect .m{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--ash);letter-spacing:.04em;}
+  /* Cada métrica contra su banda de referencia. El semáforo NO es el valor absoluto sino el
+     veredicto que ya calculó el motor: para CPM estar abajo es bueno y para CTR es malo, y esa
+     lectura no puede quedar en el frontend repetida y desincronizada. */
+  .bm{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:16px;}
+  .bmc{border:1px solid var(--u-line);border-radius:10px;padding:11px 12px;position:relative;}
+  .bmc .bt{font-family:'JetBrains Mono',monospace;font-size:.55rem;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--u-mut);display:flex;align-items:center;gap:6px;}
+  .bmc .bv{font-size:1.5rem;font-weight:600;line-height:1.15;margin:3px 0 1px;}
+  .bmc .bx{font-size:.72rem;color:var(--u-mut);}
+  .bmc .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;}
+  .v-bien .dot{background:var(--u-bien,#5ec27a);} .v-bien .bv{color:var(--u-bien,#5ec27a);}
+  .v-atencion .dot{background:#E0A526;} .v-atencion .bv{color:#E0A526;}
+  .v-mal .dot{background:var(--u-mal);} .v-mal .bv{color:var(--u-mal);}
+  .v-sin_dato{opacity:.6;} .v-sin_dato .dot{background:var(--u-mut);}
+  /* La banda: dónde cae el valor dentro del rango típico. Un número sin su escala no dice nada. */
+  .banda{height:4px;border-radius:2px;background:rgba(127,127,127,.18);margin-top:8px;position:relative;}
+  .banda i{position:absolute;top:0;bottom:0;background:rgba(127,127,127,.34);border-radius:2px;}
+  .banda b{position:absolute;top:-3px;width:2px;height:10px;background:currentColor;border-radius:1px;}
+  .fuente{font-size:.66rem;color:var(--u-mut);margin:-8px 0 16px;line-height:1.45;}
+  .tab{width:100%;border-collapse:collapse;font-size:.85rem;}
+  .tab th{text-align:left;font-family:'JetBrains Mono',monospace;font-size:.55rem;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--u-mut);font-weight:400;padding:0 8px 6px 0;}
+  .tab td{padding:7px 8px 7px 0;border-top:1px solid var(--u-line);}
+  .tab .n{text-align:right;font-family:'JetBrains Mono',monospace;font-size:.78rem;white-space:nowrap;}
+  .tab .cf{font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--u-mut);margin-right:6px;}
+  .ganador{border:1px solid color-mix(in srgb,var(--u-bien,#5ec27a) 45%,transparent);
+    background:color-mix(in srgb,var(--u-bien,#5ec27a) 10%,transparent);
+    border-radius:9px;padding:10px 12px;margin-bottom:16px;font-size:.87rem;}
+  .ganador.sin{border-color:var(--u-line);background:none;color:var(--u-mut);}
   .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
   .kpi{background:#0c0c0a;border:1px solid var(--line);border-radius:9px;padding:14px 16px;}
   .kpi b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:1.9rem;color:var(--white);line-height:1;}
@@ -77,9 +106,9 @@
   <div class="wrap" id="wrap"><div class="empty">Cargando auditoría…</div></div>
 </main></div>
 <script src="https://unpkg.com/lucide@latest"></script>
-<script src="shell.js?v=20260829"></script>
+<script src="shell.js?v=20260829b"></script>
 <script>ClausinaShell({active:'auditoria'});</script>
-<script src="panel.js?v=20260829"></script>
+<script src="panel.js?v=20260829b"></script>
 <script>
 // Todo encerrado: este script comparte el ámbito global con panel.js, y un nombre repetido
 // —pasó con 'pct'— es un SyntaxError que mata la página entera antes de la primera línea. La
@@ -100,6 +129,33 @@ Chart.defaults.color='#8a8a82'; Chart.defaults.font.family="'IBM Plex Mono', mon
 const GRID={color:'rgba(255,255,255,0.06)'};
 const CY='#1ec9ff', OR='#ff7700', GR='#5ec27a', GD='#E0A526';
 
+// Dibuja una métrica con su banda de referencia. `m` viene del motor con el veredicto ya resuelto.
+function bmCard(m){
+  if(!m) return '';
+  const [lo,hi]=m.rango||[null,null];
+  const val=(m.valor==null)?'—':(m.valor+(m.unidad||''));
+  let banda='';
+  if(lo!=null&&hi!=null){
+    // Escala hasta 1,6x el techo para que un valor por encima siga siendo visible dentro del riel.
+    const max=Math.max(hi*1.6, (m.valor||0)*1.1, hi||1);
+    const x=v=>Math.max(0,Math.min(100,100*v/max));
+    banda=`<div class="banda"><i style="left:${x(lo)}%;width:${Math.max(2,x(hi)-x(lo))}%"></i>`+
+      (m.valor!=null?`<b style="left:${x(m.valor)}%"></b>`:'')+`</div>`;
+  }
+  const ref=(lo!=null&&hi!=null)?`típico ${lo}–${hi}${m.unidad||''}`:'sin referencia';
+  return `<div class="bmc v-${esc(m.veredicto||'sin_dato')}" title="${esc(m.nota||'')}">
+    <div class="bt"><span class="dot"></span>${esc(m.etiqueta||'')}</div>
+    <div class="bv">${esc(val)}</div>
+    <div class="bx">${esc(m.valor==null?'sin medir todavía':ref)}</div>
+    ${banda}</div>`;
+}
+// Las fuentes van a la vista, no escondidas: un benchmark sin origen se lee igual de convincente
+// que uno inventado, y esa es justo la confusión que hay que evitar.
+function fuentes(ms){
+  const u=[...new Set((ms||[]).map(m=>m.fuente).filter(Boolean))];
+  return u.length?`<div class="fuente">Referencias: ${u.map(esc).join(' · ')}. Son órdenes de magnitud para negocios locales, no una medición del rubro.</div>`:'';
+}
+
 function webHTML(a){
   if(!a||!a.kpis) return `<div class="sect"><span class="t">Web</span></div><div class="nodata">— Sin datos aún (el proyecto no tiene sitio cargado). —</div>`;
   const k=a.kpis;
@@ -118,12 +174,14 @@ function webHTML(a){
 }
 function igHTML(a){
   if(!a||!a.kpis) return `<div class="sect"><span class="t">Instagram</span></div><div class="nodata">— Sin datos aún. —</div>`;
-  const k=a.kpis, g=k.global||{}, bm=k.benchmark||{};
-  return `<div class="sect"><span class="t">Instagram</span><span class="m">${k.followers?nfmt(k.followers)+' seguidores · ':''}${g.posts} posts</span></div>
+  const k=a.kpis, g=k.global||{}, cr=k.crecimiento;
+  const cab=[k.followers?nfmt(k.followers)+' seguidores':'', g.posts+' posts',
+             cr&&cr.alta!=null?`${cr.alta>=0?'+':''}${nfmt(cr.alta)} en ${cr.dias} días`:''].filter(Boolean).join(' · ');
+  return `<div class="sect"><span class="t">Instagram</span><span class="m">${esc(cab)}</span></div>
+  <div class="bm">${(k.metricas||[]).map(bmCard).join('')}</div>
+  ${fuentes(k.metricas)}
   <div class="kpis">
-    ${kpi(pct(g.er_alcance),'Engag. / alcance','típico '+(bm.er_alcance_tipico||''),'cy')}
-    ${kpi(pct(g.er_seguidores),'Engag. / seguidores','típico '+(bm.er_seguidores_tipico||''))}
-    ${kpi(nfmt(g.reach_prom),'Alcance prom',(g.reach_rate!=null?g.reach_rate+'% de la base':''))}
+    ${kpi(nfmt(g.reach_prom),'Alcance prom')}
     ${kpi(nfmt(g.views_prom),'Vistas prom')}
     ${kpi(nfmt(g.guard_prom),'Guardados/post')}
     ${kpi(nfmt(g.compart_prom),'Compartidos/post')}
@@ -136,6 +194,40 @@ function igHTML(a){
   </div>
   <div class="reco">${md(a.recomendaciones)}</div>`;
 }
+// La pauta: lo que se compró. Nunca se comparan avisos por alcance —eso lo define el presupuesto—,
+// sino por CTR de link y CPM, que es lo único que dice qué creativo funciona.
+function pautaHTML(a){
+  if(!a||!a.kpis||!a.kpis.global) return '';
+  const k=a.kpis, g=k.global;
+  const gan=k.ganador;
+  const filas=(k.avisos||[]).map(v=>`<tr>
+      <td><span class="cf">CF-${String(v.numero).padStart(4,'0')}</span> ${esc(v.titulo||'')}</td>
+      <td class="n">US$${(v.gasto||0).toFixed(2)}</td>
+      <td class="n">${nfmt(v.impresiones)}</td>
+      <td class="n">${v.ctr_link!=null?v.ctr_link+'%':'—'}</td>
+      <td class="n">${v.cpm!=null?'US$'+v.cpm:'—'}</td>
+    </tr>`).join('');
+  return `<div class="sect"><span class="t">Pauta</span><span class="m">${esc(k.periodo||'')} · US$${g.gasto} invertidos</span></div>
+  <div class="bm">${(k.metricas||[]).map(bmCard).join('')}</div>
+  ${fuentes(k.metricas)}
+  <div class="kpis">
+    ${kpi(nfmt(g.impresiones),'Impresiones')}
+    ${kpi(nfmt(g.alcance),'Personas alcanzadas')}
+    ${kpi(nfmt(g.clics_link),'Clics al destino')}
+    ${kpi(g.costo_clic!=null?'US$'+g.costo_clic:'—','Costo por clic')}
+  </div>
+  ${gan?`<div class="ganador"><b>Gana CF-${String(gan.numero).padStart(4,'0')}</b> — ${esc(gan.titulo||'')}.
+      ${gan.ctr}% de CTR contra ${gan.contra.ctr}% de CF-${String(gan.contra.numero).padStart(4,'0')}: ${gan.veces}× mejor.</div>`
+    :`<div class="ganador sin">Todavía no hay un ganador claro entre los creativos: hace falta más volumen
+      (${nfmt(k.min_impresiones_comparar)} impresiones por aviso) o una diferencia mayor para que no sea ruido.</div>`}
+  <div class="card" style="margin-bottom:16px"><h3>Por aviso</h3>
+    <table class="tab"><thead><tr><th>Creativo</th><th class="n">Gasto</th><th class="n">Impresiones</th>
+      <th class="n">CTR link</th><th class="n">CPM</th></tr></thead><tbody>${filas}</tbody></table>
+    <div class="fuente" style="margin:8px 0 0">Se comparan por CTR de link y CPM. El alcance no compara nada: lo define el presupuesto.</div>
+  </div>
+  <div class="reco">${md(a.recomendaciones)}</div>`;
+}
+
 function renderWeb(a){ if(!a||!a.kpis) return; const c=a.kpis.categorias||[];
   new Chart(document.getElementById('cw-cat'),{type:'bar',data:{labels:c.map(x=>x.nombre),
     datasets:[{label:'% OK',data:c.map(x=>x.pct),backgroundColor:c.map(x=>x.pct>=80?GR:(x.pct>=50?GD:OR))}]},
@@ -158,17 +250,18 @@ function renderIg(a){ if(!a||!a.kpis) return; const k=a.kpis;
     options:{indexAxis:'y',maintainAspectRatio:false,scales:{x:{grid:GRID},y:{grid:{display:false}}},plugins:{legend:{display:false}}}});
 }
 async function load(){
-  let web=null, ig=null;
+  let web=null, ig=null, pauta=null;
   try{
-    const [rw,ri]=await Promise.all([fetch('api/auditoria?canal=web'),fetch('api/auditoria?canal=instagram')]);
+    const [rw,ri,rp]=await Promise.all([fetch('api/auditoria?canal=web'),
+      fetch('api/auditoria?canal=instagram'), fetch('api/auditoria?canal=pauta')]);
     if(rw.status===401){location.href='login';return;}
-    web=await rw.json(); ig=await ri.json();
+    web=await rw.json(); ig=await ri.json(); pauta=await rp.json();
   }catch(e){}
   const w=document.getElementById('wrap');
-  const fechas=[web&&web.creada_en, ig&&ig.creada_en].filter(Boolean).sort().pop();
+  const fechas=[web&&web.creada_en, ig&&ig.creada_en, pauta&&pauta.creada_en].filter(Boolean).sort().pop();
   const u=document.getElementById('upd'); if(u&&fechas) u.textContent='generada '+fecha(fechas);
-  if(!web && !ig){ w.innerHTML='<div class="empty">— Todavía no hay auditoría para este proyecto. —</div>'; return; }
-  w.innerHTML = webHTML(web) + igHTML(ig);
+  if(!web && !ig && !pauta){ w.innerHTML='<div class="empty">— Todavía no hay auditoría para este proyecto. —</div>'; return; }
+  w.innerHTML = webHTML(web) + igHTML(ig) + pautaHTML(pauta);
   renderWeb(web); renderIg(ig);
 }
 // ── Generarla ────────────────────────────────────────────────────────────────────────────────

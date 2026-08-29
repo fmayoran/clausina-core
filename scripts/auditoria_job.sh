@@ -70,6 +70,9 @@ except Exception: print('')" 2>/dev/null)
 fi
 IG_SEGUIDORES="$SEG" python3 "$MOTOR/scripts/auditoria_ig.py" "$slug" > "$DIRW/ig.json" 2>>"$LOG" || echo '{}' > "$DIRW/ig.json"
 
+# Pauta: sale de lo que ya sincronizo el cron, asi que no depende de credenciales acá.
+python3 "$MOTOR/scripts/auditoria_pauta.py" "$slug" > "$DIRW/pauta.json" 2>>"$LOG" || echo '{}' > "$DIRW/pauta.json"
+
 # Sin nada medido no hay nada sobre lo que opinar: se corta acá antes de gastar una corrida del
 # creativo para que escriba sobre el vacío.
 hay=$(DIRW="$DIRW" python3 - <<'CALC'
@@ -78,8 +81,8 @@ d = os.environ["DIRW"]
 def leer(p):
     try: return json.load(open(p))
     except Exception: return {}
-w, i = leer(f"{d}/web.json"), leer(f"{d}/ig.json")
-print("si" if (w.get("score") is not None or i.get("global")) else "no")
+w, i, p = leer(f"{d}/web.json"), leer(f"{d}/ig.json"), leer(f"{d}/pauta.json")
+print("si" if (w.get("score") is not None or i.get("global") or p.get("global")) else "no")
 CALC
 )
 [ "$hay" = "si" ] || fallar "No había nada para auditar: el negocio no tiene sitio cargado ni publicaciones con métricas."
@@ -95,7 +98,18 @@ NEGOCIO ACTIVO: '$slug'. Leé su contexto ANTES de escribir nada:
 MEDICIONES YA HECHAS (no las recalcules, no las contradigas):
   Web:       $DIRW/web.json
   Instagram: $DIRW/ig.json
-El bloque 'benchmark' del JSON de Instagram es la referencia contra la que se compara.
+  Pauta:     $DIRW/pauta.json   (si trae 'vacio': true, es que todavía no hay pauta con datos)
+
+CÓMO LEER LOS BENCHMARKS: cada JSON trae un bloque 'metricas' donde CADA métrica ya viene
+comparada, con su 'valor', su 'rango', su 'veredicto' (bien/atencion/mal/sin_dato), su 'texto' y
+su 'fuente'. Usá ESOS veredictos tal cual. NO inventes rangos de referencia ni cites benchmarks de
+memoria: si una métrica no está en 'metricas', no tiene benchmark y se informa sin comparar.
+
+DE LA PAUTA, lo que importa: el CTR comparable es el DE LINK ('ctr_link'), no el total —el total
+cuenta cualquier toque y da 1,5x-2x más alto—. Los avisos se comparan entre sí por CTR de link y
+CPM, NUNCA por impresiones o alcance: eso lo define el presupuesto, no el creativo. Si el JSON
+trae 'ganador', ese es el creativo que gana y ya está validado por volumen; si no lo trae, es
+porque todavía no hay diferencia significativa y hay que decir eso en vez de elegir uno.
 
 TAREA: escribir las recomendaciones de la auditoría, en dos archivos separados.
 
@@ -118,6 +132,11 @@ $DIRW/reco_web.md — con estas secciones:
 $DIRW/reco_ig.md — con estas secciones:
 ## Estado
 ## Lectura
+## Recomendaciones
+
+$DIRW/reco_pauta.md — SÓLO si pauta.json no trae 'vacio'. Con estas secciones:
+## Estado
+## Qué creativo funciona
 ## Recomendaciones
 
 Usá '## ' para los títulos, '- ' para las listas y **negrita** para lo importante. Sin encabezado
@@ -150,6 +169,12 @@ if ig.get("global"):
     sql.append(f"""INSERT INTO contenido.auditorias (negocio_id, canal, periodo, kpis, recomendaciones)
       VALUES ('{neg}','instagram',{dq(ig.get('periodo') or 'histórico')},{dq(json.dumps(ig, ensure_ascii=False))}::jsonb,{dq(texto(f'{dirw}/reco_ig.md'))});""")
     hechos.append(f"instagram {ig['global']['posts']} posts")
+
+pa=leer(f"{dirw}/pauta.json") or {}
+if pa.get("global"):
+    sql.append(f"""INSERT INTO contenido.auditorias (negocio_id, canal, periodo, kpis, recomendaciones)
+      VALUES ('{neg}','pauta',{dq(pa.get('periodo') or 'histórico')},{dq(json.dumps(pa, ensure_ascii=False))}::jsonb,{dq(texto(f'{dirw}/reco_pauta.md'))});""")
+    hechos.append(f"pauta US${pa['global']['gasto']:.0f}")
 
 if not sql:
     resumen = "No había nada para auditar: el negocio no tiene sitio cargado ni publicaciones con métricas."
