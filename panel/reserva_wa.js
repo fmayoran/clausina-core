@@ -871,6 +871,11 @@ async function noEntendi(cfg, negocio, waId, canal, ofreceReservas, entrada, dat
   const trabas = (Number(datos.trabas) || 0) + 1;
   if (trabas >= TRABAS_MAX) {
     await db.setConversacion(negocio.id, waId, 'ofrecido', {});
+    // Queda esperando a una persona. Este es el caso MÁS necesario de marcar y el más fácil de
+    // pasar por alto: acá el bot no dice "no sé" —cree estar entendiendo y repite la consigna—,
+    // así que sin esto la conversación se cortaba en silencio. Le pasó a una clienta que quería
+    // reservar para más de 12 y se fue sin que nadie se enterara.
+    await db.marcarRequiereAccion(negocio.id, waId).catch(() => {});
     return await ofrecerMenu(cfg, negocio, waId, canal, ofreceReservas,
       'Perdón, no te estoy entendiendo. ¿Cómo seguimos?') || true;
   }
