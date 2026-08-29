@@ -246,7 +246,9 @@ function igHTML(a){
     ${kpi(nfmt(g.compart_prom),'Compartidos/post')}
   </div>
   ${(k.historias)
-    ? `<div class="kpis">
+    ? `<div class="sect" style="margin-top:18px"><span class="t" style="font-size:1.1rem">Historias</span>
+        <span class="m">${nfmt(k.historias.n)} medidas desde ${esc(k.historias.desde||'')}</span></div>
+       <div class="kpis">
         ${kpi(nfmt(k.historias.n),'Historias medidas')}
         ${kpi(nfmt(k.historias.reach_prom),'Alcance promedio')}
         ${kpi(nfmt(k.historias.views_prom),'Vistas promedio')}
