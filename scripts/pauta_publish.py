@@ -61,19 +61,35 @@ def load_env(path):
 
 
 def config_for_campania(cid):
-    """Config de ads de la marca dueña de la campaña, desde el perfil (DB). Agnóstico.
-    IDs en claro; token descifrado con APP_ENC_KEY. Devuelve dict {act,page,ig,token,slug}."""
+    """Credenciales de la plataforma donde vive esta campaña.
+
+    Salen de `contenido.pauta_cuenta` —una fila por negocio Y plataforma— y ya no de los campos
+    meta_ads_* del perfil, que ataban toda la pauta de la plataforma a un solo proveedor. Lo que
+    cambia entre plataformas vive en `config` (Meta: page_id e ig_id; Google: customer_id), así
+    sumar una no toca el esquema.
+
+    Devuelve {plataforma, act, token, slug, cfg}. `page` e `ig` se mantienen como atajo porque los
+    usa todo el adaptador de Meta; para otra plataforma se lee `cfg`.
+    """
     row = psql(
-        "SELECT coalesce(pp.meta_ads_account_id,'')||'|'||coalesce(pp.meta_ads_page_id,'')||'|'||"
-        "coalesce(pp.meta_ads_ig_id,'')||'|'||coalesce(pp.meta_ads_token_enc,'')||'|'||p.slug "
+        "SELECT coalesce(c.plataforma,'meta')||'|'||coalesce(pc.cuenta_id,'')||'|'||"
+        "coalesce(pc.token_enc,'')||'|'||p.slug||'|'||coalesce(pc.config::text,'{}') "
         "FROM contenido.pauta_campania c JOIN contenido.negocios p ON p.id=c.negocio_id "
-        "JOIN contenido.negocio_perfil pp ON pp.negocio_id=c.negocio_id "
+        "LEFT JOIN contenido.pauta_cuenta pc "
+        "       ON pc.negocio_id=c.negocio_id AND pc.plataforma=coalesce(c.plataforma,'meta') "
         f"WHERE c.id='{cid}'")
     if not row:
-        raise RuntimeError("la campaña no tiene pauta configurada en el perfil de la marca")
-    act, page, ig, tok_enc, slug = row.split("|", 4)
-    return {"act": act, "page": page, "ig": ig,
-            "token": ads_crypto.decrypt(tok_enc) if tok_enc else "", "slug": slug}
+        raise RuntimeError("no encuentro la campaña")
+    plataforma, act, tok_enc, slug, cfg_json = row.split("|", 4)
+    if not act:
+        raise RuntimeError(f"{slug} no tiene cuenta de {plataforma} configurada")
+    try:
+        cfg = json.loads(cfg_json or "{}")
+    except ValueError:
+        cfg = {}
+    return {"plataforma": plataforma, "act": act, "slug": slug, "cfg": cfg,
+            "page": cfg.get("page_id", ""), "ig": cfg.get("ig_id", ""),
+            "token": ads_crypto.decrypt(tok_enc) if tok_enc else ""}
 
 
 def graph(method, path, params):
@@ -208,14 +224,14 @@ def crear(cid):
 
     row = psql("SELECT row_to_json(t) FROM (SELECT c.nombre,c.objetivo,c.audiencia,c.presupuesto,"
                "to_char(c.fecha_inicio,'YYYY-MM-DD') fi,to_char(c.fecha_fin,'YYYY-MM-DD') ff,"
-               "c.url_destino,c.cta,c.meta_campaign_id,"
+               "c.url_destino,c.cta,c.ext_campania_id,"
                "(SELECT p.dominio_web FROM contenido.negocios p WHERE p.id=c.negocio_id) dominio,"
                "(SELECT m.tipo::text FROM contenido.media m WHERE m.pieza_id=c.pieza_id ORDER BY m.orden LIMIT 1) tipo_media "
                f"FROM contenido.pauta_campania c WHERE c.id='{cid}') t;")
     if not row:
         raise RuntimeError("campaña inexistente")
     d = json.loads(row)
-    if d.get("meta_campaign_id"):
+    if d.get("ext_campania_id"):
         return "ya creada"
 
     # Las piezas de la campaña, en orden. Cada una va a ser UN anuncio dentro del MISMO conjunto:
@@ -291,17 +307,17 @@ def crear(cid):
                 "name": nombre_ad, "adset_id": adset_id,
                 "creative": json.dumps({"creative_id": creative["id"]}),
                 "status": "PAUSED", "access_token": token})
-            psql(f"UPDATE contenido.pauta_campania_pieza SET meta_creative_id={dq(creative['id'])}, "
-                 f"meta_ad_id={dq(ad['id'])} WHERE id='{pz['rel']}';")
+            psql(f"UPDATE contenido.pauta_campania_pieza SET ext_creativo_id={dq(creative['id'])}, "
+                 f"ext_aviso_id={dq(ad['id'])} WHERE id='{pz['rel']}';")
             ads_ids.append(ad["id"])
 
         cuantos = f"{len(ads_ids)} anuncios" if len(ads_ids) > 1 else "1 anuncio"
         set_estado(cid, "pausada",
                    f"Creada en Meta (pausada) con {cuantos}. Presupuesto {'diario' if es_diario else 'total'} "
                    f"{monto_cents/100:.0f} {pres.get('moneda','USD')}. Activala para que empiece a correr.",
-                   # meta_ad_id guarda el primero por compatibilidad; el detalle por pieza vive en
+                   # ext_aviso_id guarda el primero por compatibilidad; el detalle por pieza vive en
                    # pauta_campania_pieza, que es de donde sale el rendimiento por anuncio.
-                   meta={"meta_campaign_id": camp_id, "meta_adset_id": adset_id, "meta_ad_id": ads_ids[0]})
+                   meta={"ext_campania_id": camp_id, "ext_conjunto_id": adset_id, "ext_aviso_id": ads_ids[0]})
         return "ok:" + camp_id
     except Exception as e:
         # Limpieza: borrar la campaña a medias en Meta para que el reintento sea limpio.
@@ -320,7 +336,7 @@ def crear(cid):
 def _set_status(cid, status, nuevo_estado):
     """Activar o pausar TODOS los objetos de la campaña en Meta.
 
-    Los anuncios se leen de `pauta_campania_pieza`, no de `pauta_campania.meta_ad_id`: ese campo
+    Los anuncios se leen de `pauta_campania_pieza`, no de `pauta_campania.ext_aviso_id`: ese campo
     guarda sólo el PRIMER anuncio, por compatibilidad con las campañas de un solo creativo. Cuando
     la campaña pasó a ser multi-anuncio, activar seguía tocando uno solo y el resto quedaba en
     PAUSED para siempre —con la campaña y el conjunto en ACTIVE, así que no se veía nada raro
@@ -328,13 +344,13 @@ def _set_status(cid, status, nuevo_estado):
     El Oso nunca llegó a mostrarse y parecía que alguien lo había pausado a mano.
     """
     token = config_for_campania(cid)["token"]
-    ids = psql("SELECT coalesce(meta_campaign_id,'')||'|'||coalesce(meta_adset_id,'') "
+    ids = psql("SELECT coalesce(ext_campania_id,'')||'|'||coalesce(ext_conjunto_id,'') "
                f"FROM contenido.pauta_campania WHERE id='{cid}';").split("|")
-    anuncios = psql("SELECT coalesce(meta_ad_id,'') FROM contenido.pauta_campania_pieza "
-                    f"WHERE campania_id='{cid}' AND meta_ad_id IS NOT NULL ORDER BY orden;").split("\n")
-    # Campañas viejas (un creativo) no tienen filas en pauta_campania_pieza: ahí vale meta_ad_id.
+    anuncios = psql("SELECT coalesce(ext_aviso_id,'') FROM contenido.pauta_campania_pieza "
+                    f"WHERE campania_id='{cid}' AND ext_aviso_id IS NOT NULL ORDER BY orden;").split("\n")
+    # Campañas viejas (un creativo) no tienen filas en pauta_campania_pieza: ahí vale ext_aviso_id.
     if not any(a.strip() for a in anuncios):
-        anuncios = [psql(f"SELECT coalesce(meta_ad_id,'') FROM contenido.pauta_campania WHERE id='{cid}';")]
+        anuncios = [psql(f"SELECT coalesce(ext_aviso_id,'') FROM contenido.pauta_campania WHERE id='{cid}';")]
     ids += [a.strip() for a in anuncios]
     for oid in ids:
         if oid:
@@ -352,7 +368,7 @@ def _set_status(cid, status, nuevo_estado):
 def borrar(cid):
     """Descartar una campaña ya creada: la borra en Meta (cascada a conjunto/anuncio) y marca descartada."""
     token = config_for_campania(cid)["token"]
-    camp = psql(f"SELECT coalesce(meta_campaign_id,'') FROM contenido.pauta_campania WHERE id='{cid}';")
+    camp = psql(f"SELECT coalesce(ext_campania_id,'') FROM contenido.pauta_campania WHERE id='{cid}';")
     if camp:
         try:
             graph("POST", camp, {"status": "DELETED", "access_token": token})
@@ -360,8 +376,8 @@ def borrar(cid):
             if "does not exist" not in str(e).lower() and "cannot be loaded" not in str(e).lower():
                 set_estado(cid, "error", f"No se pudo borrar en Meta: {e}")
                 raise
-    psql("UPDATE contenido.pauta_campania SET estado='descartada', meta_campaign_id=NULL, "
-         f"meta_adset_id=NULL, meta_ad_id=NULL, actualizado_en=now() WHERE id='{cid}';")
+    psql("UPDATE contenido.pauta_campania SET estado='descartada', ext_campania_id=NULL, "
+         f"ext_conjunto_id=NULL, ext_aviso_id=NULL, actualizado_en=now() WHERE id='{cid}';")
     return "ok"
 
 

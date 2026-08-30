@@ -221,24 +221,24 @@ def fetch_ad_daily(act, token):
     return out
 
 
-def upsert_ad_daily(pid, filas):
+def upsert_ad_daily(pid, filas, plataforma="meta"):
     for d in filas:
         psql(
-            "INSERT INTO contenido.ads_ad_daily(negocio_id,meta_ad_id,fecha,gasto,impresiones,alcance,clics,clics_link,actualizado_en) "
-            f"VALUES('{pid}','{d['ad_id']}','{d['fecha']}',{d['gasto']},{d['impresiones']},{d['alcance']},{d['clics']},{d.get('clics_link',0)},now()) "
-            "ON CONFLICT(negocio_id,meta_ad_id,fecha) DO UPDATE SET gasto=EXCLUDED.gasto,"
+            "INSERT INTO contenido.ads_ad_daily(negocio_id,plataforma,ext_aviso_id,fecha,gasto,impresiones,alcance,clics,clics_link,actualizado_en) "
+            f"VALUES('{pid}','{plataforma}','{d['ad_id']}','{d['fecha']}',{d['gasto']},{d['impresiones']},{d['alcance']},{d['clics']},{d.get('clics_link',0)},now()) "
+            "ON CONFLICT(negocio_id,plataforma,ext_aviso_id,fecha) DO UPDATE SET gasto=EXCLUDED.gasto,"
             "impresiones=EXCLUDED.impresiones,alcance=EXCLUDED.alcance,clics=EXCLUDED.clics,"
             "clics_link=EXCLUDED.clics_link,actualizado_en=now();")
 
 
-def upsert_daily(pid, daily):
+def upsert_daily(pid, daily, plataforma="meta"):
     for d in daily:
         if not d.get("fecha"):
             continue
         psql(
-            "INSERT INTO contenido.ads_daily(negocio_id,fecha,gasto,impresiones,alcance,clics,clics_link,actualizado_en) "
-            f"VALUES('{pid}','{d['fecha']}',{d['gasto']},{d['impresiones']},{d['alcance']},{d['clics']},{d.get('clics_link',0)},now()) "
-            "ON CONFLICT(negocio_id,fecha) DO UPDATE SET gasto=EXCLUDED.gasto,impresiones=EXCLUDED.impresiones,"
+            "INSERT INTO contenido.ads_daily(negocio_id,plataforma,fecha,gasto,impresiones,alcance,clics,clics_link,actualizado_en) "
+            f"VALUES('{pid}','{plataforma}','{d['fecha']}',{d['gasto']},{d['impresiones']},{d['alcance']},{d['clics']},{d.get('clics_link',0)},now()) "
+            "ON CONFLICT(negocio_id,plataforma,fecha) DO UPDATE SET gasto=EXCLUDED.gasto,impresiones=EXCLUDED.impresiones,"
             "alcance=EXCLUDED.alcance,clics=EXCLUDED.clics,clics_link=EXCLUDED.clics_link,actualizado_en=now();")
 
 

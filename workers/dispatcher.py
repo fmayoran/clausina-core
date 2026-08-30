@@ -335,7 +335,7 @@ def det_pauta_sync():
 def det_campania_meta():
     # Creación en Meta de campañas aprobadas (aún sin crear) + pedidos de activar/pausar.
     specs = {
-        "crear":   "c.estado='aprobada' AND c.meta_campaign_id IS NULL",
+        "crear":   "c.estado='aprobada' AND c.ext_campania_id IS NULL",
         "activar": "c.estado='activar'",
         "pausar":  "c.estado='pausar'",
         "borrar":  "c.estado='descartar'",

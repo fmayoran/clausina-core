@@ -1092,7 +1092,7 @@ function presTxt(p,cur){ p=p||{}; if(!p.monto) return '—'; return money(p.mont
 function campThumb(c){ const u=(c.pieza_tipo==='video'&&c.pieza_poster)?c.pieza_poster:c.pieza_url; return u?`<img class="camp-thumb" src="${esc(u)}" onerror="this.style.visibility='hidden'">`:'<span class="camp-thumb ph"></span>'; }
 function campCard(c){
   const [lbl,cls]=CAMP_EST[c.estado]||[c.estado,''];
-  const lv=c.meta_campaign_id?_LIVEBYID[c.meta_campaign_id]:null;   // métricas en vivo de Meta
+  const lv=c.ext_campania_id?_LIVEBYID[c.ext_campania_id]:null;   // métricas en vivo de Meta
   const metr=lv?`<div class="camp-m"><span>Gasto <b>${money(lv.gasto,_CAMPCUR)}</b></span><span>Alcance <b>${nf(lv.alcance)}</b></span><span>Impresiones <b>${nf(lv.impresiones)}</b></span><span>Clics <b>${nf(lv.clics)}</b></span><span>CTR <b>${pct(lv.ctr)}</b></span></div>`:'';
   return `<a class="camp cclick" href="#" onclick="openCamp('${c.id}');return false;">
     <div class="camp-top">${campThumb(c)}<div style="flex:1;min-width:0">
@@ -1166,7 +1166,7 @@ async function loadPauta(){
     _CAMPS=cc.campanias||[]; _CAMPCUR=cur; _EVOL=Array.isArray(re)?re:[]; _PAUTAAT=d.capturado_en||'';
     // Métricas en vivo de Meta por id de campaña + dedup: lo que ya es borrador no se repite abajo.
     const live=d.campanias||[]; _LIVEBYID={}; live.forEach(k=>{ if(k.id) _LIVEBYID[k.id]=k; });
-    const draftMetaIds=new Set(_CAMPS.map(x=>x.meta_campaign_id).filter(Boolean));
+    const draftMetaIds=new Set(_CAMPS.map(x=>x.ext_campania_id).filter(Boolean));
     const liveSolo=live.filter(k=>!draftMetaIds.has(k.id));
     const acctSt = c.estado===1 ? 'ok' : (c.estado>=100 ? 'warn' : '');
     let h=`<div class="pauta-head">
@@ -1264,7 +1264,7 @@ function openCamp(id){
   else if(['aprobada','activar','pausar','descartar'].includes(c.estado)) acts.innerHTML=`<span class="cm-note">El motor está aplicando el cambio en Meta… (se refresca solo)</span>`;
   else if(c.estado==='pausada') acts.innerHTML=`<span class="cm-note" style="flex:1">Creada <b>pausada</b> en Meta. No gasta hasta que la actives.</span><button class="btn ok" onclick="activarCamp('${c.id}')">Activar</button>`;
   else if(c.estado==='activa') acts.innerHTML=`<span class="cm-note" style="flex:1">Corriendo en Meta.</span><button class="btn no" onclick="pausarCamp('${c.id}')">Pausar</button>`;
-  else if(c.estado==='error') acts.innerHTML=`<button class="btn del" onclick="descartarCamp('${c.id}')">Descartar</button>${c.meta_campaign_id?'':`<button class="btn ok" onclick="reintentarCamp('${c.id}')">Reintentar</button>`}`;
+  else if(c.estado==='error') acts.innerHTML=`<button class="btn del" onclick="descartarCamp('${c.id}')">Descartar</button>${c.ext_campania_id?'':`<button class="btn ok" onclick="reintentarCamp('${c.id}')">Reintentar</button>`}`;
   else acts.innerHTML='';
   document.getElementById('campmodal').classList.remove('hidden');
 }

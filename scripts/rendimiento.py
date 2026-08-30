@@ -90,7 +90,7 @@ pagas = psql(f"""
          min(a.fecha)::text, max(a.fecha)::text
     FROM contenido.ads_ad_daily a
     JOIN contenido.negocios n ON n.id = a.negocio_id
-    JOIN contenido.pauta_campania_pieza cp ON cp.meta_ad_id = a.meta_ad_id
+    JOIN contenido.pauta_campania_pieza cp ON cp.ext_aviso_id = a.ext_aviso_id
     JOIN contenido.piezas p2 ON p2.id = cp.pieza_id
    WHERE n.slug='{A.slug}'
    GROUP BY p2.numero, p2.titulo_interno

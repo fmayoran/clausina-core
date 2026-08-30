@@ -247,7 +247,7 @@ async function getPerfil(negocioId) {
 const CAPS = [
   { id: 'estilo',    grupo: 'identidad',    label: 'Estilo de marca',    icon: 'palette',           href: 'identidad#estilo', desc: 'Sistema de diseño e identidad visual' },
   { id: 'instagram', grupo: 'comunicacion', label: 'Instagram',          icon: 'instagram',         href: 'instagram', desc: 'Publicaciones del feed' },
-  { id: 'pauta',     grupo: 'comunicacion', label: 'Pauta Instagram',    icon: 'badge-dollar-sign', href: 'pauta',     desc: 'Publicidad y pauta (Meta Ads)', depende: ['instagram'] },
+  { id: 'pauta',     grupo: 'comunicacion', label: 'Pauta',              icon: 'badge-dollar-sign', href: 'pauta',     desc: 'Publicidad paga. Hoy Meta; el circuito es el mismo para cualquier plataforma', depende: ['instagram'] },
   { id: 'pantalla',  grupo: 'comunicacion', label: 'Avisos en pantalla', icon: 'megaphone',         href: 'avisos',    desc: 'Avisos para la pantalla de calle' },
   { id: 'web',       grupo: 'comunicacion', label: 'Web / Landing',      icon: 'globe',             href: 'landing',   desc: 'Sitio del negocio' },
   { id: 'whatsapp',  grupo: 'comunicacion', label: 'WhatsApp',            icon: 'message-circle',    href: 'whatsapp',  desc: 'Número propio del negocio para hablar con sus clientes' },
@@ -273,10 +273,9 @@ function evaluarCap(cap, d, cfg) {
     if (!d.ig_user_id) faltan.push('IG user id');
     if (!d.ig_token_enc) faltan.push('token de Instagram');
   } else if (cap.id === 'pauta') {
-    if (!d.meta_ads_account_id) faltan.push('ad account id');
-    if (!d.meta_ads_page_id) faltan.push('page id');
-    if (!d.meta_ads_ig_id) faltan.push('IG account id (ads)');
-    if (!d.meta_ads_token_enc) faltan.push('token de Meta Ads');
+    // Alcanza con UNA plataforma configurada: la capacidad es "puede pautar", no "puede pautar en
+    // Meta". Cuál está conectada se ve en la pantalla de Pauta.
+    if (!d.pauta_plataformas) faltan.push('una cuenta de pauta conectada (Meta, Google…)');
   } else if (cap.id === 'web') {
     if (!d.dominio_web) faltan.push('dominio');
     if (!cfg.modo) faltan.push('modo (administrada o referencia)');
@@ -306,6 +305,8 @@ async function getCapacidades(negocioId) {
     `SELECT p.ig_handle, p.ig_user_id, p.dominio_web, pp.estilo_md, pp.ig_token_enc,
             pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id, pp.meta_ads_token_enc,
             pp.wa_phone_id, pp.wa_waba_id, pp.wa_token_enc,
+            (SELECT count(*) FROM contenido.pauta_cuenta pc
+               WHERE pc.negocio_id=p.id AND pc.cuenta_id IS NOT NULL AND pc.token_enc IS NOT NULL)::int AS pauta_plataformas,
             (SELECT count(*) FROM contenido.turno t WHERE t.negocio_id=p.id AND t.activo)::int AS turnos_activos,
             (SELECT count(*) FROM contenido.beneficio b WHERE b.negocio_id=p.id AND b.activo)::int AS beneficios_activos
        FROM contenido.negocios p LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id
@@ -4623,14 +4624,14 @@ async function getPautaCampanias(negocioId) {
   const { rows } = await pool.query(
     `SELECT c.id, c.estado, c.nombre, c.objetivo, c.pieza_id, c.razon, c.audiencia, c.presupuesto,
             c.fecha_inicio, c.fecha_fin, c.url_destino, c.cta, c.resumen,
-            c.meta_campaign_id, c.creado_en, c.aprobado_en,
+            c.ext_campania_id, c.creado_en, c.aprobado_en,
             pz.numero AS pieza_numero, r.ig_permalink AS pieza_permalink, r.caption AS pieza_caption,
             m.url AS pieza_url, m.poster_url AS pieza_poster, m.tipo AS pieza_tipo,
             -- Todos los creativos de la campaña: la tarjeta muestra el principal, pero el selector
             -- y el reporte por anuncio necesitan la lista entera.
             (SELECT COALESCE(json_agg(json_build_object(
                       'pieza_id', cp.pieza_id, 'numero', p2.numero, 'orden', cp.orden,
-                      'meta_ad_id', cp.meta_ad_id,
+                      'ext_aviso_id', cp.ext_aviso_id,
                       'url', m2.url, 'poster_url', m2.poster_url, 'tipo', m2.tipo) ORDER BY cp.orden), '[]'::json)
                FROM contenido.pauta_campania_pieza cp
                JOIN contenido.piezas p2 ON p2.id = cp.pieza_id
@@ -4668,7 +4669,7 @@ async function descartarCampania(negocioId, id) {
   // Si no, se descarta directo.
   const { rowCount } = await pool.query(
     `UPDATE contenido.pauta_campania
-        SET estado = CASE WHEN meta_campaign_id IS NOT NULL THEN 'descartar' ELSE 'descartada' END,
+        SET estado = CASE WHEN ext_campania_id IS NOT NULL THEN 'descartar' ELSE 'descartada' END,
             actualizado_en=now()
       WHERE id=$1 AND negocio_id=$2 AND estado NOT IN ('descartada','descartar')`, [id, negocioId]);
   return rowCount > 0;
@@ -4678,7 +4679,7 @@ async function descartarCampania(negocioId, id) {
 async function activarCampania(negocioId, id) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.pauta_campania SET estado='activar', actualizado_en=now()
-      WHERE id=$1 AND negocio_id=$2 AND estado='pausada' AND meta_campaign_id IS NOT NULL`, [id, negocioId]);
+      WHERE id=$1 AND negocio_id=$2 AND estado='pausada' AND ext_campania_id IS NOT NULL`, [id, negocioId]);
   return rowCount > 0;
 }
 async function pausarCampania(negocioId, id) {
@@ -4719,7 +4720,7 @@ async function setCreativosCampania(negocioId, id, piezaIds) {
     await cli.query('BEGIN');
     const { rows: [c] } = await cli.query(
       `SELECT id FROM contenido.pauta_campania
-        WHERE id=$1 AND negocio_id=$2 AND estado='propuesta' AND meta_campaign_id IS NULL`,
+        WHERE id=$1 AND negocio_id=$2 AND estado='propuesta' AND ext_campania_id IS NULL`,
       [id, negocioId]);
     if (!c) { await cli.query('ROLLBACK'); return { ok: false, error: 'no_editable' }; }
     // Que todas las piezas sean de este negocio: sin esto se podría pautar la pieza de otro.
@@ -4771,7 +4772,7 @@ async function editarPautaCampania(negocioId, id, campos) {
 
   const { rows: [c0] } = await pool.query(
     `SELECT presupuesto, fecha_inicio, fecha_fin FROM contenido.pauta_campania
-      WHERE id=$1 AND negocio_id=$2 AND estado='propuesta' AND meta_campaign_id IS NULL`,
+      WHERE id=$1 AND negocio_id=$2 AND estado='propuesta' AND ext_campania_id IS NULL`,
     [id, negocioId]);
   if (!c0) return { ok: false, error: 'no_editable' };
 
@@ -4789,14 +4790,14 @@ async function editarPautaCampania(negocioId, id, campos) {
 
   const { rowCount } = await pool.query(
     `UPDATE contenido.pauta_campania SET ${set.join(', ')}, actualizado_en=now()
-      WHERE id=$1 AND negocio_id=$2 AND estado='propuesta' AND meta_campaign_id IS NULL`, val);
+      WHERE id=$1 AND negocio_id=$2 AND estado='propuesta' AND ext_campania_id IS NULL`, val);
   return rowCount > 0 ? { ok: true } : { ok: false, error: 'no_editable' };
 }
 
 async function reintentarCampania(negocioId, id) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.pauta_campania SET estado='aprobada', resumen=NULL, actualizado_en=now()
-      WHERE id=$1 AND negocio_id=$2 AND estado='error' AND meta_campaign_id IS NULL`, [id, negocioId]);
+      WHERE id=$1 AND negocio_id=$2 AND estado='error' AND ext_campania_id IS NULL`, [id, negocioId]);
   return rowCount > 0;
 }
 

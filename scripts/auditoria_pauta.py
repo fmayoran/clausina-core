@@ -69,7 +69,7 @@ def main():
                sum(coalesce(a.clics_link,0))::bigint AS clics_link
           FROM contenido.ads_ad_daily a
           JOIN contenido.negocios n ON n.id = a.negocio_id
-          JOIN contenido.pauta_campania_pieza cp ON cp.meta_ad_id = a.meta_ad_id
+          JOIN contenido.pauta_campania_pieza cp ON cp.ext_aviso_id = a.ext_aviso_id
           JOIN contenido.piezas p ON p.id = cp.pieza_id
          WHERE n.slug = '{slug}'
          GROUP BY p.numero, p.titulo_interno
