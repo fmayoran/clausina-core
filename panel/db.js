@@ -227,7 +227,7 @@ async function getProyectoId(slug) {
 async function getPerfil(negocioId) {
   const { rows: [r] } = await pool.query(
     `SELECT p.nombre, p.ig_handle, p.ig_user_id, p.dominio_web, p.telegram_chat_id, p.email, p.whatsapp,
-            p.whatsapp_directo, p.gestion, p.prefijo,
+            p.whatsapp_directo, p.ga_id, p.gestion, p.prefijo,
             pp.slogan, pp.logo, pp.logo_claro, pp.brief_md, pp.estilo_md, pp.referencias_md, pp.actualizado_en,
             pp.meta_ads_account_id, pp.meta_ads_page_id, pp.meta_ads_ig_id,
             (pp.meta_ads_token_enc IS NOT NULL) AS meta_ads_token_set,
@@ -953,13 +953,15 @@ async function guardarPerfil(negocioId, d) {
        telegram_chat_id = CASE WHEN $11 THEN $5 ELSE telegram_chat_id END,
        email = CASE WHEN $12 THEN $6 ELSE email END,
        whatsapp = CASE WHEN $13 THEN $7 ELSE whatsapp END,
-       whatsapp_directo = CASE WHEN $15 THEN $14 ELSE whatsapp_directo END
+       whatsapp_directo = CASE WHEN $15 THEN $14 ELSE whatsapp_directo END,
+       ga_id = CASE WHEN $17 THEN $16 ELSE ga_id END
      WHERE id=$1`,
     [negocioId, q('ig_handle'), q('dominio_web'), q('ig_user_id'), q('telegram_chat_id'),
      q('email'), q('whatsapp'),
      d.ig_handle !== undefined, d.dominio_web !== undefined, d.ig_user_id !== undefined,
      d.telegram_chat_id !== undefined, d.email !== undefined, d.whatsapp !== undefined,
-     q('whatsapp_directo'), d.whatsapp_directo !== undefined]);
+     q('whatsapp_directo'), d.whatsapp_directo !== undefined,
+     q('ga_id'), d.ga_id !== undefined]);
   if (typeof d.prefijo === 'string') {
     const pf = d.prefijo.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
     if (pf) { await pool.query('UPDATE contenido.negocios SET prefijo=$2 WHERE id=$1', [negocioId, pf]); _negociosAt = 0; }
@@ -3380,14 +3382,20 @@ async function ofertaLanding(slug) {
        JOIN contenido.negocios p ON p.id = nc.negocio_id
       WHERE p.slug=$1 AND p.activo AND nc.capacidad='web' AND nc.habilitada`, [slug]);
   const expone = ((w && w.config && w.config.expone) || []);
-  if (!expone.includes('reservas')) return { reservas: null };
+  // El ID de analítica va aparte de las reservas: medir el sitio no depende de que el negocio
+  // tenga el botón colgado, y devolverlo sólo en ese caso dejaba sin medición a media plataforma.
+  const { rows: [g] } = await pool.query(
+    'SELECT ga_id FROM contenido.negocios WHERE slug=$1 AND activo', [slug]);
+  const ga = (g && g.ga_id) || null;
+  if (!expone.includes('reservas')) return { reservas: null, ga_id: ga };
   const n = await negocioPublico(slug);          // respeta el opt-in público
-  if (!n) return { reservas: null };
+  if (!n) return { reservas: null, ga_id: ga };
   const cfgRes = await getConfigReservas(n.id);
   // El botón apunta SIEMPRE a /r/<slug>, y es esa ruta la que decide si muestra la página o manda
   // a WhatsApp. Así el interruptor vale también para los links ya repartidos —invitaciones,
   // campañas, el QR de la mesa— y no sólo para el botón que se dibuja hoy.
   return {
+    ga_id: ga,
     reservas: {
       url: `/r/${n.slug}`,
       // Sin rótulo propio, el que corresponde al canal: "Reservar" a secas, frente a un botón que
