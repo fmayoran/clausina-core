@@ -397,7 +397,20 @@ function pubCard(p){
   const mini = t ? `<a class="mw" href="${esc(full)}" target="_blank" rel="noopener" title="Abrir completa"><img class="mini" loading="lazy" src="${esc(t)}" onerror="this.style.display='none'"></a>` : '';
   const ig = p.ig_permalink ? `<a class="link" href="${esc(p.ig_permalink)}" target="_blank" rel="noopener">Ver en Instagram ↗</a>` : '';
   const met = (p.m_views!=null) ? `<div class="metr"><b>${nf(p.m_views)}</b> vistas · ${nf(p.m_reach)} alcance · ${nf(p.m_likes)} likes</div>` : '';
-  const collab = (p.colaboradores && p.colaboradores.length) ? `<span class="badge collab" title="Colaboración (Collab)">Collab: ${p.colaboradores.map(h=>'@'+esc(h)).join(', ')}</span>` : '';
+  // La colaboración sólo duplica el alcance si la otra cuenta ACEPTA. Una invitación pendiente no
+  // hace nada y no avisa nadie: por eso el estado se muestra acá, pegado a cada cuenta, y no como
+  // un dato aparte que hay que ir a buscar.
+  const ce = p.colab_estado || null;
+  const collab = (p.colaboradores && p.colaboradores.length) ? (() => {
+    const partes = p.colaboradores.map(h => {
+      const st = ce ? ce[h] : null;
+      if (!st) return '@' + esc(h);
+      const ok = String(st).toLowerCase() === 'accepted';
+      return `@${esc(h)}<i class="cst ${ok?'si':'no'}" title="${ok?'Aceptó la colaboración':'Invitación sin aceptar: el post no sale en su cuenta'}">${ok?'✓':'pendiente'}</i>`;
+    });
+    const colgada = ce && p.colaboradores.some(h => ce[h] && String(ce[h]).toLowerCase() !== 'accepted');
+    return `<span class="badge collab${colgada?' pend':''}" title="Colaboración (Collab)">Collab: ${partes.join(', ')}</span>`;
+  })() : '';
   return `<div class="card row">${mini}<div class="rbody">
     <div class="tt">${esc(p.titulo_interno)}</div>
     <div class="meta">${cfBadge(p)}${fmtBadge(p)}${revBadge(p)}${collab}<span>${fecha(p.publicado_en)}</span></div>

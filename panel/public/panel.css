@@ -127,6 +127,10 @@ header .marcasel:hover{border-color:var(--fire);}
 .bpempty{padding:24px;color:var(--ash);font-family:'JetBrains Mono',monospace;font-size:12px;}
 /* Colaboradores (Collab) */
 .badge.collab{color:var(--fire);border-color:#3a4a1e;background:rgba(204,242,77,.08);}
+/* Colaboración con alguna invitación sin aceptar: coral, la convención de 'en curso' del panel. */
+.badge.collab.pend{color:var(--pend,#FF6A45);border-color:rgba(255,106,69,.45);background:rgba(255,106,69,.08);}
+.badge.collab .cst{font-style:normal;font-size:.82em;opacity:.85;margin-left:2px;}
+.badge.collab .cst.no{color:var(--pend,#FF6A45);opacity:1;font-weight:600;}
 .colabov{position:fixed;inset:0;z-index:130;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(0,0,0,.66);}
 .colabbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;max-width:460px;width:100%;padding:18px 20px;}
 .colabhead{display:flex;align-items:center;gap:10px;margin-bottom:4px;}

@@ -3683,6 +3683,7 @@ async function getPiezas(canal, negocioId) {
     SELECT pz.id, pz.numero, pz.canal, pz.titulo_interno, pz.estado, pz.creado_en, pz.actualizado_en,
            r.nro, r.formato, r.motivo_rechazo, r.derivado_en,
            COALESCE(r.colaboradores, (SELECT ig_colaboradores FROM contenido.negocios WHERE id=pz.negocio_id)) AS colaboradores,
+           r.colab_estado,
            (r.bitacora IS NOT NULL) AS tiene_bitacora,
            r.ig_post_id, r.ig_permalink, r.publicado_en, r.aprobado_en, r.caption,
            r.daypart, r.clima, r.transito, r.momento, r.duracion_s,
