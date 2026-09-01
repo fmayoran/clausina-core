@@ -1964,6 +1964,10 @@ app.get('/oauth/google/callback', soloAdmin, async (req, res) => {
   }
 });
 
+app.get('/api/colaboraciones', async (req, res) => {
+  try { res.json({ items: await db.getColaboracionesExternas(req.negocioId) }); }
+  catch (e) { console.error('colaboraciones', e.message); res.status(500).json({ error: 'db' }); }
+});
 app.get('/api/pauta/cuentas', async (req, res) => {
   try { res.json({ cuentas: await db.getPautaCuentas(req.negocioId), oauth: gauth.configurado() }); }
   catch (e) { console.error('pauta-cuentas', e.message); res.status(500).json({ error: 'db' }); }

@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
 <link rel="stylesheet" href="tw.css">
-<link rel="stylesheet" href="panel.css?v=20260829c">
+<link rel="stylesheet" href="panel.css?v=20260901">
 </head>
 <body>
   <header>
@@ -32,6 +32,18 @@
     <div class="col pend"><h2><span class="dot"></span>Pendiente de aprobación <span class="n" id="n-pend"></span></h2><div class="cards" id="c-pend"></div></div>
     <div class="col pub"><h2><span class="dot"></span>Publicada <span class="n" id="n-pub"></span></h2><div class="cards" id="c-pub"></div></div>
   </div>
+  <!-- Publicaciones de otra cuenta donde este negocio colabora. Salen en su grilla de Instagram
+       pero no le pertenecen, y su propia API no se las devuelve: se leen desde quien publicó.
+       Van en su propia franja y no entre las publicadas, porque no las hicimos nosotros. -->
+  <div id="colabs-zona" class="hidden" style="margin-top:26px">
+    <h2 style="font-family:'Barlow Condensed',sans-serif;font-size:1.25rem;color:var(--white);
+        border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:12px;">
+      Colaboraciones de otras cuentas <span class="n" id="n-colab"></span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--ash);
+        text-transform:none;letter-spacing:0;margin-left:8px;">salen en nuestra grilla, las publicó otra cuenta</span>
+    </h2>
+    <div class="cards" id="c-colab"></div>
+  </div>
 
   <!-- Configuración de la capacidad: antes vivía en Perfil > Redes (v2.0/F2). -->
   <div id="cfgmodal" class="modal hidden">
@@ -48,10 +60,10 @@
   </div>
 </main></div>
 <script src="https://unpkg.com/lucide@latest"></script>
-<script src="shell.js?v=20260829c"></script>
+<script src="shell.js?v=20260901"></script>
 <script>ClausinaShell({active:'instagram',cap:'instagram'});</script>
-<script src="panel.js?v=20260829c"></script>
-<script src="pedir-creativo.js?v=20260829c"></script>
+<script src="panel.js?v=20260901"></script>
+<script src="pedir-creativo.js?v=20260901"></script>
 <script>
 currentLoad=loadInstagram; loadInstagram(); setInterval(loadInstagram,6000);
 const IG_IDS=['ig_handle','ig_user_id'];

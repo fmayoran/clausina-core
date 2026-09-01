@@ -1085,6 +1085,7 @@ async function loadInstagram(){
     renderPropuestasCanal(reqs, 'instagram');
     fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado) || (p.estado==='rechazada' && !p.derivado_en)).map(pendCard).join(''));
     fill('c-pub','n-pub', piezas.filter(p=>p.estado==='publicada').map(pubCard).join(''));
+    cargarColabs();
     setUpd();
   }catch(e){ setUpd(); }
 }
@@ -1550,4 +1551,30 @@ async function cfgGuardar(ids, tokens) {
     toast(d.ok ? 'Configuración guardada' : (porque || ('No se pudo guardar' + (d.error ? ' (' + d.error + ')' : ''))), !d.ok);
     return !!d.ok;
   } catch (e) { toast('Error de conexión', true); return false; }
+}
+
+
+/* Colaboraciones de otras cuentas: publicaciones que salen en nuestra grilla pero las publicó
+ * otro. Instagram no se las devuelve al colaborador —ni se las cuenta en media_count—, así que
+ * se leen desde la cuenta que publicó. Se muestran aparte de las propias a propósito: no las
+ * decidimos nosotros, y contarlas como nuestras diría que funciona algo que no hicimos. */
+async function cargarColabs(){
+  const zona=document.getElementById('colabs-zona'); if(!zona) return;
+  try{
+    const d=await fetch('api/colaboraciones').then(r=>r.ok?r.json():null);
+    const items=(d&&d.items)||[];
+    if(!items.length){ zona.classList.add('hidden'); return; }
+    zona.classList.remove('hidden');
+    const n=document.getElementById('n-colab'); if(n) n.textContent=items.length;
+    document.getElementById('c-colab').innerHTML=items.map(c=>{
+      const img=c.media_url?`<img class="mini" src="${esc(c.media_url)}" loading="lazy" onerror="this.style.visibility='hidden'">`:'<span class="mini ph"></span>';
+      const cap=(c.caption||'').split('\n')[0].slice(0,90);
+      const f=c.publicado_en?new Date(c.publicado_en).toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'}):'';
+      return `<div class="card row">${img}<div class="rbody">
+        <div class="tt">${esc(cap||'(sin texto)')}</div>
+        <div class="meta"><span class="badge collab">de @${esc(c.autor)}</span> ${esc(f)}</div>
+        ${c.permalink?`<a class="link" href="${esc(c.permalink)}" target="_blank" rel="noopener">Ver en Instagram ↗</a>`:''}
+      </div></div>`;
+    }).join('');
+  }catch(e){ zona.classList.add('hidden'); }
 }

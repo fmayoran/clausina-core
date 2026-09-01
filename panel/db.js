@@ -4797,6 +4797,21 @@ async function editarPautaCampania(negocioId, id, campos) {
 
 /* Cuentas de pauta por plataforma. Reemplaza los campos meta_ads_* del perfil: cada negocio puede
  * tener una cuenta por plataforma, y lo propio de cada una vive en `config`. */
+/* Publicaciones de OTRA cuenta donde este negocio es colaborador aceptado.
+ * Salen en su grilla de Instagram pero no le pertenecen: Instagram no se las devuelve por su API
+ * ni se las cuenta. Se leen desde la cuenta que publicó (colabs_sync) y van aparte de las piezas
+ * propias, porque no las creamos nosotros. */
+async function getColaboracionesExternas(negocioId) {
+  const { rows } = await pool.query(
+    `SELECT c.ig_post_id, c.autor, c.permalink, c.caption, c.media_url, c.tipo,
+            c.publicado_en, n.nombre AS autor_nombre
+       FROM contenido.colaboracion_externa c
+       LEFT JOIN contenido.negocios n ON n.id = c.autor_negocio_id
+      WHERE c.negocio_id = $1
+      ORDER BY c.publicado_en DESC NULLS LAST LIMIT 60`, [negocioId]);
+  return rows;
+}
+
 async function getPautaCuentas(negocioId) {
   const { rows } = await pool.query(
     `SELECT plataforma, cuenta_id, config, (token_enc IS NOT NULL) AS conectada, actualizado_en
@@ -4896,5 +4911,5 @@ module.exports = {
   getAuditoria, pedirAuditoria, estadoAuditoria, getPauta, getPautaEvolucion, pedirRefrescoPauta,
   crearSolicitudCampania, getPautaCampanias, aprobarCampania, rechazarCampania, descartarCampania,
   activarCampania, pausarCampania, reintentarCampania, getCreativosDisponibles, setCreativosCampania,
-  editarPautaCampania, getPautaCuentas, guardarPautaCuenta, getPautaToken,
+  editarPautaCampania, getPautaCuentas, getColaboracionesExternas, guardarPautaCuenta, getPautaToken,
   health };
