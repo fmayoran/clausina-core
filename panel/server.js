@@ -63,6 +63,7 @@ async function refreshMetricas() {
 const auth = require('./auth');
 const mail = require('./mail');
 const tel = require('./telefono');
+const gauth = require('./google_oauth');
 const COOKIE_PATH = process.env.PANEL_COOKIE_PATH || '/panel';
 const TTL_S = auth.TTL_S;
 
@@ -1919,6 +1920,55 @@ app.get('/api/campanias/creativos', async (req, res) => {
 });
 // Ajustes de una propuesta de pauta antes de aprobarla (presupuesto y ventana). No es PUT
 // /api/campanias/:id: ese path ya lo tomaba el alta de campañas de comunicación, que es otra cosa.
+// Escape de HTML para la página de retorno: ahí se muestran textos que vienen de Google y de
+// excepciones, o sea de afuera. Interpolar eso crudo en HTML es una inyección esperando.
+const escHtml = (t) => String(t == null ? '' : t)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+// ── OAuth de Google ──────────────────────────────────────────────────────────────────────────
+// El VPS no tiene navegador, así que el flujo lo recibe el PANEL: Google devuelve a la persona
+// acá, el servidor canjea el código y guarda el refresh token cifrado. Nunca pasa por el
+// navegador ni hay que pegarlo a mano en ningún lado.
+app.get('/api/google/oauth/iniciar', soloAdmin, (req, res) => {
+  if (!gauth.configurado()) {
+    return res.status(503).json({ error: 'sin_credenciales',
+      detalle: 'Falta el cliente OAuth de Google (GOOGLE_OAUTH_CLIENT_ID/SECRET).' });
+  }
+  const plataforma = String(req.query.plataforma || 'google_ads');
+  res.json({ url: gauth.urlAutorizacion({ negocioId: req.negocioId, plataforma,
+                                          usuarioId: req.usuario && req.usuario.id }) });
+});
+
+// El retorno de Google. Devuelve una PÁGINA, no JSON: acá aterriza una persona en su navegador.
+app.get('/oauth/google/callback', soloAdmin, async (req, res) => {
+  const pagina = (titulo, cuerpo, ok) => res.set('Content-Type', 'text/html; charset=utf-8').send(
+    `<!doctype html><meta charset="utf-8"><title>${titulo}</title>
+     <body style="font:15px/1.6 system-ui;background:#0c0c0a;color:#e8e6e1;padding:48px;max-width:44rem">
+     <h1 style="font-size:1.3rem;color:${ok ? '#5ec27a' : '#FF6B4A'}">${titulo}</h1>
+     <p>${cuerpo}</p><p><a href="/pauta" style="color:#1ec9ff">Volver al panel</a></p>`);
+  try {
+    if (req.query.error) return pagina('No se autorizó', 'Google devolvió: ' + escHtml(req.query.error), false);
+    const st = gauth.leerEstado(req.query.state);
+    // El state firmado es lo que impide que un link armado por un tercero cuelgue SU cuenta de
+    // Google en el negocio de otro. Sin state válido no se guarda nada.
+    if (!st) return pagina('Enlace vencido o inválido', 'Volvé a empezar la conexión desde el panel.', false);
+    const tok = await gauth.canjear(String(req.query.code || ''));
+    await db.guardarPautaCuenta(st.negocioId, st.plataforma, { token: tok.refresh_token });
+    pagina('Cuenta de Google conectada',
+           'Ya podés elegir la cuenta publicitaria en el panel. El permiso queda guardado cifrado; ' +
+           'para revocarlo, desconectá la cuenta desde el panel o desde tu cuenta de Google.', true);
+  } catch (e) {
+    console.error('google oauth', e.message);
+    pagina('No se pudo completar la conexión', escHtml(e.message), false);
+  }
+});
+
+app.get('/api/pauta/cuentas', async (req, res) => {
+  try { res.json({ cuentas: await db.getPautaCuentas(req.negocioId), oauth: gauth.configurado() }); }
+  catch (e) { console.error('pauta-cuentas', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 app.post('/api/campanias/:id/ajustes', soloAprobador, async (req, res) => {
   try {
     const r = await db.editarPautaCampania(req.negocioId, req.params.id, req.body || {});

@@ -4794,6 +4794,40 @@ async function editarPautaCampania(negocioId, id, campos) {
   return rowCount > 0 ? { ok: true } : { ok: false, error: 'no_editable' };
 }
 
+/* Cuentas de pauta por plataforma. Reemplaza los campos meta_ads_* del perfil: cada negocio puede
+ * tener una cuenta por plataforma, y lo propio de cada una vive en `config`. */
+async function getPautaCuentas(negocioId) {
+  const { rows } = await pool.query(
+    `SELECT plataforma, cuenta_id, config, (token_enc IS NOT NULL) AS conectada, actualizado_en
+       FROM contenido.pauta_cuenta WHERE negocio_id=$1 ORDER BY plataforma`, [negocioId]);
+  return rows;
+}
+
+/* Guarda las credenciales de una plataforma. El token va cifrado y es WRITE-ONLY: se puede
+ * reemplazar, nunca leer desde el navegador. Si no viene token, se conserva el que había —así
+ * editar el customer_id no borra la conexión. */
+async function guardarPautaCuenta(negocioId, plataforma, { cuenta_id, config, token }) {
+  const enc = token ? cryptoAds.encrypt(String(token)) : null;
+  const { rowCount } = await pool.query(
+    `INSERT INTO contenido.pauta_cuenta (negocio_id, plataforma, cuenta_id, config, token_enc, actualizado_en)
+     VALUES ($1,$2,$3,COALESCE($4::jsonb,'{}'::jsonb),$5,now())
+     ON CONFLICT (negocio_id, plataforma) DO UPDATE SET
+       cuenta_id = COALESCE($3, contenido.pauta_cuenta.cuenta_id),
+       config    = COALESCE($4::jsonb, contenido.pauta_cuenta.config),
+       token_enc = COALESCE($5, contenido.pauta_cuenta.token_enc),
+       actualizado_en = now()`,
+    [negocioId, plataforma, cuenta_id || null,
+     config ? JSON.stringify(config) : null, enc]);
+  return rowCount > 0;
+}
+
+async function getPautaToken(negocioId, plataforma) {
+  const { rows: [r] } = await pool.query(
+    'SELECT token_enc FROM contenido.pauta_cuenta WHERE negocio_id=$1 AND plataforma=$2',
+    [negocioId, plataforma]);
+  return (r && r.token_enc) || null;
+}
+
 async function reintentarCampania(negocioId, id) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.pauta_campania SET estado='aprobada', resumen=NULL, actualizado_en=now()
@@ -4861,5 +4895,5 @@ module.exports = {
   getAuditoria, pedirAuditoria, estadoAuditoria, getPauta, getPautaEvolucion, pedirRefrescoPauta,
   crearSolicitudCampania, getPautaCampanias, aprobarCampania, rechazarCampania, descartarCampania,
   activarCampania, pausarCampania, reintentarCampania, getCreativosDisponibles, setCreativosCampania,
-  editarPautaCampania,
+  editarPautaCampania, getPautaCuentas, guardarPautaCuenta, getPautaToken,
   health };
