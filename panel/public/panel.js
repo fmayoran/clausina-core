@@ -1568,7 +1568,7 @@ let _PUB = [], _COLAB = [], _ORDEN = 'fecha';
 function normPieza(p){
   return { tipo:'propia', id:p.id, titulo:p.titulo_interno, img:thumbSrc(p.media)||null,
            fecha:p.publicado_en, permalink:p.ig_permalink, numero:p.numero,
-           views:p.m_views, reach:p.m_reach, likes:p.m_likes,
+           views:p.m_views, reach:p.m_reach, likes:p.m_likes, pauta:p.pauta||null,
            colaboradores:p.colaboradores, colab_estado:p.colab_estado, _p:p };
 }
 function normColab(c){
@@ -1612,11 +1612,21 @@ function pubTarjeta(x){
     sellos.push('<span class="et colab" title="Hay una invitación de colaboración sin aceptar">Collab pendiente</span>');
   const f = x.fecha ? new Date(x.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'short'}) : '';
   const dato=(v,et)=> `<div><b>${v==null?'—':nf(v)}</b><span>${et}</span></div>`;
+  // Las vistas de la API son SÓLO orgánicas; el panel profesional de Instagram suma la pauta y por
+  // eso muestra otro número. Si la pieza tuvo plata detrás se dice, con cuánta: comparar una
+  // promocionada contra una que no lo fue, como si las dos fueran rendimiento propio, es la
+  // confusión más cara de esta pantalla —CF-0265 tuvo 111.697 impresiones compradas—.
+  const pa = x.pauta && x.pauta.impresiones ? x.pauta : null;
+  if (pa) sellos.push(`<span class="et pago" title="Esta pieza se promocionó: US$${pa.gasto} de pauta. Las vistas de arriba son sólo las orgánicas.">Con pauta</span>`);
+  const linea = pa
+    ? `<div class="pagoln" title="Impresiones compradas, aparte de lo orgánico">+ ${nf(pa.impresiones)} impresiones de pauta · US$${pa.gasto}</div>`
+    : '';
   return `<article class="pcard">
     <div class="ph">${img}<div class="sello">${sellos.join('')}</div></div>
     <div class="cuerpo">
       <div class="tt">${esc(x.titulo||'(sin título)')}</div>
       <div class="nums">${dato(x.views,'vistas')}${dato(x.reach,'alcance')}${dato(x.likes,'likes')}</div>
+      ${linea}
       <div class="pie">${esc(f)}${x.permalink?`<a href="${esc(x.permalink)}" target="_blank" rel="noopener">Ver ↗</a>`:''}</div>
     </div></article>`;
 }

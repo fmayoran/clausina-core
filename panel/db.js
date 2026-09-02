@@ -3684,6 +3684,16 @@ async function getPiezas(canal, negocioId) {
            r.nro, r.formato, r.motivo_rechazo, r.derivado_en,
            COALESCE(r.colaboradores, (SELECT ig_colaboradores FROM contenido.negocios WHERE id=pz.negocio_id)) AS colaboradores,
            r.colab_estado,
+           -- Lo PAGO, aparte de lo orgánico. Las métricas de Instagram por API son sólo orgánicas;
+           -- el panel profesional suma la pauta, y por eso muestra otro número. Comparar una pieza
+           -- promocionada contra una que no lo fue, como si las dos fueran rendimiento propio, es
+           -- la confusión que esto evita: CF-0265 tuvo 111.697 impresiones compradas detrás.
+           (SELECT json_build_object('impresiones', sum(a.impresiones), 'alcance', sum(a.alcance),
+                                     'gasto', round(sum(a.gasto), 2))
+              FROM contenido.ads_ad_daily a
+              JOIN contenido.pauta_campania_pieza cp ON cp.ext_aviso_id = a.ext_aviso_id
+             WHERE cp.pieza_id = pz.id AND a.impresiones > 0
+            HAVING sum(a.impresiones) > 0) AS pauta,   -- sin pauta, NULL y no un objeto de nulos
            (r.bitacora IS NOT NULL) AS tiene_bitacora,
            r.ig_post_id, r.ig_permalink, r.publicado_en, r.aprobado_en, r.caption,
            r.daypart, r.clima, r.transito, r.momento, r.duracion_s,
