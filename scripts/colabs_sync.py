@@ -88,9 +88,10 @@ def guardar_externa(m, colab, autor):
 
 
 def main():
-    total = pendientes = externas = 0
+    pendientes = externas = 0
     cuentas = mapa_cuentas()
     for n in negocios():
+        total = 0     # por negocio: acumulado entre negocios, el numero de cada linea mentia
         u = f"{FB}/{n['ig']}/media?" + urllib.parse.urlencode(
             {"fields": "id,timestamp,permalink,caption,media_type,thumbnail_url,media_url,collaborators",
              "limit": "100", "access_token": n["token"]})
