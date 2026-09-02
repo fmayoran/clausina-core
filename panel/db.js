@@ -4719,7 +4719,19 @@ async function getCreativosDisponibles(negocioId) {
        JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1
       WHERE pz.negocio_id = $1 AND pz.canal='instagram'
       ORDER BY pz.numero DESC LIMIT 40`, [negocioId]);
-  return rows;
+  // Las colaboraciones se listan pero NO se pueden elegir todavía, y se dice por qué.
+  // Verificado contra la API: promocionar desde nuestra cuenta un post de otra cuenta devuelve
+  // "no coincide con ningún contenido multimedia existente". Hace falta que el dueño autorice la
+  // publicación como anuncio de colaboración. Omitirlas sin más deja la pregunta "¿y las de
+  // collab?" sin respuesta cada vez que alguien abre esta pantalla.
+  const { rows: colabs } = await pool.query(
+    `SELECT c.ig_post_id AS pieza_id, c.numero, c.caption, c.permalink,
+            c.media_url AS url, NULL AS poster_url, lower(c.tipo) AS tipo,
+            c.autor, true AS es_colab
+       FROM contenido.colaboracion_externa c
+      WHERE c.negocio_id = $1
+      ORDER BY c.publicado_en DESC LIMIT 10`, [negocioId]);
+  return [...rows, ...colabs];
 }
 
 /**

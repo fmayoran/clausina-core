@@ -1400,13 +1400,20 @@ function pintarAsk(){
   g.innerHTML=(_creaLista||[]).map(c=>{
     const u=(c.tipo==='video'&&c.poster_url)?c.poster_url:c.url;
     const i=_askSel.indexOf(c.pieza_id);
+    // La colaboración se muestra pero no se puede elegir: Meta no deja promocionar desde nuestra
+    // cuenta un post de otra sin que el dueño lo autorice. Mejor verla apagada y con el motivo
+    // que no verla y preguntarse dónde está.
+    if(c.es_colab) return `<span class="cpick bloq" title="La publicó @${esc(c.autor)}. Para promocionarla, esa cuenta tiene que autorizarla como anuncio de colaboración.">
+      <img src="${esc(u)}" loading="lazy" onerror="this.style.opacity=.15">
+      <span class="cpick-n">${esc(codColab(c.numero))} · @${esc(c.autor)}</span>
+      <span class="cpick-lock">requiere autorización</span></span>`;
     return `<a class="cpick${i>=0?' on':''}" href="#" onclick="toggleAsk('${c.pieza_id}');return false;" title="${cod(c.numero)}">
       <img src="${esc(u)}" loading="lazy" onerror="this.style.opacity=.15">
       ${i>=0?`<span class="cpick-ord">${i+1}</span>`:''}
       <span class="cpick-n">${cod(c.numero)}${c.tipo==='video'?' ▶':''}</span></a>`;
   }).join('') || '<div class="cm-note">No hay posts publicados disponibles.</div>';
   // Avisar acá y no cuando Meta rechace la campaña a medio crear.
-  const sel=(_creaLista||[]).filter(c=>_askSel.includes(c.pieza_id));
+  const sel=(_creaLista||[]).filter(c=>!c.es_colab && _askSel.includes(c.pieza_id));
   const tipos=new Set(sel.map(c=>c.tipo==='video'?'video':'imagen'));
   const h=document.getElementById('ask-hint');
   if(h) h.innerHTML = tipos.size>1
