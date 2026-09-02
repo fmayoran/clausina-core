@@ -4817,7 +4817,7 @@ async function getColaboracionesExternas(negocioId) {
             c.publicado_en, n.nombre AS autor_nombre,
             -- Las métricas van SÍ O SÍ: sin ellas la tarjeta sale con guiones y la colaboración
             -- parece no haber rendido nada, que es lo contrario de mostrarla con el mismo peso.
-            c.views, c.reach, c.likes, c.interacciones, c.shares, c.saved
+            c.numero, c.views, c.reach, c.likes, c.interacciones, c.shares, c.saved
        FROM contenido.colaboracion_externa c
        LEFT JOIN contenido.negocios n ON n.id = c.autor_negocio_id
       WHERE c.negocio_id = $1

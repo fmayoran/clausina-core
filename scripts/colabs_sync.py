@@ -91,12 +91,17 @@ def guardar_externa(m, colab, autor, met=None):
     la grilla del autor, no la del negocio al que le interesan.
     """
     cap = (m.get("caption") or "").replace("$j$", "")
+    # Numero propio de la colaboracion, por negocio. Se asigna al insertar y no se recalcula: si
+    # se recalculara por fecha en cada corrida, descubrir una colaboracion vieja renumeraria todas
+    # las demas y un COL-03 dejaria de ser el mismo de ayer.
+    prox = psql("SELECT coalesce(max(numero),0)+1 FROM contenido.colaboracion_externa "
+                f"WHERE negocio_id='{colab['id']}';") or "1"
     met = met or {}
     num = lambda k: int(met.get(k) or 0)   # noqa: E731
     psql(
         "INSERT INTO contenido.colaboracion_externa (ig_post_id,negocio_id,autor,autor_negocio_id,"
         "permalink,caption,media_url,tipo,publicado_en,estado,views,reach,likes,interacciones,"
-        "shares,saved,capturado_en) VALUES ("
+        "shares,saved,numero,capturado_en) VALUES ("
         f"'{m['id']}','{colab['id']}',$j${autor['slug']}$j$,"
         + (f"'{autor['id']}'" if autor.get("id") else "NULL") + ","
         f"$j${m.get('permalink') or ''}$j$,$j${cap}$j$,"
@@ -105,11 +110,11 @@ def guardar_externa(m, colab, autor, met=None):
         + (f"'{m['timestamp']}'" if m.get("timestamp") else "NULL") + ","
         f"$j${colab.get('estado') or ''}$j$,"
         f"{num('views')},{num('reach')},{num('likes')},{num('total_interactions')},"
-        f"{num('shares')},{num('saved')}, now()) "
+        f"{num('shares')},{num('saved')},{int(prox)}, now()) "
         "ON CONFLICT (ig_post_id, negocio_id) DO UPDATE SET estado=EXCLUDED.estado,"
         "caption=EXCLUDED.caption,media_url=EXCLUDED.media_url,views=EXCLUDED.views,"
         "reach=EXCLUDED.reach,likes=EXCLUDED.likes,interacciones=EXCLUDED.interacciones,"
-        "shares=EXCLUDED.shares,saved=EXCLUDED.saved,capturado_en=now();")
+        "shares=EXCLUDED.shares,saved=EXCLUDED.saved,capturado_en=now();")   # numero: no se toca
 
 
 def main():

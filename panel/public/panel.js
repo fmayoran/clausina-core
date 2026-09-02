@@ -1564,6 +1564,7 @@ async function cfgGuardar(ids, tokens) {
  * algo que rinde más sería mentirle a quien mira la pantalla para decidir.
  */
 let _PUB = [], _COLAB = [], _ORDEN = 'fecha';
+const codColab = n => 'COL-' + String(n).padStart(2,'0');
 
 function normPieza(p){
   return { tipo:'propia', id:p.id, titulo:p.titulo_interno, img:thumbSrc(p.media)||null,
@@ -1574,7 +1575,7 @@ function normPieza(p){
 function normColab(c){
   return { tipo:'colab', id:c.ig_post_id, titulo:(c.caption||'').split('\n')[0],
            img:c.media_url||null, fecha:c.publicado_en, permalink:c.permalink,
-           autor:c.autor, views:c.views, reach:c.reach, likes:c.likes };
+           autor:c.autor, numero:c.numero, views:c.views, reach:c.reach, likes:c.likes };
 }
 
 const _num = v => (v==null? -1 : Number(v));
@@ -1604,7 +1605,12 @@ function pubTarjeta(x){
   const img = '<div class="vac">sin imagen</div>' +
     (x.img ? `<img src="${esc(x.img)}" alt="" loading="lazy" onerror="this.remove()">` : '');
   const sellos = [];
-  if(x.tipo==='colab') sellos.push(`<span class="et colab" title="La publicó @${esc(x.autor)}; sale en nuestra grilla">Collab · @${esc(x.autor)}</span>`);
+  if(x.tipo==='colab'){
+    // Código propio, no CF-XXXX: una CF es una pieza que creamos, aprobamos y publicamos nosotros.
+    // Darle un CF a algo que publicó otro haría que se la busque en piezas, donde no está.
+    if(x.numero) sellos.push(`<span class="et" title="Colaboración número ${x.numero}">${esc(codColab(x.numero))}</span>`);
+    sellos.push(`<span class="et colab" title="La publicó @${esc(x.autor)}; sale en nuestra grilla">Collab · @${esc(x.autor)}</span>`);
+  }
   else if(x.numero) sellos.push(`<span class="et">${esc(cod(x.numero))}</span>`);
   // Una invitación sin aceptar es alcance que no se está usando: se avisa acá también.
   const ce=x.colab_estado||null;
