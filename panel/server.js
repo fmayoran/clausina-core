@@ -1734,6 +1734,14 @@ app.get('/api/campanias', async (req, res) => {
   try { res.json({ campanias: await db.getCampanias(req.negocioId) }); }
   catch (e) { console.error('campanias', e.message); res.status(500).json({ error: 'db' }); }
 });
+// ANTES que '/api/campanias/:id': Express resuelve por orden de registro, y si esta va despues,
+// 'creativos' se interpreta como un id de campania y la ruta nunca se ejecuta. Ya paso una vez con
+// el listado de pauta. Toda ruta con segmento fijo va arriba de la que tiene parametro.
+app.get('/api/campanias/creativos', async (req, res) => {
+  try { res.json(await db.getCreativosDisponibles(req.negocioId)); }
+  catch (e) { console.error('campania-creativos', e.message); res.status(500).json({ error: 'db' }); }
+});
+
 app.get('/api/campanias/:id', async (req, res) => {
   try {
     const c = await db.getCampania(req.negocioId, req.params.id);
@@ -1914,10 +1922,6 @@ app.post('/api/campanias/:id/pausar', soloAprobador, async (req, res) => {
 app.post('/api/campanias/:id/reintentar', async (req, res) => {
   try { res.json({ ok: await db.reintentarCampania(req.negocioId, req.params.id) }); }
   catch (e) { console.error('campania-reintentar', e.message); res.status(500).json({ error: 'db' }); }
-});
-app.get('/api/campanias/creativos', async (req, res) => {
-  try { res.json(await db.getCreativosDisponibles(req.negocioId)); }
-  catch (e) { console.error('campania-creativos', e.message); res.status(500).json({ error: 'db' }); }
 });
 // Ajustes de una propuesta de pauta antes de aprobarla (presupuesto y ventana). No es PUT
 // /api/campanias/:id: ese path ya lo tomaba el alta de campañas de comunicación, que es otra cosa.
