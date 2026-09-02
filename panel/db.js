@@ -3714,6 +3714,23 @@ async function getPiezas(canal, negocioId) {
 }
 
 // Canal + token + estado de la revisión vigente (para ramificar la acción por canal).
+/**
+ * Descartar una pieza que quedó RECHAZADA y escalada: el corrector se dio por vencido y espera una
+ * decisión humana, que puede ser "esto no va". No pasa por el webhook de decisión como la pieza
+ * pendiente, porque ese UPDATE filtra por estado='pendiente_aprobacion' y sobre una rechazada no
+ * tocaba nada: el panel ofrecía el botón, el servidor devolvía 409 y la pieza no se podía sacar de
+ * la lista nunca más. El trigger trg_rev_sync propaga el estado a la pieza.
+ */
+async function descartarPiezaRechazada(negocioId, id, quien) {
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.revisiones r
+        SET estado='descartada'::contenido.estado_pub, aprobado_por=$3, aprobado_en=now()
+       FROM contenido.piezas pz
+      WHERE pz.id=$1 AND pz.negocio_id=$2 AND r.id=pz.revision_vigente AND r.estado='rechazada'`,
+    [id, negocioId, (quien || 'Fer').slice(0, 80)]);
+  return rowCount > 0;
+}
+
 async function getPiezaCanal(id) {
   const { rows } = await pool.query(
     `SELECT pz.canal, r.token, r.estado, r.formato, r.ig_post_id, r.aprobado_en,
@@ -4996,6 +5013,7 @@ module.exports = {
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
   getLandingCambios, crearLandingCambio, aprobarLanding, rechazarLanding,
   getAuditoria, pedirAuditoria, estadoAuditoria, getPauta, getPautaEvolucion, pedirRefrescoPauta,
+  descartarPiezaRechazada,
   crearSolicitudCampania, getPautaCampanias, aprobarCampania, rechazarCampania, descartarCampania,
   activarCampania, pausarCampania, reintentarCampania, getCreativosDisponibles, setCreativosCampania,
   editarPautaCampania, getPautaCuentas, getColaboracionesExternas, guardarPautaCuenta, getPautaToken,

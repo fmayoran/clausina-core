@@ -2096,7 +2096,16 @@ app.post('/api/piezas/:id/rechazar', soloAprobador, async (req, res) => {
 app.post('/api/piezas/:id/descartar', soloAprobador, async (req, res) => {
   try {
     const p = await db.getPiezaCanal(req.params.id);
-    if (!p || p.estado !== 'pendiente_aprobacion') return res.status(409).json({ ok: false, error: 'no_pendiente' });
+    if (!p) return res.status(404).json({ ok: false, error: 'no_existe' });
+    // Una pieza RECHAZADA y escalada también se descarta: es justo la que quedó esperando que
+    // alguien decida. No va por el webhook, que sólo actualiza si está pendiente — el botón estaba
+    // en la tarjeta y el servidor contestaba 409, así que no había forma de sacarla de la lista.
+    if (p.estado === 'rechazada') {
+      const quien = (req.usuario && (req.usuario.nombre || req.usuario.email)) || 'Fer';
+      const ok = await db.descartarPiezaRechazada(req.negocioId, req.params.id, quien);
+      return ok ? res.json({ ok: true }) : res.status(409).json({ ok: false, error: 'no_descartable' });
+    }
+    if (p.estado !== 'pendiente_aprobacion') return res.status(409).json({ ok: false, error: 'no_pendiente' });
     if (p.canal === 'aviso') return res.json({ ok: await db.avisoEstado(req.params.id, 'descartada') });
     const status = await callWebhook(`${N8N}/cf-pub-decide?token=${encodeURIComponent(p.token)}&accion=descartar`);
     res.json({ ok: status >= 200 && status < 300, status });
