@@ -900,7 +900,7 @@ function abrirPicker({ titulo, sub, items, pick, subir }) {
       </select>
       ${subir||''}
     </div>
-    <div class="bpgrid" id="bp-grid"></div></div>`;
+    <div class="bpscroll"><div class="bpgrid" id="bp-grid"></div></div></div>`;
   ov.style.display='flex';
   pintarPicker();
   const q=document.getElementById('bp-q'); if(q) q.focus();

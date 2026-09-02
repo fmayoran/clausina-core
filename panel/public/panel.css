@@ -98,7 +98,11 @@ header .marcasel:hover{border-color:var(--fire);}
 .bphead button{margin-left:auto;background:none;border:0;color:var(--ash);font-size:22px;cursor:pointer;line-height:1;}
 /* Celdas más grandes: con 110px las fotos se leían como un muro y había que abrir una por una
    para saber qué eran. Y con el nombre debajo, que es lo que distingue dos fotos parecidas. */
-.bpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;padding:18px;overflow:auto;}
+/* El scroll va en .bpscroll y NO en la grilla: con overflow propio, Chromium calcula el alto de
+   las filas con el ancho MÍNIMO de columna (98px) en vez del real (225px), así que las filas salían
+   de 122px, las celdas de 281 desbordaban y se pisaban entre sí. Verificado en repro mínimo. */
+.bpscroll{overflow:auto;min-height:0;}
+.bpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;padding:18px;}
 .bpfiltros{display:flex;gap:8px;align-items:center;padding:12px 18px 0;flex-wrap:wrap;}
 .bpfiltros input[type=search],.bpfiltros select{background:#0c0f12;color:var(--chalk);
   border:1px solid #1c2128;border-radius:7px;padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:12px;}
@@ -114,7 +118,7 @@ header .marcasel:hover{border-color:var(--fire);}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .bpcell{position:relative;aspect-ratio:4/5;border-radius:9px;overflow:hidden;border:1px solid #1c2128;cursor:pointer;background:#0c0f12;}
 .bpcell:hover{border-color:var(--fire);}
-.bpcell img,.bpcell video{width:100%;height:100%;object-fit:cover;pointer-events:none;}  /* el click es de la celda, no de la miniatura */
+.bpcell img,.bpcell video{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none;}  /* el click es de la celda, no de la miniatura */
 /* El código ARRIBA y el nombre abajo: los dos anclados al pie se superponían — el chip del
    código quedaba encima del nombre del archivo y no se leía ninguno de los dos. */
 .bpcell .bpcode{position:absolute;top:5px;left:5px;font-family:'JetBrains Mono',monospace;font-size:9px;background:rgba(4,4,3,.72);color:var(--fire);padding:2px 6px;border-radius:5px;}
