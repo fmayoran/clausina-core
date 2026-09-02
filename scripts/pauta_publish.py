@@ -238,18 +238,27 @@ def crear(cid):
     # así compiten por el mismo público y Meta le da entrega a la que rinde. Partirlas en varios
     # conjuntos sería peor —ninguno junta los eventos que Meta necesita para aprender, y compiten
     # entre sí en la subasta—.
+    # Una pieza propia o una COLABORACIÓN de otra cuenta. LEFT JOIN contra piezas, no INNER: una
+    # colaboración no vive ahí y con INNER quedaba afuera sin decir nada. Trae además el id de
+    # Instagram de quien publicó, porque el anuncio se crea con SU identidad.
     piezas = []
     for linea in psql(
-            "SELECT cp.id||'|'||coalesce(r.ig_post_id,'')||'|'||coalesce(pz.titulo_interno,'') "
+            "SELECT cp.id||'|'||coalesce(r.ig_post_id, cp.colab_post_id, '')||'|'"
+            "||coalesce(nautor.ig_user_id,'')||'|'"
+            "||coalesce(pz.titulo_interno, 'Colaboración con @'||ce.autor, '') "
             "FROM contenido.pauta_campania_pieza cp "
-            "JOIN contenido.piezas pz ON pz.id=cp.pieza_id "
+            "LEFT JOIN contenido.piezas pz ON pz.id=cp.pieza_id "
             "LEFT JOIN contenido.revisiones r ON r.pieza_id=cp.pieza_id AND r.estado='publicada' "
+            "LEFT JOIN contenido.colaboracion_externa ce ON ce.ig_post_id=cp.colab_post_id "
+            f"       AND ce.negocio_id=(SELECT negocio_id FROM contenido.pauta_campania WHERE id='{cid}') "
+            "LEFT JOIN contenido.negocios nautor ON nautor.id=ce.autor_negocio_id "
             f"WHERE cp.campania_id='{cid}' ORDER BY cp.orden, cp.creado_en").split("\n"):
         if not linea.strip():
             continue
-        rid, media, titulo = (linea.split("|", 2) + ["", ""])[:3]
+        rid, media, ig_autor, titulo = (linea.split("|") + ["", "", "", ""])[:4]
         if media:
-            piezas.append({"rel": rid, "media": media, "titulo": titulo})
+            piezas.append({"rel": rid, "media": media, "titulo": titulo,
+                           "ig_autor": ig_autor or None})
     if not piezas:
         set_estado(cid, "error", "La campaña necesita al menos un post ya publicado como creativo.")
         return "sin creativo"
@@ -295,12 +304,27 @@ def crear(cid):
             # El nombre lleva el título de la pieza: en el reporte de Meta, tres anuncios con el
             # mismo nombre no se pueden distinguir, que es justo lo que se quiere comparar.
             nombre_ad = f"{d['nombre']} — {pz['titulo']}"[:120] if pz["titulo"] else f"{d['nombre']} {i}"
-            crea_p = {"name": nombre_ad, "object_id": page, "instagram_user_id": ig,
-                      "source_instagram_media_id": pz["media"], "access_token": token}
+            # Colaboración: el anuncio se crea con la identidad de QUIEN PUBLICÓ y declarando
+            # `branded_content`. Sin eso Meta responde "el contenido no coincide"; con nuestra
+            # identidad tampoco lo reconoce, porque el post no es nuestro.
+            # Y va SIN `object_id`: el aviso se materializa como publicación en la Página del socio,
+            # así que declarar la nuestra lo rompe. Receta leída de un anuncio creado a mano en Ads
+            # Manager, no adivinada — ver el skill `medios`.
+            # Requisitos de una sola vez, del lado de Meta: el socio autoriza la publicación como
+            # anuncio de colaboración, comparte su cuenta de Instagram Y su Página con nuestro
+            # negocio, y esos activos quedan asignados a nuestro usuario del sistema.
+            if pz.get("ig_autor"):
+                crea_p = {"name": nombre_ad, "instagram_user_id": pz["ig_autor"],
+                          "source_instagram_media_id": pz["media"],
+                          "branded_content": json.dumps({"ad_format": 3}),
+                          "access_token": token}
+            else:
+                crea_p = {"name": nombre_ad, "object_id": page, "instagram_user_id": ig,
+                          "source_instagram_media_id": pz["media"], "access_token": token}
             # Los objetivos con destino propio (perfil de Instagram, o el post mismo en Interacción)
             # ya definen adónde va el clic: agregarles un link externo sería mandar a la gente a otro
             # lado que el que la campaña eligió.
-            if objetivo not in DEST_TYPE:
+            if objetivo not in DEST_TYPE and not pz.get("ig_autor"):
                 crea_p["call_to_action"] = json.dumps({"type": cta, "value": {"link": link}})
             creative = graph("POST", f"{act}/adcreatives", crea_p)
             ad = graph("POST", f"{act}/ads", {

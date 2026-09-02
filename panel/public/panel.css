@@ -560,8 +560,9 @@ header .marcasel:hover{border-color:var(--fire);}
 .nums-nota{font-family:'JetBrains Mono',monospace;font-size:.5rem;color:var(--u-mut,#8a8a82);}
 
 /* Creativo que existe pero no se puede elegir todavía (colaboración sin autorizar). */
-.cpick.bloq{opacity:.42;cursor:not-allowed;filter:grayscale(.6);}
-.cpick.bloq:hover{border-color:var(--line);}
+/* Colaboración seleccionable: se distingue con el color de marca, no apagándola. */
+.cpick.colab{border-color:color-mix(in srgb,var(--fire) 30%,var(--line));}
+.cpick.colab .cpick-n{color:var(--fire);}
 .cpick .cpick-lock{position:absolute;top:5px;left:5px;right:5px;font-family:'JetBrains Mono',monospace;
   font-size:.48rem;letter-spacing:.04em;text-transform:uppercase;color:#0c0c0a;background:var(--pend,#FF6A45);
   border-radius:4px;padding:2px 4px;text-align:center;}

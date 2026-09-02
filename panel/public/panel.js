@@ -1403,17 +1403,19 @@ function pintarAsk(){
     // La colaboración se muestra pero no se puede elegir: Meta no deja promocionar desde nuestra
     // cuenta un post de otra sin que el dueño lo autorice. Mejor verla apagada y con el motivo
     // que no verla y preguntarse dónde está.
-    if(c.es_colab) return `<span class="cpick bloq" title="La publicó @${esc(c.autor)} y ya autorizó la promoción. Falta que Meta acepte crear el anuncio: con Reels de un socio pide que el video esté en Facebook. En verificación — se puede promocionar a mano desde el Administrador de anuncios.">
+    // La colaboración YA se puede pautar: el anuncio se crea con la identidad de quien publicó
+    // y declarando branded_content. Se marca de quién es, porque el aviso sale con esa cuenta.
+    if(c.es_colab) return `<a class="cpick colab${i>=0?' on':''}" href="#" onclick="toggleAsk('${c.pieza_id}');return false;" title="La publicó @${esc(c.autor)} — el anuncio sale con esa cuenta">
       <img src="${esc(u)}" loading="lazy" onerror="this.style.opacity=.15">
-      <span class="cpick-n">${esc(codColab(c.numero))} · @${esc(c.autor)}</span>
-      <span class="cpick-lock">sólo a mano en Meta</span></span>`;
+      ${i>=0?`<span class="cpick-ord">${i+1}</span>`:''}
+      <span class="cpick-n">${esc(codColab(c.numero))} · @${esc(c.autor)}</span></a>`;
     return `<a class="cpick${i>=0?' on':''}" href="#" onclick="toggleAsk('${c.pieza_id}');return false;" title="${cod(c.numero)}">
       <img src="${esc(u)}" loading="lazy" onerror="this.style.opacity=.15">
       ${i>=0?`<span class="cpick-ord">${i+1}</span>`:''}
       <span class="cpick-n">${cod(c.numero)}${c.tipo==='video'?' ▶':''}</span></a>`;
   }).join('') || '<div class="cm-note">No hay posts publicados disponibles.</div>';
   // Avisar acá y no cuando Meta rechace la campaña a medio crear.
-  const sel=(_creaLista||[]).filter(c=>!c.es_colab && _askSel.includes(c.pieza_id));
+  const sel=(_creaLista||[]).filter(c=>_askSel.includes(c.pieza_id));
   const tipos=new Set(sel.map(c=>c.tipo==='video'?'video':'imagen'));
   const h=document.getElementById('ask-hint');
   if(h) h.innerHTML = tipos.size>1

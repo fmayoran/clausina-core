@@ -4743,11 +4743,16 @@ async function getCreativosDisponibles(negocioId) {
  * que se promociona si la campaña tiene una sola—, no como la única.
  */
 async function setCreativosCampania(negocioId, id, piezaIds) {
-  const ids = [...new Set((Array.isArray(piezaIds) ? piezaIds : [piezaIds]).filter(Boolean))];
-  if (!ids.length) return { ok: false, error: 'sin_creativos' };
+  const todos = [...new Set((Array.isArray(piezaIds) ? piezaIds : [piezaIds]).filter(Boolean))];
+  if (!todos.length) return { ok: false, error: 'sin_creativos' };
+  // Una colaboración no vive en contenido.piezas y su id no es un uuid: es el id del post de
+  // Instagram. Se separan por forma, que es lo único que las distingue en el payload.
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const ids = todos.filter(x => UUID.test(x));
+  const colabs = todos.filter(x => !UUID.test(x));
   // Meta admite muchos anuncios por conjunto, pero comparar diez creativos con presupuesto chico
   // no da señal de nada: ninguno junta impresiones suficientes para que la diferencia signifique algo.
-  if (ids.length > 5) return { ok: false, error: 'demasiados', detalle: 5 };
+  if (todos.length > 5) return { ok: false, error: 'demasiados', detalle: 5 };
   const cli = await pool.connect();
   try {
     await cli.query('BEGIN');
@@ -4757,19 +4762,40 @@ async function setCreativosCampania(negocioId, id, piezaIds) {
       [id, negocioId]);
     if (!c) { await cli.query('ROLLBACK'); return { ok: false, error: 'no_editable' }; }
     // Que todas las piezas sean de este negocio: sin esto se podría pautar la pieza de otro.
-    const { rows: [v] } = await cli.query(
-      `SELECT count(*)::int AS n FROM contenido.piezas
-        WHERE id = ANY($1::uuid[]) AND negocio_id=$2 AND canal='instagram'`, [ids, negocioId]);
-    if (v.n !== ids.length) { await cli.query('ROLLBACK'); return { ok: false, error: 'pieza_ajena' }; }
+    if (ids.length) {
+      const { rows: [v] } = await cli.query(
+        `SELECT count(*)::int AS n FROM contenido.piezas
+          WHERE id = ANY($1::uuid[]) AND negocio_id=$2 AND canal='instagram'`, [ids, negocioId]);
+      if (v.n !== ids.length) { await cli.query('ROLLBACK'); return { ok: false, error: 'pieza_ajena' }; }
+    }
+    // Y que las colaboraciones sean de las que ESTE negocio tiene registradas: son posts ajenos,
+    // así que sin este control se podría pedir promocionar cualquier publicación de Instagram.
+    if (colabs.length) {
+      const { rows: [v2] } = await cli.query(
+        `SELECT count(*)::int AS n FROM contenido.colaboracion_externa
+          WHERE ig_post_id = ANY($1::text[]) AND negocio_id=$2 AND autor_negocio_id IS NOT NULL`,
+        [colabs, negocioId]);
+      if (v2.n !== colabs.length) { await cli.query('ROLLBACK'); return { ok: false, error: 'colab_ajena' }; }
+    }
 
     await cli.query('DELETE FROM contenido.pauta_campania_pieza WHERE campania_id=$1', [id]);
-    await cli.query(
-      `INSERT INTO contenido.pauta_campania_pieza (campania_id, pieza_id, orden)
-       SELECT $1, p.id, p.i FROM unnest($2::uuid[]) WITH ORDINALITY AS p(id, i)`, [id, ids]);
+    if (ids.length) {
+      await cli.query(
+        `INSERT INTO contenido.pauta_campania_pieza (campania_id, pieza_id, orden)
+         SELECT $1, p.id, p.i FROM unnest($2::uuid[]) WITH ORDINALITY AS p(id, i)`, [id, ids]);
+    }
+    if (colabs.length) {
+      await cli.query(
+        `INSERT INTO contenido.pauta_campania_pieza (campania_id, colab_post_id, orden)
+         SELECT $1, c.pid, c.i + $3 FROM unnest($2::text[]) WITH ORDINALITY AS c(pid, i)`,
+        [id, colabs, ids.length]);
+    }
+    // pieza_id de la campaña ilustra la tarjeta; con sólo colaboraciones queda en null y la
+    // pantalla usa la primera de la lista.
     await cli.query('UPDATE contenido.pauta_campania SET pieza_id=$2, actualizado_en=now() WHERE id=$1',
-      [id, ids[0]]);
+      [id, ids[0] || null]);
     await cli.query('COMMIT');
-    return { ok: true, creativos: ids.length };
+    return { ok: true, creativos: todos.length };
   } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
 }
 
