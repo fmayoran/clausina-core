@@ -1084,8 +1084,12 @@ async function loadInstagram(){
     ]);
     renderPropuestasCanal(reqs, 'instagram');
     fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado) || (p.estado==='rechazada' && !p.derivado_en)).map(pendCard).join(''));
-    fill('c-pub','n-pub', piezas.filter(p=>p.estado==='publicada').map(pubCard).join(''));
-    cargarColabs();
+    // Lo publicado y las colaboraciones van a la MISMA grilla: en Instagram salen en la misma
+    // grilla, y separarlas hacía parecer secundario un contenido que a veces rinde más que el
+    // propio (el post de Ardora del 01/09 hizo 16.384 vistas).
+    _PUB = piezas.filter(p=>p.estado==='publicada').map(normPieza);
+    await cargarColabs();
+    pintarPub();
     setUpd();
   }catch(e){ setUpd(); }
 }
@@ -1554,27 +1558,82 @@ async function cfgGuardar(ids, tokens) {
 }
 
 
-/* Colaboraciones de otras cuentas: publicaciones que salen en nuestra grilla pero las publicó
- * otro. Instagram no se las devuelve al colaborador —ni se las cuenta en media_count—, así que
- * se leen desde la cuenta que publicó. Se muestran aparte de las propias a propósito: no las
- * decidimos nosotros, y contarlas como nuestras diría que funciona algo que no hicimos. */
+/* ── Publicadas: una sola grilla, ordenable ───────────────────────────────────────────────────
+ * Propias y colaboraciones conviven porque en Instagram conviven. La colaboración se marca con un
+ * sello, pero la tarjeta es la misma y ordena por los mismos números: darle menos peso visual a
+ * algo que rinde más sería mentirle a quien mira la pantalla para decidir.
+ */
+let _PUB = [], _COLAB = [], _ORDEN = 'fecha';
+
+function normPieza(p){
+  return { tipo:'propia', id:p.id, titulo:p.titulo_interno, img:thumbSrc(p.media)||null,
+           fecha:p.publicado_en, permalink:p.ig_permalink, numero:p.numero,
+           views:p.m_views, reach:p.m_reach, likes:p.m_likes,
+           colaboradores:p.colaboradores, colab_estado:p.colab_estado, _p:p };
+}
+function normColab(c){
+  return { tipo:'colab', id:c.ig_post_id, titulo:(c.caption||'').split('\n')[0],
+           img:c.media_url||null, fecha:c.publicado_en, permalink:c.permalink,
+           autor:c.autor, views:c.views, reach:c.reach, likes:c.likes };
+}
+
+const _num = v => (v==null? -1 : Number(v));
+const ORDENES = {
+  fecha: (a,b)=> String(b.fecha||'').localeCompare(String(a.fecha||'')),
+  views: (a,b)=> _num(b.views)-_num(a.views),
+  reach: (a,b)=> _num(b.reach)-_num(a.reach),
+  // Interacción sobre alcance: lo comparable entre piezas de tamaños distintos.
+  er:    (a,b)=> (_num(b.likes)/Math.max(1,_num(b.reach))) - (_num(a.likes)/Math.max(1,_num(a.reach))),
+};
+
+function ordenarPub(v){ _ORDEN = ORDENES[v] ? v : 'fecha'; pintarPub(); }
+window.ordenarPub = ordenarPub;
+
+function pintarPub(){
+  const cont=document.getElementById('c-pub'); if(!cont) return;
+  const todo=[..._PUB, ..._COLAB].sort(ORDENES[_ORDEN]);
+  const n=document.getElementById('n-pub'); if(n) n.textContent=todo.length;
+  cont.innerHTML = todo.length ? todo.map(pubTarjeta).join('')
+    : '<div class="vacio-tab">Todavía no hay publicaciones.</div>';
+}
+
+function pubTarjeta(x){
+  // El marcador va SIEMPRE debajo y la imagen encima: si falla se quita y queda el marcador.
+  // Inyectar HTML desde un onerror obliga a escapar comillas dentro de un atributo de HTML, y
+  // eso rompió la página entera en la primera prueba.
+  const img = '<div class="vac">sin imagen</div>' +
+    (x.img ? `<img src="${esc(x.img)}" alt="" loading="lazy" onerror="this.remove()">` : '');
+  const sellos = [];
+  if(x.tipo==='colab') sellos.push(`<span class="et colab" title="La publicó @${esc(x.autor)}; sale en nuestra grilla">Collab · @${esc(x.autor)}</span>`);
+  else if(x.numero) sellos.push(`<span class="et">${esc(cod(x.numero))}</span>`);
+  // Una invitación sin aceptar es alcance que no se está usando: se avisa acá también.
+  const ce=x.colab_estado||null;
+  if(ce && Object.values(ce).some(v=>String(v).toLowerCase()!=='accepted'))
+    sellos.push('<span class="et colab" title="Hay una invitación de colaboración sin aceptar">Collab pendiente</span>');
+  const f = x.fecha ? new Date(x.fecha).toLocaleDateString('es-AR',{day:'2-digit',month:'short'}) : '';
+  const dato=(v,et)=> `<div><b>${v==null?'—':nf(v)}</b><span>${et}</span></div>`;
+  return `<article class="pcard">
+    <div class="ph">${img}<div class="sello">${sellos.join('')}</div></div>
+    <div class="cuerpo">
+      <div class="tt">${esc(x.titulo||'(sin título)')}</div>
+      <div class="nums">${dato(x.views,'vistas')}${dato(x.reach,'alcance')}${dato(x.likes,'likes')}</div>
+      <div class="pie">${esc(f)}${x.permalink?`<a href="${esc(x.permalink)}" target="_blank" rel="noopener">Ver ↗</a>`:''}</div>
+    </div></article>`;
+}
+
 async function cargarColabs(){
-  const zona=document.getElementById('colabs-zona'); if(!zona) return;
   try{
     const d=await fetch('api/colaboraciones').then(r=>r.ok?r.json():null);
-    const items=(d&&d.items)||[];
-    if(!items.length){ zona.classList.add('hidden'); return; }
-    zona.classList.remove('hidden');
-    const n=document.getElementById('n-colab'); if(n) n.textContent=items.length;
-    document.getElementById('c-colab').innerHTML=items.map(c=>{
-      const img=c.media_url?`<img class="mini" src="${esc(c.media_url)}" loading="lazy" onerror="this.style.visibility='hidden'">`:'<span class="mini ph"></span>';
-      const cap=(c.caption||'').split('\n')[0].slice(0,90);
-      const f=c.publicado_en?new Date(c.publicado_en).toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'}):'';
-      return `<div class="card row">${img}<div class="rbody">
-        <div class="tt">${esc(cap||'(sin texto)')}</div>
-        <div class="meta"><span class="badge collab">de @${esc(c.autor)}</span> ${esc(f)}</div>
-        ${c.permalink?`<a class="link" href="${esc(c.permalink)}" target="_blank" rel="noopener">Ver en Instagram ↗</a>`:''}
-      </div></div>`;
-    }).join('');
-  }catch(e){ zona.classList.add('hidden'); }
+    _COLAB=((d&&d.items)||[]).map(normColab);
+  }catch(e){ _COLAB=[]; }
 }
+
+/* Solapas. La de publicadas es la de siempre; el selector de orden sólo tiene sentido ahí. */
+function verTab(t){
+  ['pub','pend','prop'].forEach(k=>{
+    const p=document.getElementById('t-'+k); if(p) p.classList.toggle('hidden', k!==t);
+    const b=document.querySelector(`.sol[data-tab="${k}"]`); if(b) b.classList.toggle('on', k===t);
+  });
+  const o=document.getElementById('orden-zona'); if(o) o.style.visibility = (t==='pub'?'visible':'hidden');
+}
+window.verTab = verTab;

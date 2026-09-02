@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
 <link rel="stylesheet" href="tw.css">
-<link rel="stylesheet" href="panel.css?v=20260901">
+<link rel="stylesheet" href="panel.css?v=20260901b">
 </head>
 <body>
   <header>
@@ -27,23 +27,28 @@
     <button class="ibtn destacado" onclick="PedirCreativo.abrir({canal:'instagram'})"
       title="Contale al creativo qué querés lograr y que proponga publicaciones"><i data-lucide="sparkles" class="w-4 h-4"></i>Pedirle al creativo</button>
     <button class="ibtn" onclick="cfgIG(true)" title="Configurar la cuenta de Instagram"><i data-lucide="settings-2" class="w-4 h-4"></i>Configurar</button></div>
-  <div class="board b3">
-    <div class="col brief"><h2><span class="dot"></span>Propuestas del creativo <span class="n" id="n-prop"></span></h2><div class="cards" id="c-prop"></div></div>
-    <div class="col pend"><h2><span class="dot"></span>Pendiente de aprobación <span class="n" id="n-pend"></span></h2><div class="cards" id="c-pend"></div></div>
-    <div class="col pub"><h2><span class="dot"></span>Publicada <span class="n" id="n-pub"></span></h2><div class="cards" id="c-pub"></div></div>
+  <!-- Solapas. Lo publicado es lo que se mira todo el tiempo —es donde se evalúa el desempeño—,
+       así que es la vista por defecto y se lleva el ancho completo. Propuestas y pendientes son
+       bandejas de trabajo: se visitan cuando hay algo que resolver, no de forma continua. En tres
+       columnas competían por la pantalla y lo importante quedaba en un tercio. -->
+  <div class="solapas" role="tablist">
+    <button class="sol on" data-tab="pub"  role="tab" onclick="verTab('pub')">Publicadas <span class="n" id="n-pub"></span></button>
+    <button class="sol"    data-tab="pend" role="tab" onclick="verTab('pend')">Pendientes <span class="n" id="n-pend"></span></button>
+    <button class="sol"    data-tab="prop" role="tab" onclick="verTab('prop')">Propuestas <span class="n" id="n-prop"></span></button>
+    <div class="orden" id="orden-zona">
+      <label for="orden">Ordenar</label>
+      <select id="orden" onchange="ordenarPub(this.value)">
+        <option value="fecha">Más recientes</option>
+        <option value="views">Más vistas</option>
+        <option value="reach">Más alcance</option>
+        <option value="er">Mejor interacción</option>
+      </select>
+    </div>
   </div>
-  <!-- Publicaciones de otra cuenta donde este negocio colabora. Salen en su grilla de Instagram
-       pero no le pertenecen, y su propia API no se las devuelve: se leen desde quien publicó.
-       Van en su propia franja y no entre las publicadas, porque no las hicimos nosotros. -->
-  <div id="colabs-zona" class="hidden" style="margin-top:26px">
-    <h2 style="font-family:'Barlow Condensed',sans-serif;font-size:1.25rem;color:var(--white);
-        border-bottom:1px solid var(--line);padding-bottom:6px;margin-bottom:12px;">
-      Colaboraciones de otras cuentas <span class="n" id="n-colab"></span>
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:.6rem;color:var(--ash);
-        text-transform:none;letter-spacing:0;margin-left:8px;">salen en nuestra grilla, las publicó otra cuenta</span>
-    </h2>
-    <div class="cards" id="c-colab"></div>
-  </div>
+
+  <section class="tabp" id="t-pub"><div class="grilla" id="c-pub"></div></section>
+  <section class="tabp hidden" id="t-pend"><div class="grilla" id="c-pend"></div></section>
+  <section class="tabp hidden" id="t-prop"><div class="grilla" id="c-prop"></div></section>
 
   <!-- Configuración de la capacidad: antes vivía en Perfil > Redes (v2.0/F2). -->
   <div id="cfgmodal" class="modal hidden">
@@ -60,10 +65,10 @@
   </div>
 </main></div>
 <script src="https://unpkg.com/lucide@latest"></script>
-<script src="shell.js?v=20260901"></script>
+<script src="shell.js?v=20260901b"></script>
 <script>ClausinaShell({active:'instagram',cap:'instagram'});</script>
-<script src="panel.js?v=20260901"></script>
-<script src="pedir-creativo.js?v=20260901"></script>
+<script src="panel.js?v=20260901b"></script>
+<script src="pedir-creativo.js?v=20260901b"></script>
 <script>
 currentLoad=loadInstagram; loadInstagram(); setInterval(loadInstagram,6000);
 const IG_IDS=['ig_handle','ig_user_id'];

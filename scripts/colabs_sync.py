@@ -65,7 +65,25 @@ def mapa_cuentas():
     return out
 
 
-def guardar_externa(m, colab, autor):
+MET = "views,reach,total_interactions,saved,shares,likes,comments"
+
+
+def metricas(post_id, token):
+    """Métricas de una publicación ajena, leídas con el token de quien la publicó.
+
+    Sin esto la colaboración no se puede ordenar junto a lo propio: quedaría siempre última por no
+    tener número, que es justo lo contrario de mostrarla con el mismo peso. Y el peso es real —el
+    post de Ardora del 01/09 hizo 16.384 vistas, más que casi todo lo propio de Cortafuego—.
+    """
+    u = f"{FB}/{post_id}/insights?" + urllib.parse.urlencode({"metric": MET, "access_token": token})
+    try:
+        with urllib.request.urlopen(u, timeout=25) as r:
+            return {x["name"]: x["values"][0]["value"] for x in json.load(r).get("data", [])}
+    except Exception:      # una publicación puede no soportar alguna métrica; no es fatal
+        return {}
+
+
+def guardar_externa(m, colab, autor, met=None):
     """Una publicación de OTRA cuenta donde un negocio nuestro es colaborador.
 
     Instagram no se las devuelve al colaborador —ni siquiera se las cuenta en media_count—, así que
@@ -73,18 +91,25 @@ def guardar_externa(m, colab, autor):
     la grilla del autor, no la del negocio al que le interesan.
     """
     cap = (m.get("caption") or "").replace("$j$", "")
+    met = met or {}
+    num = lambda k: int(met.get(k) or 0)   # noqa: E731
     psql(
         "INSERT INTO contenido.colaboracion_externa (ig_post_id,negocio_id,autor,autor_negocio_id,"
-        "permalink,caption,media_url,tipo,publicado_en,estado,capturado_en) VALUES ("
+        "permalink,caption,media_url,tipo,publicado_en,estado,views,reach,likes,interacciones,"
+        "shares,saved,capturado_en) VALUES ("
         f"'{m['id']}','{colab['id']}',$j${autor['slug']}$j$,"
         + (f"'{autor['id']}'" if autor.get("id") else "NULL") + ","
         f"$j${m.get('permalink') or ''}$j$,$j${cap}$j$,"
         f"$j${m.get('thumbnail_url') or m.get('media_url') or ''}$j$,"
         f"$j${m.get('media_type') or ''}$j$,"
         + (f"'{m['timestamp']}'" if m.get("timestamp") else "NULL") + ","
-        f"$j${colab.get('estado') or ''}$j$, now()) "
+        f"$j${colab.get('estado') or ''}$j$,"
+        f"{num('views')},{num('reach')},{num('likes')},{num('total_interactions')},"
+        f"{num('shares')},{num('saved')}, now()) "
         "ON CONFLICT (ig_post_id, negocio_id) DO UPDATE SET estado=EXCLUDED.estado,"
-        "caption=EXCLUDED.caption,media_url=EXCLUDED.media_url,capturado_en=now();")
+        "caption=EXCLUDED.caption,media_url=EXCLUDED.media_url,views=EXCLUDED.views,"
+        "reach=EXCLUDED.reach,likes=EXCLUDED.likes,interacciones=EXCLUDED.interacciones,"
+        "shares=EXCLUDED.shares,saved=EXCLUDED.saved,capturado_en=now();")
 
 
 def main():
@@ -113,7 +138,8 @@ def main():
                 otro = cuentas.get(c.get("id"))
                 if otro and otro["slug"] != n["slug"] and (c.get("invite_status") or "").lower() == "accepted":
                     guardar_externa(m, {"id": otro["id"], "estado": c.get("invite_status")},
-                                    {"slug": n["slug"], "id": n.get("negocio_id")})
+                                    {"slug": n["slug"], "id": n.get("negocio_id")},
+                                    metricas(m["id"], n["token"]))
                     externas += 1
             # Se escribe por ig_post_id: es la única llave que comparten la API y nuestra base.
             psql("UPDATE contenido.revisiones SET colab_estado=$j$" + json.dumps(estado, ensure_ascii=False)
