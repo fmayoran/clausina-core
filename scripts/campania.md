@@ -19,6 +19,9 @@ En `/tmp/camp_ctx_<sid>.json` tenés:
   cada uno con `pieza_id`, `numero` (CF-XXXX), `caption`, `permalink`, `tipo` (imagen/video).
 - `piezas_elegidas`: números CF-XXXX que la persona **eligió a mano** al pedir la campaña.
   Si viene con algo, mandá sobre tu criterio (ver punto 2). Vacío = elegís vos.
+- `colaboraciones_elegidas`: publicaciones de OTRA cuenta donde este negocio colabora, elegidas
+  a mano. Cada una con `codigo` (COL-NN), `post_id` y `autor`. Se promocionan igual que lo
+  propio, con la identidad de quien publicó. Si vienen, devolvelas en `colab_post_ids`.
 - `rendimiento`: **cómo le fue a lo que este negocio ya publicó**, en DOS planos que no se mezclan:
   - **Orgánico** (`formatos`, `mejores`, `peores`): mediana de views/reach/likes por formato. Dice
     qué contenido resuena solo, sin plata atrás.
@@ -59,7 +62,12 @@ Leé además `contexto/CONTEXTO_MARCA.md` de la cápsula (estás parado en el re
    y explicá en `razon`, con nombre y apellido, cuál dejaste afuera y por qué. Nunca las ignores en
    silencio: quien las eligió va a leer la propuesta esperando encontrarlas.
 
-   Si `piezas_elegidas` viene vacío, elegís vos con el criterio de abajo.
+   Lo mismo vale para `colaboraciones_elegidas`: devolvé sus `post_id` en `colab_post_ids`.
+   Una colaboración es una publicación de otra cuenta donde este negocio está etiquetado; el
+   anuncio sale con la cara de esa cuenta pero lo paga este negocio. Decilo en `razon` cuando
+   uses una, porque cambia cómo se lee el aviso.
+
+   Si `piezas_elegidas` y `colaboraciones_elegidas` vienen vacíos, elegís vos con el criterio de abajo.
 
    **Los tres formatos se pueden promocionar** —foto, carrusel y Reel—, así que elegí por
    rendimiento y no por formato. Dos límites reales de Meta, igual: no mezcles formatos distintos
@@ -112,6 +120,7 @@ Escribí EXACTAMENTE este JSON en `/tmp/camp_res_<sid>.json` (sin texto extra):
   "nombre": "Nombre corto y claro de la campaña",
   "objetivo": "OUTCOME_TRAFFIC",
   "pieza_ids": ["uuid-de-la-principal", "uuid-de-la-segunda"],
+  "colab_post_ids": ["id-del-post-si-se-usa-una-colaboración"],
   "razon": "Por qué esta campaña/creativo/público.",
   "audiencia": {
     "ubicaciones": [{"tipo": "radio", "nombre": "Ranelagh, Buenos Aires", "radio_km": 15}],

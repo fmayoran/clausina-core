@@ -4627,17 +4627,30 @@ async function pedirRefrescoPauta() {
 async function crearSolicitudCampania(negocioId, instruccion, piezas) {
   // Las piezas se validan contra ESTE negocio: sin eso, un id de otro negocio entraría al pedido
   // y el estratega terminaría proponiendo promocionar algo ajeno.
-  let ids = [...new Set((Array.isArray(piezas) ? piezas : []).filter(Boolean))].slice(0, 5);
+  const todos = [...new Set((Array.isArray(piezas) ? piezas : []).filter(Boolean))].slice(0, 5);
+  // Una colaboración no vive en contenido.piezas y su id es el del post de Instagram, no un uuid.
+  // Mezclarlas en el mismo array hacía fallar el cast a uuid[] y el pedido moría con "no se pudo".
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let ids = todos.filter(x => UUID.test(x));
+  let colabs = todos.filter(x => !UUID.test(x));
   if (ids.length) {
     const { rows } = await pool.query(
       `SELECT id FROM contenido.piezas WHERE id = ANY($1::uuid[]) AND negocio_id=$2 AND canal='instagram'`,
       [ids, negocioId]);
     ids = rows.map(r => r.id);
   }
+  if (colabs.length) {
+    const { rows } = await pool.query(
+      `SELECT ig_post_id FROM contenido.colaboracion_externa
+        WHERE ig_post_id = ANY($1::text[]) AND negocio_id=$2 AND autor_negocio_id IS NOT NULL`,
+      [colabs, negocioId]);
+    colabs = rows.map(r => r.ig_post_id);
+  }
   const { rows: [r] } = await pool.query(
-    `INSERT INTO contenido.solicitudes_campania (negocio_id, instruccion, piezas_sugeridas)
-     VALUES ($1, $2, $3) RETURNING id`,
-    [negocioId, (instruccion || '').slice(0, 2000) || null, ids.length ? ids : null]);
+    `INSERT INTO contenido.solicitudes_campania (negocio_id, instruccion, piezas_sugeridas, colabs_sugeridos)
+     VALUES ($1, $2, $3, $4) RETURNING id`,
+    [negocioId, (instruccion || '').slice(0, 2000) || null,
+     ids.length ? ids : null, colabs.length ? colabs : null]);
   return r.id;
 }
 

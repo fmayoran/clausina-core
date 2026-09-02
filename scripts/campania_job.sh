@@ -43,6 +43,18 @@ def q(sql):
 instr = q(f"SELECT coalesce(instruccion,'') FROM contenido.solicitudes_campania WHERE id='{sid}'")
 # Publicaciones que la persona eligio al pedir. Van como numeros CF-XXXX, que es como las nombra
 # el resto del contexto: pasar uuids obligaria al modelo a cruzarlos y ahi es donde se equivoca.
+# Colaboraciones elegidas: van con su codigo COL-NN y el autor, que es como las nombra el panel.
+colabs = [x for x in q(
+    "SELECT string_agg('COL-'||lpad(ce.numero::text,2,'0')||'|'||ce.ig_post_id||'|'||ce.autor, ';' ORDER BY ce.numero) "
+    "FROM contenido.colaboracion_externa ce "
+    f"WHERE ce.ig_post_id IN (SELECT unnest(colabs_sugeridos) FROM contenido.solicitudes_campania WHERE id='{sid}')"
+).split(';') if x]
+colabs_ctx = []
+for c in colabs:
+    p_ = c.split('|')
+    if len(p_) == 3:
+        colabs_ctx.append({"codigo": p_[0], "post_id": p_[1], "autor": p_[2]})
+
 sugeridas = [x for x in q(
     "SELECT string_agg(p.numero::text, ',' ORDER BY p.numero) FROM contenido.piezas p "
     # unnest y no ANY(subconsulta): la subconsulta devuelve UNA fila con un array, y comparar
@@ -79,7 +91,8 @@ destinos = {"web": f"https://{dominio}" if dominio else None,
             "reservas": f"https://panel.clausina.ar/r/{slug}"}
 ctx={"instruccion":instr,"objetivo_marca":objetivo,"brief":brief.strip(),"estilo":estilo.strip(),
      "moneda":moneda,"publicaciones":publicaciones,"rendimiento":rendimiento,"destinos":destinos,
-     "piezas_elegidas":[int(x) for x in sugeridas]}
+     "piezas_elegidas":[int(x) for x in sugeridas],
+     "colaboraciones_elegidas":colabs_ctx}
 json.dump(ctx, open(f"/tmp/camp_ctx_{sid}.json","w"), ensure_ascii=False)
 print(f"ctx: {len(publicaciones)} publicaciones, moneda {moneda}")
 PY
@@ -148,6 +161,14 @@ camp_id=r.stdout.strip().splitlines()[0]
 for i, pz in enumerate(piezas, 1):
     psql("INSERT INTO contenido.pauta_campania_pieza (campania_id,pieza_id,orden) "
          f"VALUES ('{camp_id}','{pz}',{i}) ON CONFLICT (campania_id,pieza_id) DO NOTHING;")
+# Colaboraciones: el estratega las devuelve en `colab_post_ids` (ids de post, no uuids). Si no las
+# menciona pero la persona las eligio, se usan igual: la eleccion humana no se pierde en silencio.
+colabs_out=[str(x).strip() for x in (d.get("colab_post_ids") or []) if str(x).strip()]
+if not colabs_out:
+    colabs_out=[c["post_id"] for c in colabs_ctx]
+for j, cp in enumerate(colabs_out[:5], len(piezas)+1):
+    psql("INSERT INTO contenido.pauta_campania_pieza (campania_id,colab_post_id,orden) "
+         f"VALUES ('{camp_id}',{dq(cp)},{j});")
 upd_sol(f"estado='listo', campania_id='{camp_id}', resumen={dq(resumen)}")
 print("ok:"+nombre)
 PY
