@@ -16,6 +16,19 @@ const cfBadge = p => p.numero ? `<span class="badge cf">${cod(p.numero)}</span>`
 
 let acting=false;
 let currentLoad=function(){};
+/**
+ * Recargar DESPUÉS de una acción, forzando el repintado.
+ *
+ * busy() deshabilita todos los botones de la tarjeta y quien los devuelve a la vida es el
+ * repintado de la lista. Pero fill() saltea el render cuando el HTML no cambió —está para no
+ * reiniciar los <video> en curso—, así que si la acción FALLA y los datos quedan igual, la tarjeta
+ * se queda con los botones muertos hasta recargar la página entera. Le pasó a CF-0264: el descarte
+ * devolvía 409, y desde ese click no respondía más ningún botón de esa tarjeta.
+ */
+function recargarTrasAccion(ms){
+  for(const k in _lastHtml) delete _lastHtml[k];
+  if(ms) setTimeout(currentLoad, ms); else currentLoad();
+}
 let toastT;
 function toast(msg, err){ const t=document.getElementById('toast'); if(!t)return; t.textContent=msg; t.classList.toggle('err',!!err); t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),3800); }
 async function salir(){ try{ await fetch('api/logout',{method:'POST'}); }catch(_){} location.href='login'; }
@@ -459,7 +472,7 @@ async function reabrirPieza(id, btn){
     if(d.ok) toast('Vuelta a revisión — corregila y aprobala de nuevo');
     else toast(d.mensaje||'No se pudo', true);
   }catch(e){ toast('Error de conexión', true); }
-  acting=false; currentLoad();
+  acting=false; recargarTrasAccion(0);
 }
 function pubCard(p){
   const t = thumbSrc(p.media);
@@ -706,7 +719,7 @@ async function aprobar(id, btn, colaboradores){
   if(!disparo){ _publicando.delete(id); pintarPublicando(id, false); }
   // La publicación la hace n8n de forma async: confirmamos que la pieza REALMENTE salió, en vez de
   // asumir que sí (el hueco que dejó a CF-0260 pendiente sin avisar).
-  if(disparo) confirmarPublicacion(id); else setTimeout(currentLoad, 1200);
+  if(disparo) confirmarPublicacion(id); else recargarTrasAccion(1200);
 }
 // Poll del estado real de la pieza tras aprobar. Si no publicó en ~2 min, avisa claro.
 async function confirmarPublicacion(id){
@@ -759,7 +772,7 @@ async function descartar(id, btn){
   try{ const d=await fetch('api/piezas/'+id+'/descartar',{method:'POST'}).then(r=>r.json());
     toast(d.ok?'Descartada':'No se pudo descartar ('+(d.error||d.status)+')', !d.ok);
   }catch(e){ toast('Error de conexión', true); }
-  acting=false; setTimeout(currentLoad, 1000);
+  acting=false; recargarTrasAccion(1000);
 }
 
 /* ---------- Acciones sobre requerimientos (cola) ---------- */
@@ -813,7 +826,7 @@ async function descartarReq(id, btn){
   acting=true; if(btn){btn.disabled=true; btn.textContent='Descartando…';}
   try{ const d=await fetch('api/requerimientos/'+id+'/descartar',{method:'POST'}).then(r=>r.json()); toast(d.ok?'Descartado':'No se pudo descartar',!d.ok); }
   catch(e){ toast('Error de conexión', true); }
-  acting=false; setTimeout(currentLoad, 800);
+  acting=false; recargarTrasAccion(800);
 }
 // Descartar desde el popup de propuesta/mención.
 async function descartarDesdeModal(){
@@ -826,7 +839,7 @@ async function descartarDesdeModal(){
     if(d.ok){ toast('Descartado'); modalId=null; document.getElementById('reqmodal').classList.add('hidden'); }
     else toast('No se pudo descartar', true);
   }catch(e){ toast('Error de conexión', true); }
-  if(btn){btn.disabled=false; btn.textContent=t;} acting=false; setTimeout(currentLoad, 500);
+  if(btn){btn.disabled=false; btn.textContent=t;} acting=false; recargarTrasAccion(500);
 }
 
 /* ---------- Ventana de interacción con el creativo (preview + comentarios + generar) ---------- */
@@ -1029,7 +1042,7 @@ async function generarPublicacion(){
     if(d.ok){ toast('Generando — entra al circuito de aprobación'); modalId=null; document.getElementById('reqmodal').classList.add('hidden'); }
     else toast('No se pudo generar', true);
   }catch(e){ toast('Error de conexión', true); }
-  btn.disabled=false; btn.textContent='Generar publicación'; acting=false; setTimeout(currentLoad,500);
+  btn.disabled=false; btn.textContent='Generar publicación'; acting=false; recargarTrasAccion(500);
 }
 // "Pedir nueva versión": manda tus comentarios y el creativo reescribe el concepto (loop de refinamiento, sin generar la pieza).
 async function pedirNuevaVersion(){
@@ -1043,7 +1056,7 @@ async function pedirNuevaVersion(){
     if(d.ok){ toast('El creativo está preparando una nueva versión'); modalId=null; document.getElementById('reqmodal').classList.add('hidden'); }
     else toast('No se pudo'+(d.error?' ('+d.error+')':''), true);
   }catch(e){ toast('Error de conexión', true); }
-  if(btn){btn.disabled=false; btn.textContent='Pedir nueva versión';} acting=false; setTimeout(currentLoad,500);
+  if(btn){btn.disabled=false; btn.textContent='Pedir nueva versión';} acting=false; recargarTrasAccion(500);
 }
 
 /* ---------- Loaders por pantalla ---------- */
@@ -1611,7 +1624,7 @@ async function confirmRechazo(){
     if(d.ok){ toast('Modificación enviada — se va a corregir'); rejectId=null; document.getElementById('rejmodal').classList.add('hidden'); }
     else toast('No se pudo enviar la modificación ('+(d.error||d.status)+')', true);
   }catch(e){ toast('Error de conexión', true); }
-  btn.disabled=false; btn.textContent='Modificar'; acting=false; setTimeout(currentLoad, 1200);
+  btn.disabled=false; btn.textContent='Modificar'; acting=false; recargarTrasAccion(1200);
 }
 
 /* ---------- Marca activa (multi-tenant) ---------- */
