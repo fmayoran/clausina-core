@@ -66,6 +66,71 @@ async function verBitacora(piezaId){
   document.body.appendChild(ov);
 }
 
+/* ── Previsualización de una pieza ────────────────────────────────────────────
+ * La tarjeta recorta: muestra la media a 4/5 con object-fit:cover, así que de una historia 9:16
+ * se pierden arriba y abajo y no hay forma de saber si el sobreimpreso entra o queda cortado.
+ * Acá se ve ENTERA (contain), con el texto al lado, que es lo que hay que mirar antes de aprobar.
+ * Lee de _PEND, que llenan los dos listados al pintar: no vuelve a pedirle nada al servidor. */
+let _PEND = {}, _PVM = [], _PVI = 0;
+// Las piezas que están a la vista para revisar, indexadas para que el visor las encuentre.
+function registrarRevisables(piezas){
+  const rev = (piezas||[]).filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado) || p.estado==='rechazada');
+  _PEND = {}; rev.forEach(p=>{ if(p.id) _PEND[p.id]=p; });
+  return rev;
+}
+// El botón va sobre la miniatura y no en la fila de acciones: ahí compite con Aprobar y Descartar,
+// que son decisiones, y esto es sólo mirar.
+function pvBoton(id){
+  return `<button class="pvbtn" onclick="verPieza('${esc(id)}')" title="Ver la pieza completa, sin recortar" aria-label="Ver la pieza completa">⤢</button>`;
+}
+function verPieza(id){
+  const p=_PEND[id]; if(!p) return;
+  _PVM = (Array.isArray(p.medios)&&p.medios.length) ? p.medios : ((p.media&&p.media.url) ? [p.media] : []);
+  _PVI = 0;
+  cerrarPieza();
+  const ov=document.createElement('div'); ov.id='pv-ov'; ov.className='pvov';
+  ov.onclick=e=>{ if(e.target===ov) cerrarPieza(); };
+  ov.innerHTML=`<div class="pvbox">
+    <div class="pvhead">
+      ${p.numero?`<span class="pvcod">${cod(p.numero)}</span>`:''}
+      <span class="pvtt">${esc(p.titulo_interno||'')}</span>
+      ${fmtBadge(p)}${carrBadge(p)}
+      <button class="pvx" onclick="cerrarPieza()" title="Cerrar" aria-label="Cerrar">×</button>
+    </div>
+    <div class="pvbody">
+      <div class="pvmedia" id="pv-media"></div>
+      ${p.caption?`<div class="pvcap"><div class="pvcapk">Texto de la publicación</div>
+        <div class="pvcapt">${esc(p.caption).replace(/\n/g,'<br>')}</div></div>`:''}
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  pintarPv();
+  document.addEventListener('keydown', pvTecla);
+}
+function pintarPv(){
+  const c=document.getElementById('pv-media'); if(!c) return;
+  const m=_PVM[_PVI];
+  if(!m || !m.url){ c.innerHTML='<div class="pvsin">Esta pieza todavía no tiene material.</div>'; return; }
+  const med = m.tipo==='video'
+    ? `<video src="${esc(m.url)}" ${m.poster_url?`poster="${esc(m.poster_url)}"`:''} controls playsinline preload="metadata"></video>`
+    : `<img src="${esc(m.url)}" alt="">`;
+  const nav = _PVM.length>1
+    ? `<button class="pvnav izq" onclick="pvMover(-1)" title="Anterior" aria-label="Anterior">‹</button>
+       <button class="pvnav der" onclick="pvMover(1)" title="Siguiente" aria-label="Siguiente">›</button>
+       <span class="pvn">${_PVI+1}/${_PVM.length}</span>` : '';
+  c.innerHTML = med + nav;
+}
+function pvMover(d){ if(_PVM.length<2) return; _PVI=(_PVI+d+_PVM.length)%_PVM.length; pintarPv(); }
+function pvTecla(e){
+  if(e.key==='Escape') cerrarPieza();
+  else if(e.key==='ArrowLeft') pvMover(-1);
+  else if(e.key==='ArrowRight') pvMover(1);
+}
+function cerrarPieza(){
+  const o=document.getElementById('pv-ov'); if(o) o.remove();
+  document.removeEventListener('keydown', pvTecla);
+}
+
 /* ---------- Tarjetas Instagram ---------- */
 // Tira de medios para revisar un carrusel completo (cada uno abre la imagen/video original).
 function mediaGallery(medios, piezaId){
@@ -199,7 +264,7 @@ function modCard(p, canal){
       <button class="btn no" onclick="rechazar('${p.id}',this)">Modificar de nuevo</button>
       <button class="btn del" onclick="descartar('${p.id}',this)">Descartar</button>
     </div></div>`;
-  return `<div class="card">${thumb}<div class="body">
+  return `<div class="card"><div class="thumbw">${thumb}${pvBoton(p.id)}</div><div class="body">
     <div class="tt">${esc(p.titulo_interno)} <span class="intlbl" title="Nombre interno — no se publica">interno</span></div>
     <div class="meta">${cfBadge(p)}${fmtBadge(p)}${revBadge(p)}${carrBadge(p)}<span>${fecha(p.actualizado_en)}</span></div>
     <div class="meta2">${banner}</div>
@@ -241,7 +306,7 @@ function pendCard(p){
       : (t ? `<img class="thumb" loading="lazy" src="${esc(t)}" onerror="this.style.display='none'">` : '<div class="thumb"></div>');
   const copy = p.caption ? `<div class="copy">${esc(p.caption).replace(/\n/g,'<br>')}</div>` : '';
   const pub = estadoPublicacion(p);
-  return `<div class="card${_publicando.has(p.id)?' publicando':''}" data-pieza="${esc(p.id)}">${thumb}<div class="body">
+  return `<div class="card${_publicando.has(p.id)?' publicando':''}" data-pieza="${esc(p.id)}"><div class="thumbw">${thumb}${pvBoton(p.id)}</div><div class="body">
     <div class="tt">${esc(p.titulo_interno)} <span class="intlbl" title="Nombre interno — no se publica">interno</span></div>
     <div class="meta">${cfBadge(p)}${fmtBadge(p)}${revBadge(p)}${carrBadge(p)}<span>${fecha(p.actualizado_en)}</span></div>
     ${pub ? `<div class="meta2"><span class="rst ${pub.fase==='yendo'?'proc':'rech'}">${esc(pub.txt)}</span></div>` : ''}
@@ -434,7 +499,7 @@ function avisoPendCard(p){
   const m=p.media||{};
   const vid = m.url ? `<video class="avvid" src="${esc(m.url)}" ${m.poster_url?`poster="${esc(m.poster_url)}"`:''} preload="none" muted loop playsinline controls></video>` : '<div class="thumb"></div>';
   const copy = p.caption ? `<div class="copy">${esc(p.caption).replace(/\n/g,'<br>')}</div>` : '';
-  return `<div class="card">${vid}<div class="body">
+  return `<div class="card"><div class="thumbw">${vid}${pvBoton(p.id)}</div><div class="body">
     <div class="tt">${esc(p.titulo_interno)} <span class="intlbl">interno</span></div>
     <div class="meta">${cfBadge(p)}${revBadge(p)}<span>${fecha(p.actualizado_en)}</span></div>
     <div class="ctx">${ctxBadges(p)}</div>
@@ -1088,7 +1153,7 @@ async function loadInstagram(){
       fetch('api/requerimientos').then(x=>x.json()).catch(()=>[]),
     ]);
     renderPropuestasCanal(reqs, 'instagram');
-    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado) || p.estado==='rechazada').map(pendCard).join(''));
+    fill('c-pend','n-pend', registrarRevisables(piezas).map(pendCard).join(''));
     // Lo publicado y las colaboraciones van a la MISMA grilla: en Instagram salen en la misma
     // grilla, y separarlas hacía parecer secundario un contenido que a veces rinde más que el
     // propio (el post de Ardora del 01/09 hizo 16.384 vistas).
@@ -1453,7 +1518,7 @@ async function loadAvisos(){
       fetch('api/requerimientos').then(x=>x.json()).catch(()=>[]),
     ]);
     renderPropuestasCanal(reqs, 'aviso');
-    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado) || p.estado==='rechazada').map(avisoPendCard).join(''));
+    fill('c-pend','n-pend', registrarRevisables(piezas).map(avisoPendCard).join(''));
     fill('c-pub','n-pub', piezas.filter(p=>p.estado==='publicada').map(avisoPubCard).join(''));
     setUpd();
   }catch(e){ setUpd(); }
