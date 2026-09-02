@@ -1887,7 +1887,8 @@ app.get('/api/pauta/campanias', async (req, res) => {
   catch (e) { console.error('pauta-campanias', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/solicitar', async (req, res) => {
-  try { res.json({ ok: true, id: await db.crearSolicitudCampania(req.negocioId, (req.body || {}).instruccion) }); }
+  try { const b = req.body || {};
+    res.json({ ok: true, id: await db.crearSolicitudCampania(req.negocioId, b.instruccion, b.piezas) }); }
   catch (e) { console.error('campania-solicitar', e.message); res.status(500).json({ error: 'db' }); }
 });
 app.post('/api/campanias/:id/aprobar', soloAprobador, async (req, res) => {

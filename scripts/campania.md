@@ -17,6 +17,8 @@ En `/tmp/camp_ctx_<sid>.json` tenés:
 - `moneda`: moneda de la cuenta publicitaria (ej. USD).
 - `publicaciones`: lista de posts YA publicados en Instagram que podés usar de creativo,
   cada uno con `pieza_id`, `numero` (CF-XXXX), `caption`, `permalink`, `tipo` (imagen/video).
+- `piezas_elegidas`: números CF-XXXX que la persona **eligió a mano** al pedir la campaña.
+  Si viene con algo, mandá sobre tu criterio (ver punto 2). Vacío = elegís vos.
 - `rendimiento`: **cómo le fue a lo que este negocio ya publicó**, en DOS planos que no se mezclan:
   - **Orgánico** (`formatos`, `mejores`, `peores`): mediana de views/reach/likes por formato. Dice
     qué contenido resuena solo, sin plata atrás.
@@ -50,6 +52,15 @@ Leé además `contexto/CONTEXTO_MARCA.md` de la cápsula (estás parado en el re
    Con presupuesto chico (menos de US$10 por día) proponé **dos**, no tres: repartir menos plata
    entre más anuncios hace que ninguno junte impresiones suficientes para que la diferencia
    signifique algo.
+   **Si el pedido trae `piezas_elegidas`, esas son las que hay que usar.** Son las que eligió la
+   persona que pide la campaña, mirando su propia grilla, y valen más que tu criterio: sabe cosas
+   del negocio que no están en los números. Úsalas salvo que haya una razón DURA —mezclan formatos
+   incompatibles, alguna no tiene métricas, no está publicada— y en ese caso usá las que sí sirven
+   y explicá en `razon`, con nombre y apellido, cuál dejaste afuera y por qué. Nunca las ignores en
+   silencio: quien las eligió va a leer la propuesta esperando encontrarlas.
+
+   Si `piezas_elegidas` viene vacío, elegís vos con el criterio de abajo.
+
    **Los tres formatos se pueden promocionar** —foto, carrusel y Reel—, así que elegí por
    rendimiento y no por formato. Dos límites reales de Meta, igual: no mezcles formatos distintos
    en la misma campaña (las ubicaciones dependen del formato: un Reel va a reels/historias y una

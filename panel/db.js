@@ -4624,10 +4624,20 @@ async function pedirRefrescoPauta() {
 }
 
 // --- Campañas de pauta: el creativo propone; Fer aprueba; se crean PAUSADAS en Meta ---
-async function crearSolicitudCampania(negocioId, instruccion) {
+async function crearSolicitudCampania(negocioId, instruccion, piezas) {
+  // Las piezas se validan contra ESTE negocio: sin eso, un id de otro negocio entraría al pedido
+  // y el estratega terminaría proponiendo promocionar algo ajeno.
+  let ids = [...new Set((Array.isArray(piezas) ? piezas : []).filter(Boolean))].slice(0, 5);
+  if (ids.length) {
+    const { rows } = await pool.query(
+      `SELECT id FROM contenido.piezas WHERE id = ANY($1::uuid[]) AND negocio_id=$2 AND canal='instagram'`,
+      [ids, negocioId]);
+    ids = rows.map(r => r.id);
+  }
   const { rows: [r] } = await pool.query(
-    `INSERT INTO contenido.solicitudes_campania (negocio_id, instruccion) VALUES ($1, $2) RETURNING id`,
-    [negocioId, (instruccion || '').slice(0, 2000) || null]);
+    `INSERT INTO contenido.solicitudes_campania (negocio_id, instruccion, piezas_sugeridas)
+     VALUES ($1, $2, $3) RETURNING id`,
+    [negocioId, (instruccion || '').slice(0, 2000) || null, ids.length ? ids : null]);
   return r.id;
 }
 

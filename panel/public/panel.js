@@ -1377,12 +1377,54 @@ async function guardarCreativos(){
     else toast(d.error==='demasiados'?`Hasta ${d.detalle} creativos`:'No se pudo guardar',true);
   }catch(e){ toast('Error de conexión',true); }
 }
-function askCampania(){ const m=document.getElementById('campask'); if(m){ const i=document.getElementById('camp-instr'); if(i) i.value=''; m.classList.remove('hidden'); } }
+function askCampania(){ const i=document.getElementById('camp-instr'); if(i) i.value=''; abrirAsk(); }
 function closeAsk(){ const m=document.getElementById('campask'); if(m) m.classList.add('hidden'); }
+/* Elegir las publicaciones al PEDIR la campaña, no sólo después de que el creativo proponga.
+ * Antes el pedido era texto libre: había que describir con palabras la pieza que uno tenía en la
+ * cabeza y esperar que el estratega adivinara. Es una sugerencia con peso, no una orden: si el
+ * formato no entra en una misma campaña, el creativo lo dice en vez de fallar al crearla. */
+let _askSel = [];
+async function abrirAsk(){
+  _askSel = [];
+  const g=document.getElementById('ask-grid');
+  if(g){
+    try{
+      if(!_creaLista || !_creaLista.length) _creaLista = await fetch('api/campanias/creativos').then(r=>r.json());
+      pintarAsk();
+    }catch(e){ g.innerHTML='<div class="cm-note">No se pudieron cargar los posts.</div>'; }
+  }
+  document.getElementById('campask').classList.remove('hidden');
+}
+function pintarAsk(){
+  const g=document.getElementById('ask-grid'); if(!g) return;
+  g.innerHTML=(_creaLista||[]).map(c=>{
+    const u=(c.tipo==='video'&&c.poster_url)?c.poster_url:c.url;
+    const i=_askSel.indexOf(c.pieza_id);
+    return `<a class="cpick${i>=0?' on':''}" href="#" onclick="toggleAsk('${c.pieza_id}');return false;" title="${cod(c.numero)}">
+      <img src="${esc(u)}" loading="lazy" onerror="this.style.opacity=.15">
+      ${i>=0?`<span class="cpick-ord">${i+1}</span>`:''}
+      <span class="cpick-n">${cod(c.numero)}${c.tipo==='video'?' ▶':''}</span></a>`;
+  }).join('') || '<div class="cm-note">No hay posts publicados disponibles.</div>';
+  // Avisar acá y no cuando Meta rechace la campaña a medio crear.
+  const sel=(_creaLista||[]).filter(c=>_askSel.includes(c.pieza_id));
+  const tipos=new Set(sel.map(c=>c.tipo==='video'?'video':'imagen'));
+  const h=document.getElementById('ask-hint');
+  if(h) h.innerHTML = tipos.size>1
+    ? '<b style="color:var(--pend,#FF6A45)">Mezclaste foto y video.</b> Meta no lo permite en una misma campaña: las ubicaciones dependen del formato.'
+    : 'Elegí hasta 5. Todas tienen que ser del mismo formato: Meta no deja mezclar foto y video en una campaña, porque las ubicaciones dependen del formato.';
+}
+function toggleAsk(id){
+  const i=_askSel.indexOf(id);
+  if(i>=0) _askSel.splice(i,1); else { if(_askSel.length>=5) return toast('Hasta 5 publicaciones',true); _askSel.push(id); }
+  pintarAsk();
+}
+window.abrirAsk=abrirAsk; window.toggleAsk=toggleAsk;
+
 async function pedirCampania(){
   const instruccion=(document.getElementById('camp-instr')||{}).value||'';
-  try{ const r=await fetch('api/campanias/solicitar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({instruccion})});
-    const d=await r.json(); if(d.ok){ toast('Pedido al creativo — va a proponer una campaña'); closeAsk(); loadPauta(); } else toast('No se pudo pedir',true);
+  try{ const r=await fetch('api/campanias/solicitar',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({instruccion, piezas:_askSel})});
+    const d=await r.json(); if(d.ok){ toast(_askSel.length?'Pedido al creativo con las publicaciones elegidas':'Pedido al creativo — va a proponer una campaña'); closeAsk(); loadPauta(); } else toast('No se pudo pedir',true);
   }catch(e){ toast('Error de conexión',true); }
 }
 async function loadAvisos(){

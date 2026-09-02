@@ -41,6 +41,14 @@ def q(sql):
     return subprocess.run(["docker","exec","-i",cid,"psql","-U","postgres","-d","claude","-t","-A","-c",sql],
                           capture_output=True, text=True).stdout.strip()
 instr = q(f"SELECT coalesce(instruccion,'') FROM contenido.solicitudes_campania WHERE id='{sid}'")
+# Publicaciones que la persona eligio al pedir. Van como numeros CF-XXXX, que es como las nombra
+# el resto del contexto: pasar uuids obligaria al modelo a cruzarlos y ahi es donde se equivoca.
+sugeridas = [x for x in q(
+    "SELECT string_agg(p.numero::text, ',' ORDER BY p.numero) FROM contenido.piezas p "
+    # unnest y no ANY(subconsulta): la subconsulta devuelve UNA fila con un array, y comparar
+    # uuid contra uuid[] no existe. Fallaba en silencio dentro del job.
+    f"WHERE p.id IN (SELECT unnest(piezas_sugeridas) FROM contenido.solicitudes_campania WHERE id='{sid}')"
+).split(',') if x]
 perfil = q(f"SELECT coalesce(pp.brief_md,'')||E'\\n---ESTILO---\\n'||coalesce(pp.estilo_md,'') "
            f"FROM contenido.negocio_perfil pp WHERE pp.negocio_id='{pid}'")
 brief, _, estilo = perfil.partition('\n---ESTILO---\n')
@@ -70,7 +78,8 @@ dominio = q(f"SELECT coalesce(dominio_web,'') FROM contenido.negocios WHERE id='
 destinos = {"web": f"https://{dominio}" if dominio else None,
             "reservas": f"https://panel.clausina.ar/r/{slug}"}
 ctx={"instruccion":instr,"objetivo_marca":objetivo,"brief":brief.strip(),"estilo":estilo.strip(),
-     "moneda":moneda,"publicaciones":publicaciones,"rendimiento":rendimiento,"destinos":destinos}
+     "moneda":moneda,"publicaciones":publicaciones,"rendimiento":rendimiento,"destinos":destinos,
+     "piezas_elegidas":[int(x) for x in sugeridas]}
 json.dump(ctx, open(f"/tmp/camp_ctx_{sid}.json","w"), ensure_ascii=False)
 print(f"ctx: {len(publicaciones)} publicaciones, moneda {moneda}")
 PY
