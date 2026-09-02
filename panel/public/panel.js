@@ -179,6 +179,11 @@ async function quitarSlide(piezaId, mid){
 }
 // Tarjeta de pieza EN MODIFICACIÓN (estado rechazada): visible en la columna de pendientes
 // para que el requerimiento no "desaparezca" del board mientras el agente la reprocesa.
+/* Tarjeta de una pieza rechazada: o está siendo corregida, o el creativo NO PUDO y la escaló.
+ * `derivado_en` marca ese escalado — "no lo resuelvo, intervení vos". Durante un tiempo la lista
+ * las filtraba justamente por eso y la pieza desaparecía del tablero: el único aviso era un mail.
+ * Le pasó a CF-0264, que pedía una foto del salón que no existe en la biblioteca. Escalar a una
+ * persona es exactamente cuando esa persona tiene que verlo. */
 function modCard(p, canal){
   const enProceso = !p.derivado_en;
   const t = thumbSrc(p.media);
@@ -1083,7 +1088,7 @@ async function loadInstagram(){
       fetch('api/requerimientos').then(x=>x.json()).catch(()=>[]),
     ]);
     renderPropuestasCanal(reqs, 'instagram');
-    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado) || (p.estado==='rechazada' && !p.derivado_en)).map(pendCard).join(''));
+    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado) || p.estado==='rechazada').map(pendCard).join(''));
     // Lo publicado y las colaboraciones van a la MISMA grilla: en Instagram salen en la misma
     // grilla, y separarlas hacía parecer secundario un contenido que a veces rinde más que el
     // propio (el post de Ardora del 01/09 hizo 16.384 vistas).
@@ -1445,7 +1450,7 @@ async function loadAvisos(){
       fetch('api/requerimientos').then(x=>x.json()).catch(()=>[]),
     ]);
     renderPropuestasCanal(reqs, 'aviso');
-    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado) || (p.estado==='rechazada' && !p.derivado_en)).map(avisoPendCard).join(''));
+    fill('c-pend','n-pend', piezas.filter(p=>['pendiente_aprobacion','aprobada','borrador'].includes(p.estado) || p.estado==='rechazada').map(avisoPendCard).join(''));
     fill('c-pub','n-pub', piezas.filter(p=>p.estado==='publicada').map(avisoPubCard).join(''));
     setUpd();
   }catch(e){ setUpd(); }
