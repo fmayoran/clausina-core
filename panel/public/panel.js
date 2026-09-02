@@ -1244,8 +1244,11 @@ function openCamp(id){
   const mediaHtml=creas.length?`<div class="cm-creas${uno?' uno':''}">`+creas.map(k=>{
     const src=(k.tipo==='video'&&k.poster_url)?k.poster_url:k.url;
     const med=src?`<img src="${esc(src)}" onerror="this.style.visibility='hidden'">`:'<span class="cm-ph"></span>';
-    return `<figure class="cm-crea">${med}${k.tipo==='video'?'<span class="cm-play"></span>':''}
-      <figcaption>${k.numero?cod(k.numero):'—'}</figcaption></figure>`;
+    // Una colaboración se rotula COL-NN y con la cuenta que la publicó: el anuncio sale con esa
+    // cara aunque lo pague este negocio, y eso hay que verlo antes de aprobar.
+    const rot=k.es_colab?`${codColab(k.numero)} · @${esc(k.autor||'')}`:(k.numero?cod(k.numero):'—');
+    return `<figure class="cm-crea${k.es_colab?' colab':''}">${med}${k.tipo==='video'?'<span class="cm-play"></span>':''}
+      <figcaption>${rot}</figcaption></figure>`;
   }).join('')+'</div>':'';
   const editable=(c.estado==='propuesta');
   const pr=c.presupuesto||{}, tipo=pr.tipo||'diario';

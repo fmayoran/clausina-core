@@ -54,18 +54,27 @@ Leé además `contexto/CONTEXTO_MARCA.md` de la cápsula (estás parado en el re
    mismo: si son parecidas, el resultado no enseña nada.
    Con presupuesto chico (menos de US$10 por día) proponé **dos**, no tres: repartir menos plata
    entre más anuncios hace que ninguno junte impresiones suficientes para que la diferencia
-   signifique algo.
-   **Si el pedido trae `piezas_elegidas`, esas son las que hay que usar.** Son las que eligió la
-   persona que pide la campaña, mirando su propia grilla, y valen más que tu criterio: sabe cosas
-   del negocio que no están en los números. Úsalas salvo que haya una razón DURA —mezclan formatos
-   incompatibles, alguna no tiene métricas, no está publicada— y en ese caso usá las que sí sirven
-   y explicá en `razon`, con nombre y apellido, cuál dejaste afuera y por qué. Nunca las ignores en
-   silencio: quien las eligió va a leer la propuesta esperando encontrarlas.
+   signifique algo. Esto aplica sólo cuando elegís vos los creativos.
+   **Si el pedido trae `piezas_elegidas` o `colaboraciones_elegidas`, esas son las que hay que usar
+   y NINGUNA OTRA.** Son las que eligió la persona que pide la campaña, mirando su propia grilla, y
+   valen más que tu criterio: sabe cosas del negocio que no están en los números. Tres reglas, sin
+   excepción:
+   - **No agregues creativos propios.** Si eligió una sola, la campaña lleva UNA. La guía de abajo
+     —"con presupuesto chico proponé dos"— vale sólo cuando elegís vos; una elección explícita la
+     deja sin efecto. Sumarle una pieza tuya al lado no es enriquecer la propuesta: le parte el
+     presupuesto a la que pidió y, en la pantalla, parece que se la cambiaste.
+   - **Respetá el orden en que vinieron.** La primera de la lista es la principal, no la que a vos
+     te cierra mejor por métricas.
+   - **`razon` arranca por las elegidas**, argumentando la elección de la persona, no otra.
+   Únicamente si una es inutilizable por una razón DURA —no está publicada, no tiene métricas,
+   mezcla formatos incompatibles con las demás— la dejás afuera, usás las que sí sirven y lo decís
+   en `razon` con nombre y apellido. Nunca las ignores en silencio: quien las eligió va a leer la
+   propuesta esperando encontrarlas.
 
-   Lo mismo vale para `colaboraciones_elegidas`: devolvé sus `post_id` en `colab_post_ids`.
-   Una colaboración es una publicación de otra cuenta donde este negocio está etiquetado; el
-   anuncio sale con la cara de esa cuenta pero lo paga este negocio. Decilo en `razon` cuando
-   uses una, porque cambia cómo se lee el aviso.
+   Las `colaboraciones_elegidas` van en `colab_post_ids` y cuentan como creativos elegidos a los
+   tres efectos de arriba. Una colaboración es una publicación de otra cuenta donde este negocio
+   está etiquetado; el anuncio sale con la cara de esa cuenta pero lo paga este negocio. Decilo en
+   `razon` cuando uses una, porque cambia cómo se lee el aviso.
 
    Si `piezas_elegidas` y `colaboraciones_elegidas` vienen vacíos, elegís vos con el criterio de abajo.
 

@@ -4663,13 +4663,23 @@ async function getPautaCampanias(negocioId) {
             m.url AS pieza_url, m.poster_url AS pieza_poster, m.tipo AS pieza_tipo,
             -- Todos los creativos de la campaña: la tarjeta muestra el principal, pero el selector
             -- y el reporte por anuncio necesitan la lista entera.
+            -- Los JOIN son LEFT y hay uno a colaboracion_externa a propósito: una colaboración no
+            -- vive en contenido.piezas (pieza_id va nulo y el creativo es colab_post_id). Con el
+            -- JOIN interno anterior desaparecía de la lista, y quien la había elegido a mano veía
+            -- en la propuesta otra pieza en su lugar: parecía que el estratega se la había cambiado.
             (SELECT COALESCE(json_agg(json_build_object(
-                      'pieza_id', cp.pieza_id, 'numero', p2.numero, 'orden', cp.orden,
+                      'pieza_id', COALESCE(cp.pieza_id::text, cp.colab_post_id),
+                      'numero', COALESCE(p2.numero, ce.numero), 'orden', cp.orden,
                       'ext_aviso_id', cp.ext_aviso_id,
-                      'url', m2.url, 'poster_url', m2.poster_url, 'tipo', m2.tipo) ORDER BY cp.orden), '[]'::json)
+                      'es_colab', cp.colab_post_id IS NOT NULL, 'autor', ce.autor,
+                      'url', COALESCE(m2.url, ce.media_url),
+                      'poster_url', m2.poster_url,
+                      'tipo', COALESCE(m2.tipo::text, lower(ce.tipo))) ORDER BY cp.orden), '[]'::json)
                FROM contenido.pauta_campania_pieza cp
-               JOIN contenido.piezas p2 ON p2.id = cp.pieza_id
+               LEFT JOIN contenido.piezas p2 ON p2.id = cp.pieza_id
                LEFT JOIN contenido.media m2 ON m2.pieza_id = cp.pieza_id AND m2.orden = 1
+               LEFT JOIN contenido.colaboracion_externa ce
+                      ON ce.ig_post_id = cp.colab_post_id AND ce.negocio_id = c.negocio_id
               WHERE cp.campania_id = c.id) AS creativos
        FROM contenido.pauta_campania c
        LEFT JOIN contenido.piezas pz ON pz.id = c.pieza_id
@@ -4732,11 +4742,9 @@ async function getCreativosDisponibles(negocioId) {
        JOIN contenido.media m ON m.pieza_id = pz.id AND m.orden = 1
       WHERE pz.negocio_id = $1 AND pz.canal='instagram'
       ORDER BY pz.numero DESC LIMIT 40`, [negocioId]);
-  // Las colaboraciones se listan pero NO se pueden elegir todavía, y se dice por qué.
-  // Verificado contra la API: promocionar desde nuestra cuenta un post de otra cuenta devuelve
-  // "no coincide con ningún contenido multimedia existente". Hace falta que el dueño autorice la
-  // publicación como anuncio de colaboración. Omitirlas sin más deja la pregunta "¿y las de
-  // collab?" sin respuesta cada vez que alguien abre esta pantalla.
+  // Las colaboraciones SÍ se pueden elegir: el anuncio se crea con instagram_user_id del autor y
+  // branded_content ad_format 3, y lo paga esta cuenta. Requiere que el dueño haya compartido su
+  // página y su cuenta de IG con el usuario del sistema de este negocio.
   const { rows: colabs } = await pool.query(
     `SELECT c.ig_post_id AS pieza_id, c.numero, c.caption, c.permalink,
             c.media_url AS url, NULL AS poster_url, lower(c.tipo) AS tipo,
@@ -4792,21 +4800,26 @@ async function setCreativosCampania(negocioId, id, piezaIds) {
     }
 
     await cli.query('DELETE FROM contenido.pauta_campania_pieza WHERE campania_id=$1', [id]);
+    // El orden es el que eligió la persona, no piezas primero y colaboraciones después: el primero
+    // de la lista es el creativo principal, y empujar las colaboraciones al final le cambiaba la
+    // propuesta a quien había puesto una arriba a propósito.
+    const orden = new Map(todos.map((x, i) => [x, i + 1]));
     if (ids.length) {
       await cli.query(
         `INSERT INTO contenido.pauta_campania_pieza (campania_id, pieza_id, orden)
-         SELECT $1, p.id, p.i FROM unnest($2::uuid[]) WITH ORDINALITY AS p(id, i)`, [id, ids]);
+         SELECT $1, p.id, p.o FROM unnest($2::uuid[], $3::int[]) AS p(id, o)`,
+        [id, ids, ids.map(x => orden.get(x))]);
     }
     if (colabs.length) {
       await cli.query(
         `INSERT INTO contenido.pauta_campania_pieza (campania_id, colab_post_id, orden)
-         SELECT $1, c.pid, c.i + $3 FROM unnest($2::text[]) WITH ORDINALITY AS c(pid, i)`,
-        [id, colabs, ids.length]);
+         SELECT $1, c.pid, c.o FROM unnest($2::text[], $3::int[]) AS c(pid, o)`,
+        [id, colabs, colabs.map(x => orden.get(x))]);
     }
-    // pieza_id de la campaña ilustra la tarjeta; con sólo colaboraciones queda en null y la
-    // pantalla usa la primera de la lista.
+    // pieza_id de la campaña ilustra la tarjeta; sólo vale si la principal es una pieza propia.
+    // Si arriba de todo quedó una colaboración, va en null y la pantalla usa la primera de la lista.
     await cli.query('UPDATE contenido.pauta_campania SET pieza_id=$2, actualizado_en=now() WHERE id=$1',
-      [id, ids[0] || null]);
+      [id, (todos[0] && UUID.test(todos[0])) ? todos[0] : null]);
     await cli.query('COMMIT');
     return { ok: true, creativos: todos.length };
   } catch (e) { await cli.query('ROLLBACK'); throw e; } finally { cli.release(); }
