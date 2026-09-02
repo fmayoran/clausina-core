@@ -4814,7 +4814,10 @@ async function editarPautaCampania(negocioId, id, campos) {
 async function getColaboracionesExternas(negocioId) {
   const { rows } = await pool.query(
     `SELECT c.ig_post_id, c.autor, c.permalink, c.caption, c.media_url, c.tipo,
-            c.publicado_en, n.nombre AS autor_nombre
+            c.publicado_en, n.nombre AS autor_nombre,
+            -- Las métricas van SÍ O SÍ: sin ellas la tarjeta sale con guiones y la colaboración
+            -- parece no haber rendido nada, que es lo contrario de mostrarla con el mismo peso.
+            c.views, c.reach, c.likes, c.interacciones, c.shares, c.saved
        FROM contenido.colaboracion_externa c
        LEFT JOIN contenido.negocios n ON n.id = c.autor_negocio_id
       WHERE c.negocio_id = $1
