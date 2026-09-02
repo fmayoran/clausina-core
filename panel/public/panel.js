@@ -1403,10 +1403,10 @@ function pintarAsk(){
     // La colaboración se muestra pero no se puede elegir: Meta no deja promocionar desde nuestra
     // cuenta un post de otra sin que el dueño lo autorice. Mejor verla apagada y con el motivo
     // que no verla y preguntarse dónde está.
-    if(c.es_colab) return `<span class="cpick bloq" title="La publicó @${esc(c.autor)}. Para promocionarla, esa cuenta tiene que autorizarla como anuncio de colaboración.">
+    if(c.es_colab) return `<span class="cpick bloq" title="La publicó @${esc(c.autor)} y ya autorizó la promoción. Falta que Meta acepte crear el anuncio: con Reels de un socio pide que el video esté en Facebook. En verificación — se puede promocionar a mano desde el Administrador de anuncios.">
       <img src="${esc(u)}" loading="lazy" onerror="this.style.opacity=.15">
       <span class="cpick-n">${esc(codColab(c.numero))} · @${esc(c.autor)}</span>
-      <span class="cpick-lock">requiere autorización</span></span>`;
+      <span class="cpick-lock">sólo a mano en Meta</span></span>`;
     return `<a class="cpick${i>=0?' on':''}" href="#" onclick="toggleAsk('${c.pieza_id}');return false;" title="${cod(c.numero)}">
       <img src="${esc(u)}" loading="lazy" onerror="this.style.opacity=.15">
       ${i>=0?`<span class="cpick-ord">${i+1}</span>`:''}
