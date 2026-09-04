@@ -23,6 +23,20 @@ const H = Math.round(Number(altoMM) * MM_PX);
 const DPI_IMPRENTA = 300;
 const MAX_LADO = 3600;
 const escala = Math.max(1, Math.min(DPI_IMPRENTA / 96, MAX_LADO / Math.max(W, H)));
+/** Lleva el PNG a la medida nominal si la captura se pasó por el redondeo. Sólo corrige
+ *  diferencias de 1-2 px: si el desvío es mayor, algo más está mal y taparlo con un resize
+ *  escondería el problema, así que se deja como salió. */
+function ajustar(file, w, h) {
+  if (!(w > 0 && h > 0)) return;
+  try {
+    const [aw, ah] = execFileSync('identify', ['-format', '%w %h', file], { encoding: 'utf8' })
+      .trim().split(/\s+/).map(Number);
+    if (aw === w && ah === h) return;
+    if (Math.abs(aw - w) > 2 || Math.abs(ah - h) > 2) return;
+    execFileSync('convert', [file, '-resize', `${w}x${h}!`, file], { stdio: 'ignore' });
+  } catch (_) { /* sin ImageMagick el PNG sirve igual: no se cae el render por un píxel */ }
+}
+
 const dorsoPath = outPng.replace(/(\.[^.]+)$/, '-dorso$1');
 const prevPath = outPng.replace(/(\.[^.]+)$/, '-prev.jpg');
 
@@ -48,8 +62,15 @@ const prevPath = outPng.replace(/(\.[^.]+)$/, '-prev.jpg');
     const caras = await p.locator('.lienzo').count();
     const salidas = [outPng, dorsoPath];
     let hechas = 0;
+    // Medida NOMINAL exacta, sin el redondeo de la captura. Cuando el lienzo mide una fracción de
+    // píxel CSS (una pieza de Instagram: 91,44mm = 345,6 px), Playwright redondea la caja hacia
+    // arriba y el PNG sale en 1081 en vez de 1080. Un píxel no rompe nada, pero deja la pieza fuera
+    // de la medida que declara el formato y obliga a Instagram a recomprimirla.
+    const nomW = Math.round(Number(anchoMM) * MM_PX * escala);
+    const nomH = Math.round(Number(altoMM) * MM_PX * escala);
     for (let i = 0; i < Math.min(caras, 2); i++) {
       await p.locator('.lienzo').nth(i).screenshot({ path: salidas[i] });
+      ajustar(salidas[i], nomW, nomH);
       hechas++;
     }
     if (!hechas) {   // fallback: no encontró .lienzo, capturo el viewport
@@ -67,7 +88,7 @@ const prevPath = outPng.replace(/(\.[^.]+)$/, '-prev.jpg');
                    { stdio: 'ignore' });
     } catch (_) {}
 
-    salida({ ok: true, caras: hechas, prev: require('fs').existsSync(prevPath), px: `${Math.round(W * escala)}x${Math.round(H * escala)}`,
+    salida({ ok: true, caras: hechas, prev: require('fs').existsSync(prevPath), px: `${Math.round(Number(anchoMM) * MM_PX * escala)}x${Math.round(Number(altoMM) * MM_PX * escala)}`,
              dpi: Math.round(96 * escala) });
   } catch (e) {
     try { if (b) await b.close(); } catch (_) {}

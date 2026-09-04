@@ -55,6 +55,7 @@
   .fl{margin-bottom:14px;}
   .fl label{display:block;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;}
   .fl .hint{text-transform:none;letter-spacing:0;color:#6f6f68;}
+  .fl .fnota{display:block;margin-top:6px;font-size:.72rem;line-height:1.4;color:var(--ash);}
   .fl input,.fl textarea,.fl select{width:100%;background:#0c0c0a;border:1px solid var(--line);border-radius:7px;color:var(--white);font-family:'Inter',sans-serif;font-size:.95rem;padding:9px 11px;outline:none;}
   .fl textarea{min-height:88px;resize:vertical;line-height:1.4;}
   .fl input:focus,.fl textarea:focus,.fl select:focus{border-color:var(--pend);}
@@ -113,7 +114,8 @@
   <div class="ghd"><b>Nueva pieza gráfica</b><span>el creativo la diseña con la identidad del negocio</span><button class="x" onclick="cerrar('ov-new')">×</button></div>
   <div class="gbd">
     <div class="fl"><label>Nombre <span class="hint">— para reconocerla</span></label><input id="n-nombre" placeholder="Afiche apertura"></div>
-    <div class="fl"><label>Formato</label><select id="n-formato" onchange="onFormato()"></select></div>
+    <div class="fl"><label>Formato</label><select id="n-formato" onchange="onFormato()"></select>
+      <small id="n-fnota" class="fnota" style="display:none"></small></div>
     <div class="fl"><label>Caras</label>
       <div class="opts" id="n-caras">
         <div class="opt on" data-caras="1" onclick="setCaras(1)">Solo frente</div>
@@ -255,6 +257,13 @@ function salir(){ fetch('api/logout',{method:'POST'}).then(()=>location.href='lo
 function cerrar(id){ document.getElementById(id).style.display='none'; if(id==='ov-det') DET=null; }
 
 const DATOS = [['direccion','Dirección'],['telefono','Teléfono'],['whatsapp','WhatsApp'],['instagram','Instagram'],['web','Web'],['qr','Código QR']];
+// Un formato de Instagram se mide en PÍXELES: mostrarle "91×114mm" a quien va a publicar una foto
+// no le dice nada. Los mm son sólo cómo lo guarda el motor de render.
+const esDigital = id => String(id||'').startsWith('ig_');
+function medida(g, f){
+  if(f && f.px) return f.px+' px';
+  return `${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm`;
+}
 let FORMATOS=[], PIEZAS=[], FONDO_MODO='sin_fondo', FONDO_URL='', CARAS=1, DET=null, _poll=null, DCARA='frente';
 // La pieza abierta, para poder renombrarla sin volver a pedirla.
 let DET_G=null;
@@ -302,7 +311,7 @@ function card(g){
     <div class="gbody"><div class="gname">${esc(g.nombre)}</div>
       <div class="gcod">${cod(g.numero)}</div>
       <div class="gmeta"><span class="gst ${st}">${esc(lbl)}</span>
-        <span>${esc(f?f.label:g.formato)} · ${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm</span>
+        <span>${esc(f?f.label:g.formato)} · ${esc(medida(g,f))}</span>
         ${g.caras===2?'<span>frente+dorso</span>':''}${g.version_actual?`<span>v${g.version_actual}</span>`:''}</div></div></div>`;
 }
 // Las descartadas no se muestran salvo que se pidan. VER_DESC se mantiene entre recargas de la
@@ -364,7 +373,7 @@ function abrirNueva(){
   document.getElementById('n-dorso').value=''; setFondo('sin_fondo','dorso'); setCaras(1);
   document.getElementById('n-err').textContent='';
   document.getElementById('n-formato').innerHTML = FORMATOS.map(f=>
-    `<option value="${f.id}">${esc(f.grupo)} — ${esc(f.label)}${f.ancho?` (${f.ancho}×${f.alto}mm)`:''}</option>`).join('');
+    `<option value="${f.id}">${esc(f.grupo)} — ${esc(f.label)}${f.px?` (${esc(f.px)} px)`:(f.ancho?` (${f.ancho}×${f.alto}mm)`:'')}</option>`).join('');
   document.getElementById('n-datos').innerHTML = DATOS.map(([k,l])=>
     `<label class="chk"><input type="checkbox" id="dt-${k}" ${['direccion','instagram'].includes(k)?'checked':''}> ${l}</label>`).join('');
   const cq=document.getElementById('dt-qr'); if(cq) cq.addEventListener('change', toggleQrBox);
@@ -377,6 +386,9 @@ function abrirNueva(){
 function onFormato(){
   const f=FORMATOS.find(x=>x.id===document.getElementById('n-formato').value);
   document.getElementById('n-medidas').style.display = (f && !f.ancho) ? 'flex' : 'none';
+  // Lo que conviene saber ANTES de elegir, no después de ver la pieza mal compuesta.
+  const n=document.getElementById('n-fnota');
+  if(n){ n.textContent = (f && f.nota) ? f.nota : ''; n.style.display = (f && f.nota) ? '' : 'none'; }
 }
 // Frente y dorso comparten estas cuatro funciones: se les pasa la cara. Duplicarlas habría
 // dejado dos copias que se desincronizan en el primer arreglo.
@@ -534,7 +546,7 @@ async function refrescarDet(){
   DET_G = g;
   const f=FORMATOS.find(x=>x.id===g.formato);
   document.getElementById('d-nombre').textContent = (g.numero? cod(g.numero)+' · ':'') + g.nombre;
-  document.getElementById('d-meta').textContent=`${f?f.label:g.formato} · ${Math.round(g.ancho_mm)}×${Math.round(g.alto_mm)}mm · ${g.estado}`;
+  document.getElementById('d-meta').textContent=`${f?f.label:g.formato} · ${medida(g,f)} · ${g.estado}`;
   // Con una sola cara no hay nada que elegir: el selector no aparece y el pedido va sin alcance.
   document.getElementById('d-caras-box').style.display = g.caras===2 ? '' : 'none';
   if(g.caras!==2) DCARA='ambas'; else if(!['frente','dorso','ambas'].includes(DCARA)) DCARA='frente';

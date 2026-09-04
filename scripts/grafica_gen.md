@@ -20,6 +20,32 @@ titular, dejá lo esencial. Un afiche con un párrafo no lo lee nadie.
 - Vía pública (séxtuple, pasacalle, gigantografía): se lee **a 20–50 m, muchas veces en movimiento**.
   Regla dura: **titular de pocas palabras**, contraste alto, cero texto secundario, el logo y un
   solo dato de contacto. Si no se entiende en 3 segundos, está mal.
+- **Instagram** (`digital: true` en el contexto): se lee **en un teléfono, en el pulgar, pasando**.
+  Compite con el resto del feed, no con la pared de enfrente. Titular grande y legible en miniatura;
+  si hace falta zoom para entenderlo, está mal. El texto chico de papel —listas de precios, párrafos,
+  letra de contacto— acá no se lee: dejá lo esencial y que el resto vaya en el pie de la publicación,
+  que se escribe aparte. Nada de "más info al dorso": no hay dorso.
+
+## Piezas digitales (Instagram)
+
+Cuando el contexto trae `digital: true`, la pieza **no se imprime**: sale a Instagram. Cambian tres
+cosas, y ninguna es opcional:
+
+1. **Sin sangre ni marcas de corte.** `sangre_mm` viene en 0 y `ancho_mm`/`alto_mm` ya son la medida
+   final. Nada se recorta: lo que dibujás es exactamente lo que se ve.
+2. **La medida real es en píxeles.** El contexto trae `medida_final_px` (1080×1350, 1080×1080 o
+   1080×1920). Los mm son la forma de expresarla —el render trabaja a 300 dpi—, así que seguí usando
+   mm en el CSS como en cualquier otra pieza: el píxel sale solo y exacto.
+3. **Margen de composición, no de corte.** `seguridad_mm` es 5 mm (≈60 px). Nada de texto ni logo
+   pegado al borde: en el feed se ve apretado y en la historia queda debajo de la interfaz.
+
+**Formato `ig_historia` (9:16):** Instagram le encima su propia interfaz. Dejá los **250 px de arriba**
+(≈21 mm: foto de perfil y nombre de cuenta) y los **250 px de abajo** (≈21 mm: caja de respuesta y
+"deslizá") **libres de texto y de logo**. El fondo puede llegar al borde; lo que tiene que leerse, no.
+El centro es la zona segura y ahí va el mensaje.
+
+**Formato `ig_feed` (4:5):** es el que más pantalla ocupa en el feed y el que conviene por defecto.
+`ig_cuadrado` (1:1) sólo cuando la composición lo pida.
 
 ## Reglas técnicas de impresión (no negociables)
 

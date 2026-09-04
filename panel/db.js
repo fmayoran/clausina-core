@@ -466,7 +466,18 @@ const FORMATOS = [
   { id:'rollup',    label:'Roll-up',          ancho:800,  alto:2000, grupo:'Vía pública' },
   { id:'pasacalle', label:'Pasacalle',        ancho:3000, alto:1000, grupo:'Vía pública' },
   { id:'custom',    label:'A medida',         ancho:null, alto:null, grupo:'Vía pública' },
+  // Instagram. La medida real de estas piezas es en PÍXELES, no en papel, pero el catálogo y el
+  // render trabajan en mm: se expresan a 300 dpi (1080 px = 91,44 mm), que es la escala a la que
+  // renderiza el job, así el PNG sale EXACTO a lo que pide Instagram. `px` es lo que se muestra
+  // en pantalla: decirle "91×114mm" a quien va a publicar una foto no le dice nada.
+  { id:'ig_feed',     label:'Feed vertical 4:5',  ancho:91.44, alto:114.3,  grupo:'Instagram', px:'1080×1350',
+    nota:'El que más pantalla ocupa en el feed.' },
+  { id:'ig_cuadrado', label:'Feed cuadrado 1:1',  ancho:91.44, alto:91.44,  grupo:'Instagram', px:'1080×1080' },
+  { id:'ig_historia', label:'Historia / Reel 9:16', ancho:91.44, alto:162.56, grupo:'Instagram', px:'1080×1920',
+    nota:'Instagram tapa arriba y abajo con su propia interfaz.' },
 ];
+// Un formato digital no lleva sangre ni marcas de corte, y se mide en píxeles.
+const esDigital = id => String(id || '').startsWith('ig_');
 
 // --- Gráfica: piezas promocionales (folletos, afiches, vía pública) ---
 /**
@@ -5013,7 +5024,7 @@ module.exports = {
   getAvisosAprobados, getProgramas, getPrograma, crearPrograma, guardarPrograma, activarPrograma, eliminarPrograma, getActivoPlaylist,
   getLandingCambios, crearLandingCambio, aprobarLanding, rechazarLanding,
   getAuditoria, pedirAuditoria, estadoAuditoria, getPauta, getPautaEvolucion, pedirRefrescoPauta,
-  descartarPiezaRechazada,
+  descartarPiezaRechazada, esDigital,
   crearSolicitudCampania, getPautaCampanias, aprobarCampania, rechazarCampania, descartarCampania,
   activarCampania, pausarCampania, reintentarCampania, getCreativosDisponibles, setCreativosCampania,
   editarPautaCampania, getPautaCuentas, getColaboracionesExternas, guardarPautaCuenta, getPautaToken,

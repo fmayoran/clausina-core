@@ -63,9 +63,13 @@ cont = q(f"SELECT coalesce(json_agg(json_build_object('nombre',nombre,'rol',rol,
 ver = json.loads(q(f"SELECT row_to_json(t) FROM (SELECT nro, instruccion FROM contenido.grafica_version WHERE id='{vid}') t"))
 
 # Sangre y zona de seguridad según el tamaño: los formatos grandes llevan más.
+# Una pieza DIGITAL (Instagram) no lleva sangre: no se imprime ni se corta, y sumarle 3mm por lado
+# la sacaría de la medida exacta que pide Instagram. Su margen es de composición, no de corte.
 W=float(g["ancho_mm"]); H=float(g["alto_mm"]); grande = max(W,H) > 700
-sangre = 10 if grande else 3
-seguridad = (40 if grande else 8) + sangre
+digital = str(g["formato"]).startswith("ig_")
+sangre = 0 if digital else (10 if grande else 3)
+seguridad = 5 if digital else ((40 if grande else 8) + sangre)
+PX = lambda mm: round(mm * 300 / 25.4)   # el render trabaja a 300 dpi: mm -> px final
 
 ctx = {
   "formato": g["formato"],
@@ -74,6 +78,8 @@ ctx = {
   "medida_final_mm": f"{W:g} x {H:g}",
   "sangre_mm": sangre, "seguridad_mm": seguridad,
   "gran_formato": grande,
+  "digital": digital,
+  "medida_final_px": f"{PX(W)} x {PX(H)}" if digital else None,
   "caras": int(g.get("caras") or 1),
   "mensaje": g.get("mensaje") or "",
   "datos": g.get("datos") or {},
@@ -89,7 +95,7 @@ if g.get("fondo_url"): ctx["fondo_url"] = g["fondo_url"]
 if g.get("fondo_dorso_url"): ctx["fondo_dorso_url"] = g["fondo_dorso_url"]
 if g.get("fondo_dorso_prompt"): ctx["fondo_dorso_prompt"] = g["fondo_dorso_prompt"]
 json.dump(ctx, open(f"/tmp/graf_ctx_{vid}.json","w"), ensure_ascii=False)
-print(f"ctx: {g['formato']} {ctx['ancho_mm']}x{ctx['alto_mm']}mm (sangre {sangre}) iter={ctx['iteracion']}")
+print(f"ctx: {g['formato']} {ctx['ancho_mm']}x{ctx['alto_mm']}mm" + (f" = {ctx['medida_final_px']}px digital" if digital else f" (sangre {sangre})") + f" iter={ctx['iteracion']}")
 PY
 [ -s "/tmp/graf_ctx_$vid.json" ] || fallar "No se pudo armar el contexto de la pieza."
 
