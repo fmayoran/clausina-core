@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
 <link rel="stylesheet" href="tw.css">
-<link rel="stylesheet" href="panel.css?v=20260902h">
+<link rel="stylesheet" href="panel.css?v=20260902i">
 <script src="encuadre_dom.js?v=2"></script>
 <style>
   .gwrap{padding:18px 28px 70px;max-width:1200px;}
@@ -53,6 +53,8 @@
   .gbd{padding:18px;overflow-y:auto;}
   .gft{display:flex;gap:9px;padding:14px 18px;border-top:1px solid #20242B;}
   .gft .abtn{flex:1;justify-content:center;}
+  /* Coral = pendiente: hay un encuadre en pantalla que todavía no se guardó. */
+  .abtn.pend{border-color:var(--pend);color:var(--pend);}
   .fl{margin-bottom:14px;}
   .fl label{display:block;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;}
   .fl .hint{text-transform:none;letter-spacing:0;color:#6f6f68;}
@@ -280,7 +282,11 @@ const cod = n => n ? 'G-'+String(n).padStart(4,'0') : '';
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let _t; function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.classList.toggle('err',!!e); t.classList.add('show'); clearTimeout(_t); _t=setTimeout(()=>t.classList.remove('show'),3600); }
 function salir(){ fetch('api/logout',{method:'POST'}).then(()=>location.href='login'); }
-function cerrar(id){ document.getElementById(id).style.display='none'; if(id==='ov-det'){ DET=null; if(window.encApagar) encApagar(); } }
+function cerrar(id){
+  if(id==='ov-det' && window.encPuedeSalir && !encPuedeSalir()) return;
+  document.getElementById(id).style.display='none';
+  if(id==='ov-det'){ DET=null; if(window.encApagar) encApagar(); }
+}
 
 const DATOS = [['direccion','Dirección'],['telefono','Teléfono'],['whatsapp','WhatsApp'],['instagram','Instagram'],['web','Web'],['qr','Código QR']];
 // Un formato de Instagram se mide en PÍXELES: mostrarle "91×114mm" a quien va a publicar una foto
@@ -572,6 +578,7 @@ async function abrirDet(id){
   // quedaba en pantalla —el repintado se saltea mientras se encuadra— y la ficha mostraba una
   // pieza con las imágenes de la otra. Peor: los sliders conservaban el encuadre viejo y
   // "Aplicar" se lo pegaba a la pieza nueva.
+  if(DET && DET!==id && !encPuedeSalir()) return;
   encApagar();
   DET=id; dResetFondo(); await refrescarDet();
   document.getElementById('ov-det').style.display='flex';
@@ -660,7 +667,7 @@ function dEncNum(){
     ? ` — texto: ${tx||ty?`corrido ${tx}%/${ty}%`:'en su lugar'}${te!==100?`, ${te}% de tamaño`:''}`
     : '';
   n.textContent = COMO[DENC] + aviso + ` · se aplica al ${DCARA==='dorso'?'dorso':'frente'}` + txt;
-  encPintar();
+  encPintar(); encAvisoSucio();
 }
 /* ── Encuadre en vivo ─────────────────────────────────────────────────────────
  * El problema que resuelve: los controles se aplicaban a ciegas. Cada tanteo era mover tres
@@ -671,6 +678,26 @@ function dEncNum(){
  * Las reglas las calcula encuadre_dom.js, el MISMO archivo que usa el script que escribe el HTML
  * definitivo: la previa no puede mostrar algo distinto de lo que va a salir. */
 let ENC_VIVO=false, ENC_INFO=null, ENC_OBJ='foto';
+/* Lo que se arrastra es una PREVIA: no se guarda nada hasta "Aplicar encuadre". Se ve tan en vivo
+ * que parece que ya está editado, y al cerrar la pieza se perdía sin decir una palabra —peor desde
+ * que cerrar resetea los controles—. ENC_APLICADO es el último encuadre confirmado: todo lo que
+ * difiera de eso está sin guardar, se avisa en pantalla y se pregunta antes de tirarlo. */
+let ENC_APLICADO='';
+const encSucio = () => JSON.stringify(encAjuste()) !== ENC_APLICADO;
+function encAvisoSucio(){
+  const b=document.getElementById('d-enc-btn'); if(!b) return;
+  const sucio=encSucio();
+  b.textContent = sucio ? 'Aplicar encuadre — sin guardar' : 'Aplicar encuadre';
+  b.classList.toggle('pend', sucio);
+  const m=document.getElementById('enc-marca');
+  if(m && ENC_VIVO) m.textContent = (sucio?'SIN GUARDAR · ':'')
+    + (ENC_OBJ==='texto'?'moviendo el TEXTO':'moviendo la FOTO') + ' · shift = el otro';
+}
+// ¿Se puede abandonar lo que hay en pantalla? Si hay cambios sin aplicar, se pregunta.
+function encPuedeSalir(){
+  if(!encSucio()) return true;
+  return confirm('El encuadre que estás viendo todavía no se aplicó y se va a perder. ¿Salir igual?');
+}
 const encAjuste = () => ({
   cara: DCARA==='dorso'?'dorso':'frente', size: DENC,
   pos_x:+val('d-px'), pos_y:+val('d-py'), zoom:+val('d-zoom'),
@@ -723,6 +750,8 @@ function encApagar(){
   setVal('d-tx',0); setVal('d-ty',0); setVal('d-te',100);
   const b=document.getElementById('d-enc-vivo'); if(b) b.textContent='Encuadrar en vivo';
   const r=document.getElementById('d-enc-reset'); if(r) r.style.display='none';
+  ENC_APLICADO = JSON.stringify(encAjuste());   // recién reseteado: no hay nada pendiente
+  encAvisoSucio();
 }
 function encSalir(){ ENC_VIVO=false; ENC_INFO=null;
   document.getElementById('d-enc-vivo').textContent='Encuadrar en vivo';
@@ -787,7 +816,8 @@ async function aplicarEncuadre(){
     const d=await fetch('api/grafica/'+DET+'/encuadre',{method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify(encAjuste())}).then(r=>r.json());
-    if(d.ok){ toast('Reencuadrando — tarda segundos'); ENC_VIVO=false; cargar(); refrescarDet(); }
+    if(d.ok){ toast('Encuadre aplicado — la nueva versión sale en segundos');
+              ENC_APLICADO=JSON.stringify(encAjuste()); ENC_VIVO=false; encAvisoSucio(); cargar(); refrescarDet(); }
     else err.textContent = d.error==='ya_en_curso'?'Ya hay una versión generándose':'No se pudo aplicar';
   }catch(e){ err.textContent='Error de conexión'; }
   b.disabled=false; b.textContent='Aplicar encuadre';
