@@ -61,6 +61,7 @@
               '<label class="ibtn">Subir de disco<input type="file" accept="image/*,video/*" multiple hidden ' +
                 'onchange="PedirCreativo.deDisco(this)"></label>' +
               '<button class="ibtn" onclick="PedirCreativo.deBiblioteca()">De la biblioteca</button>' +
+              '<button class="ibtn" onclick="PedirCreativo.deGrafica()">De Gráfica</button>' +
             '</div>' +
             '<div id="pc-mats" class="pc-mats"></div>' +
             '<div class="cfghint">Si subís material, el creativo propone <b>usándolo</b> en vez de inventar.</div></div>' +
@@ -90,6 +91,37 @@
         else if (window.toast) toast('No se pudo subir ' + f.name, true);
       } catch (e) { if (window.toast) toast('Error al subir ' + f.name, true); }
     }
+  }
+
+  /* Las piezas de Gráfica también son material: una pieza diseñada para Instagram no tiene por qué
+   * bajarse a disco y volver a subirse para poder publicarla. Se manda el PNG grande (png_full) y
+   * no la miniatura de la grilla, que en Instagram se vería blanda. Entra por el mismo endpoint que
+   * la biblioteca: las dos son copiar un archivo del media store a la carpeta del pedido. */
+  function deGrafica() {
+    if (typeof abrirPicker !== 'function') { if (window.toast) toast('El selector no está disponible acá', true); return; }
+    fetch('api/grafica').then(function (r) { return r.json(); }).then(function (data) {
+      var cod = function (n) { return 'G-' + String(n == null ? '' : n).padStart(4, '0'); };
+      var items = (data.piezas || data || []).filter(function (g) {
+        return g.v_estado === 'lista' && g.png_full;
+      }).map(function (g) {
+        return { media_path: String(g.png_full).split('/media/')[1] || '',
+                 nombre: g.nombre || cod(g.numero), codigo: cod(g.numero), tipo: 'image',
+                 estado: g.estado };
+      }).filter(function (i) { return i.media_path; });
+      if (!items.length) { if (window.toast) toast('Todavía no hay piezas de Gráfica terminadas', true); return; }
+      abrirPicker({ titulo: 'Piezas de Gráfica', sub: 'elegí una o varias', items,
+        pick: async function (m, el) {
+          if (el.classList.contains('bpadded')) return;
+          el.classList.add('bpadded');
+          var d = await fetch('api/proponer/material-biblioteca', { method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ media_path: m.media_path, tipo: 'image', filename: m.codigo + ' ' + m.nombre }) })
+            .then(function (r) { return r.json(); });
+          if (d.ok) { material.push({ media_path: d.media_path, media_type: d.media_type, filename: d.filename });
+                      pintarMaterial(); }
+          else { el.classList.remove('bpadded'); if (window.toast) toast('No se pudo agregar', true); }
+        } });
+    }).catch(function () { if (window.toast) toast('No se pudo abrir Gráfica', true); });
   }
 
   // Reusa el selector de biblioteca del panel: es el mismo material y el mismo criterio.
@@ -135,5 +167,6 @@
   }
 
   window.PedirCreativo = { abrir, cerrar, enviar, deDisco, deBiblioteca,
+    deGrafica: deGrafica,
     quitar: function (i) { material.splice(i, 1); pintarMaterial(); } };
 })();

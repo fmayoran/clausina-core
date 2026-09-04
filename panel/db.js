@@ -491,6 +491,10 @@ async function getGraficas(negocioId, { descartadas = false } = {}) {
     SELECT g.id, g.numero, g.nombre, g.formato, g.ancho_mm, g.alto_mm, g.mensaje, g.estado, g.version_actual,
            g.caras, g.fondo_modo, g.fondo_url, g.datos, g.actualizado_en,
            COALESCE(v.png_prev_url, v.png_url) AS png_url,
+           -- La de arriba es la copia liviana que dibuja la grilla. Esta es la buena, y es la que
+           -- hay que mandar cuando la pieza se usa como material de una publicación: la miniatura
+           -- de 900px se vería blanda en Instagram.
+           v.png_url AS png_full,
            v.png_dorso_url, v.pdf_url, v.estado AS v_estado, v.error AS v_error, v.nro AS v_nro
       FROM contenido.grafica g
       LEFT JOIN LATERAL (SELECT * FROM contenido.grafica_version x
