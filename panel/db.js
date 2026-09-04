@@ -635,12 +635,19 @@ async function ajustarEncuadre(negocioId, id, d) {
     // Por debajo de 100 la foto no llega a los bordes y se ve el color de la pieza alrededor.
     // Es una decisión de diseño, no un error: el tope en 100 era una suposición mía.
     zoom: num(d.zoom, 100, 40, 300),
+    // El texto sobreimpreso se mueve como bloque. En % de la cara: el script lo pasa a mm, que es
+    // como está diseñada la pieza, para que la previa del panel y el render den lo mismo.
+    texto_x: num(d.texto_x, 0, -50, 50), texto_y: num(d.texto_y, 0, -50, 50),
+    texto_escala: num(d.texto_escala, 100, 50, 200),
   };
   const COMO = { cover: 'que cubra toda la cara', ancho: 'a todo el ancho',
                  alto: 'a todo el alto', contain: 'entera, sin recortar' };
-  const texto = `Encuadre de la foto del ${aj.cara}: ${COMO[aj.size]}` +
+  const movido = aj.texto_x !== 0 || aj.texto_y !== 0, redim = aj.texto_escala !== 100;
+  const texto = `Encuadre del ${aj.cara}: foto ${COMO[aj.size]}` +
     (aj.zoom !== 100 ? `, zoom ${aj.zoom}%` : '') +
-    ((aj.pos_x !== 50 || aj.pos_y !== 50) ? `, posición ${aj.pos_x}%/${aj.pos_y}%` : '') + '.';
+    ((aj.pos_x !== 50 || aj.pos_y !== 50) ? `, posición ${aj.pos_x}%/${aj.pos_y}%` : '') +
+    (movido ? `; texto corrido ${aj.texto_x}%/${aj.texto_y}%` : '') +
+    (redim ? `${movido ? ' y' : '; texto'} al ${aj.texto_escala}%` : '') + '.';
   try {
     await pool.query(
       `INSERT INTO contenido.grafica_version (grafica_id, nro, instruccion, ajuste)

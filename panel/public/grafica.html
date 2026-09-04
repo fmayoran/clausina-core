@@ -10,6 +10,7 @@
 <script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
 <link rel="stylesheet" href="tw.css">
 <link rel="stylesheet" href="panel.css?v=20260902f">
+<script src="encuadre_dom.js?v=1"></script>
 <style>
   .gwrap{padding:18px 28px 70px;max-width:1200px;}
   .ghead{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
@@ -80,6 +81,16 @@
   .dprev{background:#0c0f12;border:1px solid var(--line);border-radius:10px;display:grid;
          justify-items:center;align-content:center;gap:10px;padding:14px;min-height:320px;}
   .dprev img{max-width:100%;max-height:56vh;object-fit:contain;}
+  /* Escenario de encuadre: la pieza REAL (su HTML) escalada para entrar en el panel. Se dibuja
+     acá y no sobre el PNG porque el PNG ya tiene la foto y el texto horneados. */
+  .encesc{position:relative;overflow:hidden;border-radius:8px;background:#000;cursor:grab;
+    touch-action:none;box-shadow:0 0 0 1px var(--line);}
+  .encesc.arrastrando{cursor:grabbing;}
+  .encesc iframe{border:0;position:absolute;top:0;left:0;transform-origin:top left;pointer-events:none;}
+  .encesc .encmarca{position:absolute;left:8px;top:8px;z-index:2;font-family:'JetBrains Mono',monospace;
+    font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.6);
+    padding:3px 7px;border-radius:5px;pointer-events:none;}
+  .encvivo{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
   .caratabs{display:flex;gap:6px;}
   .ctab{background:transparent;border:1px solid var(--line);color:var(--ash);font-family:'JetBrains Mono',monospace;font-size:.62rem;padding:5px 12px;border-radius:7px;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;}
   .ctab.on{border-color:var(--pend);color:var(--pend);}
@@ -195,6 +206,7 @@
            Está antes del pedido por texto a propósito: mover o agrandar la foto es lo que más se
            pide, y hacerlo por texto costaba ocho versiones. -->
       <div class="fl" id="d-enc-box" style="display:none">
+        <div id="d-enc-foto">
         <label>Encuadre de la foto <span class="hint">— sale en segundos, sin gastar diseño</span></label>
         <div class="opts" id="d-enc">
           <div class="opt on" data-size="cover" onclick="dSetEnc('cover')">Cubrir</div>
@@ -210,7 +222,21 @@
           <label style="flex:1;text-transform:none;letter-spacing:0;font-size:.66rem">Zoom
             <input type="range" id="d-zoom" min="40" max="200" step="5" value="100" oninput="dEncNum()"></label>
         </div>
+        </div>
+        <label style="margin-top:12px">Texto sobreimpreso <span class="hint">— se mueve como bloque</span></label>
+        <div class="row2" style="gap:14px">
+          <label style="flex:1;text-transform:none;letter-spacing:0;font-size:.66rem">Horizontal
+            <input type="range" id="d-tx" min="-50" max="50" value="0" oninput="dEncNum()"></label>
+          <label style="flex:1;text-transform:none;letter-spacing:0;font-size:.66rem">Vertical
+            <input type="range" id="d-ty" min="-50" max="50" value="0" oninput="dEncNum()"></label>
+          <label style="flex:1;text-transform:none;letter-spacing:0;font-size:.66rem">Tamaño
+            <input type="range" id="d-te" min="50" max="200" step="5" value="100" oninput="dEncNum()"></label>
+        </div>
         <div class="gsub" id="d-enc-nota" style="margin-top:6px"></div>
+        <div class="encvivo">
+          <button class="abtn" id="d-enc-vivo" onclick="encVivo()">Encuadrar en vivo</button>
+          <button class="abtn" id="d-enc-reset" onclick="encReset()" style="display:none">Volver al original</button>
+        </div>
         <button class="abtn" id="d-enc-btn" onclick="aplicarEncuadre()" style="margin-top:8px">Aplicar encuadre</button>
       </div>
       <div class="fl"><label>Imagen de fondo</label>
@@ -551,13 +577,19 @@ async function refrescarDet(){
   document.getElementById('d-caras-box').style.display = g.caras===2 ? '' : 'none';
   if(g.caras!==2) DCARA='ambas'; else if(!['frente','dorso','ambas'].includes(DCARA)) DCARA='frente';
   dCaraUI(DCARA);
-  // Sin foto no hay nada que reencuadrar: el bloque no aparece.
+  // El texto se puede mover aunque la pieza no tenga foto: lo que se oculta sin foto es el
+  // encuadre de la foto, no el bloque entero.
   const conFoto = !!(g.fondo_url || (DCARA==='dorso' && g.fondo_dorso_url));
-  document.getElementById('d-enc-box').style.display = conFoto ? '' : 'none';
-  if(conFoto) dEncNum();
+  const hayVersion = (g.versiones||[]).some(v=>v.estado==='lista');
+  document.getElementById('d-enc-box').style.display = hayVersion ? '' : 'none';
+  document.getElementById('d-enc-foto').style.display = conFoto ? '' : 'none';
+  if(hayVersion) dEncNum();
   const vs=g.versiones||[], activa=vs.find(v=>v.estado==='lista')||vs[0];
   const enCurso=vs.some(v=>v.estado==='pendiente'||v.estado==='procesando');
-  if(enCurso){
+  // Mientras se encuadra en vivo, el escenario NO se toca: la ficha se refresca sola cada tantos
+  // segundos y repintar acá borraría el iframe justo en la mitad de un arrastre.
+  if(ENC_VIVO && !enCurso){ /* el escenario manda */ }
+  else if(enCurso){
     document.getElementById('d-prev').innerHTML='<div class="ph" style="color:#FF6A45"><span class="spin"></span><br>diseñando…</div>';
   } else if(activa&&activa.png_url){
     const dorso = activa.png_dorso_url;
@@ -611,18 +643,131 @@ function dEncNum(){
   const aviso = DENC==='contain' && z!==100 ? ' · el zoom no aplica con «Entera»'
     : (z<100 ? ` · zoom ${z}% — se va a ver el fondo de la pieza alrededor`
              : (z!==100 ? ` · zoom ${z}%` : ''));
-  n.textContent = COMO[DENC] + aviso + ` · se aplica al ${DCARA==='dorso'?'dorso':'frente'}`;
+  const tx=+val('d-tx'), ty=+val('d-ty'), te=+val('d-te');
+  const txt = (tx||ty||te!==100)
+    ? ` — texto: ${tx||ty?`corrido ${tx}%/${ty}%`:'en su lugar'}${te!==100?`, ${te}% de tamaño`:''}`
+    : '';
+  n.textContent = COMO[DENC] + aviso + ` · se aplica al ${DCARA==='dorso'?'dorso':'frente'}` + txt;
+  encPintar();
 }
+/* ── Encuadre en vivo ─────────────────────────────────────────────────────────
+ * El problema que resuelve: los controles se aplicaban a ciegas. Cada tanteo era mover tres
+ * sliders sin ver nada, esperar un render entero y recién ahí saber si servía — y cada intento
+ * gastaba una versión. Acá se abre la pieza REAL (su HTML, no el PNG, que ya tiene la foto y el
+ * texto horneados), se la arrastra con el mouse y se ve al instante. Recién al aplicar se
+ * renderiza una vez, con el encuadre ya elegido.
+ * Las reglas las calcula encuadre_dom.js, el MISMO archivo que usa el script que escribe el HTML
+ * definitivo: la previa no puede mostrar algo distinto de lo que va a salir. */
+let ENC_VIVO=false, ENC_INFO=null, ENC_OBJ='foto';
+const encAjuste = () => ({
+  cara: DCARA==='dorso'?'dorso':'frente', size: DENC,
+  pos_x:+val('d-px'), pos_y:+val('d-py'), zoom:+val('d-zoom'),
+  texto_x:+val('d-tx'), texto_y:+val('d-ty'), texto_escala:+val('d-te'),
+});
+const val = id => (document.getElementById(id)||{}).value ?? 0;
+function setVal(id,v){ const e=document.getElementById(id); if(e) e.value=v; }
+
+async function encVivo(){
+  if(ENC_VIVO) return encSalir();
+  const v = (DET_G&&DET_G.versiones||[]).find(x=>x.estado==='lista'&&x.html_url);
+  if(!v){ document.getElementById('d-err').textContent='Todavía no hay una versión para encuadrar'; return; }
+  const prev=document.getElementById('d-prev');
+  const caja=prev.getBoundingClientRect();
+  prev.innerHTML=`<div class="encesc" id="enc-esc"><span class="encmarca" id="enc-marca">arrastrá para mover · rueda para zoom</span>
+    <iframe id="enc-ifr" src="${esc(v.html_url)}" scrolling="no"></iframe></div>`;
+  const ifr=document.getElementById('enc-ifr');
+  await new Promise(r=>{ ifr.onload=r; setTimeout(r,4000); });
+  try{
+    const d=ifr.contentDocument;
+    const caras=d.querySelectorAll('.lienzo');
+    const l=caras[DCARA==='dorso'&&caras[1]?1:0];
+    if(!l) throw new Error('sin lienzo');
+    // El módulo se carga DENTRO del iframe: getComputedStyle y las medidas tienen que salir de
+    // su propia ventana, no de la del panel.
+    await new Promise((ok,fail)=>{ const sc=d.createElement('script');
+      sc.src='/encuadre_dom.js?v=1'; sc.onload=ok; sc.onerror=fail; d.head.appendChild(sc); });
+    ENC_INFO = ifr.contentWindow.EncuadreDOM.detectar(l);
+    if(ENC_INFO.error) throw new Error(ENC_INFO.error);
+    const w=l.getBoundingClientRect().width, h=l.getBoundingClientRect().height;
+    const k=Math.min((caja.width||360)/w, (window.innerHeight*0.56)/h);
+    ifr.style.width=w+'px'; ifr.style.height=h+'px'; ifr.style.transform='scale('+k+')';
+    const esc_=document.getElementById('enc-esc');
+    esc_.style.width=Math.round(w*k)+'px'; esc_.style.height=Math.round(h*k)+'px';
+    esc_.dataset.k=k;
+    encArrastre(esc_);
+    ENC_VIVO=true;
+    document.getElementById('d-enc-vivo').textContent='Volver a la imagen';
+    document.getElementById('d-enc-reset').style.display='';
+    encPintar();
+  }catch(e){
+    document.getElementById('d-err').textContent='No se pudo abrir la vista en vivo ('+(e.message||e)+')';
+    encSalir();
+  }
+}
+function encSalir(){ ENC_VIVO=false; ENC_INFO=null;
+  document.getElementById('d-enc-vivo').textContent='Encuadrar en vivo';
+  document.getElementById('d-enc-reset').style.display='none';
+  refrescarDet();
+}
+function encReset(){ setVal('d-px',50); setVal('d-py',50); setVal('d-zoom',100);
+  setVal('d-tx',0); setVal('d-ty',0); setVal('d-te',100); dEncNum(); }
+
+// Pinta el ajuste actual dentro del iframe. Es lo único que corre en cada movimiento del mouse:
+// una regla CSS, sin ida al servidor y sin re-render.
+function encPintar(){
+  if(!ENC_VIVO||!ENC_INFO) return;
+  const ifr=document.getElementById('enc-ifr'); if(!ifr||!ifr.contentDocument) return;
+  const d=ifr.contentDocument;
+  let st=d.getElementById('enc-vivo-css');
+  if(!st){ st=d.createElement('style'); st.id='enc-vivo-css'; d.head.appendChild(st); }
+  st.textContent = ifr.contentWindow.EncuadreDOM.reglas(ENC_INFO, encAjuste(), DCARA==='dorso'?'dorso':'frente');
+}
+
+/* Arrastrar mueve la foto; con Shift (o el botón derecho del control) mueve el texto. La foto va
+ * al revés que el mouse a propósito: uno arrastra LA FOTO, y subir background-position la corre
+ * hacia el otro lado. */
+function encArrastre(escena){
+  let x0=0,y0=0,base=null;
+  const k=Number(escena.dataset.k)||1;
+  escena.addEventListener('pointerdown', e=>{
+    escena.setPointerCapture(e.pointerId); escena.classList.add('arrastrando');
+    x0=e.clientX; y0=e.clientY;
+    ENC_OBJ = e.shiftKey ? 'texto' : 'foto';
+    base={ px:+val('d-px'), py:+val('d-py'), tx:+val('d-tx'), ty:+val('d-ty') };
+    marca();
+  });
+  escena.addEventListener('pointermove', e=>{
+    if(!base) return;
+    const dx=(e.clientX-x0)/(escena.clientWidth||1)*100, dy=(e.clientY-y0)/(escena.clientHeight||1)*100;
+    if(ENC_OBJ==='texto'){ setVal('d-tx', Math.max(-50,Math.min(50, Math.round(base.tx+dx))));
+                           setVal('d-ty', Math.max(-50,Math.min(50, Math.round(base.ty+dy)))); }
+    else { setVal('d-px', Math.max(0,Math.min(100, Math.round(base.px-dx))));
+           setVal('d-py', Math.max(0,Math.min(100, Math.round(base.py-dy)))); }
+    dEncNum();
+  });
+  const soltar=e=>{ base=null; escena.classList.remove('arrastrando');
+    try{ escena.releasePointerCapture(e.pointerId); }catch(_){} };
+  escena.addEventListener('pointerup', soltar);
+  escena.addEventListener('pointercancel', soltar);
+  escena.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const paso = e.deltaY<0 ? 5 : -5;
+    if(e.shiftKey){ setVal('d-te', Math.max(50,Math.min(200, +val('d-te')+paso))); ENC_OBJ='texto'; }
+    else { setVal('d-zoom', Math.max(40,Math.min(300, +val('d-zoom')+paso))); ENC_OBJ='foto'; }
+    marca(); dEncNum();
+  }, { passive:false });
+  function marca(){ const m=document.getElementById('enc-marca');
+    if(m) m.textContent = (ENC_OBJ==='texto'?'moviendo el TEXTO':'moviendo la FOTO')+' · shift = el otro'; }
+}
+
 async function aplicarEncuadre(){
   const b=document.getElementById('d-enc-btn'), err=document.getElementById('d-err');
   err.textContent=''; b.disabled=true; b.textContent='Aplicando…';
   try{
     const d=await fetch('api/grafica/'+DET+'/encuadre',{method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ cara: DCARA==='dorso'?'dorso':'frente', size:DENC,
-        pos_x:+document.getElementById('d-px').value, pos_y:+document.getElementById('d-py').value,
-        zoom:+document.getElementById('d-zoom').value })}).then(r=>r.json());
-    if(d.ok){ toast('Reencuadrando — tarda segundos'); cargar(); refrescarDet(); }
+      body:JSON.stringify(encAjuste())}).then(r=>r.json());
+    if(d.ok){ toast('Reencuadrando — tarda segundos'); ENC_VIVO=false; cargar(); refrescarDet(); }
     else err.textContent = d.error==='ya_en_curso'?'Ya hay una versión generándose':'No se pudo aplicar';
   }catch(e){ err.textContent='Error de conexión'; }
   b.disabled=false; b.textContent='Aplicar encuadre';
