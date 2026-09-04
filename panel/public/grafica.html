@@ -9,8 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
 <link rel="stylesheet" href="tw.css">
-<link rel="stylesheet" href="panel.css?v=20260902f">
-<script src="encuadre_dom.js?v=1"></script>
+<link rel="stylesheet" href="panel.css?v=20260902g">
+<script src="encuadre_dom.js?v=2"></script>
 <style>
   .gwrap{padding:18px 28px 70px;max-width:1200px;}
   .ghead{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
@@ -280,7 +280,7 @@ const cod = n => n ? 'G-'+String(n).padStart(4,'0') : '';
 const esc = s => (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let _t; function toast(m,e){ const t=document.getElementById('toast'); t.textContent=m; t.classList.toggle('err',!!e); t.classList.add('show'); clearTimeout(_t); _t=setTimeout(()=>t.classList.remove('show'),3600); }
 function salir(){ fetch('api/logout',{method:'POST'}).then(()=>location.href='login'); }
-function cerrar(id){ document.getElementById(id).style.display='none'; if(id==='ov-det') DET=null; }
+function cerrar(id){ document.getElementById(id).style.display='none'; if(id==='ov-det'){ DET=null; if(window.encApagar) encApagar(); } }
 
 const DATOS = [['direccion','Dirección'],['telefono','Teléfono'],['whatsapp','WhatsApp'],['instagram','Instagram'],['web','Web'],['qr','Código QR']];
 // Un formato de Instagram se mide en PÍXELES: mostrarle "91×114mm" a quien va a publicar una foto
@@ -564,7 +564,15 @@ async function dSubirFondo(inp){
     else document.getElementById('dupst').textContent='no se pudo subir';
   }catch(e){ document.getElementById('dupst').textContent='error'; }
 }
-async function abrirDet(id){ DET=id; dResetFondo(); await refrescarDet(); document.getElementById('ov-det').style.display='flex'; }
+async function abrirDet(id){
+  // Apagar el escenario ANTES de cambiar de pieza. Sin esto la previa en vivo de la anterior
+  // quedaba en pantalla —el repintado se saltea mientras se encuadra— y la ficha mostraba una
+  // pieza con las imágenes de la otra. Peor: los sliders conservaban el encuadre viejo y
+  // "Aplicar" se lo pegaba a la pieza nueva.
+  encApagar();
+  DET=id; dResetFondo(); await refrescarDet();
+  document.getElementById('ov-det').style.display='flex';
+}
 async function refrescarDet(){
   if(!DET) return;
   let g; try{ g=await fetch('api/grafica/'+DET).then(r=>r.json()); }catch(e){ return; }
@@ -588,7 +596,8 @@ async function refrescarDet(){
   const enCurso=vs.some(v=>v.estado==='pendiente'||v.estado==='procesando');
   // Mientras se encuadra en vivo, el escenario NO se toca: la ficha se refresca sola cada tantos
   // segundos y repintar acá borraría el iframe justo en la mitad de un arrastre.
-  if(ENC_VIVO && !enCurso){ /* el escenario manda */ }
+  const esc0=document.getElementById('enc-esc');
+  if(ENC_VIVO && !enCurso && esc0 && esc0.dataset.pieza===DET){ /* el escenario manda */ }
   else if(enCurso){
     document.getElementById('d-prev').innerHTML='<div class="ph" style="color:#FF6A45"><span class="spin"></span><br>diseñando…</div>';
   } else if(activa&&activa.png_url){
@@ -673,7 +682,7 @@ async function encVivo(){
   if(!v){ document.getElementById('d-err').textContent='Todavía no hay una versión para encuadrar'; return; }
   const prev=document.getElementById('d-prev');
   const caja=prev.getBoundingClientRect();
-  prev.innerHTML=`<div class="encesc" id="enc-esc"><span class="encmarca" id="enc-marca">arrastrá para mover · rueda para zoom</span>
+  prev.innerHTML=`<div class="encesc" id="enc-esc" data-pieza="${esc(DET)}"><span class="encmarca" id="enc-marca">arrastrá para mover · rueda para zoom</span>
     <iframe id="enc-ifr" src="${esc(v.html_url)}" scrolling="no"></iframe></div>`;
   const ifr=document.getElementById('enc-ifr');
   await new Promise(r=>{ ifr.onload=r; setTimeout(r,4000); });
@@ -685,7 +694,7 @@ async function encVivo(){
     // El módulo se carga DENTRO del iframe: getComputedStyle y las medidas tienen que salir de
     // su propia ventana, no de la del panel.
     await new Promise((ok,fail)=>{ const sc=d.createElement('script');
-      sc.src='/encuadre_dom.js?v=1'; sc.onload=ok; sc.onerror=fail; d.head.appendChild(sc); });
+      sc.src='/encuadre_dom.js?v=2'; sc.onload=ok; sc.onerror=fail; d.head.appendChild(sc); });
     ENC_INFO = ifr.contentWindow.EncuadreDOM.detectar(l);
     if(ENC_INFO.error) throw new Error(ENC_INFO.error);
     const w=l.getBoundingClientRect().width, h=l.getBoundingClientRect().height;
@@ -703,6 +712,14 @@ async function encVivo(){
     document.getElementById('d-err').textContent='No se pudo abrir la vista en vivo ('+(e.message||e)+')';
     encSalir();
   }
+}
+// Apaga el escenario y deja los controles en cero. No repinta: lo hace quien llama.
+function encApagar(){
+  ENC_VIVO=false; ENC_INFO=null;
+  setVal('d-px',50); setVal('d-py',50); setVal('d-zoom',100);
+  setVal('d-tx',0); setVal('d-ty',0); setVal('d-te',100);
+  const b=document.getElementById('d-enc-vivo'); if(b) b.textContent='Encuadrar en vivo';
+  const r=document.getElementById('d-enc-reset'); if(r) r.style.display='none';
 }
 function encSalir(){ ENC_VIVO=false; ENC_INFO=null;
   document.getElementById('d-enc-vivo').textContent='Encuadrar en vivo';
