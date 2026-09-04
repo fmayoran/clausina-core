@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
 <link rel="stylesheet" href="tw.css">
-<link rel="stylesheet" href="panel.css?v=20260902g">
+<link rel="stylesheet" href="panel.css?v=20260902h">
 <script src="encuadre_dom.js?v=2"></script>
 <style>
   .gwrap{padding:18px 28px 70px;max-width:1200px;}
@@ -523,7 +523,10 @@ function dCaraUI(c){
       ? 'Elegí Frente o Dorso para cambiar la imagen de fondo.'
       : 'Se cambia la del ' + c + '.';
     document.querySelectorAll('#d-fondo .opt').forEach(o=>{
-      const bloq = c==='ambas' && o.dataset.modo!=='mantener';
+      // dosCaras es la mitad que faltaba. En una pieza de UNA cara, DCARA vale 'ambas' —no hay
+      // nada que elegir— y esto bloqueaba el cambio de fondo dejando sólo "Mantener", que no era
+      // la intención: la ambigüedad de "¿cuál de las dos imágenes?" sólo existe con dos caras.
+      const bloq = dosCaras && c==='ambas' && o.dataset.modo!=='mantener';
       o.style.opacity = bloq ? '.4' : '';
       o.style.pointerEvents = bloq ? 'none' : '';
     });
