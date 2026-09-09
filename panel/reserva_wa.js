@@ -706,10 +706,14 @@ async function porIntencion(cfg, negocio, waId, i, canal, ofreceReservas, datos 
   if (!i.fecha && i.fecha_pedida) {
     const motivo = i.fecha_iso ? await db.diaBloqueado(negocio.id, i.fecha_iso).catch(() => null) : null;
     if (motivo !== null && negocio.whatsapp_directo) {
-      await decir(cfg, waId, `Para ${i.fecha_pedida} las reservas no las tomo por acá` +
-        (motivo ? ` (${motivo})` : '') + '. Te paso con el local, que lo maneja directamente.', negocio.id);
+      // INVITAR a reservar allá, no sólo pasar el contacto. Quien escribe para esa fecha ya
+      // decidió que quiere venir: decirle "te paso con el local" lo deja parado, y decirle
+      // "reservá por ahí" le termina la frase. La reserva no se pierde, cambia de mostrador.
       await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
-      if (await ofrecerDirecto(cfg, negocio, waId)) return true;
+      const porque = motivo ? ` tenemos ${motivo} y` : '';
+      if (await ofrecerDirecto(cfg, negocio, waId,
+            `Para ${i.fecha_pedida}${porque} las reservas se toman directo con el local. ` +
+            'Escribiles y reservá por ahí.')) return true;
     }
     const j = await faq.responder(`¿Están abiertos ${i.fecha_pedida}?`, canal.faq || []).catch(() => null);
     await decir(cfg, waId, `Para ${i.fecha_pedida} no tengo disponibilidad.` +
