@@ -206,7 +206,14 @@ async function atender(negocio, mensaje) {
 
   // Sólo al principio: más adelante la persona ya está reservando y "quiero reservar" no puede
   // hacerla volver al casillero uno.
-  if (ofreceReservas && (!paso || paso === 'ofrecido') && QUIERO_RESERVAR.test(entrada)) {
+  // Tocar el botón "Reservar" —o escribir esa sola palabra— abre el flujo y punto: es una orden,
+  // no algo que haya que interpretar. Para todo lo demás, la expresión regular queda como RED DE
+  // SEGURIDAD y no como puerta principal: con el intérprete disponible entra por él, que lee "te
+  // reservo para dos" igual que "quiero reservar" y además se trae el día y la cantidad. Sin clave
+  // de API, la regex es lo único que hay.
+  const pidioReservar = /^reserv(ar|a|o|ó)$/i.test(entrada)
+    || (!voz.disponible() && QUIERO_RESERVAR.test(entrada));
+  if (ofreceReservas && (!paso || paso === 'ofrecido') && pidioReservar) {
     await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
     if (!datos.invitacion && await db.invitacionesActivas(negocio.id)) {
       return await preguntarCodigo(cfg, negocio, waId, datos);
@@ -267,8 +274,9 @@ async function atender(negocio, mensaje) {
       // La conversación igual queda en 'ofrecido', así que lo que escriba después se atiende con
       // todo el menú disponible; el saludo sigue saliendo cuando lo pide de verdad —un "hola"
       // suelto, o "menú"—, que es cuando significa algo.
-      const resp = await responderFaq(cfg, negocio, waId, entrada, canal);
-      if (resp) return await trasResponder(cfg, negocio, waId, canal, ofreceReservas, resp, datos);
+      // Quien abre la charla pidiendo una mesa no tiene por qué recibir el menú y volver a
+      // escribir lo mismo: si el primer mensaje ya es una reserva, se empieza por ahí.
+      if (await resolverLibre(cfg, negocio, waId, entrada, canal, ofreceReservas, datos)) return true;
       return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil, datos);
     }
     // "Otra consulta": lo que sigue va al inbox para que lo lea una persona.
@@ -285,8 +293,7 @@ async function atender(negocio, mensaje) {
       // Texto libre en vez de un botón: puede ser una pregunta. Si está contestada, se contesta
       // y se queda donde estaba, en vez de arrancar a pedirle días a alguien que preguntó otra cosa.
       if (entrada !== 'reservar') {
-        const resp = await responderFaq(cfg, negocio, waId, entrada, canal);
-        if (resp) return await trasResponder(cfg, negocio, waId, canal, ofreceReservas, resp, datos);
+        if (await resolverLibre(cfg, negocio, waId, entrada, canal, ofreceReservas, datos)) return true;
       }
       // Y si no la sabemos contestar, va a una persona. ANTES caía en la reserva: "¿Hacen sándwich
       // para llevar?" recibía "¿Tenés un código de invitación?". Empezar a pedir días a quien no
@@ -568,10 +575,114 @@ async function pedirConsulta(cfg, negocio, waId) {
   return true;
 }
 
+/**
+ * Último intento antes de derivar a una persona: entender QUÉ quiere el mensaje.
+ *
+ * Hasta acá la conversación pasó por lo determinístico —botones, "hola", "gracias", "volver", el
+ * código de invitación, la expresión regular de reservar— y por las respuestas que el negocio ya
+ * escribió. Si nada de eso enganchó, el camino viejo era derivar. Pero sobre las conversaciones
+ * reales, buena parte de lo que se derivaba era gente pidiendo justo lo que el bot sabe hacer:
+ * "Tenés lugar para las 10:15", "Te reservo para dos personas para hoy a la noche".
+ *
+ * El intérprete es el MISMO que ya usaban las notas de voz, con sus dos garantías intactas:
+ * elige la fecha y el turno de la disponibilidad real —el esquema se lo restringe y después se
+ * revalida—, y no redacta nada. Acá sólo ENRUTA: decide a qué flujo va la conversación. Lo que
+ * sale escrito sigue siendo texto nuestro o del negocio, palabra por palabra.
+ *
+ * Devuelve true si atendió el mensaje; false para que quien llama siga con lo suyo.
+ */
+/**
+ * Resolver un mensaje de texto libre al principio de la charla.
+ *
+ * Se preguntan las DOS cosas a la vez —qué quiere la persona, y si el negocio ya tiene escrita una
+ * respuesta— porque la decisión necesita las dos y en serie se le suma al cliente la espera de la
+ * segunda. Después se elige, y el orden importa:
+ *
+ * 1. Una reserva CON datos gana. "Necesitaría una reserva para 4 personas para hoy al mediodía"
+ *    caía en la respuesta guardada sobre reservas y le recitaba la política de cubiertos y
+ *    anticipación a alguien que ya había dicho día, turno y cantidad. Quien pide una mesa quiere
+ *    la mesa, no el reglamento.
+ * 2. Si no, manda lo que el negocio escribió: es su voz y es exacta.
+ * 3. Y si tampoco, se enruta por intención (saludo, cortesía, hablar con una persona) o se pide
+ *    reservar sin datos.
+ *
+ * Devuelve true si el mensaje quedó atendido.
+ */
+async function resolverLibre(cfg, negocio, waId, entrada, canal, ofreceReservas, datos = {}) {
+  const [i, j] = await Promise.all([
+    leerIntencion(negocio, entrada, ofreceReservas),
+    faq.responder(entrada, (canal && canal.faq) || []).catch(() => null),
+  ]);
+
+  // `fecha_pedida` cuenta como dato aunque no haya fecha: es justamente el caso en que hay algo
+  // que decir —"para el viernes 11 no tengo disponibilidad"— y contestar la política en su lugar
+  // deja a la persona esperando una lista donde ese día no está, sin saber por qué.
+  const conDatos = i && i.intencion === 'reserva'
+    && (i.fecha || i.turno_id || i.cantidad || i.fecha_pedida);
+  if (conDatos && await porIntencion(cfg, negocio, waId, i, canal, ofreceReservas, datos)) return true;
+
+  if (j != null) {
+    const r = canal.faq[j].r;
+    await decir(cfg, waId, r, negocio.id);
+    return await trasResponder(cfg, negocio, waId, canal, ofreceReservas, r, datos);
+  }
+  return await porIntencion(cfg, negocio, waId, i, canal, ofreceReservas, datos);
+}
+
+async function leerIntencion(negocio, texto, ofreceReservas) {
+  if (!voz.disponible() || !ofreceReservas) return null;
+  const t = String(texto || '').trim();
+  // Un payload de botón no es lenguaje natural, y los mensajes de una palabra ya los agarró lo
+  // determinístico. Consultarle al modelo por ellos es gastar una llamada para no aprender nada.
+  if (!t || t.length < 4 || t.startsWith('acc:')) return null;
+  try {
+    const cfgRes = await db.getConfigReservas(negocio.id);
+    const hoy = fechaLocal();
+    const opciones = await db.disponibilidadPublica(negocio.id, hoy, fechaLocal(Date.now() + 30 * 864e5));
+    return await voz.interpretar(t, { opciones, hoy, unidad: cfgRes.unidad,
+      cantidadMin: cfgRes.cantidad_min, cantidadMax: cfgRes.cantidad_max });
+  } catch (e) { return null; }
+}
+
+/** Actúa sobre una intención ya leída. Devuelve true si atendió el mensaje. */
+async function porIntencion(cfg, negocio, waId, i, canal, ofreceReservas, datos = {}) {
+  if (!i) return false;
+
+  if (i.intencion === 'saludo') {
+    await db.borrarConversacion(negocio.id, waId);
+    return await saludar(cfg, negocio, waId, canal, ofreceReservas, null, {});
+  }
+  if (i.intencion === 'cortesia') {
+    await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
+    await decir(cfg, waId, 'De nada. Cualquier cosa, acá estoy.', negocio.id);
+    return true;
+  }
+  if (i.intencion === 'humano' && negocio.whatsapp_directo) {
+    return await ofrecerDirecto(cfg, negocio, waId);
+  }
+  if (i.intencion !== 'reserva') return false;
+
+  // Pidió un día que no está en la agenda: se lo dice, con el motivo del negocio si lo tiene.
+  // Mostrarle otra lista sin explicar por qué se lee como "está lleno", que es otra cosa.
+  if (!i.fecha && i.fecha_pedida) {
+    const j = await faq.responder(`¿Están abiertos ${i.fecha_pedida}?`, canal.faq || []).catch(() => null);
+    await decir(cfg, waId, `Para ${i.fecha_pedida} no tengo disponibilidad.` +
+      (j != null ? ' ' + canal.faq[j].r : ''), negocio.id);
+  }
+  // Lo entendido entra al MISMO flujo que los botones. `avanzar` pregunta lo que falte y termina
+  // pidiendo un sí antes de reservar nada: un dato mal leído se corrige ahí, no en la mesa.
+  await avanzar(cfg, negocio, waId, { ...datos, fecha: i.fecha, turno_id: i.turno_id,
+                                      cantidad: i.cantidad, nombre: i.nombre });
+  return true;
+}
+
 async function recibirConsulta(cfg, negocio, waId, texto, canal, ofreceReservas = true) {
   // Primero lo que el negocio ya contestó: si hay respuesta, no hay nada que derivar.
   const resp = await responderFaq(cfg, negocio, waId, texto, canal);
   if (resp) return await trasResponder(cfg, negocio, waId, canal, ofreceReservas, resp);
+  // Antes de darse por vencido: ¿no será que está pidiendo algo que sabemos hacer?
+  const i = await leerIntencion(negocio, texto, ofreceReservas);
+  if (await porIntencion(cfg, negocio, waId, i, canal, ofreceReservas)) return true;
   await db.borrarConversacion(negocio.id, waId);
   // El mensaje ya se guarda en la bitácora del webhook: acá sólo se acusa recibo. Prometer un
   // plazo que no controlamos sería peor que no prometer nada.

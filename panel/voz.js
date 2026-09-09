@@ -1,7 +1,14 @@
-/* Interpretar una nota de voz como una reserva — ClaUsina v2.0 / F5g, paso 2.
+/* Interpretar un mensaje del cliente: qué quiere y, si quiere reservar, con qué datos.
  *
- * La transcripción la hace el host (whisper.cpp). Acá sólo se lee ese texto y se lo convierte en
- * los cuatro datos de una reserva: día, turno, cantidad y nombre.
+ * Nació para las notas de voz (la transcripción la hace el host con whisper.cpp) pero el texto es
+ * texto: hoy lo usan los dos caminos. Del mensaje salen la INTENCIÓN y, cuando es una reserva, sus
+ * cuatro datos: día, turno, cantidad y nombre.
+ *
+ * POR QUÉ TAMBIÉN PARA EL TEXTO. La intención escrita se detectaba con una expresión regular y una
+ * lista corta de verbos. "Necesito" entraba y "necesitaría" no; "podría" entraba y "podrías" no.
+ * Sobre las conversaciones reales eso dejaba afuera "Tenés lugar para las 10:15", "Te reservo para
+ * dos personas para hoy a la noche" y "Ahora me podrías reservar 4 cubiertos para las 14:00": gente
+ * pidiendo exactamente lo que el bot sabe hacer, derivada a una persona.
  *
  * DOS DECISIONES QUE IMPORTAN
  *
@@ -20,8 +27,9 @@ const ia = require('./ia');
 
 const DOW = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 
-const SISTEMA = `Sos el asistente de un negocio que toma reservas por WhatsApp. Te llega la
-transcripción de una nota de voz de un cliente y tenés que extraer los datos de la reserva.
+const SISTEMA = `Sos el asistente de un negocio que toma reservas por WhatsApp. Te llega un mensaje de
+un cliente —escrito, o la transcripción de una nota de voz— y tenés que decidir qué quiere y, si
+quiere reservar, extraer los datos de la reserva.
 
 Reglas:
 - Elegí fecha y turno SOLAMENTE de la lista de opciones disponibles que te paso. Si el cliente
@@ -36,8 +44,16 @@ Reglas:
 - La cantidad es cuánta gente va, no cuántas mesas ni la hora. "Somos cuatro" es 4.
 - El nombre es el del cliente si lo dice. No lo inventes ni lo deduzcas del audio.
 - Todo dato que no esté dicho con claridad va en null. Preguntar es barato; asumir mal, no.
-- intencion es "reserva" sólo si está pidiendo reservar. Una consulta, un reclamo, un saludo o
-  cualquier otra cosa es "otra".`;
+- intencion clasifica QUÉ quiere la persona, y sirve para decidir a dónde va la conversación:
+  - "reserva": está pidiendo reservar. Pedir una mesa, un lugar o un horario es reserva, con o sin
+    la palabra "reservar". Preguntar SI se puede reservar, o cómo, no lo es: eso es "consulta".
+  - "consulta": pregunta algo del negocio (carta, precios, horarios, si hay algo sin gluten).
+  - "saludo": sólo saluda o abre la charla, sin pedir nada todavía.
+  - "cortesia": agradece, confirma que le respondiste o cierra la charla. No espera respuesta.
+  - "humano": pide hablar con una persona o con el local.
+  - "otra": cualquier otra cosa (ofrecerse a trabajar, vender algo, un reclamo).
+  Ante la duda entre "consulta" y otra cosa, elegí "consulta": que la pregunta siga su camino
+  normal es inofensivo, mandarla a un flujo que no pidió no lo es.`;
 
 /** El esquema restringe fecha y turno a lo que realmente hay: el modelo no puede inventar un día. */
 function esquema(opciones) {
@@ -46,7 +62,7 @@ function esquema(opciones) {
   return {
     type: 'object',
     properties: {
-      intencion: { type: 'string', enum: ['reserva', 'otra'] },
+      intencion: { type: 'string', enum: ['reserva', 'consulta', 'saludo', 'cortesia', 'humano', 'otra'] },
       fecha:     { anyOf: [{ type: 'string', enum: fechas }, { type: 'null' }] },
       turno_id:  { anyOf: [{ type: 'string', enum: turnos }, { type: 'null' }] },
       // Libre a propósito: es lo que la persona dijo, no un valor de la agenda. Es el único
@@ -72,7 +88,7 @@ La cantidad se mide en ${unidad}.
 Opciones disponibles:
 ${lista}
 
-Transcripción de la nota de voz:
+Mensaje del cliente:
 """
 ${texto}
 """`;
@@ -102,9 +118,12 @@ async function interpretar(texto, { opciones, hoy, unidad, cantidadMin, cantidad
  */
 function validar(c, { opciones, cantidadMin, cantidadMax }) {
   if (!c || typeof c !== 'object') return null;
-  const r = { intencion: c.intencion === 'reserva' ? 'reserva' : 'otra',
+  const INTENCIONES = ['reserva', 'consulta', 'saludo', 'cortesia', 'humano', 'otra'];
+  const r = { intencion: INTENCIONES.includes(c.intencion) ? c.intencion : 'otra',
               fecha: null, turno_id: null, fecha_pedida: null, cantidad: null, nombre: null };
-  if (r.intencion === 'otra') return r;
+  // Los datos de reserva sólo se leen si la intención es reservar. Quien llama distingue por
+  // `intencion`, y los caminos viejos que preguntaban `!== 'reserva'` siguen andando igual.
+  if (r.intencion !== 'reserva') return r;
 
   // No se valida contra nada: es texto de la persona y sólo se usa para repetírselo.
   const ped = String(c.fecha_pedida || '').trim();
