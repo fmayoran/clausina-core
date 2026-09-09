@@ -33,8 +33,12 @@ Reglas, en orden de importancia:
 - Escribí en español rioplatense, breve —dos o tres frases—, sin emojis, sin saludos ni
   presentaciones: la charla ya viene empezada.
 - No prometas nada en nombre del negocio ("te lo reservamos", "te hacemos un descuento").
+- Podés combinar las fuentes si hacen falta las dos: un precio de la carta y una condición de las
+  respuestas escritas son dos datos del mismo material, y contestar sólo la mitad porque están en
+  secciones distintas es no haber contestado.
 - fuente: de dónde sacaste la respuesta, en tres palabras y en minúscula, para poder decírselo a
-  la persona. Usá "la carta publicada" o "lo que publicamos" según corresponda.`;
+  la persona. "la carta publicada" si salió de la carta, "lo que publicamos" si salió de las
+  publicaciones, y "la información del local" si salió de las respuestas escritas o de varias.`;
 
 /**
  * Devuelve { respuesta, fuente } o null.

@@ -205,6 +205,25 @@ async function atender(negocio, mensaje) {
   const paso = conv ? conv.paso : null;
   let datos = conv ? (conv.datos || {}) : {};
 
+  // Los botones del menú se atienden SIEMPRE, no sólo cuando la charla sigue "abierta". El id lo
+  // mandó nuestro propio menú: es una orden, no algo que interpretar. El estado de la charla se
+  // poda, así que tocar "Escribir al local" un rato después caía en el saludo y había que tocarlo
+  // DOS veces para que pasara el contacto. Le pasó a Nadia el 09/09 a las 13:28.
+  //
+  // "Escribir al local" vale incluso en medio de una reserva —pedir una persona no se le niega a
+  // nadie, y menos si la reserva se trabó—. Los otros dos sólo fuera del flujo: abandonarían una
+  // reserva a medio hacer por tocar un botón de un menú viejo que quedó más arriba en el chat.
+  if (entrada === 'directo' && negocio.whatsapp_directo) {
+    if (await ofrecerDirecto(cfg, negocio, waId)) return true;
+  }
+  if (!paso || paso === 'ofrecido' || paso === 'consulta') {
+    if (entrada === 'consulta') return await pedirConsulta(cfg, negocio, waId);
+    if (entrada.startsWith('acc:')) {
+      const i = parseInt(entrada.slice(4), 10);
+      if (await responderAcceso(cfg, negocio, waId, canal, i, datos)) return true;
+    }
+  }
+
   // Sólo al principio: más adelante la persona ya está reservando y "quiero reservar" no puede
   // hacerla volver al casillero uno.
   // Tocar el botón "Reservar" —o escribir esa sola palabra— abre el flujo y punto: es una orden,
@@ -277,7 +296,15 @@ async function atender(negocio, mensaje) {
       // suelto, o "menú"—, que es cuando significa algo.
       // Quien abre la charla pidiendo una mesa no tiene por qué recibir el menú y volver a
       // escribir lo mismo: si el primer mensaje ya es una reserva, se empieza por ahí.
-      if (await resolverLibre(cfg, negocio, waId, entrada, canal, ofreceReservas, datos)) return true;
+      const q = {};
+      if (await resolverLibre(cfg, negocio, waId, entrada, canal, ofreceReservas, datos, q)) return true;
+      // Preguntó algo y no lo supimos contestar: eso va a una persona. Saludar acá es contestar
+      // otra cosa, y quien acaba de reservar y pregunta "¿hay algo para el cumpleañero?" recibía
+      // el menú de bienvenida —la charla se poda al confirmar, así que su pregunta parecía la
+      // primera de todas—. Pasó el 09/09 a las 11:51.
+      if (canal.inbox && (q.intencion === 'consulta' || q.intencion === 'otra')) {
+        return await recibirConsulta(cfg, negocio, waId, entrada, canal, ofreceReservas);
+      }
       return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil, datos);
     }
     // "Otra consulta": lo que sigue va al inbox para que lo lea una persona.
@@ -608,7 +635,16 @@ async function pedirConsulta(cfg, negocio, waId) {
 async function porContexto(cfg, negocio, waId, texto, canal, ofreceReservas, datos = {}) {
   let r = null;
   try {
-    const material = await db.materialPublicado(negocio.id);
+    // Las respuestas frecuentes entran al material, no sólo al selector. El selector es de todo o
+    // nada: si una entrada contesta la mitad de la pregunta, devuelve null y esa mitad se pierde.
+    // Karina preguntó el 09/09 si podía encargar un sándwich de vacío y pasarlo a buscar: la carta
+    // tenía el combo y su precio, la respuesta cargada decía que hay Take Away, y como ninguna de
+    // las dos contestaba TODO, se le dijo que el retiro no estaba publicado. Estaba, en la otra.
+    const faqs = ((canal && canal.faq) || []).map(f => `P: ${f.p}\nR: ${f.r}`).join('\n\n');
+    const material = [
+      await db.materialPublicado(negocio.id),
+      faqs ? `=== RESPUESTAS QUE EL NEGOCIO YA TIENE ESCRITAS ===\n${faqs}` : '',
+    ].filter(Boolean).join('\n\n');
     r = await contexto.responder(texto, material);
   } catch (e) { return false; }
   if (!r) return false;
@@ -638,7 +674,7 @@ async function porContexto(cfg, negocio, waId, texto, canal, ofreceReservas, dat
  *
  * Devuelve true si el mensaje quedó atendido.
  */
-async function resolverLibre(cfg, negocio, waId, entrada, canal, ofreceReservas, datos = {}) {
+async function resolverLibre(cfg, negocio, waId, entrada, canal, ofreceReservas, datos = {}, out = {}) {
   const [i, j] = await Promise.all([
     leerIntencion(negocio, entrada, ofreceReservas),
     faq.responder(entrada, (canal && canal.faq) || []).catch(() => null),
@@ -647,6 +683,7 @@ async function resolverLibre(cfg, negocio, waId, entrada, canal, ofreceReservas,
   // `fecha_pedida` cuenta como dato aunque no haya fecha: es justamente el caso en que hay algo
   // que decir —"para el viernes 11 no tengo disponibilidad"— y contestar la política en su lugar
   // deja a la persona esperando una lista donde ese día no está, sin saber por qué.
+  out.intencion = i ? i.intencion : null;
   const conDatos = i && i.intencion === 'reserva'
     && (i.fecha || i.turno_id || i.cantidad || i.fecha_pedida);
   if (conDatos && await porIntencion(cfg, negocio, waId, i, canal, ofreceReservas, datos)) return true;
