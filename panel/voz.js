@@ -41,6 +41,9 @@ Reglas:
 - fecha_pedida: el día que pidió, tal como lo dijo ("el próximo sábado", "el 25 de diciembre"),
   AUNQUE no esté en la lista. Va en null sólo si no mencionó ningún día. Sirve para poder
   decirle que ese día no hay, en vez de mostrarle otros sin explicar por qué.
+- fecha_iso: ESE MISMO día en formato AAAA-MM-DD, resuelto contra la fecha de hoy, aunque no esté
+  en la lista de disponibles. Sirve para saber si ese día está cerrado y decirlo. Null si no
+  mencionó un día concreto o si no se puede resolver a una fecha exacta.
 - La cantidad es cuánta gente va, no cuántas mesas ni la hora. "Somos cuatro" es 4.
 - El nombre es el del cliente si lo dice. No lo inventes ni lo deduzcas del audio.
 - Todo dato que no esté dicho con claridad va en null. Preguntar es barato; asumir mal, no.
@@ -68,10 +71,13 @@ function esquema(opciones) {
       // Libre a propósito: es lo que la persona dijo, no un valor de la agenda. Es el único
       // campo que puede describir un día que NO existe, y para eso está.
       fecha_pedida: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+      // La fecha pedida en formato de calendario, esté o no disponible: con ella se puede mirar
+      // si ese día está bloqueado y contestar lo que corresponde en vez de "no hay lugar".
+      fecha_iso: { anyOf: [{ type: 'string' }, { type: 'null' }] },
       cantidad:  { anyOf: [{ type: 'integer' }, { type: 'null' }] },
       nombre:    { anyOf: [{ type: 'string' }, { type: 'null' }] },
     },
-    required: ['intencion', 'fecha', 'turno_id', 'fecha_pedida', 'cantidad', 'nombre'],
+    required: ['intencion', 'fecha', 'turno_id', 'fecha_pedida', 'fecha_iso', 'cantidad', 'nombre'],
     additionalProperties: false,
   };
 }
@@ -120,7 +126,8 @@ function validar(c, { opciones, cantidadMin, cantidadMax }) {
   if (!c || typeof c !== 'object') return null;
   const INTENCIONES = ['reserva', 'consulta', 'saludo', 'cortesia', 'humano', 'otra'];
   const r = { intencion: INTENCIONES.includes(c.intencion) ? c.intencion : 'otra',
-              fecha: null, turno_id: null, fecha_pedida: null, cantidad: null, nombre: null };
+              fecha: null, turno_id: null, fecha_pedida: null, fecha_iso: null,
+              cantidad: null, nombre: null };
   // Los datos de reserva sólo se leen si la intención es reservar. Quien llama distingue por
   // `intencion`, y los caminos viejos que preguntaban `!== 'reserva'` siguen andando igual.
   if (r.intencion !== 'reserva') return r;
@@ -128,6 +135,14 @@ function validar(c, { opciones, cantidadMin, cantidadMax }) {
   // No se valida contra nada: es texto de la persona y sólo se usa para repetírselo.
   const ped = String(c.fecha_pedida || '').trim();
   if (ped && ped.length <= 60) r.fecha_pedida = ped;
+
+  // Una fecha que sale de un modelo y va a consultarse contra la base: se comprueba la forma y
+  // que caiga en un rango razonable. Un "2026-13-45" no llega a ninguna consulta.
+  const iso = String(c.fecha_iso || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso) && !isNaN(Date.parse(iso + 'T12:00:00'))) {
+    const dias = (Date.parse(iso + 'T12:00:00') - Date.now()) / 864e5;
+    if (dias > -2 && dias < 400) r.fecha_iso = iso;
+  }
 
   const delDia = opciones.filter(o => o.fecha === c.fecha);
   if (delDia.length) r.fecha = c.fecha;

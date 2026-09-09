@@ -15,6 +15,7 @@
 const wa = require('./whatsapp');
 const db = require('./db');
 const voz = require('./voz');
+const contexto = require('./contexto');
 const faq = require('./faq');
 const inv = require('./invitaciones');
 const tel = require('./telefono');
@@ -592,6 +593,35 @@ async function pedirConsulta(cfg, negocio, waId) {
  * Devuelve true si atendió el mensaje; false para que quien llama siga con lo suyo.
  */
 /**
+ * Contestar con el material que el negocio ya publicó: la carta online y lo que salió en
+ * Instagram. Es el último intento antes de que la consulta espere a una persona.
+ *
+ * Va DESPUÉS de las respuestas frecuentes y de la intención, y el orden no es casual: primero lo
+ * que el negocio escribió palabra por palabra, después lo que se puede hacer, y recién al final
+ * una respuesta redactada. Y esa respuesta sale siempre rotulada con su fuente —"Según la carta
+ * publicada…"—: quien la lee sabe de dónde salió el dato y puede desconfiar. Sin la fuente, se
+ * leería como una promesa del negocio.
+ *
+ * Cuando la respuesta deriva parte al equipo ("eso lo ve el equipo"), la conversación igual queda
+ * marcada en el inbox: se contestó lo que se podía y alguien tiene que cerrar el resto.
+ */
+async function porContexto(cfg, negocio, waId, texto, canal, ofreceReservas, datos = {}) {
+  let r = null;
+  try {
+    const material = await db.materialPublicado(negocio.id);
+    r = await contexto.responder(texto, material);
+  } catch (e) { return false; }
+  if (!r) return false;
+
+  await decir(cfg, waId, contexto.conFuente(r), negocio.id);
+  await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
+  if (/\b(el equipo|te confirman|te confirmamos|lo ve[nm]?\b)/i.test(r.respuesta)) {
+    await db.marcarRequiereAccion(negocio.id, waId).catch(() => {});
+  }
+  return true;
+}
+
+/**
  * Resolver un mensaje de texto libre al principio de la charla.
  *
  * Se preguntan las DOS cosas a la vez —qué quiere la persona, y si el negocio ya tiene escrita una
@@ -626,7 +656,9 @@ async function resolverLibre(cfg, negocio, waId, entrada, canal, ofreceReservas,
     await decir(cfg, waId, r, negocio.id);
     return await trasResponder(cfg, negocio, waId, canal, ofreceReservas, r, datos);
   }
-  return await porIntencion(cfg, negocio, waId, i, canal, ofreceReservas, datos);
+  if (await porIntencion(cfg, negocio, waId, i, canal, ofreceReservas, datos)) return true;
+  // Nada de lo anterior: ¿lo contesta algo que el negocio ya publicó?
+  return await porContexto(cfg, negocio, waId, entrada, canal, ofreceReservas, datos);
 }
 
 async function leerIntencion(negocio, texto, ofreceReservas) {
@@ -662,9 +694,23 @@ async function porIntencion(cfg, negocio, waId, i, canal, ofreceReservas, datos 
   }
   if (i.intencion !== 'reserva') return false;
 
-  // Pidió un día que no está en la agenda: se lo dice, con el motivo del negocio si lo tiene.
-  // Mostrarle otra lista sin explicar por qué se lee como "está lleno", que es otra cosa.
+  // Pidió un día que no está en la agenda. Hay que distinguir DOS casos que se ven igual desde
+  // acá y no lo son:
+  //
+  //  - El día está BLOQUEADO: el negocio lo cerró a propósito y las reservas de esa fecha se
+  //    toman por otra vía. Mostrar días alternativos es contestar otra cosa; corresponde decirlo
+  //    y pasar la línea del local. Pasó con el Día del Maestro: se promocionaban el 10 y el 11
+  //    en Instagram, con pauta, y quien pedía esa noche recibía una lista donde esa fecha no
+  //    estaba y ninguna explicación.
+  //  - No hay lugar, o cae fuera de la ventana de anticipación: ahí sí se ofrecen los otros días.
   if (!i.fecha && i.fecha_pedida) {
+    const motivo = i.fecha_iso ? await db.diaBloqueado(negocio.id, i.fecha_iso).catch(() => null) : null;
+    if (motivo !== null && negocio.whatsapp_directo) {
+      await decir(cfg, waId, `Para ${i.fecha_pedida} las reservas no las tomo por acá` +
+        (motivo ? ` (${motivo})` : '') + '. Te paso con el local, que lo maneja directamente.', negocio.id);
+      await db.setConversacion(negocio.id, waId, 'ofrecido', datos);
+      if (await ofrecerDirecto(cfg, negocio, waId)) return true;
+    }
     const j = await faq.responder(`¿Están abiertos ${i.fecha_pedida}?`, canal.faq || []).catch(() => null);
     await decir(cfg, waId, `Para ${i.fecha_pedida} no tengo disponibilidad.` +
       (j != null ? ' ' + canal.faq[j].r : ''), negocio.id);
@@ -683,6 +729,7 @@ async function recibirConsulta(cfg, negocio, waId, texto, canal, ofreceReservas 
   // Antes de darse por vencido: ¿no será que está pidiendo algo que sabemos hacer?
   const i = await leerIntencion(negocio, texto, ofreceReservas);
   if (await porIntencion(cfg, negocio, waId, i, canal, ofreceReservas)) return true;
+  if (await porContexto(cfg, negocio, waId, texto, canal, ofreceReservas)) return true;
   await db.borrarConversacion(negocio.id, waId);
   // El mensaje ya se guarda en la bitácora del webhook: acá sólo se acusa recibo. Prometer un
   // plazo que no controlamos sería peor que no prometer nada.

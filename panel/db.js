@@ -3096,6 +3096,62 @@ async function secretoDeNumero(phoneId) {
 }
 
 // Qué negocio es dueño de un número, para saber a quién le llegó el mensaje.
+/**
+ * El material publicado del negocio, para contestar consultas que la lista de respuestas
+ * frecuentes no cubre. Son dos fuentes y las dos son PÚBLICAS: no hay nada acá que el cliente no
+ * pudiera ver por su cuenta, lo que hace que citarlo sea seguro.
+ *
+ *  - La carta online, tal como está publicada (la foto diaria de scripts/carta_sync.js).
+ *  - Lo que se publicó en Instagram en los últimos 45 días, con su fecha. Es donde viven las
+ *    promociones y las fechas especiales: el Día del Maestro se anunciaba en tres publicaciones
+ *    mientras el asistente contestaba que le pasaba el mensaje al equipo.
+ *
+ * Se devuelve un solo texto porque es lo que consume el modelo, con los rótulos que le permiten
+ * decir de dónde sacó cada cosa.
+ */
+async function materialPublicado(negocioId) {
+  const partes = [];
+  const { rows: [c] } = await pool.query(
+    'SELECT texto, actualizado_en FROM contenido.negocio_carta WHERE negocio_id=$1', [negocioId]);
+  if (c && c.texto) partes.push(`=== CARTA PUBLICADA (actualizada ${fechaCorta(c.actualizado_en)}) ===\n${c.texto}`);
+
+  const { rows: pz } = await pool.query(
+    `SELECT r.caption, r.publicado_en
+       FROM contenido.revisiones r
+       JOIN contenido.piezas p ON p.id = r.pieza_id AND p.revision_vigente = r.id
+      WHERE p.negocio_id = $1 AND r.estado = 'publicada' AND r.caption IS NOT NULL
+        AND r.publicado_en > now() - interval '45 days'
+      ORDER BY r.publicado_en DESC LIMIT 12`, [negocioId]);
+  if (pz.length) {
+    partes.push('=== PUBLICACIONES RECIENTES EN INSTAGRAM ===\n' + pz.map(
+      x => `[publicado el ${fechaCorta(x.publicado_en)}]\n${String(x.caption).slice(0, 700)}`).join('\n\n'));
+  }
+  return partes.join('\n\n');
+}
+
+const fechaCorta = (d) => {
+  if (!d) return 'sin fecha';
+  const f = new Date(d);
+  return `${String(f.getDate()).padStart(2, '0')}/${String(f.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/**
+ * ¿Ese día está cerrado a propósito? Devuelve el motivo (puede ser vacío) o null si no hay bloqueo.
+ *
+ * No es lo mismo que "no hay lugar". Un día bloqueado es una decisión del negocio —una fecha con
+ * menú fijo, un evento privado, cerrado por descanso— y la respuesta correcta no es mostrar otros
+ * días: es decir por qué y con quién hablar. El 10 y 11 de septiembre, con el Día del Maestro
+ * publicándose en Instagram, alguien pedía esa noche y recibía una lista donde esa fecha no
+ * figuraba, sin ninguna explicación.
+ */
+async function diaBloqueado(negocioId, fecha) {
+  const { rows: [b] } = await pool.query(
+    `SELECT coalesce(motivo,'') AS motivo FROM contenido.bloqueo
+      WHERE negocio_id=$1 AND fecha=$2::date AND turno_id IS NULL LIMIT 1`,
+    [negocioId, fecha]);
+  return b ? b.motivo : null;
+}
+
 async function negocioPorPhoneId(phoneId) {
   const { rows: [r] } = await pool.query(
     `SELECT p.id, p.slug, p.nombre, p.whatsapp_directo FROM contenido.negocios p
@@ -5010,7 +5066,7 @@ module.exports = {
   crearLink, getLinks, setLinkActivo, getPiezasParaAccion,
   destinatariosAviso, datosParaAviso,
   getWhatsappNegocio, guardarWhatsappNegocio, verificarWhatsappNegocio, PLANTILLAS_RESERVA,
-  secretoDeNumero, negocioPorPhoneId,
+  secretoDeNumero, negocioPorPhoneId, diaBloqueado, materialPublicado,
   getConversacion, setConversacion, borrarConversacion, podarConversaciones, reservasPorWhatsapp,
   CAPS_BOT, ACCESO_TITULO_MAX, getCanalWhatsapp, guardarCanalWhatsapp, getInbox, getConversacionInbox, marcarAtendido,
   marcarRequiereAccion, cerrarConversacion,
