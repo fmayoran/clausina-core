@@ -378,7 +378,7 @@ function pendCard(p){
         ? `<button class="btn no" onclick="reabrirPieza('${p.id}',this)" title="Vuelve a revisión para corregirla y aprobarla de nuevo">Volver a revisión</button>`
         : ''}</div>`
       : `<div class="acts">
-      <button class="btn ok" onclick='aprobarIG("${p.id}", ${JSON.stringify(p.colaboradores||[])})'>Aprobar y publicar</button>
+      <button class="btn ok" onclick='aprobarIG("${p.id}", ${JSON.stringify(p.colaboradores||[])}, ${JSON.stringify(p.formato||"")})'>Aprobar y publicar</button>
       <div class="acts-row">
         <button class="btn no" onclick='abrirChat("${p.id}", ${JSON.stringify(p.titulo_interno||"")})'>Hablar</button>
         <button class="btn no" onclick="rechazar('${p.id}',this)">Modificar</button>
@@ -784,10 +784,10 @@ async function confirmarPublicacion(id){
   tick();
 }
 // Aprobar una pieza de IG: primero elegir/editar los colaboradores (Collab).
-let _colId=null, _colList=[];
-function aprobarIG(id, colabs){
+let _colId=null, _colList=[], _colFmt='';
+function aprobarIG(id, colabs, formato){
   if(acting) return;
-  _colId=id; _colList=(Array.isArray(colabs)?colabs:[]).slice();
+  _colId=id; _colList=(Array.isArray(colabs)?colabs:[]).slice(); _colFmt=String(formato||'');
   renderColab(); document.getElementById('colab-ov').style.display='flex';
 }
 function renderColab(){
@@ -795,14 +795,26 @@ function renderColab(){
   if(!ov){ ov=document.createElement('div'); ov.id='colab-ov'; ov.className='colabov'; document.body.appendChild(ov); ov.addEventListener('click',e=>{ if(e.target===ov) cerrarColab(); }); }
   const chips=_colList.length ? _colList.map((h,i)=>`<span class="colchip">@${esc(h)}<button title="Quitar" onclick="quitarColab(${i})">×</button></span>`).join('')
                               : '<span class="colnone">sin colaboradores — se publica sin Collab</span>';
+  // En una historia NO hay Collab ni etiquetas: Instagram no las expone por API —el publicador
+  // manda sólo la imagen— y Collab directamente no existe para historias, ni siquiera a mano.
+  // Ofrecer el campo igual era dejar poner un colaborador que después no iba a ningún lado, sin
+  // que nadie avisara. Se dice acá, que es el momento en que se está por decidir.
+  const esHistoria = _colFmt === 'story';
   ov.innerHTML=`<div class="colabbox">
-    <div class="colabhead"><b>Colaboradores del post</b><button class="colx" onclick="cerrarColab()" title="Cerrar">×</button></div>
-    <p class="colabhint">Se invita a estas cuentas a Collab (aparece también en su feed si aceptan). Sacá o agregá las que quieras.</p>
+    <div class="colabhead"><b>${esHistoria?'Publicar la historia':'Colaboradores del post'}</b><button class="colx" onclick="cerrarColab()" title="Cerrar">×</button></div>
+    ${esHistoria?`<p class="colabhint alerta">Es una <b>historia</b>: no lleva Collab ni etiquetas.
+      Collab no existe para historias, y la mención con @ Instagram no la deja poner por API —sólo
+      a mano desde el teléfono—. Si querés que @ardora.ar aparezca, hay dos caminos: que la mención
+      vaya <b>horneada en la imagen</b> (se ve, pero no es tocable ni les avisa), o publicarla a mano
+      desde el celular con el sticker de mención.</p>
+      <p class="colabhint">Lo que sí funciona por acá es una publicación de <b>feed o reel</b>: ahí
+      la invitación a Collab y la etiqueta salen solas.</p>`
+    :`<p class="colabhint">Se invita a estas cuentas a Collab (aparece también en su feed si aceptan). Sacá o agregá las que quieras.</p>
     <p class="colabhint">Instagram descarta en silencio la invitación si la cuenta invitada es privada
       o tiene apagadas las invitaciones a colaborar (Configuración → Privacidad → Etiquetas y
       menciones). El post sale igual y nadie avisa: si no llega, se revisa allá.</p>
     <div class="colchips">${chips}</div>
-    <div class="coladd"><input id="colab-in" placeholder="agregar cuenta (ej. ardora.ar)" onkeydown="if(event.key==='Enter'){event.preventDefault();agregarColab();}"><button onclick="agregarColab()">+</button></div>
+    <div class="coladd"><input id="colab-in" placeholder="agregar cuenta (ej. ardora.ar)" onkeydown="if(event.key==='Enter'){event.preventDefault();agregarColab();}"><button onclick="agregarColab()">+</button></div>`}
     <div class="colabfoot"><button class="btn ok" onclick="confirmarAprobIG()">Aprobar y publicar</button><button class="btn no" onclick="cerrarColab()">Cancelar</button></div>
   </div>`;
 }
