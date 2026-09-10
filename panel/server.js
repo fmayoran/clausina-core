@@ -907,7 +907,10 @@ app.get('/api/negocios', async (req, res) => {
       .filter(m => admin || propios.has(m.slug))
       // `id` lo necesita la pantalla de usuarios para asignar negocios. Es aditivo: los demás
       // consumidores siguen leyendo por slug.
-      .map(m => ({ id: m.id, slug: m.slug, nombre: m.nombre, activo: m.activo, logo: m.logo, prefijo: m.prefijo }));
+      // `ig_handle` lo usa la previsualización de una publicación: sin la cuenta, el simulacro
+      // de Instagram no se parece a Instagram.
+      .map(m => ({ id: m.id, slug: m.slug, nombre: m.nombre, activo: m.activo, logo: m.logo,
+                   prefijo: m.prefijo, ig_handle: m.ig_handle }));
     res.json({ negocios, activa: req.negocio });
   } catch (e) { console.error('marcas', e.message); res.status(500).json({ error: 'db' }); }
 });

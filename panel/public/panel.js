@@ -5,7 +5,10 @@ const fecha = s => { if(!s) return ''; const d=new Date(s); return d.toLocaleDat
 const pad4 = n => String(n).padStart(4,'0');
 let PREFIJO='CF';   // prefijo del código del negocio activo (badge de piezas)
 const cod = n => (PREFIJO||'CF')+'-'+pad4(n);
-fetch('api/negocios').then(r=>r.json()).then(d=>{ const a=(d.negocios||[]).find(x=>x.slug===d.activa); if(a&&a.prefijo) PREFIJO=a.prefijo; }).catch(()=>{});
+let IG_CUENTA='', IG_LOGO='';
+fetch('api/negocios').then(r=>r.json()).then(d=>{ const a=(d.negocios||[]).find(x=>x.slug===d.activa);
+  if(a&&a.prefijo) PREFIJO=a.prefijo;
+  if(a){ IG_CUENTA=String(a.ig_handle||'').replace(/^@/,''); IG_LOGO=a.logo||''; } }).catch(()=>{});
 const hace = s => { if(!s) return ''; const d=Math.max(0,(Date.now()-new Date(s).getTime())/1000|0); if(d<60) return 'recién'; const m=Math.floor(d/60); return m<60 ? 'hace '+m+'m' : 'hace '+Math.floor(m/60)+'h'; };
 const nf = x => Number(x||0).toLocaleString('es-AR');
 const thumbSrc = m => (m && m.url) ? ((m.tipo==='video' && m.poster_url) ? m.poster_url : m.url) : '';
@@ -94,8 +97,54 @@ function registrarRevisables(piezas){
 // El botón va sobre la miniatura y no en la fila de acciones: ahí compite con Aprobar y Descartar,
 // que son decisiones, y esto es sólo mirar.
 function pvBoton(id){
-  return `<button class="pvbtn" onclick="verPieza('${esc(id)}')" title="Ver la pieza completa, sin recortar" aria-label="Ver la pieza completa">⤢</button>`;
+  return `<button class="pvbtn" onclick="verPieza('${esc(id)}')" title="Ver cómo va a quedar publicada" aria-label="Ver cómo va a quedar publicada">⤢</button>`;
 }
+
+/* ── Cómo se ve en Instagram ──────────────────────────────────────────────────
+ * Dos cosas que la tarjeta no puede mostrar y hacen dudar de si la pieza está completa:
+ *
+ * 1. EL PIE SE PLIEGA. En el feed, Instagram corta el texto y deja "... más". Ver el caption
+ *    entero en el panel no dice nada sobre lo que la gente va a LEER sin tocar nada, que es
+ *    donde tiene que estar lo importante. Acá se marca dónde cae ese pliegue.
+ * 2. EN UNA HISTORIA EL PIE NO SE PUBLICA. El publicador manda sólo la imagen (media_type
+ *    STORIES, sin caption). Un texto cuidado para una historia no lo lee nadie: hay que
+ *    hornearlo en la imagen. Sin decirlo, la previa mentiría por omisión.
+ *
+ * El corte del feed es de ~125 caracteres; no hay número oficial y depende del ancho, así que
+ * se marca como aproximado en vez de fingir precisión.
+ */
+const IG_PLIEGUE = 125;
+function igPie(caption){
+  const t = String(caption || '');
+  if (!t) return '<div class="igsin">Esta publicación no lleva texto.</div>';
+  const corte = t.length <= IG_PLIEGUE ? -1 : (() => {
+    const esp = t.lastIndexOf(' ', IG_PLIEGUE);
+    return esp > 40 ? esp : IG_PLIEGUE;
+  })();
+  const arroba = IG_CUENTA ? `<b>${esc(IG_CUENTA)}</b> ` : '';
+  if (corte < 0) return `<div class="igpie">${arroba}${esc(t).replace(/\n/g,'<br>')}</div>`;
+  return `<div class="igpie">${arroba}${esc(t.slice(0, corte)).replace(/\n/g,'<br>')}` +
+         `<span class="igmas">… más</span>` +
+         `<span class="igresto">${esc(t.slice(corte)).replace(/\n/g,'<br>')}</span></div>` +
+         `<div class="igaviso">Lo que sigue de «… más» sólo se ve si tocan para desplegar. ` +
+         `Lo que tiene que entrar antes son las primeras ${IG_PLIEGUE} letras.</div>`;
+}
+/** El costado del visor: la publicación como la va a ver la gente, según el formato. */
+function igLado(p){
+  const esHistoria = String(p.formato || '') === 'story';
+  const cab = `<div class="igcab">${IG_LOGO?`<img class="igav" src="${esc(IG_LOGO)}" alt="">`:'<span class="igav"></span>'}` +
+              `<span class="igcta">${esc(IG_CUENTA || 'tu cuenta')}</span></div>`;
+  if (esHistoria) {
+    return `<div class="igcapk">Así se publica</div>${cab}` +
+      `<div class="igaviso fuerte">Es una <b>historia</b>: Instagram publica sólo la imagen. ` +
+      `El texto de abajo <b>no se va a ver</b> — si algo tiene que leerse, va horneado en la pieza. ` +
+      `Dura 24 horas y no queda en el perfil.</div>` +
+      (p.caption ? `<div class="igcapk">Texto guardado (no se publica)</div>
+        <div class="igpie apagado">${esc(p.caption).replace(/\n/g,'<br>')}</div>` : '');
+  }
+  return `<div class="igcapk">Así se publica</div>${cab}${igPie(p.caption)}`;
+}
+
 function verPieza(id){
   const p=_PEND[id]; if(!p) return;
   _PVM = (Array.isArray(p.medios)&&p.medios.length) ? p.medios : ((p.media&&p.media.url) ? [p.media] : []);
@@ -112,8 +161,7 @@ function verPieza(id){
     </div>
     <div class="pvbody">
       <div class="pvmedia" id="pv-media"></div>
-      ${p.caption?`<div class="pvcap"><div class="pvcapk">Texto de la publicación</div>
-        <div class="pvcapt">${esc(p.caption).replace(/\n/g,'<br>')}</div></div>`:''}
+      <div class="pvcap">${igLado(p)}</div>
     </div>
   </div>`;
   document.body.appendChild(ov);

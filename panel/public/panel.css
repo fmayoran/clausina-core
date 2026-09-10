@@ -90,6 +90,27 @@ header .marcasel:hover{border-color:var(--fire);}
 .pvcapk{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;
   text-transform:uppercase;color:var(--ash);margin-bottom:8px;}
 .pvcapt{font-size:13.5px;line-height:1.55;color:var(--chalk);white-space:normal;}
+
+/* Cómo se ve publicado. No imita a Instagram pixel por pixel —sería disfrazar una previa de
+   captura—: imita lo único que cambia una decisión, que es DÓNDE se corta el texto. */
+.igcapk{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ash);margin:14px 0 8px;}
+.igcapk:first-child{margin-top:0;}
+.igcab{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.igav{width:28px;height:28px;border-radius:50%;object-fit:cover;background:#2a2f36;flex:0 0 auto;
+  border:1px solid var(--line);}
+.igcta{font-size:13px;font-weight:600;color:var(--chalk);}
+.igpie{font-size:13.5px;line-height:1.5;color:var(--chalk);white-space:normal;}
+.igpie b{font-weight:600;}
+/* El pliegue: lo de abajo existe, pero nadie lo lee salvo que toque. Se muestra apagado para que
+   se vea de un vistazo cuánto queda del otro lado. */
+.igmas{color:var(--ash);}
+.igresto{color:#5d6068;}
+.igpie.apagado{color:#5d6068;}
+.igaviso{margin-top:10px;font-size:12px;line-height:1.45;color:var(--ash);
+  border-left:2px solid var(--line);padding-left:9px;}
+.igaviso.fuerte{color:var(--chalk);border-left-color:var(--fire);}
+.igsin{font-size:12.5px;color:var(--ash);}
 @media(max-width:820px){
   .pvbody{flex-direction:column;overflow:auto;}
   .pvcap{flex:1 1 auto;border-left:0;border-top:1px solid var(--line);}

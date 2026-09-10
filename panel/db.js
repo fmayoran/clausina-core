@@ -211,7 +211,7 @@ let _negocios = null, _negociosAt = 0;
 async function getNegocios() {
   if (!_negocios || Date.now() - _negociosAt > 60000) {
     const { rows } = await pool.query(
-      `SELECT p.id, p.slug, p.nombre, p.activo, p.gestion, p.prefijo, pp.logo
+      `SELECT p.id, p.slug, p.nombre, p.activo, p.gestion, p.prefijo, pp.logo, p.ig_handle
          FROM contenido.negocios p LEFT JOIN contenido.negocio_perfil pp ON pp.negocio_id=p.id
         ORDER BY p.activo DESC, p.creado_en`);
     _negocios = rows; _negociosAt = Date.now();
