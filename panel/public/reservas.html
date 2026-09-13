@@ -330,6 +330,9 @@
         <span class="mesnom" id="sv-fecha"></span>
         <button class="btn2 chico" onclick="svMover(1)" title="Día siguiente">→</button>
         <button class="btn2 chico" onclick="svHoy()">Hoy</button>
+        <!-- La acción va junto a la navegación del día y no al final: al final la empujaban los
+             totales, que se alinean a la derecha, y terminaba sola en un renglón aparte. -->
+        <button class="btn chico" onclick="svNueva()">+ Nueva reserva</button>
         <input type="text" class="svbusca" id="sv-q" placeholder="buscar por nombre o teléfono"
                oninput="pintarServicio()" autocomplete="off">
         <div class="svtot" id="sv-tot"></div>
@@ -644,6 +647,19 @@ let SV_FECHA = hoy(), SV_DISP = [], SV_RES = [], SV_TIMER = null;
 
 function svMover(n) { SV_FECHA = sumar(SV_FECHA, n); cargarServicio(); }
 function svHoy() { SV_FECHA = hoy(); cargarServicio(); }
+
+/**
+ * Alta desde la barra: con el día que se está mirando y el primer turno que todavía no pasó.
+ *
+ * El "+ Reserva" de cada turno sirve cuando ya se sabe para cuál es. Éste es para el otro caso,
+ * que es el más común atendiendo: suena el teléfono, hay que anotar, y el turno se elige después
+ * de preguntarle a la persona. Elegir el turno vivo evita el error de cargar sobre uno que ya
+ * terminó sólo porque era el primero de la lista.
+ */
+function svNueva() {
+  const vivo = SV_DISP.find(t => !t.bloqueado && !yaPaso(SV_FECHA, t.hora_hasta)) || SV_DISP[0];
+  abrirReserva(SV_FECHA, vivo && vivo.turno_id);
+}
 
 async function cargarServicio() {
   $('sv-fecha').textContent = fechaTxt(SV_FECHA) + (SV_FECHA === hoy() ? ' · hoy' : '');
