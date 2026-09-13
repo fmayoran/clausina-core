@@ -86,6 +86,12 @@
   .conv.on{background:color-mix(in srgb,var(--u-acc) 12%,transparent);}
   .conv .q{display:flex;align-items:center;gap:7px;font-size:.9rem;}
   .conv .pend{width:7px;height:7px;border-radius:50%;background:var(--u-mal);flex:0 0 auto;}
+  /* El nombre cede y la hora no: la hora es un ancla para saber si una charla es de recién o de
+     anteayer, y no sirve de nada si la come el "…" del renglón de abajo. */
+  .conv .nom{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .conv .hora{flex:0 0 auto;font-family:'JetBrains Mono',monospace;font-size:.6rem;
+    color:var(--u-mut);}
+  .conv.hoy .hora{color:var(--u-fg);}
   .filtro{display:flex;gap:6px;margin-bottom:8px;}
   .fbtn{flex:1;border:1px solid var(--u-line);background:none;color:var(--u-mut);cursor:pointer;
     border-radius:7px;padding:6px 8px;font:inherit;font-size:.76rem;white-space:nowrap;}
@@ -506,6 +512,21 @@ const cuando = s => { if (!s) return ''; const d = new Date(s);
   return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) + ' ' +
          d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }); };
 
+/**
+ * La hora para la LISTA. Lo de hoy se lee mil veces por día y la fecha sobra: alcanza con la hora.
+ * Lo de ayer se dice con todas las letras porque "21:05" a secas se lee como de hoy. Más atrás,
+ * la fecha corta.
+ */
+const hora = s => { if (!s) return ''; const d = new Date(s);
+  const hm = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const dia = x => x.toLocaleDateString('es-AR');
+  const hoy = new Date();
+  const ayer = new Date(hoy.getTime() - 864e5);
+  if (dia(d) === dia(hoy)) return hm;
+  if (dia(d) === dia(ayer)) return 'ayer ' + hm;
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) + ' ' + hm; };
+const esDeHoy = s => !!s && new Date(s).toLocaleDateString('es-AR') === new Date().toLocaleDateString('es-AR');
+
 // Qué se está mirando: lo que espera a una persona, o el histórico completo. Arranca en 'accion'
 // porque es lo accionable; el resto es archivo y no debería competir por la atención.
 let FILTRO = 'accion';
@@ -519,10 +540,12 @@ function filtrar(f) {
 function pintarConvs() {
   const lista = FILTRO === 'accion' ? CONVS.filter(c => c.requiere_accion) : CONVS;
   $('convs').innerHTML = lista.length ? lista.map(c => `
-      <button class="conv${ACTUAL === c.wa_id ? ' on' : ''}" onclick="verConv('${escapar(c.wa_id)}')">
+      <button class="conv${ACTUAL === c.wa_id ? ' on' : ''}${esDeHoy(c.ultimo) ? ' hoy' : ''}"
+              onclick="verConv('${escapar(c.wa_id)}')">
         <span class="q">${c.requiere_accion ? '<span class="pend"></span>' : ''}
-          ${escapar(c.cliente || c.wa_id)}</span>
-        <span class="u">${escapar((c.ultimo_texto || '').slice(0, 40))} · ${cuando(c.ultimo)}</span>
+          <span class="nom">${escapar(c.cliente || c.wa_id)}</span>
+          <span class="hora" title="Último mensaje: ${escapar(cuando(c.ultimo))}">${escapar(hora(c.ultimo))}</span></span>
+        <span class="u">${escapar((c.ultimo_texto || '').slice(0, 60))}</span>
       </button>`).join('')
     : `<div class="vacio" style="padding:20px">${FILTRO === 'accion'
         ? 'Nada esperando respuesta. Lo que el bot resolvió está en «Todas».'
@@ -636,6 +659,9 @@ async function responder() {
     });
     const t = document.querySelector('.tab[data-pane="inbox"]'); if (t) t.classList.add('on');
     const p = document.getElementById('p-inbox'); if (p) p.classList.add('on');
+    // El subtítulo lo escribe cargar(), que es justo lo que no se llama acá: sin esto se queda
+    // en "cargando…" para siempre y parece que la pantalla nunca terminó de abrir.
+    $('sub').textContent = 'conversaciones del negocio';
     cargarInbox();
     return;                       // cargar() y cargarCanal() pegan contra rutas que ya no puede
   }
