@@ -135,6 +135,71 @@
   .vbtn.on{background:var(--u-acc);color:var(--u-accfg);}
   /* Reservas dentro de un turno */
   .resv{display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 8px 0;}
+  /* ══ Servicio: la pantalla del día, pensada para tenerla abierta mientras se atiende ══
+     No es el calendario con otra pintura. El calendario responde "¿entra esta reserva?"; esto
+     responde "¿quién viene, cuántos son, quién llegó y a quién hay que llamar". Por eso las
+     reservas dejan de ser pastillas y pasan a ser filas con el dato completo a la vista:
+     el teléfono, la nota de la mesa y el botón de llegó, sin abrir nada. */
+  .cantfila{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .cantfila input{width:90px;flex:0 0 auto;}
+  .cantrap{display:flex;gap:5px;flex-wrap:wrap;}
+  .cantrap button{font-family:'JetBrains Mono',monospace;font-size:.72rem;padding:7px 11px;
+    border:1px solid var(--u-line);background:var(--u-bg);color:var(--u-fg);border-radius:7px;cursor:pointer;}
+  .cantrap button:hover{border-color:var(--u-acc);}
+  .cantrap button.on{background:var(--u-acc);color:var(--u-accfg);border-color:var(--u-acc);}
+  .svbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+  .svtot{display:flex;gap:18px;flex-wrap:wrap;margin-left:auto;}
+  .svtot div{text-align:right;}
+  .svtot b{display:block;font-family:'Inter Tight',sans-serif;font-size:1.35rem;font-weight:700;
+    line-height:1.1;color:var(--u-fg);}
+  .svtot span{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--u-mut);}
+  .svbusca{flex:1;min-width:150px;max-width:280px;}
+  .svturno{background:var(--u-surf);border:1px solid var(--u-line);border-radius:14px;
+    margin-bottom:16px;overflow:hidden;}
+  .svturno.pasado{opacity:.62;}
+  .svth{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px 16px;
+    border-bottom:1px solid var(--u-line);background:var(--u-bg);}
+  .svth h3{font-family:'Inter Tight',sans-serif;font-size:1.02rem;font-weight:700;margin:0;color:var(--u-fg);}
+  .svth .hora{font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--u-mut);}
+  .svth .cupo{font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--u-mut);margin-left:auto;}
+  .svth .cupo b{color:var(--u-fg);}
+  /* Filas: el nombre manda, el resto acompaña. En una fila de servicio lo que se busca con el
+     ojo es un apellido, no un estado. */
+  .svfila{display:flex;align-items:center;gap:12px;padding:11px 16px;border-top:1px solid var(--u-line);
+    flex-wrap:wrap;}
+  .svfila:first-of-type{border-top:0;}
+  .svfila.llego{background:color-mix(in srgb, var(--u-ok) 7%, transparent);}
+  .svfila.fue{opacity:.5;}
+  .svcant{font-family:'Inter Tight',sans-serif;font-weight:700;font-size:1.15rem;min-width:34px;
+    text-align:center;color:var(--u-fg);}
+  .svcant small{display:block;font-family:'JetBrains Mono',monospace;font-size:.5rem;
+    letter-spacing:.1em;color:var(--u-mut);font-weight:400;}
+  .svquien{min-width:0;flex:1;}
+  .svnom{font-family:'Inter Tight',sans-serif;font-weight:600;font-size:1rem;color:var(--u-fg);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .svmeta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px;}
+  .svmeta a,.svmeta span{font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--u-mut);}
+  .svmeta a{text-decoration:none;border-bottom:1px dotted var(--u-line);}
+  .svmeta a:hover{color:var(--u-acc);border-bottom-color:var(--u-acc);}
+  /* La nota de la mesa se lee ANTES de que llegue la gente: un celíaco o un cumpleaños enterado
+     a la hora de servir ya es tarde. Por eso va en la fila y no adentro del detalle. */
+  .svnota{font-size:.8rem;color:var(--u-fg);background:var(--u-medio-suave);
+    border-left:2px solid var(--u-medio);padding:3px 8px;border-radius:0 5px 5px 0;
+    margin-top:5px;display:inline-block;}
+  .svacc{display:flex;gap:6px;flex-wrap:wrap;}
+  .svsin{padding:16px;color:var(--u-mut);font-family:'JetBrains Mono',monospace;font-size:.7rem;}
+  .svest{font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.1em;
+    text-transform:uppercase;padding:3px 8px;border-radius:99px;border:1px solid var(--u-line);
+    color:var(--u-mut);white-space:nowrap;}
+  .svest.ok{color:var(--u-ok);border-color:var(--u-ok);}
+  .svest.pend{color:var(--u-medio);border-color:var(--u-medio);}
+  .svest.mal{color:var(--u-mal);border-color:var(--u-mal);}
+  @media(max-width:700px){
+    .svtot{margin-left:0;width:100%;justify-content:space-between;gap:10px;}
+    .svfila{align-items:flex-start;}
+    .svacc{width:100%;}
+  }
   .rchip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--u-line);
          border-radius:999px;padding:4px 11px;background:none;cursor:pointer;
          font-family:'Inter',sans-serif;font-size:.78rem;color:var(--u-fg);transition:.13s;}
@@ -251,14 +316,29 @@
     </div>
 
     <div class="tabs" id="tabs">
-      <button class="tab on" data-pane="cal">Calendario</button>
+      <button class="tab on" data-pane="serv">Servicio</button>
+      <button class="tab" data-pane="cal">Calendario</button>
       <button class="tab" data-pane="lista">Reservas</button>
       <button class="tab" data-pane="links">Enlaces</button>
       <button class="tab" data-pane="cfg">Configuración</button>
     </div>
 
+    <!-- ══════════ SERVICIO ══════════ -->
+    <div class="pane on" id="p-serv">
+      <div class="svbar">
+        <button class="btn2 chico" onclick="svMover(-1)" title="Día anterior">←</button>
+        <span class="mesnom" id="sv-fecha"></span>
+        <button class="btn2 chico" onclick="svMover(1)" title="Día siguiente">→</button>
+        <button class="btn2 chico" onclick="svHoy()">Hoy</button>
+        <input type="text" class="svbusca" id="sv-q" placeholder="buscar por nombre o teléfono"
+               oninput="pintarServicio()" autocomplete="off">
+        <div class="svtot" id="sv-tot"></div>
+      </div>
+      <div id="sv-cuerpo"></div>
+    </div>
+
     <!-- ══════════ CALENDARIO ══════════ -->
-    <div class="pane on" id="p-cal">
+    <div class="pane" id="p-cal">
       <div class="mescab">
         <button class="btn2 chico" onclick="mover(-1)" id="nav-ant" title="Anterior">←</button>
         <span class="mesnom" id="mesnom"></span>
@@ -436,7 +516,13 @@
         </div></div>
       <div><label for="r-turno">Turno</label><select id="r-turno" onchange="topeDelTurno()"></select></div>
       <div class="full"><label for="r-cantidad" id="lbl-cantidad">Cantidad</label>
-        <input type="number" id="r-cantidad" min="1" value="2">
+        <div class="cantfila">
+          <input type="number" id="r-cantidad" min="1" value="2" oninput="pintarCantRapida(+this.max||99, null)">
+          <!-- Los tamaños de mesa que se piden todo el tiempo. Tomar una reserva por teléfono con
+               el salón lleno y tener que tipear un número es la clase de fricción que termina en
+               un papel al lado de la caja. -->
+          <span class="cantrap" id="cant-rapida"></span>
+        </div>
         <div class="hint" id="hint-cantidad">La reserva ocupa el turno completo.</div></div>
     </div>
     <label for="r-cliente">Cliente</label>
@@ -543,7 +629,137 @@ document.getElementById('tabs').addEventListener('click', e => {
   document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + b.dataset.pane));
   if (b.dataset.pane === 'lista') cargarLista();
   if (b.dataset.pane === 'links') cargarLinks();
+  if (b.dataset.pane === 'serv') cargarServicio();
 });
+
+/* ═══════════ SERVICIO ═══════════
+ * La pantalla de tener abierta mientras se atiende. El calendario contesta "¿entra esta
+ * reserva?"; ésta contesta "¿quién viene, cuántos son, quién llegó y a quién hay que llamar".
+ *
+ * Todo el dato que se necesita en el mostrador está EN la fila —teléfono, nota de la mesa,
+ * invitación a aplicar, estado— y las decisiones son un toque. Antes había que abrir cada
+ * reserva en un modal para ver el teléfono o la nota: con el salón lleno, eso no se hace.
+ */
+let SV_FECHA = hoy(), SV_DISP = [], SV_RES = [], SV_TIMER = null;
+
+function svMover(n) { SV_FECHA = sumar(SV_FECHA, n); cargarServicio(); }
+function svHoy() { SV_FECHA = hoy(); cargarServicio(); }
+
+async function cargarServicio() {
+  $('sv-fecha').textContent = fechaTxt(SV_FECHA) + (SV_FECHA === hoy() ? ' · hoy' : '');
+  try {
+    const [rd, rr] = await Promise.all([
+      fetch(`api/reservas/disponibilidad?desde=${SV_FECHA}&hasta=${SV_FECHA}`),
+      fetch(`api/reservas?desde=${SV_FECHA}&hasta=${SV_FECHA}`),
+    ]);
+    SV_DISP = (await rd.json()).dias || [];
+    SV_RES = (await rr.json()).reservas || [];
+  } catch (e) { $('sv-cuerpo').innerHTML = '<div class="vacio">Error al cargar.</div>'; return; }
+  pintarServicio();
+  // Se refresca solo: lo que cambia mientras tanto es una reserva que entró por WhatsApp, y
+  // enterarse cuando la gente ya está en la puerta es tarde.
+  clearTimeout(SV_TIMER);
+  SV_TIMER = setTimeout(() => { if (document.getElementById('p-serv').classList.contains('on')) cargarServicio(); }, 60000);
+}
+
+// Cancelada y no_show no ocupan lugar ni se atienden: se muestran aparte para no ensuciar la
+// lista con gente que no viene, pero NO se esconden — quien atiende necesita saber que alguien
+// canceló si esa persona aparece igual en la puerta.
+const SV_VIVAS = ['solicitada', 'confirmada', 'cumplida'];
+
+function svFiltradas(turnoId) {
+  const q = ($('sv-q').value || '').trim().toLowerCase();
+  return SV_RES.filter(r => r.turno_id === turnoId).filter(r => {
+    if (!q) return true;
+    return (r.cliente || '').toLowerCase().includes(q)
+        || String(r.telefono || '').replace(/\D/g, '').includes(q.replace(/\D/g, '') || '\u0000');
+  }).sort((a, b) => (SV_VIVAS.indexOf(a.estado) - SV_VIVAS.indexOf(b.estado))
+                 || (a.cliente || '').localeCompare(b.cliente || ''));
+}
+
+function svWa(tel) {
+  const n = String(tel || '').replace(/\D/g, '');
+  return n.length >= 8 ? 'https://wa.me/' + n : null;
+}
+
+function svFila(r) {
+  const u = unidad();
+  const wa = svWa(r.telefono);
+  const est = r.estado === 'cumplida' ? '<span class="svest ok">llegó</span>'
+            : r.estado === 'solicitada' ? '<span class="svest pend">sin confirmar</span>'
+            : r.estado === 'no_show' ? '<span class="svest mal">no vino</span>'
+            : r.estado === 'cancelada' ? '<span class="svest mal">cancelada</span>' : '';
+  const acc = [];
+  if (r.estado === 'solicitada') acc.push(`<button class="btn2 chico" onclick="svEstado('${r.id}','confirmada')">Confirmar</button>`);
+  if (r.estado === 'solicitada' || r.estado === 'confirmada') {
+    acc.push(`<button class="btn chico" onclick="svEstado('${r.id}','cumplida')">Llegó</button>`);
+    acc.push(`<button class="btn2 chico" onclick="svEstado('${r.id}','no_show')">No vino</button>`);
+  }
+  acc.push(`<button class="btn2 chico" onclick="verReserva('${r.id}')" title="Ver todo">···</button>`);
+  return `<div class="svfila${r.estado === 'cumplida' ? ' llego' : ''}${['no_show','cancelada'].includes(r.estado) ? ' fue' : ''}">
+    <span class="svcant">${r.cantidad}<small>${escapar(r.cantidad === 1 ? u.sing : u.plur)}</small></span>
+    <div class="svquien">
+      <div class="svnom">${escapar(r.cliente) || '<span class="mono2">sin nombre</span>'}</div>
+      <div class="svmeta">
+        ${wa ? `<a href="${wa}" target="_blank" rel="noopener" title="Abrir WhatsApp">${escapar(r.telefono)}</a>`
+             : (r.telefono ? `<span>${escapar(r.telefono)}</span>` : '<span>sin teléfono</span>')}
+        <span>·&nbsp;${escapar(r.canal)}</span>
+        ${r.invitacion ? `<span class="svest pend" title="${escapar(r.invitacion.texto || '')}">🎟 ${escapar(r.invitacion.texto || 'invitación')}</span>` : ''}
+        ${est}
+      </div>
+      ${r.notas ? `<div class="svnota">${escapar(r.notas)}</div>` : ''}
+    </div>
+    <div class="svacc">${acc.join('')}</div>
+  </div>`;
+}
+
+function pintarServicio() {
+  const ts = SV_DISP;
+  if (!ts.length) {
+    $('sv-cuerpo').innerHTML = '<div class="card2"><div class="vacio">Ningún turno corre este día.</div></div>';
+    $('sv-tot').innerHTML = ''; return;
+  }
+  const vivas = SV_RES.filter(r => SV_VIVAS.includes(r.estado));
+  const cub = vivas.reduce((n, r) => n + r.cantidad, 0);
+  const lleg = SV_RES.filter(r => r.estado === 'cumplida').reduce((n, r) => n + r.cantidad, 0);
+  const sinConf = SV_RES.filter(r => r.estado === 'solicitada').length;
+  const u = unidad();
+  $('sv-tot').innerHTML = `
+    <div><b>${vivas.length}</b><span>reservas</span></div>
+    <div><b>${cub}</b><span>${escapar(u.plur)}</span></div>
+    <div><b>${lleg}</b><span>llegaron</span></div>
+    ${sinConf ? `<div><b style="color:var(--u-medio)">${sinConf}</b><span>sin confirmar</span></div>` : ''}`;
+
+  $('sv-cuerpo').innerHTML = ts.map(t => {
+    const rs = svFiltradas(t.turno_id);
+    const suyas = SV_RES.filter(r => r.turno_id === t.turno_id && SV_VIVAS.includes(r.estado));
+    const cubT = suyas.reduce((n, r) => n + r.cantidad, 0);
+    const llegT = SV_RES.filter(r => r.turno_id === t.turno_id && r.estado === 'cumplida').reduce((n, r) => n + r.cantidad, 0);
+    return `<div class="svturno${yaPaso(SV_FECHA, t.hora_hasta) ? ' pasado' : ''}">
+      <div class="svth">
+        <h3>${escapar(t.nombre)}</h3>
+        <span class="hora">${t.hora_desde}–${t.hora_hasta}</span>
+        ${t.bloqueado ? '<span class="svest mal">cerrado</span>' : ''}
+        <span class="cupo"><b>${cubT}</b> de ${t.capacidad} ${escapar(u.plur)}${llegT ? ` · <b>${llegT}</b> en mesa` : ''}</span>
+        <button class="btn2 chico" onclick="abrirReserva('${SV_FECHA}','${t.turno_id}')">+ Reserva</button>
+      </div>
+      ${rs.length ? rs.map(svFila).join('') : '<div class="svsin">sin reservas en este turno</div>'}
+    </div>`;
+  }).join('');
+}
+
+// Marcar desde la fila: sin modal y sin preguntar. Durante el servicio, un cartel de confirmación
+// por cada mesa que llega es exactamente la fricción que hace que nadie marque nada.
+async function svEstado(id, estado) {
+  try {
+    const r = await fetch(`api/reservas/${id}/estado`, { method: 'POST',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado }) });
+    if (!r.ok) { alert('No se pudo cambiar el estado.'); return; }
+    const loc = SV_RES.find(x => x.id === id); if (loc) loc.estado = estado;   // se ve al instante
+    pintarServicio();
+    cargarServicio();
+  } catch (e) { alert('Error de conexión.'); }
+}
 
 /* El campo de fecha vive en campo-fecha.js: lo usan Reservas e Invitaciones. */
 let FD_RESERVA = null, FD_BLOQUEO = null;
@@ -810,7 +1026,9 @@ async function cargarCal() {
 /* ── Detalle de una reserva ── */
 function reservaPorId(id) {
   for (const k in RESV) { const r = RESV[k].find(x => x.id === id); if (r) return r; }
-  return null;
+  // También las de Servicio: el detalle se abre desde las dos pantallas y RESV sólo lo llena el
+  // calendario. Sin esto, el "···" de una fila de servicio no abría nada.
+  return (SV_RES || []).find(x => x.id === id) || null;
 }
 function verReserva(id) {
   const r = reservaPorId(id); if (!r) return;
@@ -863,7 +1081,7 @@ async function estadoDesdeDetalle(id, e) {
   try {
     await fetch(`api/reservas/${id}/estado`, { method: 'POST',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: e }) });
-    cerrarDetalle(); cargarCal();
+    cerrarDetalle(); cargarCal(); cargarServicio();
   } catch (_) {}
 }
 
@@ -923,15 +1141,32 @@ function topeDelTurno() {
   const t = TURNOS.find(x => x.id === $('r-turno').value);
   const tope = (t && t.cantidad_max) || CFG.cantidad_max;
   $('r-cantidad').max = tope;
+  // Cuánto queda LIBRE en ese turno, dicho antes de cargar y no después de que el servidor
+  // rebote. Sale de la disponibilidad que ya está cargada; si no la hay, no se inventa.
+  const f = FD_RESERVA && FD_RESERVA.valor;
+  const d = (SV_FECHA === f ? SV_DISP : DISP).find(x => x.fecha === f && x.turno_id === $('r-turno').value);
+  const libre = d ? (d.capacidad - d.ocupado) : null;
   $('hint-cantidad').textContent = `La reserva ocupa el turno completo. Máximo ${tope} ` +
-    `${unidad().plur}${t && t.cantidad_max ? ' en este turno' : ''}.`;
+    `${unidad().plur}${t && t.cantidad_max ? ' en este turno' : ''}.` +
+    (libre != null ? ` Quedan ${libre} ${unidad().plur} libres.` : '');
+  pintarCantRapida(tope, libre);
 }
+
+/** Los tamaños de mesa más pedidos, hasta donde entre de verdad en ese turno. */
+function pintarCantRapida(tope, libre) {
+  const caja = $('cant-rapida'); if (!caja) return;
+  const techo = Math.min(tope || 99, libre == null ? 99 : libre);
+  const act = +$('r-cantidad').value;
+  caja.innerHTML = [2, 4, 6, 8, 10, 12].filter(n => n <= techo && n >= (CFG.cantidad_min || 1))
+    .map(n => `<button type="button" class="${n === act ? 'on' : ''}" onclick="ponerCant(${n})">${n}</button>`).join('');
+}
+function ponerCant(n) { $('r-cantidad').value = n; topeDelTurno(); }
 function abrirReserva(fecha, turnoId) {
   FD_RESERVA.valor = fecha || SEL || hoy();
   turnosDelDia();
   if (turnoId) $('r-turno').value = turnoId;
   $('lbl-cantidad').textContent = 'Cantidad · ' + unidad().plur;
-  $('r-cantidad').value = CFG.cantidad_min || 1;
+  $('r-cantidad').value = 2 >= (CFG.cantidad_min || 1) ? 2 : (CFG.cantidad_min || 1);
   $('r-cliente').value = ''; $('r-tel').value = ''; $('r-notas').value = '';
   CLIENTE_SEL = null; acEstado(); acCerrar();
   topeDelTurno();
@@ -966,7 +1201,7 @@ async function guardarReserva() {
         cliente_telefono: $('r-tel').value, notas: $('r-notas').value, canal: 'panel',
       }) });
     const j = await r.json();
-    if (r.ok && j.ok) { cerrarReserva(); cargarCal(); cargarLista(); }
+    if (r.ok && j.ok) { cerrarReserva(); cargarCal(); cargarLista(); cargarServicio(); }
     else {
       let m = ERR_RES[j.error] || 'No se pudo crear la reserva.';
       if (j.error === 'sin_lugar' && j.detalle) m += ` Quedan ${j.detalle.libre} lugar(es).`;
@@ -1260,6 +1495,7 @@ async function cargarTodo() {
     ` · capacidad en ${unidad().plur}`;
   pintarCfg(); pintarTurnos(); rotularUnidad();
   await cargarCal();
+  await cargarServicio();
 }
 (async () => {
   MES = primerDia(hoy()); SEL = hoy();
