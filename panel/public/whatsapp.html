@@ -614,9 +614,35 @@ async function responder() {
   } catch (e) { m.className = 'msg mal'; m.textContent = 'error de conexión'; }
 }
 
-cargar();
-cargarCanal();
-cargarInbox();
+/* Qué solapas ve este usuario.
+ *
+ * "Número" es la configuración de las credenciales y "Asistente" la del bot: las dos son la forma
+ * del canal, no su operación diaria. Quien atiende el inbox no tiene por qué entrar ahí, y el
+ * servidor ya rechaza esas rutas; esto evita ofrecer puertas cerradas.
+ *
+ * Los paneles se OCULTAN, no se borran: hay funciones que escriben dentro de ellos al cargar, y
+ * borrarlos del DOM las hace fallar. Ya pasó en Reservas.
+ */
+(async () => {
+  let configura = true;
+  try {
+    const r = await fetch('api/yo');
+    if (r.ok) { const yo = await r.json(); if (yo.configura === false) configura = false; }
+  } catch (_) {}
+  if (!configura) {
+    ['num', 'bot'].forEach(k => {
+      const t = document.querySelector(`.tab[data-pane="${k}"]`); if (t) t.remove();
+      const p = document.getElementById('p-' + k); if (p) { p.classList.remove('on'); p.style.display = 'none'; }
+    });
+    const t = document.querySelector('.tab[data-pane="inbox"]'); if (t) t.classList.add('on');
+    const p = document.getElementById('p-inbox'); if (p) p.classList.add('on');
+    cargarInbox();
+    return;                       // cargar() y cargarCanal() pegan contra rutas que ya no puede
+  }
+  cargar();
+  cargarCanal();
+  cargarInbox();
+})();
 </script>
 </body>
 </html>

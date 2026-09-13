@@ -1193,29 +1193,29 @@ app.post('/api/capacidades/:cap', soloAdmin, async (req, res) => {
 });
 
 // --- WhatsApp del negocio (v2.0 / F5d) ----------------------------------------------------
-app.get('/api/whatsapp/config', async (req, res) => {
+app.get('/api/whatsapp/config', soloConfigura, async (req, res) => {
   try { res.json(await db.getWhatsappNegocio(req.negocioId) || {}); }
   catch (e) { console.error('wa config', e.message); res.status(500).json({ error: 'db' }); }
 });
-app.put('/api/whatsapp/config', async (req, res) => {
+app.put('/api/whatsapp/config', soloConfigura, async (req, res) => {
   try { res.json(await db.guardarWhatsappNegocio(req.negocioId, req.body || {})); }
   catch (e) {
     if (e.code === 'no_enc_key') return res.status(409).json({ ok: false, error: e.code });
     console.error('wa guardar', e.message); res.status(500).json({ ok: false, error: 'db' });
   }
 });
-app.post('/api/whatsapp/verificar', async (req, res) => {
+app.post('/api/whatsapp/verificar', soloConfigura, async (req, res) => {
   try { res.json(await db.verificarWhatsappNegocio(req.negocioId)); }
   catch (e) { console.error('wa verificar', e.message); res.status(500).json({ error: 'db' }); }
 });
 
 // --- Canal de WhatsApp: configurador e inbox (v2.0 / F5f) ---------------------------------
-app.get('/api/whatsapp/canal', async (req, res) => {
+app.get('/api/whatsapp/canal', soloConfigura, async (req, res) => {
   try {
     res.json({ config: await db.getCanalWhatsapp(req.negocioId), disponibles: db.CAPS_BOT });
   } catch (e) { console.error('wa canal', e.message); res.status(500).json({ error: 'db' }); }
 });
-app.put('/api/whatsapp/canal', async (req, res) => {
+app.put('/api/whatsapp/canal', soloConfigura, async (req, res) => {
   try { res.json(await db.guardarCanalWhatsapp(req.negocioId, req.body || {})); }
   catch (e) { console.error('wa canal guardar', e.message); res.status(500).json({ ok: false, error: 'db' }); }
 });
@@ -1223,7 +1223,7 @@ app.put('/api/whatsapp/canal', async (req, res) => {
 // Borradores de respuestas frecuentes. El modelo pone las PREGUNTAS (las conoce del rubro) y sólo
 // contesta las que puede fundar en datos del negocio; el resto las deja vacías, que es la forma de
 // mostrarle a Fer qué falta cargar. No se guarda nada acá: eso lo decide una persona en la pantalla.
-app.post('/api/whatsapp/faq/sugerir', async (req, res) => {
+app.post('/api/whatsapp/faq/sugerir', soloConfigura, async (req, res) => {
   try {
     if (!faq.disponible()) return res.status(503).json({ error: 'sin_clave' });
     res.json({ entradas: await faq.sugerir(await db.fichaNegocio(req.negocioId)) || [] });
@@ -1594,7 +1594,10 @@ app.delete('/api/clientes/:id', async (req, res) => {
 });
 // Exportar: contracara de "los datos son del negocio". Cualquiera que vea el negocio puede
 // llevarse su base; no es una operación privilegiada, es un derecho del dueño del dato.
-app.get('/api/clientes/exportar', async (req, res) => {
+// Bajarse la base entera de comensales no es atender el salón: es llevarse el activo del
+// negocio. Queda del lado de quien administra. Borrar un cliente suelto sí se deja: un duplicado
+// cargado a mano lo arregla quien lo cargó.
+app.get('/api/clientes/exportar', soloConfigura, async (req, res) => {
   try {
     const csv = await db.exportarClientes(req.negocioId);
     res.set('Content-Type', 'text/csv; charset=utf-8');
