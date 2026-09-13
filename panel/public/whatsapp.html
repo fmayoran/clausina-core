@@ -92,6 +92,13 @@
   .conv .hora{flex:0 0 auto;font-family:'JetBrains Mono',monospace;font-size:.6rem;
     color:var(--u-mut);}
   .conv.hoy .hora{color:var(--u-fg);}
+  /* Encabezado de grupo: pegajoso, porque la gracia de agrupar se pierde si al bajar ya no se
+     sabe en qué día se está parado. */
+  .convdia{position:sticky;top:0;z-index:1;background:var(--u-bg);
+    font-family:'JetBrains Mono',monospace;font-size:.55rem;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--u-mut);padding:7px 14px;
+    border-bottom:1px solid var(--u-line);display:flex;gap:8px;}
+  .convdia b{margin-left:auto;font-weight:400;color:var(--u-mut);}
   .filtro{display:flex;gap:6px;margin-bottom:8px;}
   .fbtn{flex:1;border:1px solid var(--u-line);background:none;color:var(--u-mut);cursor:pointer;
     border-radius:7px;padding:6px 8px;font:inherit;font-size:.76rem;white-space:nowrap;}
@@ -527,6 +534,17 @@ const hora = s => { if (!s) return ''; const d = new Date(s);
   return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' }) + ' ' + hm; };
 const esDeHoy = s => !!s && new Date(s).toLocaleDateString('es-AR') === new Date().toLocaleDateString('es-AR');
 
+/** En qué montón cae una charla. La lista ya viene ordenada de la más nueva a la más vieja, así
+ *  que alcanza con recorrerla y cortar cuando cambia el montón. */
+const grupoDe = s => {
+  if (!s) return 'Anteriores';
+  const dia = x => x.toLocaleDateString('es-AR');
+  const d = new Date(s), hoy = new Date();
+  if (dia(d) === dia(hoy)) return 'Hoy';
+  if (dia(d) === dia(new Date(hoy.getTime() - 864e5))) return 'Ayer';
+  return 'Anteriores';
+};
+
 // Qué se está mirando: lo que espera a una persona, o el histórico completo. Arranca en 'accion'
 // porque es lo accionable; el resto es archivo y no debería competir por la atención.
 let FILTRO = 'accion';
@@ -538,15 +556,29 @@ function filtrar(f) {
 }
 
 function pintarConvs() {
-  const lista = FILTRO === 'accion' ? CONVS.filter(c => c.requiere_accion) : CONVS;
-  $('convs').innerHTML = lista.length ? lista.map(c => `
+  // Se ordena acá y no se confía en el orden en que vino: agrupar recorriendo una lista
+  // desordenada parte los montones y salen "Hoy… Ayer… Hoy…" otra vez más abajo. El servidor
+  // hoy la manda por fecha, pero eso es una coincidencia feliz, no una garantía de esta pantalla.
+  const lista = (FILTRO === 'accion' ? CONVS.filter(c => c.requiere_accion) : CONVS)
+    .slice().sort((a, b) => new Date(b.ultimo || 0) - new Date(a.ultimo || 0));
+  // Cuántas hay en cada montón, para poder decirlo en el encabezado sin volver a recorrer.
+  const cuenta = {};
+  lista.forEach(c => { const g = grupoDe(c.ultimo); cuenta[g] = (cuenta[g] || 0) + 1; });
+  let grupo = null;
+  $('convs').innerHTML = lista.length ? lista.map(c => {
+    const g = grupoDe(c.ultimo);
+    const cab = g === grupo ? '' :
+      `<div class="convdia">${g}<b>${cuenta[g]}</b></div>`;
+    grupo = g;
+    return cab + `
       <button class="conv${ACTUAL === c.wa_id ? ' on' : ''}${esDeHoy(c.ultimo) ? ' hoy' : ''}"
               onclick="verConv('${escapar(c.wa_id)}')">
         <span class="q">${c.requiere_accion ? '<span class="pend"></span>' : ''}
           <span class="nom">${escapar(c.cliente || c.wa_id)}</span>
           <span class="hora" title="Último mensaje: ${escapar(cuando(c.ultimo))}">${escapar(hora(c.ultimo))}</span></span>
         <span class="u">${escapar((c.ultimo_texto || '').slice(0, 60))}</span>
-      </button>`).join('')
+      </button>`;
+  }).join('')
     : `<div class="vacio" style="padding:20px">${FILTRO === 'accion'
         ? 'Nada esperando respuesta. Lo que el bot resolvió está en «Todas».'
         : 'Sin conversaciones.'}</div>`;
