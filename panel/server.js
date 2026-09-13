@@ -702,6 +702,12 @@ app.get('/api/yo', (req, res) => {
     // El front lo usa para mandar al onboarding antes de dejar entrar al panel.
     perfil_completo: !!u.perfil_completado_en,
     negocios: auth.esAdmin(u) ? 'todos' : (u.negocios || []).map(n => ({ slug: n.slug, rol: n.rol })),
+    // Permisos EN EL NEGOCIO ACTIVO, para que el menú y las solapas no ofrezcan puertas que el
+    // servidor va a cerrar. La decisión sigue siendo del servidor; esto es sólo no mentirle a
+    // quien mira la pantalla.
+    rol: req.rol,
+    secciones: auth.seccionesDe(u, req.negocioId),
+    configura: auth.puedeConfigurar(u, req.negocioId),
   });
 });
 
@@ -795,9 +801,51 @@ app.use(async (req, res, next) => {
   } catch (e) { console.error('marca', e.message); res.status(500).json({ error: 'marca' }); }
 });
 
+/* ── Secciones que alcanza el rol ──────────────────────────────────────────────────
+ *
+ * Un rol acotado —hoy `operador`— sólo llega a lo suyo, y eso se decide ACÁ y no en el menú:
+ * esconder una entrada del menú no impide escribir la URL, y las 60 y pico de rutas de negocio
+ * contestarían igual. Al resolverse junto al negocio, quedan cubiertas todas de una vez.
+ *
+ * Para los roles sin límite (admin, aprobador, editor) esto no hace nada: `seccionesDe` les
+ * devuelve null y se sale en la primera línea. El riesgo de este filtro alcanza sólo al rol nuevo.
+ *
+ * Por eso mismo la lista es una ALLOWLIST y no una lista de prohibidas: una ruta que nadie mapeó
+ * queda fuera del alcance del rol acotado en vez de quedar abierta por olvido. Si mañana el
+ * operador necesita algo que no está acá, se agrega a mano y se ve lo que se está abriendo.
+ */
+const SECCION_DE_RUTA = [
+  [/^\/api\/reservas/, 'reservas'],
+  [/^\/api\/clientes/, 'clientes'],
+  [/^\/api\/(whatsapp|inbox)/, 'whatsapp'],
+  [/^\/api\/piezas/, 'instagram'],
+  [/^\/api\/pauta|^\/api\/campanias/, 'pauta'],
+  [/^\/api\/grafica/, 'grafica'],
+  [/^\/api\/landing/, 'landing'],
+  [/^\/api\/invitaciones|^\/api\/beneficios/, 'invitaciones'],
+  [/^\/api\/biblioteca/, 'biblioteca'],
+];
+// Lo que necesita cualquiera para que el panel funcione: quién soy, qué negocios tengo, el
+// selector, una miniatura. Negarlo no protege nada y deja la pantalla rota.
+const RUTAS_COMUNES = /^\/api\/(yo|negocios|telefono|miniatura|logout|capacidades|status)/;
+
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/')) return next();
+  const secciones = auth.seccionesDe(req.usuario, req.negocioId);
+  if (secciones === null) return next();                 // rol sin límite: nada cambia
+  if (RUTAS_COMUNES.test(req.path)) return next();
+  const par = SECCION_DE_RUTA.find(([re]) => re.test(req.path));
+  if (par && secciones.includes(par[1])) return next();
+  return res.status(403).json({ error: 'sin_permiso', mensaje: 'Tu usuario no tiene acceso a esta sección.' });
+});
+
 // Compuertas reutilizables.
 const soloAdmin = (req, res, next) =>
   auth.esAdmin(req.usuario) ? next() : res.status(403).json({ error: 'solo_admin' });
+/** Turnos, capacidad, bloqueos, enlaces públicos: la forma del negocio, no su operación diaria. */
+const soloConfigura = (req, res, next) =>
+  auth.puedeConfigurar(req.usuario, req.negocioId)
+    ? next() : res.status(403).json({ error: 'sin_permiso', mensaje: 'Tu usuario no puede cambiar la configuración.' });
 // Aprobar / rechazar / publicar: la compuerta humana de la plataforma.
 const soloAprobador = (req, res, next) =>
   auth.puedeAprobar(req.usuario, req.negocioId) ? next() : res.status(403).json({ error: 'sin_permiso' });
@@ -1382,21 +1430,21 @@ app.get('/api/reservas/config', async (req, res) => {
     res.json({ config: cfg, turnos, unidades: db.UNIDADES });
   } catch (e) { console.error('reservas-config', e.message); res.status(500).json({ error: 'db' }); }
 });
-app.put('/api/reservas/config', async (req, res) => {
+app.put('/api/reservas/config', soloConfigura, async (req, res) => {
   try { res.json(await db.guardarConfigReservas(req.negocioId, req.body || {}, auth.esAdmin(req.usuario))); }
   catch (e) { resError(res, e, 'guardar config reservas'); }
 });
-app.post('/api/reservas/turnos', async (req, res) => {
+app.post('/api/reservas/turnos', soloConfigura, async (req, res) => {
   try { res.json(await db.guardarTurno(req.negocioId, null, req.body || {})); }
   catch (e) { resError(res, e, 'crear turno'); }
 });
-app.put('/api/reservas/turnos/:id', async (req, res) => {
+app.put('/api/reservas/turnos/:id', soloConfigura, async (req, res) => {
   try {
     const r = await db.guardarTurno(req.negocioId, req.params.id, req.body || {});
     res.status(r.ok ? 200 : 404).json(r);
   } catch (e) { resError(res, e, 'editar turno'); }
 });
-app.delete('/api/reservas/turnos/:id', async (req, res) => {
+app.delete('/api/reservas/turnos/:id', soloConfigura, async (req, res) => {
   try {
     const r = await db.borrarTurno(req.negocioId, req.params.id);
     res.status(r.ok ? 200 : 404).json(r);
@@ -1412,15 +1460,15 @@ app.put('/api/landing/expone', async (req, res) => {
 });
 
 // --- Enlaces de acción (v2.0 / F5) -------------------------------------------------------
-app.get('/api/acciones', async (req, res) => {
+app.get('/api/acciones', soloConfigura, async (req, res) => {
   try { res.json({ links: await db.getLinks(req.negocioId), piezas: await db.getPiezasParaAccion(req.negocioId) }); }
   catch (e) { console.error('acciones', e.message); res.status(500).json({ error: 'db' }); }
 });
-app.post('/api/acciones', async (req, res) => {
+app.post('/api/acciones', soloConfigura, async (req, res) => {
   try { res.json(await db.crearLink(req.negocioId, req.body || {})); }
   catch (e) { resError(res, e, 'crear accion'); }
 });
-app.post('/api/acciones/:id/activo', async (req, res) => {
+app.post('/api/acciones/:id/activo', soloConfigura, async (req, res) => {
   try {
     const r = await db.setLinkActivo(req.negocioId, req.params.id, (req.body || {}).activo);
     res.status(r.ok ? 200 : 404).json(r);
@@ -1431,11 +1479,11 @@ app.get('/api/reservas/bloqueos', async (req, res) => {
   try { const { desde, hasta } = rango(req, 120); res.json({ bloqueos: await db.getBloqueos(req.negocioId, desde, hasta) }); }
   catch (e) { console.error('bloqueos', e.message); res.status(500).json({ error: 'db' }); }
 });
-app.post('/api/reservas/bloqueos', async (req, res) => {
+app.post('/api/reservas/bloqueos', soloConfigura, async (req, res) => {
   try { res.json(await db.crearBloqueo(req.negocioId, req.body || {})); }
   catch (e) { resError(res, e, 'crear bloqueo'); }
 });
-app.delete('/api/reservas/bloqueos/:id', async (req, res) => {
+app.delete('/api/reservas/bloqueos/:id', soloConfigura, async (req, res) => {
   try {
     const r = await db.borrarBloqueo(req.negocioId, req.params.id);
     res.status(r.ok ? 200 : 404).json(r);

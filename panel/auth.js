@@ -162,10 +162,55 @@ const puedeVer = (usuario, negocioId) => rolEn(usuario, negocioId) !== null;
 /** Aprobar, rechazar, publicar: la compuerta humana de la plataforma. */
 const puedeAprobar = (usuario, negocioId) => ['admin', 'aprobador'].includes(rolEn(usuario, negocioId));
 
+/* ── Qué alcanza cada rol ──────────────────────────────────────────────────────────
+ *
+ * Hasta acá el permiso era binario: quien tenía un rol en un negocio veía TODO ese negocio.
+ * No había forma de dar Reservas sin dar también Instagram, Pauta e Identidad, ni de impedir
+ * que quien atiende el salón cambiara turnos, capacidad o bloqueos.
+ *
+ * `operador` es el primer rol acotado: atiende reservas, ve la ficha del comensal y contesta
+ * WhatsApp, y no toca configuración.
+ *
+ * DOS REGLAS QUE HACEN QUE ESTO SIRVA DE ALGO:
+ *  1. La lista de secciones la aplica el SERVIDOR. Esconder una solapa es cosmética: si el
+ *     endpoint no rechaza, la configuración sigue alcanzable escribiendo la URL.
+ *  2. `secciones: null` es "todas". Sólo los roles acotados enumeran, así que agregar una
+ *     sección nueva a la plataforma no se la quita sin querer a los roles que ya existían.
+ */
+const PERMISOS = {
+  admin:     { secciones: null, configurar: true },
+  aprobador: { secciones: null, configurar: true },
+  editor:    { secciones: null, configurar: true },
+  operador:  { secciones: ['reservas', 'clientes', 'whatsapp'], configurar: false },
+};
+const ROLES_NEGOCIO = Object.keys(PERMISOS).filter(r => r !== 'admin');
+
+const permisosDe = (usuario, negocioId) => PERMISOS[rolEn(usuario, negocioId)] || null;
+
+/** Las secciones que puede abrir, o null si no tiene límite. */
+function seccionesDe(usuario, negocioId) {
+  const p = permisosDe(usuario, negocioId);
+  return p ? p.secciones : [];
+}
+
+/** Tocar la configuración del negocio: turnos, capacidad, bloqueos, enlaces públicos. */
+const puedeConfigurar = (usuario, negocioId) => {
+  const p = permisosDe(usuario, negocioId);
+  return !!(p && p.configurar);
+};
+
+/** ¿Puede abrir esta sección? Sin rol en el negocio, no. */
+function puedeSeccion(usuario, negocioId, seccion) {
+  const s = seccionesDe(usuario, negocioId);
+  if (s === null) return true;
+  return s.includes(seccion);
+}
+
 module.exports = {
   COOKIE, TTL_S, STATE_COOKIE,
   hashPassword, verifyPassword, tokenNuevo, tokenHash,
   issue, readToken, readCookie, cookieHeader,
   googleActivo, estadoNuevo, estadoValido, urlDeGoogle, canjearCodigo,
   esAdmin, rolEn, puedeVer, puedeAprobar,
+  PERMISOS, ROLES_NEGOCIO, seccionesDe, puedeConfigurar, puedeSeccion,
 };

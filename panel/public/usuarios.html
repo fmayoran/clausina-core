@@ -69,7 +69,8 @@
     </div>
     <p class="mono text-[11px] text-pmut dark:text-mut mb-7">
       El <b>administrador</b> ve toda la plataforma. El <b>aprobador</b> aprueba y publica en sus negocios;
-      el <b>editor</b> prepara pero no aprueba.
+      el <b>editor</b> prepara pero no aprueba. El <b>operador</b> es el rol del salón: atiende reservas,
+      ve la ficha del comensal y contesta WhatsApp, y no entra al resto del panel ni a la configuración.
     </p>
 
     <div class="rounded-2xl bg-psurf dark:bg-surf border border-pline dark:border-line card scrollx">
@@ -213,6 +214,7 @@ function pintarNegocios(){
       <select id="r-${esc(n.slug)}">
         <option value="aprobador"${asignados[n.slug]==='aprobador'?' selected':''}>aprueba</option>
         <option value="editor"${asignados[n.slug]==='editor'?' selected':''}>edita</option>
+        <option value="operador"${asignados[n.slug]==='operador'?' selected':''}>opera reservas</option>
       </select>
     </div>`).join('');
 }

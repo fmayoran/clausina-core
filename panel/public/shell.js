@@ -445,6 +445,14 @@
         location.replace('mi-cuenta'); return yo;
       }
       if (yo.admin) return yo;
+      // Un rol acotado sólo ve sus secciones. El servidor ya las rechaza; esto evita ofrecer en
+      // el menú puertas que al tocarlas dan "sin permiso", que se lee como que algo está roto.
+      if (Array.isArray(yo.secciones)) {
+        document.querySelectorAll('[data-nav]').forEach(function (a) {
+          var id = a.getAttribute('data-nav');
+          if (id !== 'mi-cuenta' && yo.secciones.indexOf(id) === -1) a.remove();
+        });
+      }
       NAV_ADMIN.forEach(function (id) {
         var a = document.querySelector('[data-nav="' + id + '"]');
         if (a) a.remove();

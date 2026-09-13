@@ -4,6 +4,8 @@ const { Pool } = require('pg');
 const cryptoAds = require('./crypto_ads');
 const tel = require('./telefono');
 const inv = require('./invitaciones');
+// Sólo por la lista de roles válidos. auth no requiere db, así que no hay ciclo.
+const auth = require('./auth');
 
 const pool = new Pool({
   host: process.env.PGHOST || 'crm_pgvector',
@@ -195,7 +197,9 @@ async function setNegociosDeUsuario(usuarioId, negocios) {
     for (const n of negocios || []) {
       await c.query(
         `INSERT INTO contenido.usuario_negocio (usuario_id, negocio_id, rol) VALUES ($1, $2, $3)`,
-        [usuarioId, n.negocio_id, n.rol === 'editor' ? 'editor' : 'aprobador']);
+        // El rol se valida contra la lista de auth: cualquier cosa desconocida cae en el más
+        // acotado, no en el más amplio. Equivocarse hacia arriba da permisos que nadie pidió.
+        [usuarioId, n.negocio_id, auth.ROLES_NEGOCIO.includes(n.rol) ? n.rol : 'operador']);
     }
     await c.query('COMMIT');
   } catch (e) {

@@ -1517,7 +1517,21 @@ async function cargarTodo() {
   MES = primerDia(hoy()); SEL = hoy();
   FD_RESERVA = CampoFecha(document.getElementById('fd-reserva'), { min: hoy(), onChange: turnosDelDia });
   FD_BLOQUEO = CampoFecha(document.getElementById('fd-bloqueo'), {});
-  try { const y = await fetch('api/yo'); ES_ADMIN = y.ok ? !!(await y.json()).admin : false; } catch (_) {}
+  try {
+    const y = await fetch('api/yo');
+    if (y.ok) {
+      const yo = await y.json();
+      ES_ADMIN = !!yo.admin;
+      // Sin permiso de configuración, Configuración y Enlaces no se muestran. El servidor ya las
+      // rechaza; esto es para que quien atiende no vea dos solapas que no puede abrir.
+      if (yo.configura === false) {
+        ['cfg', 'links'].forEach(k => {
+          const t = document.querySelector(`.tab[data-pane="${k}"]`); if (t) t.remove();
+          const p = document.getElementById('p-' + k); if (p) p.remove();
+        });
+      }
+    }
+  } catch (_) {}
   try { await cargarTodo(); await cargarBloqueos(); }
   catch (e) { $('sub').textContent = 'error al cargar'; }
 })();
