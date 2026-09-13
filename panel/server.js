@@ -691,8 +691,21 @@ app.use(async (req, res, next) => {
 });
 
 // Quién soy: lo usa el front para saber qué mostrar y qué esconder.
-app.get('/api/yo', (req, res) => {
+app.get('/api/yo', async (req, res) => {
   const u = req.usuario;
+  // El negocio activo NO está resuelto todavía: esta ruta se registra antes de esa compuerta a
+  // propósito, porque tiene que contestar aunque el usuario no tenga ningún negocio (es la que
+  // manda al onboarding). Se resuelve acá en chico, con el mismo criterio, para poder informar
+  // los permisos DEL negocio que se está mirando. Sin esto los permisos salían vacíos y el menú
+  // le escondía TODO al operador, incluso lo suyo.
+  let negocioId = null;
+  try {
+    const propios = (u.negocios || []).map(n => n.slug);
+    const pedido = readMarca(req);
+    const slug = auth.esAdmin(u) ? (pedido || 'cortafuego')
+      : (pedido && propios.includes(pedido) ? pedido : propios[0]);
+    if (slug) negocioId = await db.getProyectoId(slug);
+  } catch (_) {}
   res.json({
     id: u.id, nombre: u.nombre, email: u.email,
     whatsapp: u.whatsapp || '', cargo: u.cargo || '',
@@ -705,9 +718,9 @@ app.get('/api/yo', (req, res) => {
     // Permisos EN EL NEGOCIO ACTIVO, para que el menú y las solapas no ofrezcan puertas que el
     // servidor va a cerrar. La decisión sigue siendo del servidor; esto es sólo no mentirle a
     // quien mira la pantalla.
-    rol: req.rol,
-    secciones: auth.seccionesDe(u, req.negocioId),
-    configura: auth.puedeConfigurar(u, req.negocioId),
+    rol: auth.rolEn(u, negocioId),
+    secciones: auth.seccionesDe(u, negocioId),
+    configura: auth.puedeConfigurar(u, negocioId),
   });
 });
 
