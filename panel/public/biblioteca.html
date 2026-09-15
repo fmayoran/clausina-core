@@ -28,6 +28,14 @@
   .mcell:hover .gx{display:block;}
   .mcell .code{position:absolute;bottom:5px;left:5px;font-family:'JetBrains Mono',monospace;font-size:8.5px;background:rgba(0,0,0,.62);color:#CCF24D;padding:2px 6px;border-radius:6px;pointer-events:none;}
   #uprog{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#14171b;border:1px solid #20242B;border-radius:11px;padding:12px 16px;min-width:250px;max-width:90vw;z-index:212;}
+  /* El detalle de lo que NO subió: se queda hasta que lo cierren. Un toast de 3 segundos sirve
+     para confirmar, no para explicar un error que hay que leer con calma. */
+  #upfail{margin:12px 0;padding:12px 14px;border:1px solid var(--u-mal);border-radius:10px;
+    background:color-mix(in srgb,var(--u-mal) 8%,transparent);font-size:.9rem;color:var(--u-fg);}
+  #upfail ul{margin:7px 0 10px;padding-left:18px;}
+  #upfail li{margin:3px 0;}
+  #upfail button{border:1px solid var(--u-line);background:none;color:var(--u-mut);cursor:pointer;
+    border-radius:7px;padding:5px 12px;font:inherit;font-size:.8rem;}
   #uprog.hidden{display:none;}
   #uprog .uptxt{font-family:'Inter',sans-serif;font-size:12.5px;color:#ECEEF0;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   #uprog .upbar{height:5px;background:#0c0f12;border-radius:3px;overflow:hidden;}
@@ -108,6 +116,7 @@
 <div id="lb"><button class="x" onclick="cerrarLb()">×</button><div class="box" id="lb-box"></div></div>
 <div id="toast"></div>
 <div id="uprog" class="hidden"><div class="uptxt"></div><div class="upbar"><div class="upfill"></div></div></div>
+<div id="upfail" class="hidden"></div>
 
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="shell.js?v=20260902b"></script>
@@ -283,31 +292,45 @@ async function subirArchivos(input){
   const up=document.getElementById('uprog'), txt=up.querySelector('.uptxt'), fill=up.querySelector('.upfill');
   up.classList.remove('hidden'); fill.style.width='0';
   let ok=0, pes=0, done=0;
+  // POR QUÉ SE GUARDA EL MOTIVO DE CADA FALLA. Antes esto era un `catch(e){}` mudo y el único
+  // aviso era "No se pudo subir", sin decir cuál ni por qué. Un video que no aparecía en la
+  // biblioteca no tenía forma de explicarse: ni en la pantalla, ni en el log del servidor.
+  // Ahora cada archivo que falla dice qué le pasó, con su nombre y su peso.
+  const fallas=[];
+  const mb = b => (b/1048576).toFixed(b>10485760?0:1) + ' MB';
   for(const f of files){
     done++;
-    const isVideo=(f.type||'').startsWith('video/')||/\.(mp4|mov|webm|m4v|avi)$/i.test(f.name);
+    const isVideo=(f.type||'').startsWith('video/')||/\.(mp4|mov|webm|m4v|avi|mkv|mpg|mpeg|3gp|hevc)$/i.test(f.name);
     fill.style.width=Math.round((done-1)/files.length*100)+'%';
     try{
       if(isVideo){
         // Video: streaming al server, que lo comprime para Instagram (tope de entrada 600MB).
-        if(f.size>600*1024*1024){ pes++; }
+        if(f.size>600*1024*1024){ pes++; fallas.push(`${f.name} pesa ${mb(f.size)} y el tope es 600 MB`); }
         else { await subirVideo(f, txt, fill, done, files.length); ok++; }
       } else {
         txt.textContent=`Subiendo ${done}/${files.length} — ${f.name}`;
-        if(f.size>85*1024*1024){ pes++; }
+        if(f.size>85*1024*1024){ pes++; fallas.push(`${f.name} pesa ${mb(f.size)} y el tope para imágenes es 85 MB`); }
         else {
           const dataUrl=await new Promise((r,j)=>{const rd=new FileReader();rd.onload=()=>r(rd.result);rd.onerror=j;rd.readAsDataURL(f);});
           const d=await fetch('api/biblioteca/subir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataUrl,filename:f.name,carpeta:_uploadFolder})}).then(r=>r.json());
-          if(d.ok) ok++;
+          if(d.ok) ok++; else fallas.push(`${f.name}: ${d.error||'el servidor lo rechazó'}`);
         }
       }
-    }catch(e){}
+    }catch(e){ fallas.push(`${f.name}: ${e.message||'se cortó la subida'}`); }
     fill.style.width=Math.round(done/files.length*100)+'%';
   }
   if(ok) fill.classList.add('hecho');           // verde: terminó
   await new Promise(r=>setTimeout(r,500));      // que se vea el verde antes de esconder la barra
   up.classList.add('hidden'); fill.classList.remove('hecho');
-  toast((ok?ok+' subido(s) a “'+_uploadFolder+'”':'No se pudo subir')+(pes?` · ${pes} muy pesado(s)`:''), !ok);
+  if(fallas.length){
+    // El detalle va en un cartel que se queda, no en un toast que se va a los 3 segundos: si
+    // algo no subió, hay que poder leer por qué sin haber estado mirando la pantalla.
+    const c=document.getElementById('upfail');
+    c.innerHTML='<b>No se subió:</b><ul>'+fallas.map(m=>`<li>${esc(m)}</li>`).join('')+
+      '</ul><button onclick="this.parentElement.classList.add(\'hidden\')">Entendido</button>';
+    c.classList.remove('hidden');
+  }
+  toast((ok?ok+' subido(s) a “'+_uploadFolder+'”':'No se subió ningún archivo')+(pes?` · ${pes} muy pesado(s)`:''), !ok);
   await cargar();
 }
 // Sube un video crudo por streaming (XHR, con barra de progreso); el server lo comprime.
