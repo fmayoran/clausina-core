@@ -3,7 +3,17 @@
 # cola de requerimientos (tg_briefs, origen=creativo, estado=propuesta). Manda cada una a Telegram
 # para que Fer pueda RESPONDER ese mensaje con la foto/video; guarda tg_msg_id para vincular la respuesta.
 # Uso: propuestas_publicar.py <CID> <CHAT_ID> <BOT_TOKEN> [canal] [negocio_id]
-import json, sys, subprocess, urllib.request, urllib.parse
+import json, re, sys, subprocess, urllib.request, urllib.parse
+
+# Cómo se reconoce "no necesito nada tuyo". El creativo escribe esto en prosa, así que se leen las
+# formas que usa de verdad —"No requiere material nuevo", "no hace falta material", "se puede con
+# la biblioteca"— y ante la duda se asume que SÍ necesita material: equivocarse hacia la propuesta
+# cuesta una vuelta; equivocarse hacia generar cuesta una pieza hecha con lo que no era.
+SIN_MATERIAL = re.compile(
+    r"\bno\s+(requiere|necesita|hace\s+falta|precisa)\b"
+    r"|\bsin\s+material\s+nuevo\b"
+    r"|\b(uso|usar|usando|con)\s+(la\s+)?(biblioteca|material\s+ya|lo\s+ya\s+publicado)\b",
+    re.I)
 
 CID, CHAT, BOT = sys.argv[1], sys.argv[2], sys.argv[3]
 CANAL = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4] == 'aviso' else 'instagram'
@@ -55,6 +65,20 @@ for p in props:
     concepto = (p.get('concepto') or '').strip()
     copy = (p.get('copy_tentativo') or '').strip()
     req = (p.get('requiere_material') or 'No requiere material nuevo').strip()
+    # ¿Necesita algo que sólo puede aportar Fer?
+    #
+    # POR QUÉ CAMBIA EL ESTADO INICIAL. Sobre 43 propuestas reales: de las que pedían una foto de
+    # Fer, la MITAD murió esperando ese material —la propuesta ahí no es un borrador, es un pedido,
+    # y sin la foto la idea se cae—. De las que el creativo podía hacer solo, 13 de 15 terminaron
+    # generándose igual: pedir permiso para hacer lo que ya podía hacer era una vuelta de más, y
+    # quedaban ideas esperando meses. Una de hoy decía "no requiere material nuevo" y estaba
+    # parada lo mismo.
+    #
+    # Así que: si se puede sola, va derecho a generar y aparece en pendientes de aprobación. Si
+    # necesita material, sigue siendo propuesta. El visto humano no se toca — lo que se aprueba es
+    # la PIEZA, como siempre; lo que se deja de aprobar es el permiso para empezar.
+    sola = bool(SIN_MATERIAL.search(req))
+    estado = 'pendiente' if sola else 'propuesta'
     fmt = (p.get('formato_sugerido') or 'feed').strip()
     # el texto del requerimiento guarda concepto + copy tentativo + formato sugerido (lo lee el agente al activarse)
     texto = concepto
@@ -64,7 +88,7 @@ for p in props:
     pid_col = ", negocio_id" if PROYECTO_ID else ""
     pid_val = f",'{esc(PROYECTO_ID)}'" if PROYECTO_ID else ""
     bid = psql("INSERT INTO contenido.tg_briefs (chat_id, origen, estado, canal_destino, titulo, texto, requiere_material" + pid_col + ") "
-               f"VALUES ('{esc(CHAT)}','creativo','propuesta','{CANAL}','{esc(titulo)}','{esc(texto)}','{esc(req)}'" + pid_val + ") RETURNING id;")
+               f"VALUES ('{esc(CHAT)}','creativo','{estado}','{CANAL}','{esc(titulo)}','{esc(texto)}','{esc(req)}'" + pid_val + ") RETURNING id;")
     if not bid:
         continue
     # Adjuntar el material del pedido a este requerimiento (disponible al generar la pieza).
@@ -77,7 +101,12 @@ for p in props:
         fn_val = f"'{esc(fn)}'" if fn else "NULL"
         psql("INSERT INTO contenido.brief_material (brief_id, media_path, media_type, filename, orden) "
              f"VALUES ('{bid}','{mp}','{mt}',{fn_val},{i});")
-    msg = (f"[PROPUESTA] {titulo}\n\n{concepto}\n\nNecesito: {req}\n\n"
+    # El aviso tiene que decir la verdad de CADA caso: pedirle una foto a alguien por algo que ya
+    # se está generando solo es la forma más rápida de que deje de leer los avisos.
+    msg = (f"[GENERANDO] {titulo}\n\n{concepto}\n\n"
+           "Se está armando sola y va a quedar esperando tu aprobación en https://panel.clausina.ar"
+           if sola else
+           f"[PROPUESTA] {titulo}\n\n{concepto}\n\nNecesito: {req}\n\n"
            "Respondé este mensaje con la foto/video para activarla — o gestionala en https://panel.clausina.ar")
     mid = tg_send(msg)
     if mid:
