@@ -7,6 +7,13 @@ Los workflows están exportados en `workflows/*.json` (fuente versionada; el est
 
 > **Modelo `contenido` (desde 02/06/2026):** las queries leen/escriben `contenido.revisiones` + `piezas` + `media`, devolviendo **los mismos alias** que antes (`asset_ig`, `caption`, `web_*`, `estado`, `tipo_media`, `poster_url`, `titulo_interno`…), por eso `preview.html`/`novedades.html` no cambiaron. `cf-crear-pendiente` ahora acepta `pieza_id` opcional: con él agrega una **revisión** a la pieza existente (loop de corrección) y **reemplaza la media**; sin él crea pieza nueva. La cola `cf-rechazos-pendientes` solo muestra revisiones `rechazada` que son la **vigente** de su pieza y sin `derivado_en`: una corrección (nueva revisión) las supera y salen solas; **`cf-marcar-procesado` se repurposeó** para *derivar a Fer* (setea `derivado_en` por `revision_id`) los rechazos que la rutina no puede auto-resolver (visuales / ≥3 intentos), así dejan de reprocesarse.
 
+> **El NEGOCIO sale del brief (15/09/2026):** `cf-crear-pendiente` resolvía el negocio con
+> `COALESCE(j->>'proyecto','cortafuego')`, y el payload documentado del brief NO manda `proyecto`:
+> toda pieza generada para un negocio que no fuera Cortafuego terminaba en Cortafuego. Salió a la
+> luz con la primera pieza de ClaUsina, que quedó esperando aprobación en la cola de Cortafuego con
+> el copy de otra marca. Ahora el negocio sale del `brief_id`; `proyecto` queda de respaldo; y si no
+> se puede resolver, **falla** (negocio_id es NOT NULL) en vez de adivinar.
+
 > **El formato se HEREDA (15/09/2026):** `cf-crear-pendiente` ponía `formato='feed'` cuando el
 > pedido no lo declaraba, incluso corrigiendo una pieza que ya era `story`. Como el job de
 > corrección manda el formato sólo a veces, una historia se volvía feed sola entre una versión y
