@@ -355,8 +355,82 @@ function estadoPublicacion(p){
   return { fase:'trabada', txt:'No salió — '+causa };
 }
 
+/* Una pieza a la que le falta materia prima.
+ *
+ * El creativo llegó hasta donde pudo —el concepto, el copy— y declaró qué le falta. Antes esto era
+ * una cola aparte, "Propuestas", donde la idea esperaba permiso: de 28 que pedían material, la
+ * mitad murió ahí. Ahora la pieza existe, se ve, y lo que falta es una etiqueta con dos salidas:
+ * subirle el material, o pedirle que lo resuelva con IA.
+ */
+function faltaCard(p){
+  return `<div class="card falta" data-pieza="${esc(p.id)}"><div class="body">
+    <div class="tt">${esc(p.titulo_interno)} <span class="intlbl" title="Nombre interno — no se publica">interno</span></div>
+    <div class="meta">${cfBadge(p)}${fmtBadge(p)}${revBadge(p)}<span>${fecha(p.actualizado_en)}</span></div>
+    <div class="meta2"><span class="rst falta">Falta material para terminarla</span></div>
+    <div class="faltaq">${esc(p.falta_material)}</div>
+    ${p.caption ? `<div class="copy">${esc(p.caption).replace(/\n/g,'<br>')}</div>` : ''}
+    </div>
+    <div class="acts">
+      <label class="btn ok" style="cursor:pointer">Subir el material
+        <input type="file" accept="image/*,video/*" multiple hidden onchange="subirFalta('${esc(p.id)}',this)"></label>
+      <div class="acts-row">
+        <button class="btn no" onclick="resolverConIA('${esc(p.id)}',this)" title="Que el creativo lo genere y termine la pieza">Que lo resuelva con IA</button>
+        <button class="btn del" onclick="descartar('${esc(p.id)}',this)">Descartar</button>
+      </div>
+    </div></div>`;
+}
+
+/* Las dos salidas de una pieza a la que le falta material.
+ *
+ * Las dos terminan en el MISMO circuito de corrección que ya existe: se le deja al creativo un
+ * motivo y, si hay, el material, y el corrector rehace la pieza. No hace falta un camino nuevo —
+ * y uno nuevo sería otro camino que mantener y que se puede romper solo.
+ */
+async function pedirQueTermine(id, motivo, btn){
+  try{
+    const d=await fetch('api/piezas/'+id+'/rechazar',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({motivo})}).then(r=>r.json());
+    if(d.ok) toast('Listo — el creativo la está terminando');
+    else { toast('No se pudo pedir ('+(d.error||d.status)+')', true); return false; }
+  }catch(e){ toast('Error de conexión', true); return false; }
+  recargarTrasAccion(1200);
+  return true;
+}
+
+async function subirFalta(id, input){
+  const files=[...(input.files||[])]; if(!files.length||acting) return;
+  const lbl=input.closest('label'), base=lbl.textContent;
+  acting=true; lbl.style.pointerEvents='none';
+  let okc=0;
+  for(let i=0;i<files.length;i++){
+    lbl.textContent='Subiendo '+(i+1)+'/'+files.length+'…';
+    try{
+      const dataUrl=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=no;r.readAsDataURL(files[i]);});
+      const d=await fetch('api/piezas/'+id+'/material',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({dataUrl,filename:files[i].name})}).then(r=>r.json());
+      if(d.ok) okc++;
+    }catch(e){}
+  }
+  input.value=''; lbl.textContent=base; lbl.style.pointerEvents=''; acting=false;
+  if(!okc){ toast('No se pudo subir', true); return; }
+  // El material solo no alcanza: hay que pedirle que rehaga la pieza con eso.
+  await pedirQueTermine(id, 'Acá está el material que faltaba. Terminá la pieza usándolo: '
+    + okc + ' archivo(s) adjunto(s).');
+}
+
+async function resolverConIA(id, btn){
+  if(acting) return;
+  if(!confirm('El creativo va a generar el material con IA y terminar la pieza. ¿Seguimos?')) return;
+  acting=true; busy(btn,'Pidiendo…');
+  await pedirQueTermine(id, 'No te voy a pasar material para esto: generá vos la imagen con IA, '
+    + 'respetando la estética de la marca, y terminá la pieza.', btn);
+  acting=false;
+}
+
 function pendCard(p){
   if(p.estado==='rechazada') return modCard(p,'instagram');
+  // Lo que le falta manda sobre el resto: no es una pieza para aprobar, es una que pide algo.
+  if(p.falta_material) return faltaCard(p);
   const t = thumbSrc(p.media);
   const medios = Array.isArray(p.medios) ? p.medios : [];
   const m = p.media || {};
@@ -1173,6 +1247,17 @@ function renderCola(){
       : solicitudCard(b)).join('')
     + prop.map(b => b.origen==='mencion' ? mentionCard(b) : propCard(b)).join('');
   fill('c-prop','n-prop', propHtml);
+  // La solapa ya no es "Propuestas": el creativo no deja ideas esperando permiso, genera la pieza.
+  // Lo que queda acá es lo que se está generando ahora y lo que llegó de afuera —las menciones de
+  // Instagram—, y casi siempre no hay nada. Una solapa vacía permanente enseña a ignorarla, así
+  // que aparece sólo cuando tiene algo.
+  const solProp = document.getElementById('sol-prop');
+  if (solProp) {
+    const hay = work.length + prop.length;
+    solProp.hidden = !hay;
+    // Si estaba abierta y se vació, hay que salir: si no, queda una pestaña activa invisible.
+    if (!hay && solProp.classList.contains('on')) verTab('pub');
+  }
   fill('c-cola','n-cola', cola.map(reqRow).join(''));
   _stats.cola=cola.length; _stats.prop=prop.length; _stats.work=work.length; paintResumen();
 }

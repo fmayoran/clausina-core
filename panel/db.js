@@ -3763,7 +3763,7 @@ async function getPiezas(canal, negocioId) {
   if (canal) { params.push(canal); where += ` AND pz.canal = $${params.length}`; }
   const { rows } = await pool.query(`
     SELECT pz.id, pz.numero, pz.canal, pz.titulo_interno, pz.estado, pz.creado_en, pz.actualizado_en,
-           r.nro, r.formato, r.motivo_rechazo, r.derivado_en,
+           r.nro, r.formato, r.motivo_rechazo, r.derivado_en, r.falta_material,
            COALESCE(r.colaboradores, (SELECT ig_colaboradores FROM contenido.negocios WHERE id=pz.negocio_id)) AS colaboradores,
            r.colab_estado,
            -- Lo PAGO, aparte de lo orgánico. Las métricas de Instagram por API son sólo orgánicas;

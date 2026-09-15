@@ -55,6 +55,12 @@ header .marcasel:hover{border-color:var(--fire);}
 .cards{padding:12px;display:flex;flex-direction:column;gap:12px;}
 .card{background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:hidden;}
 .card .thumb{width:100%;aspect-ratio:4/5;object-fit:cover;display:block;background:#1a1a17;}
+/* Pieza a la que le falta materia prima: no está esperando un visto, está pidiendo algo. Por eso
+   no lleva miniatura —todavía no hay arte— y el pedido se lee antes que el copy. */
+.card.falta{border-color:var(--pend);}
+.rst.falta{color:var(--pend);border-color:var(--pend);}
+.faltaq{margin-top:9px;padding:9px 11px;border-left:2px solid var(--pend);background:var(--pend-suave,rgba(255,106,69,.08));
+  border-radius:0 7px 7px 0;font-size:.95rem;line-height:1.35;color:var(--chalk);}
 /* La miniatura recorta a 4/5 a propósito —la grilla tiene que ser pareja—, así que el botón de
    ver entera va encima de ella: es el único lugar donde se necesita, y no compite con Aprobar. */
 .thumbw{position:relative;}

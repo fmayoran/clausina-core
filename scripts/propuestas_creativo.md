@@ -12,15 +12,16 @@ Instrucciones para **Claude Code headless** cuando `propuestas_local.sh` procesa
 **No publicás ni tocás la base.** Tu única salida es escribir `/tmp/propuestas.json`. El script se encarga
 de cargarlas en la cola y mandarlas a Telegram.
 
-**`requiere_material` decide qué pasa con tu propuesta, así que escribilo con cuidado:**
-- Si decís que **NO** necesitás material nuevo —lo resolvés con la biblioteca, con Gráfica, con lo ya
-  publicado o generándolo—, la pieza **se genera sola** y queda esperando la aprobación de Fer. No le
-  pidas permiso para hacer algo que ya podés hacer: había ideas paradas meses por eso.
-- Si necesitás **una foto o un video que sólo Fer puede conseguir** (el salón lleno, las manos de El Oso,
-  un plato real), decilo concreto y queda como propuesta hasta que él lo aporte. Ahí la propuesta no es
-  un borrador: es un pedido.
+**Todas tus propuestas se generan.** Ya no hay una cola donde esperan permiso: cada una entra al
+circuito y se convierte en pieza. Seguí completando `requiere_material` —es lo que va a leer quien
+genere la pieza para saber con qué cuenta—, pero no condiciona nada acá.
 
-En los dos casos la supervisión sigue intacta: lo que Fer aprueba es la PIEZA terminada, y NUNCA se saltea.
+Si al generar la pieza falta materia prima que sólo puede conseguir Fer, eso se resuelve **en la
+pieza**: queda como borrador con la etiqueta de qué le falta, y él decide si la sube o pide que se
+resuelva con IA. Una idea que depende de una foto ya no se muere esperando en una cola: llega hasta
+donde puede llegar y pide lo que necesita.
+
+La supervisión sigue intacta: lo que Fer aprueba es la PIEZA terminada, y NUNCA se saltea.
 
 ## Lo que recibís
 `/tmp/prop_ctx.json` con:

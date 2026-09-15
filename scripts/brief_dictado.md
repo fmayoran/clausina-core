@@ -29,6 +29,13 @@ y su estética. **No uses reglas ni datos de otra marca**: lo que no esté en el
 3. **Redactá** caption (con las menciones y hashtags que indique el contexto de marca), `web_titulo`, `web_copy`, `web_tags` con la voz de marca.
 4. **Insertá** la pieza: `POST /webhook/cf-crear-pendiente` (un solo `curl`, JSON inline; `\n` para saltos del caption) con:
    `{"titulo_interno":"...","formato":"feed|story","caption":"...","web_titulo":"...","web_copy":"...","web_tags":["..."],"media":[{"url":"<URL pública>","tipo":"image|video","poster_url":"<URL webp si es video>"}],"brief_id":"<el brief_id que recibiste>"}`
+
+   **Si te falta material que no podés resolver** —una foto real del salón lleno, de las manos de El
+   Oso, de un plato de verdad— **NO abandones el pedido**: registrá la pieza igual, con el copy y todo
+   lo que sí pudiste hacer, y agregá `"falta_material":"<qué necesitás, concreto>"`. La pieza queda
+   como BORRADOR con esa etiqueta y Fer decide ahí: te sube la foto, o te pide que la resuelvas con IA.
+   Sin ese campo la pieza entra a aprobación como terminada, así que no lo uses para dudas menores:
+   es para cuando falta materia prima que sólo puede conseguir él.
    → devuelve `{token}`. **Incluí siempre `brief_id`**: vincula el requerimiento con la pieza (correlación en el panel) y marca el brief como procesado. El **número de pieza (CF-NNNN) lo asigna la base sola**; el `titulo_interno` es solo descriptivo.
 5. **Notificá**: `GET /webhook/cf-pub-notify?token=<token>` (manda la tarjeta de Telegram a Fer; el mail dejó de ser operativo).
 6. Resumí en una línea qué hiciste.

@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;450;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script>try{if(localStorage.getItem('clausina-mode')!=='light')document.documentElement.classList.add('dark');}catch(e){document.documentElement.classList.add('dark');}</script>
 <link rel="stylesheet" href="tw.css">
-<link rel="stylesheet" href="panel.css?v=20260913c">
+<link rel="stylesheet" href="panel.css?v=20260915a">
 </head>
 <body>
   <header>
@@ -34,7 +34,7 @@
   <div class="solapas" role="tablist">
     <button class="sol on" data-tab="pub"  role="tab" onclick="verTab('pub')">Publicadas <span class="n" id="n-pub"></span></button>
     <button class="sol"    data-tab="pend" role="tab" onclick="verTab('pend')">Pendientes <span class="n" id="n-pend"></span></button>
-    <button class="sol"    data-tab="prop" role="tab" onclick="verTab('prop')">Propuestas <span class="n" id="n-prop"></span></button>
+    <button class="sol"    data-tab="prop" role="tab" onclick="verTab('prop')" id="sol-prop" hidden>En curso <span class="n" id="n-prop"></span></button>
     <div class="orden" id="orden-zona">
       <label for="orden">Ordenar</label>
       <select id="orden" onchange="ordenarPub(this.value)">
@@ -67,7 +67,7 @@
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="shell.js?v=20260902b"></script>
 <script>ClausinaShell({active:'instagram',cap:'instagram'});</script>
-<script src="panel.js?v=20260913c"></script>
+<script src="panel.js?v=20260915a"></script>
 <script src="pedir-creativo.js?v=20260904a"></script>
 <script>
 currentLoad=loadInstagram; loadInstagram(); setInterval(loadInstagram,6000);
