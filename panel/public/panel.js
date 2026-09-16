@@ -1241,11 +1241,9 @@ function renderCola(){
   const prop=_reqList.filter(b=>reqClass(b)==='prop');
   const cola=_reqList.filter(b=>reqClass(b)==='cola');
   // Propuestas: primero los pedidos en curso (estado), después las propuestas/menciones accionables.
-  const propHtml = work.map(b =>
-      (b.brief_estado==='revisar'||b.brief_estado==='revisando') ? revisandoCard(b)
-      : (!b.pieza_id && (b.brief_estado==='pendiente'||b.brief_estado==='procesando')) ? generandoCard(b)
-      : solicitudCard(b)).join('')
-    + prop.map(b => b.origen==='mencion' ? mentionCard(b) : propCard(b)).join('');
+  // Lo que se está generando ya se muestra arriba de Pendientes, que es donde se lo espera.
+  // Acá queda lo que llegó de AFUERA y necesita una decisión: las menciones de Instagram.
+  const propHtml = prop.map(b => b.origen==='mencion' ? mentionCard(b) : propCard(b)).join('');
   fill('c-prop','n-prop', propHtml);
   // La solapa ya no es "Propuestas": el creativo no deja ideas esperando permiso, genera la pieza.
   // Lo que queda acá es lo que se está generando ahora y lo que llegó de afuera —las menciones de
@@ -1253,7 +1251,7 @@ function renderCola(){
   // que aparece sólo cuando tiene algo.
   const solProp = document.getElementById('sol-prop');
   if (solProp) {
-    const hay = work.length + prop.length;
+    const hay = prop.length;
     solProp.hidden = !hay;
     // Si estaba abierta y se vació, hay que salir: si no, queda una pestaña activa invisible.
     if (!hay && solProp.classList.contains('on')) verTab('pub');
@@ -1285,15 +1283,17 @@ function renderPropuestasCanal(reqs, canal){
   if(!document.getElementById('c-prop')) return;
   const mios=(reqs||[]).filter(b=>(b.canal_destino||'instagram')===canal);
   _sinCanalBadge = true;
-  const work=mios.filter(b=>reqClass(b)==='work');
+  // Lo que se está generando NO va acá: va arriba de Pendientes, que es donde se lo pidió y donde
+  // se lo espera. Acá queda lo que llegó de afuera y necesita una decisión: las menciones.
   const prop=mios.filter(b=>reqClass(b)==='prop');
-  const html = work.map(b =>
-      (b.brief_estado==='revisar'||b.brief_estado==='revisando') ? revisandoCard(b)
-      : (!b.pieza_id && (b.brief_estado==='pendiente'||b.brief_estado==='procesando')) ? generandoCard(b)
-      : solicitudCard(b)).join('')
-    + prop.map(b => b.origen==='mencion' ? mentionCard(b) : propCard(b)).join('');
   _sinCanalBadge = false;
-  fill('c-prop','n-prop', html);
+  fill('c-prop','n-prop', prop.map(b => b.origen==='mencion' ? mentionCard(b) : propCard(b)).join(''));
+  // La solapa aparece sólo cuando tiene algo: una pestaña vacía permanente enseña a ignorarla.
+  const solProp = document.getElementById('sol-prop');
+  if (solProp) {
+    solProp.hidden = !prop.length;
+    if (!prop.length && solProp.classList.contains('on')) verTab('pub');
+  }
   // Las tarjetas traen íconos <i data-lucide>: si nadie los convierte después de repintar, queda
   // el hueco vacío. shell.js sólo los crea al cargar la página, y esto se redibuja cada 6 s.
   if(window.lucide) lucide.createIcons();
@@ -1311,7 +1311,20 @@ async function loadInstagram(){
       fetch('api/requerimientos').then(x=>x.json()).catch(()=>[]),
     ]);
     renderPropuestasCanal(reqs, 'instagram');
-    fill('c-pend','n-pend', registrarRevisables(piezas).map(pendCard).join(''));
+    // Lo que se está generando va ARRIBA de Pendientes, no en otra solapa.
+    //
+    // Se pide desde acá y acá se espera el resultado: mandar la señal de "estoy trabajando" a una
+    // pestaña aparte —que además se esconde cuando está vacía— es esconderla justo de quien
+    // acaba de pedir. Fer pidió una propuesta y no vio nada, con el creativo trabajando.
+    //
+    // Y es coherente con el modelo nuevo: ya no hay propuestas, hay piezas. Una pieza generándose
+    // es una pieza que todavía no nació, y su lugar es la fila donde va a aparecer.
+    const enCurso = (reqs || []).filter(b => reqClass(b) === 'work');
+    fill('c-pend','n-pend',
+      enCurso.map(b => (b.brief_estado==='revisar'||b.brief_estado==='revisando') ? revisandoCard(b)
+                     : (!b.pieza_id && (b.brief_estado==='pendiente'||b.brief_estado==='procesando')) ? generandoCard(b)
+                     : solicitudCard(b)).join('')
+      + registrarRevisables(piezas).map(pendCard).join(''));
     // Lo publicado y las colaboraciones van a la MISMA grilla: en Instagram salen en la misma
     // grilla, y separarlas hacía parecer secundario un contenido que a veces rinde más que el
     // propio (el post de Ardora del 01/09 hizo 16.384 vistas).
