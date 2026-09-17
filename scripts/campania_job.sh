@@ -84,17 +84,28 @@ try:
     rendimiento=json.loads(_r.stdout) if _r.returncode==0 and _r.stdout.strip() else None
 except Exception:
     rendimiento=None
+# Cómo rindió cada CAMPAÑA anterior y con qué objetivo se corrió. Es lo que permite recomendar
+# estrategia y no sólo elegir el creativo: dos campañas con el mismo creativo pero distinto
+# objetivo pueden rendir 25 veces distinto, y eso sólo se ve a nivel campaña.
+try:
+    _h=_sp.run(["python3", f"{MOTOR}/scripts/pauta_historial.py", slug],
+               capture_output=True, text=True, timeout=90)
+    campanias_previas=json.loads(_h.stdout) if _h.returncode==0 and _h.stdout.strip() else []
+except Exception:
+    campanias_previas=[]
+
 # A dónde mandar a la gente. El link de reservas resuelve solo si va a la página o a WhatsApp
 # según cómo esté configurado el negocio, así que sirve siempre y no queda pegado a un canal.
 dominio = q(f"SELECT coalesce(dominio_web,'') FROM contenido.negocios WHERE id='{pid}'")
 destinos = {"web": f"https://{dominio}" if dominio else None,
             "reservas": f"https://panel.clausina.ar/r/{slug}"}
 ctx={"instruccion":instr,"objetivo_marca":objetivo,"brief":brief.strip(),"estilo":estilo.strip(),
-     "moneda":moneda,"publicaciones":publicaciones,"rendimiento":rendimiento,"destinos":destinos,
+     "moneda":moneda,"publicaciones":publicaciones,"rendimiento":rendimiento,
+     "campanias_previas":campanias_previas,"destinos":destinos,
      "piezas_elegidas":[int(x) for x in sugeridas],
      "colaboraciones_elegidas":colabs_ctx}
 json.dump(ctx, open(f"/tmp/camp_ctx_{sid}.json","w"), ensure_ascii=False)
-print(f"ctx: {len(publicaciones)} publicaciones, moneda {moneda}")
+print(f"ctx: {len(publicaciones)} publicaciones, {len(campanias_previas)} campañas previas, moneda {moneda}")
 PY
 
 rm -f "/tmp/camp_res_$sid.json"
