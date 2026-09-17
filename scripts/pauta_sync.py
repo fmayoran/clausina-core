@@ -14,6 +14,7 @@ import urllib.parse
 import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import datetime
 import ads_crypto  # noqa: E402
 
 GRAPH = "https://graph.facebook.com/v21.0"
@@ -91,6 +92,17 @@ def cents(v):
     return round(num(v) / 100, 2)
 
 
+def vencida(stop_time):
+    """¿La ventana de esta campaña ya terminó? Sin fecha de fin, no vence nunca."""
+    if not stop_time:
+        return False
+    try:
+        t = datetime.datetime.fromisoformat(str(stop_time).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return t < datetime.datetime.now(datetime.timezone.utc)
+
+
 def build_snapshot(act, token):
     if not act.startswith("act_"):
         act = "act_" + act
@@ -151,6 +163,11 @@ def build_snapshot(act, token):
             "objetivo": OBJETIVOS.get(c.get("objective"), c.get("objective") or "—"),
             "estado": c.get("effective_status"),
             "estado_txt": EFFECTIVE_STATUS.get(c.get("effective_status"), c.get("effective_status") or "—"),
+            # La fecha de fin y si ya pasó. Meta puede tener una campaña en ACTIVE con la ventana
+            # vencida: no entrega más, pero el estado sigue diciendo activa. En su propia pantalla
+            # la muestra como "Finalizada", y esa diferencia era justo la que confundía acá.
+            "fin": c.get("stop_time"),
+            "vencida": vencida(c.get("stop_time")),
             "presupuesto": budget(c),
             "gasto": round(num(i.get("spend")), 2),
             "impresiones": int(num(i.get("impressions"))),
@@ -269,7 +286,39 @@ def upsert(slug, snapshot):
         f"INSERT INTO contenido.ads_snapshot(negocio_id,capturado_en,data) "
         f"VALUES('{pid}', now(), ${tag}${payload}${tag}$::jsonb) "
         f"ON CONFLICT(negocio_id) DO UPDATE SET capturado_en=now(), data=EXCLUDED.data;")
+    reconciliar(pid, snapshot)
     return pid
+
+
+def reconciliar(pid, snapshot):
+    """Traer el estado de Meta a las campañas de ClaUsina.
+
+    EL PROBLEMA QUE RESUELVE. `pauta_campania.estado` se escribía al activar o pausar desde el
+    panel y no se volvía a mirar nunca. Si alguien pausaba en Meta —o la ventana simplemente
+    terminaba— ClaUsina seguía diciendo "activa" para siempre. Fer veía dos campañas activas en el
+    panel que en Meta figuraban finalizadas.
+
+    DOS COSAS DISTINTAS, Y POR ESO DOS ESTADOS:
+      - PAUSADA: alguien la paró. Se puede reanudar.
+      - FINALIZADA: su ventana terminó. Meta la deja en ACTIVE pero no entrega más, y en su propia
+        pantalla la muestra como finalizada. Llamarla "activa" es mentir sobre algo que ya no gasta.
+
+    Sólo se tocan los estados ASENTADOS. Los de tránsito —activar, pausar, descartar, aprobada—
+    los está manejando el worker en ese momento: pisarlos sería competir con él y perder el pedido.
+    """
+    asentados = ("'activa'", "'pausada'", "'finalizada'")
+    for c in snapshot.get("campanias", []):
+        cid = c.get("id")
+        if not cid:
+            continue
+        if c.get("estado") == "ACTIVE":
+            nuevo = "finalizada" if c.get("vencida") else "activa"
+        else:
+            nuevo = "pausada"
+        psql(
+            f"UPDATE contenido.pauta_campania SET estado='{nuevo}', actualizado_en=now() "
+            f"WHERE negocio_id='{pid}' AND ext_campania_id='{cid}' "
+            f"AND estado IN ({','.join(asentados)}) AND estado <> '{nuevo}';")
 
 
 def heartbeat(msg):
