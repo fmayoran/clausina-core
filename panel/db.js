@@ -105,6 +105,15 @@ async function logWhatsapp({ direccion, wa_id, usuario_id, mensaje_id, tipo, tex
   } catch (e) { console.error('log whatsapp', e.message); return false; }
 }
 
+/** Cerrar el estado del entrante una vez que se sabe si el asistente lo atendió. */
+async function estadoMensaje(mensajeId, estado) {
+  if (!mensajeId) return false;
+  const { rowCount } = await pool.query(
+    `UPDATE contenido.whatsapp_mensaje SET estado=$2
+      WHERE mensaje_id=$1 AND direccion='entrante'`, [mensajeId, estado || null]);
+  return rowCount > 0;
+}
+
 /**
  * La transcripción de una nota de voz, si ya la escribió el worker del host.
  * Se busca por el id de Meta y no por el de la fila porque el webhook atiende el mensaje ANTES
@@ -2940,6 +2949,23 @@ async function getConversacionInbox(negocioId, waId) {
  * Marca el último mensaje entrante y no inserta uno nuevo: la marca es sobre lo que la persona
  * escribió, así el inbox puede mostrar desde cuándo espera y qué fue lo último que dijo.
  */
+/**
+ * ¿Le hablamos a este número hace menos de `segundos`?
+ *
+ * En WhatsApp la gente parte una idea en dos mensajes —"Hola buenas noches" y, un segundo después,
+ * "Te quiero consultar"—. Cada uno entra al webhook por su cuenta y se contesta por su cuenta, así
+ * que salen dos o tres respuestas nuestras en el mismo segundo. Esto permite callarse cuando lo que
+ * íbamos a decir ya se dijo recién.
+ */
+async function hablamosHacePoco(negocioId, waId, segundos) {
+  const { rows: [r] } = await pool.query(
+    `SELECT 1 FROM contenido.whatsapp_mensaje
+      WHERE negocio_id=$1 AND wa_id=$2 AND direccion='saliente'
+        AND creado_en > now() - make_interval(secs => $3) LIMIT 1`,
+    [negocioId, String(waId || ''), Math.max(0, +segundos || 0)]);
+  return !!r;
+}
+
 async function marcarRequiereAccion(negocioId, waId) {
   const { rowCount } = await pool.query(
     `UPDATE contenido.whatsapp_mensaje SET requiere_accion = true
@@ -5073,7 +5099,8 @@ module.exports = {
   secretoDeNumero, negocioPorPhoneId, diaBloqueado, materialPublicado,
   getConversacion, setConversacion, borrarConversacion, podarConversaciones, reservasPorWhatsapp,
   CAPS_BOT, ACCESO_TITULO_MAX, getCanalWhatsapp, guardarCanalWhatsapp, getInbox, getConversacionInbox, marcarAtendido,
-  marcarRequiereAccion, cerrarConversacion,
+  marcarRequiereAccion, cerrarConversacion, hablamosHacePoco,
+  estadoMensaje,
   negocioPublico, disponibilidadPublica, porQueNoEseDia, urlReservaWhatsapp, registrarApertura, marcarCompletado, linkDeApertura,
   ofertaLanding, guardarQueExponeLanding,
   getCapacidades, getCapacidadesTodas, setCapacidad, crearNegocio, GRUPOS_CAP,

@@ -208,6 +208,12 @@
       <div class="card2">
         <div class="sec">Qué puede hacer</div>
         <div id="caps"></div>
+        <div class="aviso" id="caps-aviso" style="display:none;margin-top:12px;">
+          <b>El asistente no está ofreciendo reservar.</b> La casilla está marcada, pero las reservas
+          de este negocio no están abiertas al público, así que el botón no aparece en el menú y cada
+          pedido de mesa termina esperando a una persona. Se abre en
+          <a href="reservas.html#config">Reservas → Configuración</a>.
+        </div>
         <div class="hint" id="caps-nota" style="margin-top:12px;"></div>
         <label class="chk" for="c-inbox" style="margin-top:18px;">
           <input type="checkbox" id="c-inbox">
@@ -391,6 +397,14 @@ async function cargarCanal() {
     }).join('');
     $('caps-nota').textContent = 'Por ahora el asistente sabe tomar reservas. La lista crece a ' +
       'medida que otras capacidades aprendan a atenderse por chat.';
+    // Marcar "Reservar" no alcanza: si las reservas no están abiertas al público, el asistente no
+    // las ofrece y no hay nada que lo diga. Estuvo cuatro días así en Cortafuego —la casilla
+    // marcada, el botón nunca en el menú, y todo pedido de mesa derivado a una persona—. Mientras
+    // la casilla y el interruptor vivan en pantallas distintas, esto tiene que avisar.
+    const res = (caps || []).find(c => c.id === 'reservas');
+    const mudo = CANAL.ofrece.includes('reservas') && res && res.habilitada
+      && !((res.config || {}).publico);
+    $('caps-aviso').style.display = mudo ? '' : 'none';
   } catch (e) {}
 }
 async function guardarCanal() {

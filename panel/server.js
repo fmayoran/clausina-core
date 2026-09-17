@@ -122,18 +122,26 @@ app.post('/webhook/whatsapp', express.raw({ type: '*/*', limit: '2mb' }), async 
         // esto quedaba registrado DESPUÉS de su propia respuesta: el inbox mostraba la conversación
         // al revés, con cada contestación arriba de la pregunta que la provocó.
         const recibido = new Date();
+        // El entrante se guarda ANTES de contestar. Guardarlo después tenía un efecto que no se
+        // veía: cuando el asistente se daba por vencido y marcaba "esto lo tiene que ver una
+        // persona", esa marca cae sobre el último entrante que EXISTE, y el que la había
+        // provocado todavía no estaba guardado. Así el inbox mostraba esperando el mensaje
+        // anterior —un "Otra consulta", o directamente un "Hola buenas noches"— en vez de la
+        // pregunta que nadie contestó, y con la hora equivocada. Le pasó a Gerson el 14/09 a las
+        // 22:38. El estado se completa abajo, que es lo único que hacía falta esperar.
+        await db.logWhatsapp({
+          direccion: 'entrante', wa_id: m.wa_id, usuario_id: null, negocio_id: negocio.id,
+          mensaje_id: m.mensaje_id, tipo: m.tipo, texto: m.texto, crudo: m.crudo,
+          media_id: m.media_id, creado_en: recibido, estado: 'recibido',
+        });
         // Del otro lado hay un CLIENTE FINAL, no un operador. Si el negocio tiene las reservas
         // abiertas, el asistente lo atiende; si no, se registra y no se contesta — mejor callar
         // que ofrecer algo que después no se puede cumplir.
         const atendido = await reservaWa.atender(negocio, m).catch(e => {
           console.error('reserva wa', e.message); return false;
         });
-        await db.logWhatsapp({
-          direccion: 'entrante', wa_id: m.wa_id, usuario_id: null, negocio_id: negocio.id,
-          mensaje_id: m.mensaje_id, tipo: m.tipo, texto: m.texto, crudo: m.crudo,
-          media_id: m.media_id, creado_en: recibido,
-          estado: atendido ? 'atendido_bot' : 'cliente_de_negocio',
-        });
+        await db.estadoMensaje(m.mensaje_id, atendido ? 'atendido_bot' : 'cliente_de_negocio')
+          .catch(() => {});
         // Nota de voz: la transcripción llega después, del worker del host. Se la espera SIN
         // await — bloquear acá dejaría al resto del lote de Meta esperando a whisper.
         if (atendido && m.tipo === 'audio' && m.media_id) {

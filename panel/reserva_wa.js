@@ -84,6 +84,23 @@ const SALUDO = /^[¡¿\s]*(hola+|holis|buenas|buen d[ií]a|buenas tardes|buenas 
 // rechazar un nombre se arregla escribiéndolo de nuevo, tomar una cancelación como nombre deja
 // una reserva que nadie pidió.
 const CANCELAR = /^\s*(cancel|anul|olvid[aá])/i;
+// Un mensaje que no tiene NI UNA letra ni un número es un acuse de recibo, no una consulta: un
+// 👍, un "!!", un corazón. Llega como texto —no como reacción de WhatsApp—, así que el guard de
+// `reaction` no lo agarra, y terminaba en "ya le pasé tu mensaje al equipo" con la tarjeta del
+// local encima, para alguien que sólo estaba diciendo que sí. Pasó el 16/09 a las 20:36.
+const SOLO_EMOJI = /^(?=.*\S)[^\p{L}\p{N}]+$/u;
+// "Te quiero consultar" ANUNCIA una pregunta; no la hace. Sin esto se derivaba al equipo antes de
+// que la persona llegara a escribirla —y el equipo recibía un aviso sin consulta adentro—. Anclada
+// de punta a punta a propósito: "una consulta, ¿hacen delivery?" tiene la pregunta adentro y hay
+// que contestarla, no pedirla de nuevo. Pasó el 15/09 a las 19:38.
+const ANUNCIO_CONSULTA = new RegExp(
+  '^[¡¿\\s]*(' +
+    '(te|le)\\s+(quer[ií]a|quiero|quisiera)\\s+(hacer\\s+)?(una\\s+)?(consulta|pregunta)r?' +
+  '|(te|le)\\s+(hago|hac[ií]a)\\s+(una\\s+)?(consulta|pregunta)' +
+  '|(quer[ií]a|quiero|quisiera|necesito|puedo|podr[ií]a)\\s+(hacer(te|le)?\\s+)?(una\\s+)?(consulta|pregunta)r?' +
+  '|(tengo|ten[ií]a)\\s+(una\\s+)?(consulta|pregunta|duda)' +
+  '|(una\\s+)?(consulta|pregunta|duda)(cita)?' +
+  ')[\\s,.!¡?¿]*$', 'i');
 
 /** Mensajes cortos: en WhatsApp un párrafo largo no se lee. */
 async function decir(cfg, waId, texto, negocioId) {
@@ -151,6 +168,14 @@ async function atender(negocio, mensaje) {
   // ubicación, contactos): quedan en la bitácora y los ve una persona.
   if (!entrada) return true;
   const conv = await db.getConversacion(negocio.id, waId);
+
+  // Un emoji suelto cierra, no abre. Si ya veníamos hablando se calla —contestarle "de nada" a un
+  // pulgar arriba es un eco, y derivarlo al equipo es peor—; si es lo primero que escribe esta
+  // persona, un emoji es todo lo que tenemos y se la saluda.
+  if (SOLO_EMOJI.test(entrada)) {
+    if (conv || await db.hablamosHacePoco(negocio.id, waId, 12 * 3600).catch(() => false)) return true;
+    return await saludar(cfg, negocio, waId, canal, ofreceReservas, mensaje.perfil, {});
+  }
 
   // Cortesía: contestar y no tocar nada. SÓLO cuando no hay nada pendiente de respuesta: adentro
   // del flujo estas mismas palabras son un "sí" —"dale", "ok" y "listo" confirman una reserva
@@ -222,6 +247,19 @@ async function atender(negocio, mensaje) {
       const i = parseInt(entrada.slice(4), 10);
       if (await responderAcceso(cfg, negocio, waId, canal, i, datos)) return true;
     }
+  }
+
+  // Anunciar una consulta no es hacerla: se pregunta qué necesita y se espera. Va después de los
+  // botones —"Otra consulta" es un payload y ya se atendió arriba— y sólo fuera del flujo: en
+  // medio de una reserva, "una duda" se atiende donde esté.
+  if (ANUNCIO_CONSULTA.test(entrada) && (!paso || paso === 'ofrecido')) {
+    // Si el menú acaba de salir ya preguntó "¿en qué te puedo ayudar?": volver a preguntarlo es el
+    // segundo de los tres mensajes que salieron juntos el 15/09. Se calla y espera la pregunta.
+    if (await db.hablamosHacePoco(negocio.id, waId, 25).catch(() => false)) {
+      await db.setConversacion(negocio.id, waId, 'consulta', datos);
+      return true;
+    }
+    return await pedirConsulta(cfg, negocio, waId);
   }
 
   // Sólo al principio: más adelante la persona ya está reservando y "quiero reservar" no puede
