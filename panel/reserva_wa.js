@@ -94,13 +94,14 @@ const SOLO_EMOJI = /^(?=.*\S)[^\p{L}\p{N}]+$/u;
 // de punta a punta a propósito: "una consulta, ¿hacen delivery?" tiene la pregunta adentro y hay
 // que contestarla, no pedirla de nuevo. Pasó el 15/09 a las 19:38.
 const ANUNCIO_CONSULTA = new RegExp(
-  '^[¡¿\\s]*(' +
+  // Un saludo pegado adelante no cambia nada: "Hola quiero consultar algo" es el mismo anuncio.
+  '^[¡¿\\s]*((hola+|buenas|buen d[ií]a|buenas tardes|buenas noches|hey|qu[eé] tal)[\\s,.!¡]*)?(' +
     '(te|le)\\s+(quer[ií]a|quiero|quisiera)\\s+(hacer\\s+)?(una\\s+)?(consulta|pregunta)r?' +
   '|(te|le)\\s+(hago|hac[ií]a)\\s+(una\\s+)?(consulta|pregunta)' +
-  '|(quer[ií]a|quiero|quisiera|necesito|puedo|podr[ií]a)\\s+(hacer(te|le)?\\s+)?(una\\s+)?(consulta|pregunta)r?' +
+  '|(quer[ií]a|quiero|quisiera|necesito|puedo|podr[ií]a)\\s+(hacer(te|le)?\\s+)?(una\\s+)?(consultar|preguntar(te|le)?|consulta|pregunta)' +
   '|(tengo|ten[ií]a)\\s+(una\\s+)?(consulta|pregunta|duda)' +
   '|(una\\s+)?(consulta|pregunta|duda)(cita)?' +
-  ')[\\s,.!¡?¿]*$', 'i');
+  ')(\\s+(algo|una\\s+cosa|algo\\s+m[aá]s))?[\\s,.!¡?¿]*$', 'i');
 
 /** Mensajes cortos: en WhatsApp un párrafo largo no se lee. */
 async function decir(cfg, waId, texto, negocioId) {
@@ -252,7 +253,10 @@ async function atender(negocio, mensaje) {
   // Anunciar una consulta no es hacerla: se pregunta qué necesita y se espera. Va después de los
   // botones —"Otra consulta" es un payload y ya se atendió arriba— y sólo fuera del flujo: en
   // medio de una reserva, "una duda" se atiende donde esté.
-  if (ANUNCIO_CONSULTA.test(entrada) && (!paso || paso === 'ofrecido')) {
+  // 'consulta' entra también: ya dijimos "contame", y si vuelve a anunciar en vez de preguntar,
+  // lo que corresponde es seguir esperando, no derivar al equipo un aviso sin consulta adentro.
+  // Le pasó a Diego el 19/09 a las 16:58, con el "Contame" todavía arriba en la pantalla.
+  if (ANUNCIO_CONSULTA.test(entrada) && (!paso || paso === 'ofrecido' || paso === 'consulta')) {
     // Si el menú acaba de salir ya preguntó "¿en qué te puedo ayudar?": volver a preguntarlo es el
     // segundo de los tres mensajes que salieron juntos el 15/09. Se calla y espera la pregunta.
     if (await db.hablamosHacePoco(negocio.id, waId, 25).catch(() => false)) {
