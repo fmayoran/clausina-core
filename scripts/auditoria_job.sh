@@ -70,6 +70,22 @@ except Exception: print('')" 2>/dev/null)
 fi
 IG_SEGUIDORES="$SEG" python3 "$MOTOR/scripts/auditoria_ig.py" "$slug" > "$DIRW/ig.json" 2>>"$LOG" || echo '{}' > "$DIRW/ig.json"
 
+# Un negocio que recién entró no tiene NADA publicado por la plataforma, así que la auditoría propia
+# sale vacía — y es justo el momento en que más sirve mirarle el Instagram, porque es cuando hay que
+# decidir qué hacer con la cuenta. Ahí se mira desde afuera, con la lente pública. Pasó con Wera
+# Sushi el 10/10/2026: 136 publicaciones propias, 2675 seguidores, y la auditoría no arrancaba.
+if python3 -c "
+import json,sys
+try: sys.exit(0 if (json.load(open('$DIRW/ig.json')) or {}).get('global') else 1)
+except Exception: sys.exit(1)"; then :; else
+  echo "$(ts) ig: sin datos propios -> se mira con la lente publica" >> "$LOG"
+  python3 "$MOTOR/scripts/auditoria_ig_publico.py" "$slug" > "$DIRW/ig_pub.json" 2>>"$LOG" || true
+  if python3 -c "
+import json,sys
+try: sys.exit(0 if (json.load(open('$DIRW/ig_pub.json')) or {}).get('global') else 1)
+except Exception: sys.exit(1)"; then mv "$DIRW/ig_pub.json" "$DIRW/ig.json"; fi
+fi
+
 # Pauta: sale de lo que ya sincronizo el cron, asi que no depende de credenciales acá.
 python3 "$MOTOR/scripts/auditoria_pauta.py" "$slug" > "$DIRW/pauta.json" 2>>"$LOG" || echo '{}' > "$DIRW/pauta.json"
 
@@ -104,6 +120,18 @@ CÓMO LEER LOS BENCHMARKS: cada JSON trae un bloque 'metricas' donde CADA métri
 comparada, con su 'valor', su 'rango', su 'veredicto' (bien/atencion/mal/sin_dato), su 'texto' y
 su 'fuente'. Usá ESOS veredictos tal cual. NO inventes rangos de referencia ni cites benchmarks de
 memoria: si una métrica no está en 'metricas', no tiene benchmark y se informa sin comparar.
+
+SI ig.json TRAE 'fuente': 'lente_publica', la cuenta se midió DESDE AFUERA: es un negocio que
+todavía no publicó nada por la plataforma, así que sólo se ven likes y comentarios. Entonces:
+  - La interacción está sobre SEGUIDORES, no sobre alcance. No la llames alcance ni la compares
+    con un benchmark de alcance.
+  - Alcance, impresiones, guardados, compartidos, visitas al perfil e historias vienen en null
+    porque son privados de la cuenta, NO porque rindan mal. Decilo así, con esas palabras, y no
+    saques ninguna conclusión de un null.
+  - Preferí la MEDIANA ('interac_med') sobre el promedio cuando las dos difieran mucho: un sorteo
+    o una pieza viral corre el promedio de toda la cuenta y hace parecer normal lo que pasó una vez.
+  - Cerrá las recomendaciones diciendo que conectar el Instagram del negocio es lo que habilita
+    medir el resto. Es el primer paso, no una nota al pie.
 
 DE LA PAUTA META (hoy el único canal de pauta; nombralo así, 'Pauta Meta'), lo que importa: el CTR comparable es el DE LINK ('ctr_link'), no el total —el total
 cuenta cualquier toque y da 1,5x-2x más alto—. Los avisos se comparan entre sí por CTR de link y

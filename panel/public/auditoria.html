@@ -234,16 +234,30 @@ function webHTML(a){
 function igHTML(a){
   if(!a||!a.kpis) return `<div class="sect"><span class="t">Instagram</span></div><div class="nodata">— Sin datos aún. —</div>`;
   const k=a.kpis, g=k.global||{}, cr=k.crecimiento;
-  const cab=[k.followers?nfmt(k.followers)+' seguidores':'', g.posts+' posts',
+  // Medida desde afuera: el negocio todavía no publicó nada por la plataforma y la cuenta se leyó
+  // con la lente pública. Hay que DECIRLO arriba y cambiar los KPI de la fila: los cuatro de
+  // siempre dependen del alcance y acá vienen todos en null, así que mostrarlos sería cuatro
+  // guiones que se leen como "esta cuenta no rinde" cuando el dato simplemente no es visible.
+  const afuera = k.fuente === 'lente_publica';
+  const cab=[k.followers?nfmt(k.followers)+' seguidores':'',
+             (afuera && k.publicaciones_totales ? g.posts+' de '+nfmt(k.publicaciones_totales)+' posts'
+                                                : g.posts+' posts'),
              cr&&cr.alta!=null?`${cr.alta>=0?'+':''}${nfmt(cr.alta)} en ${cr.dias} días`:''].filter(Boolean).join(' · ');
   return `<div class="sect"><span class="t">Instagram</span><span class="m">${esc(cab)}</span></div>
+  ${afuera?`<div class="nodata" style="text-align:left;margin-bottom:14px">
+      <b>Mirada de afuera.</b> ${esc(k.nota_fuente||'')}</div>`:''}
   <div class="bm">${(k.metricas||[]).map(bmCard).join('')}</div>
   ${fuentes(k.metricas)}
   <div class="kpis">
-    ${kpi(nfmt(g.reach_prom),'Alcance prom')}
-    ${kpi(nfmt(g.views_prom),'Vistas prom')}
-    ${kpi(nfmt(g.guard_prom),'Guardados/post')}
-    ${kpi(nfmt(g.compart_prom),'Compartidos/post')}
+    ${afuera
+      ? `${kpi(nfmt(g.interac_med),'Interacciones (mediana)')}
+         ${kpi(nfmt(g.interac_prom),'Interacciones (prom)')}
+         ${kpi(nfmt(g.likes_prom),'Likes/post')}
+         ${kpi(nfmt(g.comentarios_prom),'Comentarios/post')}`
+      : `${kpi(nfmt(g.reach_prom),'Alcance prom')}
+         ${kpi(nfmt(g.views_prom),'Vistas prom')}
+         ${kpi(nfmt(g.guard_prom),'Guardados/post')}
+         ${kpi(nfmt(g.compart_prom),'Compartidos/post')}`}
   </div>
   ${(k.historias)
     ? `<div class="sect" style="margin-top:18px"><span class="t" style="font-size:1.1rem">Historias</span>
@@ -256,13 +270,13 @@ function igHTML(a){
       </div>`
     : `<div class="nodata">Historias: todavía sin capturas. ${esc(k.historias_nota||'')}</div>`}
   <div class="grid">
-    <div class="card"><h3>Mes en curso, día por día</h3><div class="cw"><canvas id="c-dia"></canvas></div>
-      <div class="fuente" style="margin:8px 0 0">La franja verde es el rango típico de interacción sobre alcance (1–3%).</div></div>
-    <div class="card"><h3>Cadencia y alcance por mes</h3><div class="cw"><canvas id="c-cad"></canvas></div>
+    ${afuera?'':`<div class="card"><h3>Mes en curso, día por día</h3><div class="cw"><canvas id="c-dia"></canvas></div>
+      <div class="fuente" style="margin:8px 0 0">La franja verde es el rango típico de interacción sobre alcance (1–3%).</div></div>`}
+    <div class="card"><h3>${afuera?'Cadencia e interacción por mes':'Cadencia y alcance por mes'}</h3><div class="cw"><canvas id="c-cad"></canvas></div>
       <div class="fuente" style="margin:8px 0 0">La franja marca el rango típico de publicaciones (3–5 por semana, llevado a mes).</div></div>
     <div class="card"><h3>Rendimiento por formato</h3><div class="cw"><canvas id="c-fmt"></canvas></div></div>
     <div class="card"><h3>Mix de formatos</h3><div class="cw"><canvas id="c-mix"></canvas></div></div>
-    <div class="card"><h3>Top posts (engag./alcance)</h3><div class="cw"><canvas id="c-top"></canvas></div></div>
+    <div class="card"><h3>${afuera?'Top posts (interacciones)':'Top posts (engag./alcance)'}</h3><div class="cw"><canvas id="c-top"></canvas></div></div>
   </div>
   `;
 }
@@ -305,18 +319,24 @@ function renderWeb(a){ if(!a||!a.kpis) return; const c=a.kpis.categorias||[];
     datasets:[{label:'% OK',data:c.map(x=>x.pct),backgroundColor:c.map(x=>x.pct>=80?GR:(x.pct>=50?GD:OR))}]},
     options:{maintainAspectRatio:false,scales:{y:{grid:GRID,min:0,max:100},x:{grid:{display:false}}},plugins:{legend:{display:false}}}}); }
 function renderIg(a){ if(!a||!a.kpis) return; const k=a.kpis;
+  // Medido desde afuera no hay alcance: las series que lo usan se dibujan con interacciones, que es
+  // lo único visible. Dejarlas en cero daba gráficos planos que parecían una cuenta muerta.
+  const afuera = k.fuente === 'lente_publica';
   const cad=k.cadencia||[];
   mk('c-cad',{data:{labels:cad.map(x=>x.mes),datasets:[
     {type:'bar',label:'Posts',data:cad.map(x=>x.posts),backgroundColor:'rgba(30,201,255,0.55)',yAxisID:'y'},
-    {type:'line',label:'Alcance prom',data:cad.map(x=>x.reach_prom),borderColor:OR,backgroundColor:OR,tension:.3,yAxisID:'y1'}]},
+    {type:'line',label:afuera?'Interacciones prom':'Alcance prom',
+     data:cad.map(x=>afuera?x.interac_prom:x.reach_prom),borderColor:OR,backgroundColor:OR,tension:.3,yAxisID:'y1'}]},
     options:{maintainAspectRatio:false,scales:{y:{position:'left',grid:GRID},y1:{position:'right',grid:{display:false}},x:{grid:{display:false}}},
       // La banda es de posts POR SEMANA y el eje es mensual: se convierte, si no la referencia miente.
       plugins:{legend:{labels:{boxWidth:10}},bandaBM:(()=>{const r=rangoDe(k.metricas,'cadencia_semanal');
         return r.lo!=null?{lo:r.lo*4.3,hi:r.hi*4.3}:{};})()}}});
   const fmt=k.por_formato||[];
-  mk('c-fmt',{type:'bar',data:{labels:fmt.map(x=>x.formato),datasets:[
-    {label:'Alcance prom',data:fmt.map(x=>x.reach_prom),backgroundColor:CY},
-    {label:'Vistas prom',data:fmt.map(x=>x.views_prom),backgroundColor:'rgba(255,119,0,0.7)'}]},
+  mk('c-fmt',{type:'bar',data:{labels:fmt.map(x=>x.formato),datasets: afuera
+    ? [{label:'Interacciones (mediana)',data:fmt.map(x=>x.interac_med),backgroundColor:CY},
+       {label:'Interacciones (prom)',data:fmt.map(x=>x.interac_prom),backgroundColor:'rgba(255,119,0,0.7)'}]
+    : [{label:'Alcance prom',data:fmt.map(x=>x.reach_prom),backgroundColor:CY},
+       {label:'Vistas prom',data:fmt.map(x=>x.views_prom),backgroundColor:'rgba(255,119,0,0.7)'}]},
     options:{maintainAspectRatio:false,scales:{y:{grid:GRID},x:{grid:{display:false}}},plugins:{legend:{labels:{boxWidth:10}}}}});
   mk('c-mix',{type:'doughnut',data:{labels:fmt.map(x=>x.formato),datasets:[{data:fmt.map(x=>x.n),backgroundColor:[CY,OR,GR,GD]}]},
     options:{maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:12}}}}});
@@ -332,7 +352,9 @@ function renderIg(a){ if(!a||!a.kpis) return; const k=a.kpis;
       plugins:{legend:{labels:{boxWidth:10}},bandaBM:{...rangoDe(k.metricas,'er_alcance'),yScaleID:'y1'}}}});
 
   const top=k.top||[];
-  mk('c-top',{type:'bar',data:{labels:top.map(x=>x.fecha+' · '+x.formato),datasets:[{label:'ER %',data:top.map(x=>x.er_pct),backgroundColor:GR}]},
+  mk('c-top',{type:'bar',data:{labels:top.map(x=>x.fecha+' · '+x.formato),
+    datasets:[afuera?{label:'Interacciones',data:top.map(x=>x.interac),backgroundColor:GR}
+                    :{label:'ER %',data:top.map(x=>x.er_pct),backgroundColor:GR}]},
     options:{indexAxis:'y',maintainAspectRatio:false,scales:{x:{grid:GRID},y:{grid:{display:false}}},plugins:{legend:{display:false}}}});
 }
 // ── Tablero ──────────────────────────────────────────────────────────────────────────────────
@@ -385,8 +407,10 @@ function renderDash(){
     mk('d-web',{type:'bar',data:{labels:c.map(x=>x.nombre),
       datasets:[{data:c.map(x=>x.pct!=null?x.pct:x.score),backgroundColor:CY,borderRadius:3}]},options:MINI}); }
   if(ki&&ki.global){ const cad=ki.cadencia||[];
+    // Mismo criterio que el detalle: sin alcance visible, la forma de la serie la da la interacción.
+    const _af = ki.fuente === 'lente_publica';
     mk('d-instagram',{type:'bar',data:{labels:cad.map(x=>x.mes),
-      datasets:[{data:cad.map(x=>x.reach_prom),backgroundColor:GR,borderRadius:3}]},options:MINI}); }
+      datasets:[{data:cad.map(x=>_af?x.interac_prom:x.reach_prom),backgroundColor:GR,borderRadius:3}]},options:MINI}); }
   if(kp&&kp.global){ const d=kp.por_dia||[];
     mk('d-pauta',{type:'line',data:{labels:d.map(x=>x.fecha),
       datasets:[{data:d.map(x=>x.gasto),borderColor:CY,backgroundColor:'rgba(30,201,255,.16)',

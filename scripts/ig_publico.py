@@ -41,13 +41,65 @@ def _pg(sql):
                            "-t", "-A", "-q", "-c", sql], capture_output=True, text=True).stdout.strip()
 
 
+# `business_discovery` vive SOLO en la Graph de Facebook, y ahí sólo entra un token de Facebook
+# —empiezan con "EAA"—. Un token de "Instagram API with Instagram Login" —empiezan con "IGAA"—
+# es válido, no está vencido, y contra graph.facebook.com devuelve igual "Invalid OAuth access
+# token - Cannot parse access token": el mensaje hace pensar en un token muerto cuando el token
+# está perfecto y lo que está mal es la puerta. Es la misma trampa que ya documentamos en
+# auditoria_ig.py con IG_SEGUIDORES; acá volvió a morder, con la lente configurada el 15/08 y sin
+# funcionar desde entonces.
+def _es_token_facebook(tok):
+    return bool(tok) and not tok.startswith("IG")
+
+
+def _token_de_negocio():
+    """Un token de Facebook con los permisos de la lente, tomado de un negocio ya conectado.
+
+    La lente es de PLATAFORMA pero hoy no hay una cuenta de ClaUsina conectada, así que se apoya en
+    la de un negocio —que es lo que el diseño ya preveía—. Se devuelve también el slug para poder
+    DECIR con qué cuenta se miró: una lente prestada que no se nombra es una sorpresa esperando.
+    """
+    filas = _pg("""SELECT n.slug, pp.meta_ads_ig_id, pp.meta_ads_token_enc
+                     FROM contenido.negocio_perfil pp JOIN contenido.negocios n ON n.id=pp.negocio_id
+                    WHERE pp.meta_ads_token_enc IS NOT NULL AND pp.meta_ads_ig_id IS NOT NULL
+                    ORDER BY n.slug""")
+    for linea in [x for x in filas.split("\n") if x.strip()]:
+        slug, ig_id, enc = linea.split("|")
+        try:
+            tok = ads_crypto.decrypt(enc)
+        except Exception:
+            continue
+        if _es_token_facebook(tok):
+            return ig_id, tok, slug
+    return None, None, None
+
+
 def lente():
     """(ig_id, token) de la lente, desde la config de plataforma (cifrada en la DB)."""
     row = _pg("SELECT valor FROM contenido.plataforma_config WHERE clave='ig_lente_id'")
     tok = _pg("SELECT valor_enc FROM contenido.plataforma_config WHERE clave='ig_lente_token'")
-    if not row or not tok:
-        raise RuntimeError("La lente de Instagram no está configurada (panel → Configuración).")
-    return row, ads_crypto.decrypt(tok)
+    claro = None
+    if row and tok:
+        try:
+            claro = ads_crypto.decrypt(tok)
+        except Exception:
+            claro = None
+    if claro and _es_token_facebook(claro):
+        return row, claro
+    # La lente configurada no sirve para esto. Antes de fallar se usa la de un negocio conectado:
+    # dejar la auditoría de un negocio nuevo trabada por una config vieja no le sirve a nadie.
+    ig_id, prestado, slug = _token_de_negocio()
+    if prestado:
+        print(f"lente: el token configurado no es de Facebook; se usa la cuenta de {slug}",
+              file=sys.stderr)
+        return ig_id, prestado
+    if claro and not _es_token_facebook(claro):
+        raise RuntimeError(
+            "El token de la lente es de Instagram Login (IGAA...) y business_discovery sólo "
+            "funciona con un token de Facebook (EAA...). Cargá uno de una cuenta IG Business "
+            "vinculada a una pagina, con instagram_basic, instagram_manage_insights, "
+            "pages_read_engagement y pages_show_list.")
+    raise RuntimeError("La lente de Instagram no está configurada (panel → Configuración).")
 
 
 def _get(url):
