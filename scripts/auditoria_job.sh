@@ -215,5 +215,31 @@ subprocess.run(["docker","exec","-i",pg,"psql","-U","postgres","-d","claude","-q
 print("auditoría:", " · ".join(hechos) or "sin datos")
 PY
 
+# ── El informe descargable ───────────────────────────────────────────────────────────────────
+# La pantalla muestra la auditoría de a una sección y esconde las conclusiones detrás de un botón,
+# porque ahí se navega. El informe es para leer de corrido y mandar por mail: los tres canales, con
+# sus recomendaciones completas, en un PDF. Se arma ACÁ y no a pedido para que el botón sea una
+# descarga y no una espera de minutos: la corrida ya tiene todo junto en el directorio de trabajo,
+# que un segundo después se borra.
+if [ "$(psql "SELECT estado FROM contenido.auditoria_req WHERE id='$rid';")" = "lista" ]; then
+  MEDIA_HOST="/var/lib/docker/volumes/clausina_panel_clausina-media/_data"
+  BASE_URL="https://panel.clausina.ar/media"
+  stamp=$(date +%Y%m%d-%H%M)
+  rel="auditoria/$slug"
+  nombre_neg=$(psql "SELECT nombre FROM contenido.negocios WHERE slug='$slug';")
+  mkdir -p "$MEDIA_HOST/$rel"
+  if node "$MOTOR/scripts/auditoria_informe.js" "$DIRW" "$slug" "$nombre_neg" \
+       "$MEDIA_HOST/$rel/auditoria-$stamp.html" "$MEDIA_HOST/$rel/auditoria-$stamp.pdf" >> "$LOG" 2>&1 \
+     && [ -s "$MEDIA_HOST/$rel/auditoria-$stamp.pdf" ]; then
+    psql "UPDATE contenido.auditoria_req SET informe_pdf_url='$BASE_URL/$rel/auditoria-$stamp.pdf',
+          informe_html_url='$BASE_URL/$rel/auditoria-$stamp.html' WHERE id='$rid';" >/dev/null
+    echo "$(ts) informe listo: $rel/auditoria-$stamp.pdf" >> "$LOG"
+  else
+    # Que falle el PDF no invalida la auditoría: los datos ya están guardados y la pantalla los
+    # muestra igual. Se anota y se sigue; el botón de descarga simplemente no aparece.
+    echo "$(ts) informe: no se pudo generar el PDF" >> "$LOG"
+  fi
+fi
+
 echo "$(ts) auditoria $rid ($slug) terminada" >> "$LOG"
 rm -rf "$DIRW"

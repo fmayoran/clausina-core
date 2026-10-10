@@ -554,7 +554,11 @@ app.get('/api/miniatura', async (req, res) => {
   }
 });
 
-const MEDIA_PRIVADA = ['material', 'referencias', 'creativo', 'marca'];
+// `auditoria/` va cerrada: el informe trae gasto de pauta, CPM, qué canal está fallando y la
+// estrategia recomendada. Es material interno del negocio, no una pieza para compartir por link
+// como el manual de marca. La URL además es medio adivinable —slug y fecha—, así que abierta sería
+// una filtración esperando a que alguien pruebe.
+const MEDIA_PRIVADA = ['material', 'referencias', 'creativo', 'marca', 'auditoria'];
 app.use('/media', (req, res, next) => {
   const carpeta = req.path.split('/').filter(Boolean)[0] || '';
   if (!MEDIA_PRIVADA.includes(carpeta)) return next();

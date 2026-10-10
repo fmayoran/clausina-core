@@ -4713,7 +4713,8 @@ async function pedirAuditoria(negocioId, usuarioId) {
 /** El estado del último pedido, para saber si hay que esperar o si algo falló. */
 async function estadoAuditoria(negocioId) {
   const { rows: [r] } = await pool.query(
-    `SELECT id, estado, error, resumen, creado_en, iniciado_en, procesado_en
+    `SELECT id, estado, error, resumen, creado_en, iniciado_en, procesado_en,
+            informe_pdf_url, informe_html_url
        FROM contenido.auditoria_req WHERE negocio_id=$1 ORDER BY creado_en DESC LIMIT 1`, [negocioId]);
   return r || null;
 }

@@ -12,6 +12,12 @@
 <link rel="stylesheet" href="panel.css?v=20260917a">
 <script src="vendor/chart.min.js"></script>
 <style>
+  /* La descarga es secundaria: generar una auditoría cuesta minutos y plata, bajarla no. Que se
+     distingan a simple vista evita el clic equivocado. */
+  .gen.descarga{background:transparent;border:1px solid var(--u-line,#2a2a26);
+    color:var(--u-fg,#f5f2ec);text-decoration:none;display:inline-flex;align-items:center;}
+  .gen.descarga:hover{background:rgba(255,255,255,.05);}
+
   .gen{margin-left:14px;background:var(--pend,#FF6A45);color:#0c0c0a;border:0;border-radius:8px;
        font-family:'Inter Tight',sans-serif;font-weight:700;padding:7px 15px;cursor:pointer;}
   .gen:disabled{opacity:.5;cursor:default;}
@@ -129,6 +135,8 @@
   <div class="cabecera">
     <h1>Auditoría</h1>
     <span class="upd" id="upd"></span>
+    <a class="gen descarga" id="b-pdf" href="#" style="display:none;"
+       download>Descargar informe (PDF)</a>
     <button class="gen" id="b-gen" onclick="generar()">Generar auditoría</button>
   </div>
   <p class="intro">Mide la web contra el sitio publicado y el Instagram contra lo que ya se
@@ -484,6 +492,15 @@ async function verEstado(){
     caja.innerHTML = '';
     // Al terminar hay datos nuevos que la pantalla todavía no tiene.
     if(e && e.estado === 'lista' && _esperando){ _esperando = false; load(); }
+  }
+  // El informe lo deja escrito la corrida, así que el botón es una descarga y no una espera. Si
+  // esa corrida no llegó a generarlo —Chromium puede fallar sin invalidar la auditoría—, el botón
+  // no aparece: mejor que no esté a que lleve a un 404.
+  const pdf = document.getElementById('b-pdf');
+  if(pdf){
+    const url = !corriendo && e && e.estado === 'lista' ? e.informe_pdf_url : null;
+    pdf.style.display = url ? '' : 'none';
+    if(url) pdf.href = url;
   }
 }
 async function generar(){
