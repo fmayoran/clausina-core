@@ -4,3 +4,10 @@ node_modules/
 scripts/*.log
 panel/node_modules/
 __pycache__/
+
+# El respaldo previo al sync de n8n lo REESCRIBE sync_secrets.py cada vez que rota un token, así
+# que aparecía como cambio sin commitear y frenaba el guard de deploy.sh —que exige árbol limpio
+# porque EasyPanel construye desde GitHub—. En git no aporta nada: su laburo es permitir volver
+# atrás justo después de un sync, y para eso se lee del disco, no del historial. Además es un
+# volcado del workflow completo, con los ids y nombres de sus credenciales adentro.
+scripts/n8n/backups/*.pre-sync.json
